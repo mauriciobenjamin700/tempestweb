@@ -102,6 +102,7 @@ EXAMPLE_NAMES = [
     "anim_demo",
     "gesture_demo",
     "a11y_demo",
+    "list_demo",
 ]
 
 

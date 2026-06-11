@@ -45,6 +45,7 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "style.js",
     "events.js",
     "transport.js",
+    "virtualize.js",
 )
 
 # Name of the zipped tempestweb package shipped in a wasm artifact and unpacked

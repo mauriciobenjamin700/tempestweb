@@ -103,6 +103,7 @@ function applyProps(el, props) {
   }
   applyControlProps(el, type, props);
   applyA11yProps(el, props);
+  applyLazyProps(el, type, props);
 }
 
 /**
@@ -151,6 +152,42 @@ function applyA11yProps(el, props) {
  * @param {Object} props       The props to apply.
  * @returns {void}
  */
+// Virtualized list widgets: rendered as scroll viewports whose visible window
+// the runtime slides in response to scroll events (see client/virtualize.js).
+const LAZY_TYPES = Object.freeze(["LazyColumn", "LazyRow", "LazyGrid"]);
+
+/**
+ * Mark a virtualized list element and mirror its windowing metadata to data
+ * attributes so the scroll controller can compute the visible window.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyLazyProps(el, type, props) {
+  if (type == null || !LAZY_TYPES.includes(type)) {
+    return;
+  }
+  const horizontal = type === "LazyRow";
+  // A bounded, scrollable viewport: the app's Style sets the extent (e.g.
+  // height); overflow scrolls the materialized window, and scrolling past the
+  // edge slides the window (see client/virtualize.js). min-height:0 stops a flex
+  // parent from growing the viewport to fit its content instead of scrolling.
+  el.style.overflowY = horizontal ? "hidden" : "auto";
+  el.style.overflowX = horizontal ? "auto" : "hidden";
+  el.style.minHeight = "0";
+  if ("item_count" in props && props.item_count != null) {
+    el.setAttribute("data-tw-item-count", String(props.item_count));
+  }
+  if ("window_size" in props && props.window_size != null) {
+    el.setAttribute("data-tw-window-size", String(props.window_size));
+  }
+  // window is [start, end) when slid, or null (start at 0).
+  const start = Array.isArray(props.window) ? props.window[0] : 0;
+  el.setAttribute("data-tw-window-start", String(start ?? 0));
+}
+
 function applyControlProps(el, type, props) {
   if (type === "Input") {
     el.setAttribute("type", props.secure ? "password" : "text");

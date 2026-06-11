@@ -17,10 +17,31 @@ from __future__ import annotations
 
 from typing import Any
 
-from tempest_core import Widget
+from tempest_core import App, Widget
 from tempest_core.widgets.events import Event, EventValidationError, parse_event
 
-__all__ = ["coerce_event"]
+__all__ = ["coerce_event", "apply_scroll"]
+
+
+def apply_scroll(app: App[Any], key: str, payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload
+    """Slide a virtualized list's visible window from a ``scroll`` wire event.
+
+    The DOM client reports a list's visible ``[start, end)`` window as it scrolls;
+    this drives :meth:`~tempest_core.core.state.App.slide_window`, which records
+    the window and requests a rebuild so the list materializes the slid items.
+    A malformed payload is ignored.
+
+    Args:
+        app: The application whose list window to slide.
+        key: The ``key`` of the target virtualized list.
+        payload: The wire payload, expected to carry int ``start`` and ``end``.
+    """
+    if not isinstance(payload, dict):
+        return
+    start = payload.get("start")
+    end = payload.get("end")
+    if isinstance(start, int) and isinstance(end, int) and end >= start:
+        app.slide_window(key, start, end)
 
 
 def _build_event_types() -> dict[str, dict[str, type[Event]]]:

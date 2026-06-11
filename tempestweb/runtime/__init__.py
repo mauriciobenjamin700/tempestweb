@@ -11,7 +11,7 @@ See ``docs/plan.md`` (Trilhos A e B) and ``docs/contract.md``.
 
 from __future__ import annotations
 
-from tempestweb.runtime.events import coerce_event
+from tempestweb.runtime.events import apply_scroll, coerce_event
 from tempestweb.runtime.serialize import (
     EVENT_TYPE_TO_HANDLER_PROPS,
     find_node_type,
@@ -31,6 +31,7 @@ __all__ = [
     "NativeCallError",
     "WasmAppHandle",
     "WasmRuntime",
+    "apply_scroll",
     "bootstrap",
     "coerce_event",
     "find_node_type",

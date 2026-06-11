@@ -35,7 +35,7 @@ from typing import Any, Generic, TypeVar
 from tempest_core import App, Node, Scene, Widget
 from tempest_core.core.ir import Patch
 
-from tempestweb.runtime.events import coerce_event
+from tempestweb.runtime.events import apply_scroll, coerce_event
 from tempestweb.transports.base import (
     Event,
     PatchTransport,
@@ -316,6 +316,9 @@ class WasmRuntime(Generic[S]):
         key = event.get("key")
         event_type = event.get("type")
         if not isinstance(key, str) or not isinstance(event_type, str):
+            return
+        if event_type == "scroll":
+            apply_scroll(self._app, key, event.get("payload", {}))
             return
         entry = self._handlers.get(key)
         if entry is None:

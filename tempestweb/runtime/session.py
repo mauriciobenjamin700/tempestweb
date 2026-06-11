@@ -37,7 +37,7 @@ from tempestweb.native.dispatch import (
     native_call,
     uninstall_bridge,
 )
-from tempestweb.runtime.events import coerce_event
+from tempestweb.runtime.events import apply_scroll, coerce_event
 from tempestweb.runtime.serialize import (
     find_node_type,
     patches_to_wire,
@@ -205,6 +205,9 @@ class AppSession(Generic[S]):
         key = event.get("key")
         event_type = event.get("type")
         if not isinstance(key, str) or not isinstance(event_type, str):
+            return
+        if event_type == "scroll":
+            apply_scroll(self.app, key, event.get("payload", {}))
             return
         handler = resolve_handler(scene, key, event_type)
         if handler is None:

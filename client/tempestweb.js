@@ -8,6 +8,7 @@
 
 import { applyPatches, buildElement } from "./dom.js";
 import { bindEvents } from "./events.js";
+import { installVirtualization } from "./virtualize.js";
 
 /**
  * @typedef {Object} MountHandle
@@ -57,6 +58,7 @@ export function mount(root, transport, initialNode) {
   };
 
   const unbind = bindEvents(root, transport);
+  const virtualization = installVirtualization(root, transport);
 
   transport.onPatches((patches) => {
     // Partition the batch: overlay-layer patches (path starts with "overlay")
@@ -76,12 +78,20 @@ export function mount(root, transport, initialNode) {
     if (overlayPatches.length > 0) {
       applyPatches(overlayHost(), overlayPatches);
     }
+    // A slid virtualized window replaced a list's children — re-anchor scroll on
+    // the next frame (once the new window is laid out) so it doesn't oscillate.
+    if (typeof globalThis.requestAnimationFrame === "function") {
+      globalThis.requestAnimationFrame(() => virtualization.reanchor());
+    } else {
+      Promise.resolve().then(() => virtualization.reanchor());
+    }
   });
 
   return {
     root,
     unmount() {
       unbind();
+      virtualization.dispose();
       if (tree.parentNode === root) {
         root.removeChild(tree);
       }

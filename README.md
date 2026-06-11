@@ -27,9 +27,10 @@ JavaScript, no framework, no build step, no TypeScript) and two patch transports
 - [`docs/agents/MANIFEST.md`](docs/agents/MANIFEST.md) — parallel agent task plan.
 
 Want runnable apps? Browse the **[Example Gallery](https://mauriciobenjamin700.github.io/tempestweb/en/examples/)**
-([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 26 single-concept
-demos (stopwatch, forms, data table, kanban, chat, theming, i18n, canvas, and more),
-each running unchanged in both modes.
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 35 single-concept
+demos (stopwatch, forms, data table, kanban, chat, theming, i18n, canvas, native
+capabilities, observability, PWA/WebPush, and a server-mode walkthrough), each
+running unchanged in both modes.
 
 ## How it works
 

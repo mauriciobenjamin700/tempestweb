@@ -100,6 +100,18 @@ plugins:
             "Theme switcher": "Alternador de tema"
             "Internationalized greeting": "Saudação internacionalizada"
             "Sketch pad (canvas)": "Sketch pad (canvas)"
+            "Native capabilities": "Capacidades nativas"
+            "Weather (HTTP + geolocation)": "Clima (HTTP + geolocalização)"
+            "Copy & share": "Copiar e compartilhar"
+            "Camera capture": "Captura de câmera"
+            "Notes on device storage": "Notas no armazenamento do dispositivo"
+            "Feature flags": "Feature flags"
+            "Error boundary + telemetry": "Error boundary + telemetria"
+            "JWT auth gate": "Gate de autenticação JWT"
+            "PWA & offline examples": "PWA e offline"
+            "PWA install + WebPush": "Instalação PWA + WebPush"
+            "Execution modes": "Modos de execução"
+            "Running Mode B (server)": "Rodando o Modo B (servidor)"
             "Wire contract": "Contrato de fronteira"
             Capabilities: Capacidades
             "PWA & offline": "PWA e offline"
@@ -171,6 +183,19 @@ nav:
       - "Theme switcher": examples/theme-switcher.md
       - "Internationalized greeting": examples/i18n-greeting.md
       - "Sketch pad (canvas)": examples/sketch-canvas.md
+      - "Native capabilities":
+          - "Weather (HTTP + geolocation)": examples/weather-native.md
+          - "Copy & share": examples/clipboard-share.md
+          - "Camera capture": examples/photo-capture.md
+          - "Notes on device storage": examples/file-storage.md
+      - "Observability":
+          - "Feature flags": examples/feature-flags.md
+          - "Error boundary + telemetry": examples/error-boundary.md
+          - "JWT auth gate": examples/auth-jwt.md
+      - "PWA & offline examples":
+          - "PWA install + WebPush": examples/pwa-webpush.md
+      - "Execution modes":
+          - "Running Mode B (server)": examples/server-mode.md
   - Wire contract: wire-contract.md
   - Capabilities: capabilities.md
   - PWA & offline: pwa.md

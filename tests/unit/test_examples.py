@@ -119,6 +119,14 @@ EXAMPLE_NAMES = [
     "sketch-canvas",
     "quiz-app",
     "onboarding-carousel",
+    "weather-native",
+    "clipboard-share",
+    "photo-capture",
+    "file-storage",
+    "feature-flags",
+    "error-boundary",
+    "auth-jwt",
+    "pwa-webpush",
 ]
 
 

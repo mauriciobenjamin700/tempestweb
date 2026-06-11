@@ -98,6 +98,46 @@ Personalização visual, internacionalização e desenho.
 
 ---
 
+## Capacidades nativas
+
+A ponte nativa (`tempestweb.native`) dá acesso a geolocalização, HTTP, câmera,
+área de transferência, compartilhamento e armazenamento — sempre via _callables_
+injetáveis, então cada exemplo roda determinístico nos testes com um `FakeBridge`.
+
+- [**Clima (HTTP + geolocalização)**](weather-native.md) — handler `async` encadeado (`idle → loading → loaded/error`) combinando `geolocation.get_position` e `http.request`.
+- [**Copiar e compartilhar**](clipboard-share.md) — `clipboard.write` + `share.share` injetados no estado, dirigindo dois handlers `async` com transições de fase.
+- [**Captura de câmera**](photo-capture.md) — ciclo `IDLE → CAPTURING → CAPTURED/ERROR` com `camera.capture`, preview por _data URI_ e `Card` de metadados.
+- [**Notas no armazenamento do dispositivo**](file-storage.md) — CRUD de notas sobre `storage.put/get/list_keys/remove` injetados.
+
+---
+
+## Observabilidade
+
+Telemetria, _feature flags_, fronteiras de erro e autenticação — os blocos que
+deixam um app pronto para produção.
+
+- [**Feature flags**](feature-flags.md) — `FeatureFlagsProvider` + `InMemoryFeatureFlagsAdapter`: duas flags trocam variantes de widget ao vivo.
+- [**Error boundary + telemetria**](error-boundary.md) — `ErrorBoundary` envolvendo um filho explosivo, com `on_error` ligado a `Logger` + `TelemetryProvider`.
+- [**Gate de autenticação JWT**](auth-jwt.md) — `AuthStore` + `route_guard`, JWTs decodificados offline, `is_jwt_expired` e trilha de auditoria via `Logger`.
+
+---
+
+## PWA e offline
+
+Instalação como app e notificações push no browser.
+
+- [**Instalação PWA + WebPush**](pwa-webpush.md) — fluxo de consentimento em 7 fases (`notifications.request_permission`/`subscribe`) + script `build_pwa.py` que emite manifesto e ícones instaláveis.
+
+---
+
+## Modos de execução
+
+O mesmo `view` rodando no servidor, sem mudar uma linha.
+
+- [**Rodando o Modo B (servidor)**](server-mode.md) — o exemplo do contador rodando _unchanged_ em um servidor FastAPI por WebSocket via `TestClient`.
+
+---
+
 !!! check "Pronto para começar?"
     Escolha um exemplo que se pareça com o que você quer construir, copie o
     `app.py`, e rode nos dois modos. Todos passam no _gate_ verde (build, ruff,

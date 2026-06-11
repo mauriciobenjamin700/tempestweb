@@ -98,6 +98,46 @@ Visual customization, internationalization, and drawing.
 
 ---
 
+## Native capabilities
+
+The native bridge (`tempestweb.native`) exposes geolocation, HTTP, camera,
+clipboard, share, and storage — always through injectable callables, so every
+example runs deterministically in tests with a `FakeBridge`.
+
+- [**Weather (HTTP + geolocation)**](weather-native.md) — a chained `async` handler (`idle → loading → loaded/error`) combining `geolocation.get_position` and `http.request`.
+- [**Copy & share**](clipboard-share.md) — injected `clipboard.write` + `share.share`, driving two `async` handlers through phase transitions.
+- [**Camera capture**](photo-capture.md) — an `IDLE → CAPTURING → CAPTURED/ERROR` lifecycle with `camera.capture`, a data-URI preview, and a metadata `Card`.
+- [**Notes on device storage**](file-storage.md) — a notes CRUD over injected `storage.put/get/list_keys/remove`.
+
+---
+
+## Observability
+
+Telemetry, feature flags, error boundaries, and auth — the blocks that make an
+app production-ready.
+
+- [**Feature flags**](feature-flags.md) — `FeatureFlagsProvider` + `InMemoryFeatureFlagsAdapter`: two flags swap widget variants live.
+- [**Error boundary + telemetry**](error-boundary.md) — an `ErrorBoundary` wrapping a boom-togglable child, with `on_error` wired to a `Logger` + `TelemetryProvider`.
+- [**JWT auth gate**](auth-jwt.md) — `AuthStore` + `route_guard`, JWTs decoded offline, `is_jwt_expired`, and an audit trail via `Logger`.
+
+---
+
+## PWA and offline
+
+Install-as-app and browser push notifications.
+
+- [**PWA install + WebPush**](pwa-webpush.md) — a 7-phase consent flow (`notifications.request_permission`/`subscribe`) + a `build_pwa.py` script emitting an installable manifest and icons.
+
+---
+
+## Execution modes
+
+The same `view` running on the server, without changing a line.
+
+- [**Running Mode B (server)**](server-mode.md) — the counter example running unchanged on a FastAPI WebSocket server via `TestClient`.
+
+---
+
 !!! check "Ready to start?"
     Pick the example closest to what you want to build, copy its `app.py`, and
     run it in both modes. They all pass the green gate (build, ruff, mypy

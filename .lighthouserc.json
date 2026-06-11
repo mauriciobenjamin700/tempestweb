@@ -1,0 +1,31 @@
+{
+  "//": "Lighthouse CI config for the PWA gate (P4). Asserts the installable PWA",
+  "//2": "signals via thresholds rather than exact scores — headless Chromium is",
+  "//3": "flaky on absolute numbers, so we pin behavior, not points. The staticDistDir",
+  "//4": "is wired to the Trilho C build output once it lands.",
+  "ci": {
+    "collect": {
+      "staticDistDir": "./dist",
+      "url": ["http://localhost/index.html"],
+      "numberOfRuns": 1,
+      "settings": {
+        "onlyCategories": ["pwa"],
+        "preset": "desktop"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "installable-manifest": ["error", { "minScore": 1 }],
+        "service-worker": ["warn", { "minScore": 1 }],
+        "viewport": ["error", { "minScore": 1 }],
+        "maskable-icon": ["warn", { "minScore": 1 }],
+        "apple-touch-icon": ["warn", { "minScore": 1 }],
+        "splash-screen": ["warn", { "minScore": 1 }],
+        "themed-omnibox": ["warn", { "minScore": 1 }]
+      }
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

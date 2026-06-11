@@ -19,11 +19,12 @@ from tempestweb.runtime.serialize import (
     resolve_handler,
     scene_to_initial_patches,
 )
-from tempestweb.runtime.session import AppSession
+from tempestweb.runtime.session import AppSession, NativeCallError
 
 __all__ = [
     "AppSession",
     "EVENT_TYPE_TO_HANDLER_PROPS",
+    "NativeCallError",
     "node_to_wire",
     "patch_to_wire",
     "patches_to_wire",

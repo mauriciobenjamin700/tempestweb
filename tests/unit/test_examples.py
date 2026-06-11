@@ -92,7 +92,7 @@ def _types(node: Node) -> set[str]:
     return {n.type for n in _walk(node)}
 
 
-EXAMPLE_NAMES = ["counter", "todo", "form", "fetch", "async_demo"]
+EXAMPLE_NAMES = ["counter", "todo", "form", "fetch", "async_demo", "overlay_demo"]
 
 
 @pytest.mark.parametrize("name", EXAMPLE_NAMES)

@@ -14,7 +14,9 @@ output and as the entrypoint each transport will drive.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -68,14 +70,24 @@ def load_app(entrypoint: str | Path) -> LoadedApp:
     if not path.is_file():
         raise ProjectLoadError(f"entrypoint not found: {path}")
 
-    spec = importlib.util.spec_from_file_location(f"tempestweb_app_{path.stem}", path)
+    # Make the synthetic module name unique per resolved path so loading several
+    # projects (each with its own ``app.py``) in one process never reuses a stale
+    # module object from ``sys.modules``.
+    digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:12]
+    module_name = f"tempestweb_app_{path.stem}_{digest}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise ProjectLoadError(f"cannot build an import spec for {path}")
 
     module = importlib.util.module_from_spec(spec)
+    # Register before exec so `@dataclass` (which resolves field types via
+    # ``sys.modules[cls.__module__]`` under ``from __future__ import annotations``)
+    # and any decorator that inspects the defining module work correctly.
+    sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)
     except Exception as exc:  # noqa: BLE001 - surface any import-time failure
+        sys.modules.pop(module_name, None)
         raise ProjectLoadError(f"failed to import {path}: {exc}") from exc
 
     make_state = getattr(module, "make_state", None)

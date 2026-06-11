@@ -102,6 +102,41 @@ function applyProps(el, props) {
     }
   }
   applyControlProps(el, type, props);
+  applyA11yProps(el, props);
+}
+
+/**
+ * Apply accessibility props (semantics + focus) onto an element.
+ *
+ * Maps the core's renderer-agnostic a11y model to ARIA/DOM: ``semantics.label``
+ * → ``aria-label``, ``semantics.role`` → ``role``, ``semantics.hint`` →
+ * ``aria-description``; ``focus_order`` sets an explicit ``tabindex`` and
+ * ``focusable`` toggles a default one (``0`` to include, ``-1`` to exclude).
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyA11yProps(el, props) {
+  const sem = props.semantics;
+  if (sem != null && typeof sem === "object") {
+    if (sem.label != null) {
+      el.setAttribute("aria-label", String(sem.label));
+    }
+    if (sem.role != null) {
+      el.setAttribute("role", String(sem.role));
+    }
+    if (sem.hint != null) {
+      el.setAttribute("aria-description", String(sem.hint));
+    }
+  }
+  if (props.focus_order != null) {
+    el.setAttribute("tabindex", String(props.focus_order));
+  } else if (props.focusable === true) {
+    el.setAttribute("tabindex", "0");
+  } else if (props.focusable === false) {
+    el.setAttribute("tabindex", "-1");
+  }
 }
 
 /**

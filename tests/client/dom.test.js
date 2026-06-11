@@ -183,3 +183,29 @@ test("Image builds an <img> with src/alt", () => {
   assert.equal(el.getAttribute("src"), "/cat.png");
   assert.equal(el.getAttribute("alt"), "a cat");
 });
+
+test("semantics + focus map to ARIA/tabindex (E.7)", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Button",
+    key: "b",
+    props: {
+      label: "ok",
+      semantics: { label: "Confirm", role: "button", hint: "submits the form" },
+      focusable: true,
+    },
+    children: [],
+  });
+  assert.equal(el.getAttribute("aria-label"), "Confirm");
+  assert.equal(el.getAttribute("role"), "button");
+  assert.equal(el.getAttribute("aria-description"), "submits the form");
+  assert.equal(el.getAttribute("tabindex"), "0");
+});
+
+test("focus_order sets an explicit tabindex; focusable=false excludes", () => {
+  withDocument();
+  const ordered = buildElement({ type: "Container", key: "x", props: { focus_order: 3 }, children: [] });
+  assert.equal(ordered.getAttribute("tabindex"), "3");
+  const excluded = buildElement({ type: "Container", key: "y", props: { focusable: false }, children: [] });
+  assert.equal(excluded.getAttribute("tabindex"), "-1");
+});

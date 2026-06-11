@@ -71,7 +71,9 @@ mypy tempestweb
 pytest -q
 
 # Cliente JS (jsdom) — runner standalone, sem framework de build
-node --test tests/client/      # usa node:test + jsdom; ver tests/client/README
+node --test "tests/client/*.test.js"   # usa node:test + jsdom; ver tests/client/README
+# NB: a forma com diretório (`node --test tests/client/`) quebra no Node 24+
+#     (MODULE_NOT_FOUND); use o glob acima.
 ```
 
 Se uma fase depende de browser/device real (ex.: A2 com Pyodide ao vivo), escreva

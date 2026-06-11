@@ -26,6 +26,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, cast
 
+from pydantic import BaseModel
+
 from tempestweb._core import Insert, Node, Patch, Remove, Replace, Scene, Update
 
 __all__ = [
@@ -56,21 +58,28 @@ EVENT_TYPE_TO_HANDLER_PROPS: dict[str, tuple[str, ...]] = {
 
 
 def _json_safe(value: Any) -> Any:  # noqa: ANN401 — walks arbitrary IR prop values
-    """Recursively replace non-JSON-able values (handlers) with ``None``.
+    """Replace non-JSON-able prop values (handlers, Pydantic models) recursively.
 
     The IR carries live handler callables in ``props``; this strips them to
-    ``None`` so the result is JSON-serializable while preserving every other
-    prop (style dicts, strings, numbers, nested structures) untouched.
+    ``None`` so the result is JSON-serializable.  Pydantic
+    :class:`~pydantic.BaseModel` instances (e.g.
+    :class:`~tempestweb._core.style.Style`,
+    :class:`~tempestweb._core.style.Edge`) are lowered via
+    ``model_dump(mode="json")`` which resolves colors, edges, enums and other
+    structured style values to plain JSON-safe scalars before the recursive walk.
 
     Args:
         value: Any prop value drawn from a node's ``props``.
 
     Returns:
-        A JSON-able value: callables become ``None``; dicts and lists are walked
-        recursively; everything else is returned unchanged.
+        A JSON-able value: callables become ``None``; Pydantic models are dumped
+        to dicts; dicts and lists are walked recursively; everything else is
+        returned unchanged.
     """
     if callable(value):
         return None
+    if isinstance(value, BaseModel):
+        return _json_safe(value.model_dump(mode="json"))
     if isinstance(value, dict):
         return {key: _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):

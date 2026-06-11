@@ -58,7 +58,7 @@ function keyedAncestor(target, root) {
  *
  * @param {string} domType   The DOM event type ("click", "input", ...).
  * @param {EventTarget|null} target  The event target.
- * @returns {Object}         The TWEvent `payload`.
+ * @returns {{value?: string}}  The TWEvent `payload` ({ value } for input/change, else {}).
  */
 function payloadFor(domType, target) {
   if (domType === "input" || domType === "change") {

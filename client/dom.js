@@ -130,7 +130,7 @@ function resolvePath(root, path) {
 /**
  * Apply a single Update patch: set/unset props on the node at `path`.
  * @param {HTMLElement} root  The root element.
- * @param {{path:number[], set_props:Object, unset_props:string[]}} patch  The patch.
+ * @param {{path:number[], set_props?:Object, unset_props?:string[]}} patch  The patch.
  * @returns {void}
  */
 function applyUpdate(root, patch) {

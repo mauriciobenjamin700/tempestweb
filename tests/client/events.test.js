@@ -33,7 +33,7 @@ test("clicking a Button calls sendEvent with its key", () => {
   const transport = mockTransport();
   bindEvents(dom.root, transport);
 
-  const incButton = tree.querySelector('[data-tw-key="inc"]');
+  const incButton = tree.querySelector("[data-tw-key=\"inc\"]");
   incButton.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
 
   assert.equal(transport.events.length, 1);
@@ -46,7 +46,7 @@ test("the dec Button reports its own key", () => {
   bindEvents(dom.root, transport);
 
   tree
-    .querySelector('[data-tw-key="dec"]')
+    .querySelector("[data-tw-key=\"dec\"]")
     .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
 
   assert.equal(transport.events[0].key, "dec");
@@ -119,7 +119,7 @@ test("the unbind function detaches all listeners", () => {
   unbind();
 
   tree
-    .querySelector('[data-tw-key="inc"]')
+    .querySelector("[data-tw-key=\"inc\"]")
     .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   assert.equal(transport.events.length, 0);
 });

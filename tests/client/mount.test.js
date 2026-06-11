@@ -57,7 +57,7 @@ test("mount wires events so a button click reaches sendEvent with its key", () =
   mount(dom.root, transport, fixture("node_initial.json"));
 
   dom.root
-    .querySelector('[data-tw-key="inc"]')
+    .querySelector("[data-tw-key=\"inc\"]")
     .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
 
   assert.equal(transport.events.length, 1);
@@ -71,7 +71,7 @@ test("unmount removes the tree and stops events", () => {
   const transport = mockTransport();
   const handle = mount(dom.root, transport, fixture("node_initial.json"));
 
-  const inc = dom.root.querySelector('[data-tw-key="inc"]');
+  const inc = dom.root.querySelector("[data-tw-key=\"inc\"]");
   handle.unmount();
   assert.equal(dom.root.children.length, 0);
 

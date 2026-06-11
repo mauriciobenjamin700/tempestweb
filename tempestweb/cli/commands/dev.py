@@ -97,9 +97,7 @@ def create_dev_session(
     config = load_config(project_root)
     resolved_mode = mode or config.mode
     if resolved_mode not in VALID_MODES:
-        raise DevError(
-            f"invalid mode {resolved_mode!r}; expected one of {VALID_MODES}"
-        )
+        raise DevError(f"invalid mode {resolved_mode!r}; expected one of {VALID_MODES}")
 
     if verify:
         entrypoint = config.entrypoint_path

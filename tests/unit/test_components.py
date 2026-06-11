@@ -11,6 +11,7 @@ from tempestweb.components import (
     LoginForm,
     PasswordField,
     SignupForm,
+    TextField,
     validate_email,
     validate_phone,
 )
@@ -113,3 +114,18 @@ def test_password_field_is_secure() -> None:
     node = build(PasswordField(value="x", on_change=lambda _v: None))
     inputs: list[Any] = [n for n in _walk(node) if n.type == "Input"]
     assert inputs and inputs[0].props.get("secure") is True
+
+
+def test_text_field_generic_labelled_input() -> None:
+    """TextField renders a label, a text Input and (when set) an error line."""
+    node = build(
+        TextField(
+            value="Ada", label="Name", error="required", on_change=lambda _v: None
+        )
+    )
+    types = _types(node)
+    assert "Input" in types
+    labels = [n for n in _walk(node) if n.key == "text-field-label"]
+    assert labels and labels[0].props.get("content") == "Name"
+    inputs = [n for n in _walk(node) if n.type == "Input"]
+    assert inputs[0].props.get("value") == "Ada"

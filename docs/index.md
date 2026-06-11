@@ -65,9 +65,13 @@ onde o patch veio. Por isso o renderizador é **um só** nos dois modos.
 - **[Arquitetura](architecture.md)** — as quatro camadas e por que o renderizador
   é compartilhado.
 - **[Tutorial](tutorial/index.md)** — construa o counter, um conceito por página.
-- **[Contrato de fronteira](contract.md)** — o wire format Python↔cliente.
-- **[Roadmap (PWA e SSE)](roadmap.md)** — o que vem por aí: app instalável,
-  offline-first, WebPush.
+- **[Contrato de fronteira](wire-contract.md)** — o wire format Python↔cliente.
+- **[Capacidades](capabilities.md)** — Web APIs tipadas (geolocation, clipboard,
+  camera) como awaitables Python.
+- **[PWA e offline](pwa.md)** — app instalável, service worker, IndexedDB, WebPush.
+- **[Observabilidade](observability.md)** — telemetry, logger, feature flags, auth.
+- **[Roadmap e docs de design](design-docs.md)** — o que vem por aí e os planos
+  vivos do projeto.
 
 !!! info "Idioma"
     Esta documentação é **bilíngue**. Use o seletor de idioma no topo da página

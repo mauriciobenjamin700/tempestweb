@@ -66,9 +66,13 @@ modes.
 - **[Architecture](architecture.md)** — the four layers and why the renderer is
   shared.
 - **[Tutorial](tutorial/index.md)** — build the counter, one concept per page.
-- **[Wire contract](contract.md)** — the Python↔client wire format.
-- **[Roadmap (PWA & SSE)](roadmap.md)** — what's coming: installable app,
-  offline-first, WebPush.
+- **[Wire contract](wire-contract.md)** — the Python↔client wire format.
+- **[Capabilities](capabilities.md)** — typed Web APIs (geolocation, clipboard,
+  camera) as Python awaitables.
+- **[PWA & offline](pwa.md)** — installable app, service worker, IndexedDB, WebPush.
+- **[Observability](observability.md)** — telemetry, logger, feature flags, auth.
+- **[Roadmap & design docs](design-docs.md)** — what's coming and the project's
+  living design plans.
 
 !!! info "Language"
     This documentation is **bilingual**. Use the language selector at the top of

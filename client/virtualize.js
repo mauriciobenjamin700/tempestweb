@@ -15,8 +15,9 @@
 // -window-start. Scroll events do not bubble, so the listener is attached in the
 // capture phase on the mount root and survives patch churn.
 
+import { VIRT_STYLE_ID as STYLE_ID } from "./constants.js";
+
 const LAZY_ATTR = "data-tw-item-count";
-const STYLE_ID = "tw-virt-styles";
 
 /**
  * Read a non-negative integer data attribute, defaulting when absent/invalid.

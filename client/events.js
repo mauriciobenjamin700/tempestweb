@@ -10,6 +10,7 @@
 //
 // Verify in tests/client/ with a mock transport (jsdom dispatchEvent).
 
+import { GESTURE_TYPE, LONG_PRESS_MS, SWIPE_MIN_PX } from "./constants.js";
 import { KEY_ATTR, TYPE_ATTR } from "./dom.js";
 
 // The DOM event names captured and their corresponding TWEvent `type`. Identity
@@ -20,13 +21,6 @@ const EVENT_TYPES = Object.freeze({
   change: "change",
   submit: "submit",
 });
-
-// Gesture recognition thresholds (E.5). A pointer interaction over a
-// GestureDetector resolves to swipe / long_press / tap.
-const SWIPE_MIN_PX = 30; // minimum travel to count as a swipe
-const LONG_PRESS_MS = 500; // hold time (with little travel) for a long press
-// Widget type that opts into gesture events (so taps don't fire on every button).
-const GESTURE_TYPE = "GestureDetector";
 
 /**
  * Find the nearest ancestor-or-self element carrying a widget key.

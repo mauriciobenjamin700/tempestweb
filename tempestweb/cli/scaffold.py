@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from tempestweb.core.constants import DEFAULT_MODE
+
 __all__ = [
     "DEFAULT_MODE",
     "PROJECT_FILES",
@@ -19,9 +21,6 @@ __all__ = [
     "render_files",
     "scaffold_project",
 ]
-
-# The mode a fresh project defaults to (Mode A — WASM, per docs/plan.md §6).
-DEFAULT_MODE = "wasm"
 
 # Project-relative paths the scaffolder always writes, in a stable order.
 PROJECT_FILES: tuple[str, ...] = (

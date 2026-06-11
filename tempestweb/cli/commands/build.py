@@ -28,6 +28,7 @@ from pathlib import Path
 
 from tempestweb.cli.config import VALID_MODES, ProjectConfig, load_config
 from tempestweb.cli.loader import load_app, render_initial_tree
+from tempestweb.core.constants import WASM_PACKAGE_ARCHIVE, WASM_PYODIDE_VERSION
 from tempestweb.pwa import ManifestOptions, emit_icons, write_manifest
 
 __all__ = [
@@ -47,6 +48,7 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "transport.js",
     "virtualize.js",
     "router.js",
+    "constants.js",
 )
 
 # Native capability bridge modules (client/native/*.js), copied into the wasm
@@ -62,10 +64,6 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "share.js",
     "storage.js",
 )
-
-# Name of the zipped tempestweb package shipped in a wasm artifact and unpacked
-# into the Pyodide virtual filesystem by the bootstrap.
-WASM_PACKAGE_ARCHIVE: str = "tempestweb-pkg.zip"
 
 # Subpackages of ``tempestweb`` the Mode A runtime needs in the browser. The
 # server/CLI/devserver stacks (and their Starlette/uvicorn deps) are omitted —
@@ -330,13 +328,6 @@ def _index_html(name: str) -> str:
   </body>
 </html>
 """
-
-
-# Pyodide release the wasm bootstrap loads from the CDN. CPython 3.14.2; ships a
-# prebuilt emscripten ``pydantic_core`` wheel in its own package index, so the
-# vendored core's only hard dependency loads via ``loadPackage`` (NOT PyPI
-# micropip — PyPI has no emscripten wheel). See docs/agents/reports/NOTES-T3.md.
-WASM_PYODIDE_VERSION: str = "v314.0.0"
 
 
 def _bootstrap_js(name: str) -> str:

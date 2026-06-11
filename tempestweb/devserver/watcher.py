@@ -17,13 +17,10 @@ import os
 from collections.abc import AsyncIterator, Callable, Iterable, Sequence
 from pathlib import Path
 
+from tempestweb.core.constants import DEFAULT_WATCH_SUFFIXES
 from tempestweb.devserver.reload import ReloadEvent, ReloadKind, ReloadSignal
 
 __all__ = ["DEFAULT_WATCH_SUFFIXES", "ChangeStream", "FileWatcher"]
-
-# Only changes to these suffixes trigger a reload by default. Editors write
-# swap/temp files constantly; restricting suffixes keeps the loop quiet.
-DEFAULT_WATCH_SUFFIXES: tuple[str, ...] = (".py", ".html", ".css", ".js")
 
 # A change batch is the set of absolute paths that changed together. This mirrors
 # the shape of one ``watchfiles.awatch`` yield (a set of ``(Change, path)`` pairs)

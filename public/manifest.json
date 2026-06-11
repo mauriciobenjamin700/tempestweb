@@ -50,6 +50,7 @@
   "tempestweb/native/__init__.py",
   "tempestweb/runtime/__init__.py",
   "tempestweb/runtime/wasm.py",
+  "tempestweb/runtime/wasm_main.py",
   "tempestweb/server/__init__.py",
   "tempestweb/transports/__init__.py",
   "tempestweb/transports/base.py",

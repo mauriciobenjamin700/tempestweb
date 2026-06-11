@@ -10,9 +10,12 @@ from tempestweb.runtime.wasm import (
     serialize_node,
     serialize_patches,
 )
+from tempestweb.runtime.wasm_main import WasmAppHandle, bootstrap
 
 __all__ = [
+    "WasmAppHandle",
     "WasmRuntime",
+    "bootstrap",
     "serialize_node",
     "serialize_patches",
 ]

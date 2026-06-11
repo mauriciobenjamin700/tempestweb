@@ -24,9 +24,9 @@ so the two transports carry an identical patch stream.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
-from tempestweb._core import Insert, Node, Patch, Replace, Scene
+from tempestweb._core import Insert, Node, Patch, Replace, Scene, Update
 
 __all__ = [
     "EVENT_TYPE_TO_HANDLER_PROPS",
@@ -55,7 +55,7 @@ EVENT_TYPE_TO_HANDLER_PROPS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _json_safe(value: Any) -> Any:
+def _json_safe(value: Any) -> Any:  # noqa: ANN401 — walks arbitrary IR prop values
     """Recursively replace non-JSON-able values (handlers) with ``None``.
 
     The IR carries live handler callables in ``props``; this strips them to
@@ -117,10 +117,9 @@ def patch_to_wire(patch: Patch) -> dict[str, Any]:
     dumped["path"] = list(dumped.get("path", []))
     if isinstance(patch, (Insert, Replace)):
         dumped["node"] = node_to_wire(patch.node)
-    elif "set_props" in dumped:
+    elif isinstance(patch, Update):
         dumped["set_props"] = {
-            name: _json_safe(value)
-            for name, value in patch.set_props.items()
+            name: _json_safe(value) for name, value in patch.set_props.items()
         }
     return dumped
 
@@ -152,9 +151,7 @@ def scene_to_initial_patches(scene: Scene) -> list[dict[str, Any]]:
     Returns:
         The JSON-able initial patch batch.
     """
-    patches: list[dict[str, Any]] = [
-        {"path": [], "node": node_to_wire(scene.root)}
-    ]
+    patches: list[dict[str, Any]] = [{"path": [], "node": node_to_wire(scene.root)}]
     for index, overlay in enumerate(scene.overlays):
         patches.append(
             {"path": ["overlay"], "index": index, "node": node_to_wire(overlay)}
@@ -213,5 +210,5 @@ def resolve_handler(
     for prop_name in candidates:
         handler = target.props.get(prop_name)
         if callable(handler):
-            return handler
+            return cast("Callable[..., Any]", handler)
     return None

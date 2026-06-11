@@ -22,21 +22,33 @@ The session is transport-agnostic: the same class drives the WebSocket transport
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
-from typing import Generic, TypeVar
+from collections.abc import Callable, Coroutine
+from contextlib import suppress
+from itertools import count
+from typing import Any, Generic, TypeVar
 
 from tempestweb._core import App, Widget
+from tempestweb._core import Patch as CorePatch
 from tempestweb._core.widgets import handler_accepts_event
 from tempestweb.runtime.serialize import (
     patches_to_wire,
     resolve_handler,
     scene_to_initial_patches,
 )
-from tempestweb.transports.base import Event, Patch, PatchTransport, TransportClosedError
+from tempestweb.transports.base import (
+    Event,
+    NativeResult,
+    PatchTransport,
+    TransportClosedError,
+)
 
-__all__ = ["AppSession"]
+__all__ = ["AppSession", "NativeCallError"]
 
 S = TypeVar("S")
+
+
+class NativeCallError(RuntimeError):
+    """Raised when a proxied native capability call fails on the client."""
 
 
 class AppSession(Generic[S]):
@@ -73,8 +85,11 @@ class AppSession(Generic[S]):
         self.app: App[S] | None = None
         self._tasks: set[asyncio.Task[None]] = set()
         self._closed: bool = False
+        self._native_seq: count[int] = count(1)
+        self._native_pending: dict[str, asyncio.Future[Any]] = {}
+        transport.on_native_result(self._resolve_native_result)
 
-    def _apply_patches(self, patches: list[Patch]) -> None:
+    def _apply_patches(self, patches: list[CorePatch]) -> None:
         """App ``apply_patches`` callback: forward a rebuilt batch to the client.
 
         The app calls this synchronously from its coalesced rebuild (scheduled via
@@ -90,7 +105,7 @@ class AppSession(Generic[S]):
         wire = patches_to_wire(patches)
         self._spawn(self.transport.send_patches(wire))
 
-    def _spawn(self, coro: object) -> None:
+    def _spawn(self, coro: Coroutine[Any, Any, None]) -> None:
         """Schedule a coroutine as a tracked session task.
 
         Tracked tasks are cancelled on :meth:`close`, so no orphan task outlives
@@ -99,7 +114,7 @@ class AppSession(Generic[S]):
         Args:
             coro: The coroutine to run as a background task.
         """
-        task: asyncio.Task[None] = asyncio.ensure_future(coro)  # type: ignore[arg-type]
+        task: asyncio.Task[None] = asyncio.ensure_future(coro)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
@@ -149,6 +164,58 @@ class AppSession(Generic[S]):
         if asyncio.iscoroutine(result):
             await result
 
+    async def native_call(self, capability: str, args: dict[str, Any]) -> Any:  # noqa: ANN401 — value type depends on the capability
+        """Proxy a native Web API capability to the client and await its result.
+
+        Sends a ``native_call`` envelope, suspends until the matching
+        ``native_result`` arrives (correlated by ``call_id``), then returns the
+        client's value or raises on failure. This is the server-side leg of the
+        4th boundary crossing (see ``docs/contract.md``); in Mode A the same API
+        resolves in-process without a round-trip.
+
+        Args:
+            capability: Stable capability name (e.g. ``"geolocation.get"``).
+            args: JSON-able arguments forwarded to the client capability.
+
+        Returns:
+            The JSON-able ``value`` the client returned for the capability.
+
+        Raises:
+            NativeCallError: If the client reports the capability failed.
+            TransportClosedError: If the connection drops before a result.
+        """
+        call_id = f"c{next(self._native_seq)}"
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[Any] = loop.create_future()
+        self._native_pending[call_id] = future
+        try:
+            await self.transport.send_native_call(call_id, capability, args)
+            return await future
+        finally:
+            self._native_pending.pop(call_id, None)
+
+    def _resolve_native_result(self, result: NativeResult) -> None:
+        """Resolve the awaitable for an inbound ``native_result`` envelope.
+
+        Registered as the transport's native-result sink. Matches ``call_id`` to
+        a pending future and settles it with the value or a
+        :class:`NativeCallError`. Unknown / stale ``call_id`` values are ignored.
+
+        Args:
+            result: The JSON-able ``native_result`` payload.
+        """
+        call_id = result.get("call_id")
+        if not isinstance(call_id, str):
+            return
+        future = self._native_pending.get(call_id)
+        if future is None or future.done():
+            return
+        if result.get("ok"):
+            future.set_result(result.get("value"))
+        else:
+            error = result.get("error")
+            future.set_exception(NativeCallError(str(error)))
+
     async def run(self) -> None:
         """Serve the client until the transport closes.
 
@@ -176,13 +243,15 @@ class AppSession(Generic[S]):
         if self._closed:
             return
         self._closed = True
+        for future in self._native_pending.values():
+            if not future.done():
+                future.set_exception(TransportClosedError("session closed"))
+        self._native_pending.clear()
         tasks = list(self._tasks)
         for task in tasks:
             task.cancel()
         for task in tasks:
-            try:
+            with suppress(asyncio.CancelledError, Exception):
                 await task
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
-                pass
         self._tasks.clear()
         await self.transport.close()

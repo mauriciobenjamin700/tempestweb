@@ -1,0 +1,66 @@
+# tempestweb
+
+> Build web apps in **typed Python**. One declarative widget tree, a **DOM**
+> renderer, and **two execution modes** that share 100% of the application code:
+> **Mode A (WASM)** runs your Python in the browser via Pyodide; **Mode B
+> (server)** runs it on the server (FastAPI) and talks to a thin JS client over
+> WebSocket.
+
+Sister project to [tempestroid](../tempestroid) — same "one tree, multiple
+renderers" architecture. The renderer-agnostic engine (IR, reconciler, state,
+style, widgets) is shared; tempestweb adds a **DOM** leaf renderer (pure
+JavaScript, no framework, no build step, no TypeScript) and two patch transports.
+
+## Status
+
+🚧 Early construction. See the design docs:
+
+- [`docs/plan.md`](docs/plan.md) — full design and phase plan.
+- [`docs/roadmap.md`](docs/roadmap.md) — phase checklist.
+- [`docs/arquitetura.md`](docs/arquitetura.md) — architecture.
+- [`docs/contract.md`](docs/contract.md) — the Python↔client wire format.
+- [`docs/agents/MANIFEST.md`](docs/agents/MANIFEST.md) — parallel agent task plan.
+
+## How it works
+
+```text
+   view(app) ──build──▶ Node tree (IR)        ← shared core (vendored from tempestroid)
+                            │
+                          diff
+                            ▼
+                        [ Patch ]              insert / remove / update / reorder / replace
+                       ╱          ╲
+              Mode A transport   Mode B transport
+              (pyodide.ffi)       (WebSocket)
+                       ╲          ╱
+                  client/ (pure JS): apply patches to the DOM
+                  + Style→CSS + event capture                  ← same code in both modes
+```
+
+The application's `view()` never names a transport — the same `examples/counter/app.py`
+runs under `--mode wasm` and `--mode server` unchanged.
+
+## Develop
+
+```bash
+uv venv && uv pip install -e ".[dev,server,cli]"
+make check          # ruff + mypy + pytest + JS (jsdom) tests
+```
+
+## Layout
+
+| Path | What |
+|---|---|
+| `tempestweb/_core/` | Vendored renderer-agnostic engine (do not hand-edit). |
+| `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`). |
+| `tempestweb/server/` | FastAPI + WebSocket host (Mode B). |
+| `tempestweb/native/` | Web API capability adapters. |
+| `tempestweb/cli/` | `tempestweb new/dev/build/run`. |
+| `client/` | Pure-JS DOM renderer, Style→CSS, event capture. |
+| `tests/fixtures/` | Golden wire-format fixtures derived from the core. |
+
+## Conventions
+
+Python: double quotes, full typing (mypy `--strict`), Google docstrings in English,
+async-first. Client: **plain JavaScript only** — no TypeScript, no framework, no
+build step. See [`CLAUDE.md`](CLAUDE.md).

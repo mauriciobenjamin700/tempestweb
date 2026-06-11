@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+dist/
+build/
+
+# Pyodide / WASM build artifacts
+/site/
+/public/pyodide/
+
+# Node (only if a test runner needs it; the client itself ships no node_modules)
+node_modules/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Worktrees live outside the tree; ignore any stray local ones
+/worktrees/

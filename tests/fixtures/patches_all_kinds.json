@@ -1,0 +1,67 @@
+{
+  "update": [
+    {
+      "path": [
+        0
+      ],
+      "set_props": {
+        "content": "y"
+      },
+      "unset_props": []
+    }
+  ],
+  "insert": [
+    {
+      "path": [],
+      "index": 1,
+      "node": {
+        "type": "Button",
+        "key": "b1",
+        "props": {
+          "style": null,
+          "semantics": null,
+          "focusable": null,
+          "focus_order": null,
+          "label": "+",
+          "on_click": null
+        },
+        "children": []
+      }
+    }
+  ],
+  "remove": [
+    {
+      "path": [],
+      "index": 1
+    }
+  ],
+  "reorder": [
+    {
+      "path": [],
+      "order": [
+        1,
+        0
+      ]
+    }
+  ],
+  "replace": [
+    {
+      "path": [
+        0
+      ],
+      "node": {
+        "type": "Button",
+        "key": "n",
+        "props": {
+          "style": null,
+          "semantics": null,
+          "focusable": null,
+          "focus_order": null,
+          "label": "x",
+          "on_click": null
+        },
+        "children": []
+      }
+    }
+  ]
+}

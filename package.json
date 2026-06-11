@@ -1,0 +1,12 @@
+{
+  "name": "tempestweb-client",
+  "private": true,
+  "type": "module",
+  "description": "Pure-JS DOM renderer for tempestweb. No build step. jsdom only for tests.",
+  "scripts": {
+    "test": "node --test \"tests/client/**/*.test.js\""
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

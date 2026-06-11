@@ -1,0 +1,151 @@
+{
+  "type": "Column",
+  "key": null,
+  "props": {
+    "style": {
+      "direction": null,
+      "justify": null,
+      "align": null,
+      "align_self": null,
+      "grow": null,
+      "gap": 8.0,
+      "flex_wrap": null,
+      "padding": {
+        "top": 16.0,
+        "right": 16.0,
+        "bottom": 16.0,
+        "left": 16.0
+      },
+      "margin": null,
+      "border": null,
+      "radius": null,
+      "background": null,
+      "color": null,
+      "opacity": null,
+      "shadow": null,
+      "font_family": null,
+      "font_size": null,
+      "font_weight": null,
+      "font_style": null,
+      "text_align": null,
+      "text_decoration": null,
+      "letter_spacing": null,
+      "line_height": null,
+      "max_lines": null,
+      "text_overflow": null,
+      "text_scale": null,
+      "font_asset": null,
+      "width": null,
+      "height": null,
+      "min_width": null,
+      "max_width": null,
+      "min_height": null,
+      "max_height": null,
+      "aspect_ratio": null,
+      "stack_align": null,
+      "position": null,
+      "top": null,
+      "right": null,
+      "bottom": null,
+      "left": null,
+      "transition": null
+    },
+    "semantics": null,
+    "focusable": null,
+    "focus_order": null
+  },
+  "children": [
+    {
+      "type": "Text",
+      "key": "label",
+      "props": {
+        "style": null,
+        "semantics": null,
+        "focusable": null,
+        "focus_order": null,
+        "content": "Count: 0"
+      },
+      "children": []
+    },
+    {
+      "type": "Row",
+      "key": null,
+      "props": {
+        "style": {
+          "direction": null,
+          "justify": null,
+          "align": null,
+          "align_self": null,
+          "grow": null,
+          "gap": 4.0,
+          "flex_wrap": null,
+          "padding": null,
+          "margin": null,
+          "border": null,
+          "radius": null,
+          "background": null,
+          "color": null,
+          "opacity": null,
+          "shadow": null,
+          "font_family": null,
+          "font_size": null,
+          "font_weight": null,
+          "font_style": null,
+          "text_align": null,
+          "text_decoration": null,
+          "letter_spacing": null,
+          "line_height": null,
+          "max_lines": null,
+          "text_overflow": null,
+          "text_scale": null,
+          "font_asset": null,
+          "width": null,
+          "height": null,
+          "min_width": null,
+          "max_width": null,
+          "min_height": null,
+          "max_height": null,
+          "aspect_ratio": null,
+          "stack_align": null,
+          "position": null,
+          "top": null,
+          "right": null,
+          "bottom": null,
+          "left": null,
+          "transition": null
+        },
+        "semantics": null,
+        "focusable": null,
+        "focus_order": null
+      },
+      "children": [
+        {
+          "type": "Button",
+          "key": "dec",
+          "props": {
+            "style": null,
+            "semantics": null,
+            "focusable": null,
+            "focus_order": null,
+            "label": "-",
+            "on_click": null
+          },
+          "children": []
+        },
+        {
+          "type": "Button",
+          "key": "inc",
+          "props": {
+            "style": null,
+            "semantics": null,
+            "focusable": null,
+            "focus_order": null,
+            "label": "+",
+            "on_click": null
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}

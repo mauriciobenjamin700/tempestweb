@@ -1,0 +1,65 @@
+[project]
+name = "tempestweb"
+version = "0.0.0"
+description = "Build web apps in typed Python — one tree, a DOM renderer, two execution modes (WASM + server)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Mauricio Benjamin", email = "mauricio.benjamin@reloverelations.com" }]
+dependencies = [
+    # Core model engine. Currently vendored under tempestweb/_core/; this will be
+    # replaced by a `tempest-core` dependency once that package is extracted.
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+# Mode B — Python on the server, thin JS client over WebSocket.
+server = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "websockets>=12",
+]
+# CLI + dev loop.
+cli = [
+    "watchfiles>=0.21",
+]
+dev = [
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+tempestweb = "tempestweb.cli.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tempestweb"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+# Vendored core is a mechanical copy — exclude from lint AND format.
+extend-exclude = ["tempestweb/_core"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "Q"]
+# Vendored core is a mechanical copy — do not lint it.
+exclude = ["tempestweb/_core/**"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+# Vendored core ships its own typing posture; check it separately if needed.
+exclude = ["tempestweb/_core/"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

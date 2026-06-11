@@ -29,6 +29,11 @@ dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",
 ]
+# Bilingual MkDocs documentation site (PT-BR default + EN-US under /en/).
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocs-static-i18n>=1.2",
+]
 
 [project.scripts]
 tempestweb = "tempestweb.cli.main:main"

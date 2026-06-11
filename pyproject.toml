@@ -23,6 +23,11 @@ server = [
 cli = [
     "watchfiles>=0.21",
 ]
+# Server-side WebPush (P3). Mirrors tempest-fastapi-sdk[webpush]; lazily imported
+# so tempestweb.server.webpush imports without it (the dep is touched only on send).
+webpush = [
+    "pywebpush>=1.14",
+]
 dev = [
     "ruff>=0.6",
     "mypy>=1.10",

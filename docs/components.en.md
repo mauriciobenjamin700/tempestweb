@@ -124,6 +124,27 @@ tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
     state. You always know what's in the fields — and can pre-fill, clear or
     validate them from outside whenever you want.
 
+## Sign up
+
+`SignupForm` follows the same idea with email + password + confirm-password. Show
+the confirm error when the passwords differ:
+
+```python
+from tempestweb.components import SignupForm
+
+SignupForm(
+    email=app.state.email,
+    password=app.state.password,
+    confirm=app.state.confirm,
+    on_email_change=set_email,
+    on_password_change=set_password,
+    on_confirm_change=set_confirm,
+    on_submit=do_signup,
+    confirm_error="" if app.state.password == app.state.confirm else "Passwords do not match",
+    title="Create account",
+)
+```
+
 ## Recap
 
 - Import from `tempestweb.components` — fields and forms in one place.

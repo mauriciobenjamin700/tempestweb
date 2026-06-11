@@ -123,6 +123,27 @@ tempestweb run --mode server   # Python no servidor (FastAPI + WebSocket)
     estado escondido. Você sempre sabe o que tem nos campos — e pode pré-preencher,
     limpar ou validar de fora quando quiser.
 
+## Cadastro
+
+`SignupForm` segue a mesma ideia, com e-mail + senha + confirmação de senha. Mostre
+o erro de confirmação quando as senhas diferem:
+
+```python
+from tempestweb.components import SignupForm
+
+SignupForm(
+    email=app.state.email,
+    password=app.state.password,
+    confirm=app.state.confirm,
+    on_email_change=set_email,
+    on_password_change=set_password,
+    on_confirm_change=set_confirm,
+    on_submit=do_signup,
+    confirm_error="" if app.state.password == app.state.confirm else "As senhas não conferem",
+    title="Criar conta",
+)
+```
+
 ## Recapitulando
 
 - Importe de `tempestweb.components` — campos e formulários prontos num lugar só.

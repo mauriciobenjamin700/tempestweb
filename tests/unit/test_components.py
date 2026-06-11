@@ -10,6 +10,7 @@ from tempestweb.components import (
     EmailField,
     LoginForm,
     PasswordField,
+    SignupForm,
     validate_email,
     validate_phone,
 )
@@ -70,6 +71,27 @@ def test_login_form_submit_handler_fires() -> None:
     assert callable(handler)
     handler()
     assert fired == ["go"]
+
+
+def test_signup_form_has_three_inputs() -> None:
+    """SignupForm lays out email + password + confirm-password and a submit."""
+    node = build(
+        SignupForm(
+            email="",
+            password="",
+            confirm="",
+            on_email_change=lambda _v: None,
+            on_password_change=lambda _v: None,
+            on_confirm_change=lambda _v: None,
+            on_submit=lambda: None,
+        )
+    )
+    inputs = [n for n in _walk(node) if n.type == "Input"]
+    assert len(inputs) == 3
+    # The two password fields are secure.
+    secure = [n for n in inputs if n.props.get("secure") is True]
+    assert len(secure) == 2
+    assert _find(node, key="signup-submit") is not None
 
 
 def test_validators_reexported() -> None:

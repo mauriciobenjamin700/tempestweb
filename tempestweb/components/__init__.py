@@ -24,7 +24,7 @@ from tempestweb.components.fields import (
     validate_email,
     validate_phone,
 )
-from tempestweb.components.forms import LoginForm
+from tempestweb.components.forms import LoginForm, SignupForm
 
 __all__ = [
     "AddressField",
@@ -33,6 +33,7 @@ __all__ = [
     "EmailField",
     "LoginForm",
     "PasswordField",
+    "SignupForm",
     "PhoneField",
     "validate_cnpj",
     "validate_cpf",

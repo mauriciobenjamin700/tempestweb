@@ -1,0 +1,130 @@
+site_name: tempestweb
+site_description: >-
+  Construa web apps em Python tipado — uma árvore declarativa, um renderizador
+  DOM, e dois modos de execução (WASM no browser + servidor FastAPI).
+site_author: Mauricio Benjamin
+site_url: https://mauriciobenjamin700.github.io/tempestweb/
+repo_url: https://github.com/mauriciobenjamin700/tempestweb
+repo_name: mauriciobenjamin700/tempestweb
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Mauricio Benjamin — MIT License
+
+theme:
+  name: material
+  language: pt-BR
+  features:
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - toc.follow
+    - search.suggest
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Mudar para o modo escuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Mudar para o modo claro
+  icon:
+    repo: fontawesome/brands/github
+
+# Source design docs live next to the code and are linked from the rendered
+# pages via their GitHub blob URLs. They are not built into the site (they use
+# repo-relative links that do not resolve under --strict).
+exclude_docs: |
+  plan.md
+  roadmap.md
+  contract.md
+  arquitetura.md
+  agents/
+
+plugins:
+  - search:
+      lang:
+        - pt
+        - en
+  - i18n:
+      docs_structure: suffix
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: pt
+          default: true
+          name: Português (Brasil)
+          build: true
+          site_name: tempestweb
+          nav_translations:
+            Home: Início
+            Installation: Instalação
+            Architecture: Arquitetura
+            Tutorial: Tutorial
+            "Tutorial — the Counter": "Tutorial — o Counter"
+            "1. The view tree": "1. A árvore de view"
+            "2. State and handlers": "2. Estado e handlers"
+            "3. Patches on the wire": "3. Patches na rede"
+            "4. Running both modes": "4. Rodando os dois modos"
+            "Wire contract": "Contrato de fronteira"
+            Capabilities: Capacidades
+            "PWA & offline": "PWA e offline"
+            Observability: Observabilidade
+            "Roadmap & design docs": "Roadmap e docs de design"
+        - locale: en
+          name: English (US)
+          build: true
+          site_name: tempestweb
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/mauriciobenjamin700/tempestweb
+
+nav:
+  - Home: index.md
+  - Installation: installation.md
+  - Architecture: architecture.md
+  - Tutorial:
+      - "Tutorial — the Counter": tutorial/index.md
+      - "1. The view tree": tutorial/view.md
+      - "2. State and handlers": tutorial/state.md
+      - "3. Patches on the wire": tutorial/patches.md
+      - "4. Running both modes": tutorial/modes.md
+  - Wire contract: wire-contract.md
+  - Capabilities: capabilities.md
+  - PWA & offline: pwa.md
+  - Observability: observability.md
+  - Roadmap & design docs: design-docs.md

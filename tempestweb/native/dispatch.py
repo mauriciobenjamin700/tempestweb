@@ -45,6 +45,7 @@ browser, no Pyodide, and no server present.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import itertools
 from typing import Any, Protocol, cast, runtime_checkable
 
@@ -130,49 +131,60 @@ class NativeBridge(Protocol):
         ...
 
 
-#: The process-wide installed bridge, or ``None`` off-platform.
-_bridge: NativeBridge | None = None
+#: The installed bridge, held in a :class:`~contextvars.ContextVar` so it is
+#: **isolated per asyncio context**, not process-wide. In Mode A (one app per
+#: process) the bootstrap sets it in the main context and every task sees it. In
+#: Mode B each client connection runs ``AppSession.run`` in its own task, so each
+#: ``install_bridge`` in :meth:`AppSession.start` sets the bridge only for that
+#: connection's context — concurrent sessions never clobber one another's
+#: ``await native.*`` path. ``None`` off-platform.
+_bridge: contextvars.ContextVar[NativeBridge | None] = contextvars.ContextVar(
+    "tempestweb_native_bridge", default=None
+)
 
 
 def install_bridge(bridge: NativeBridge) -> None:
-    """Install the process-wide native bridge for the current execution mode.
+    """Install the native bridge for the current execution mode and context.
 
     Called once during app bootstrap — by the WASM runtime (Mode A) with an
-    in-process FFI bridge, or by the server session (Mode B) with a transport
-    bridge.
+    in-process FFI bridge, or by each server session (Mode B) with its own
+    transport bridge. The bridge is stored in a context-local variable, so a
+    Mode-B server serving many connections keeps each session's bridge isolated
+    (the call must run in that connection's task — which it does, since the
+    session's :meth:`~tempestweb.runtime.session.AppSession.start` is awaited
+    from its own ``run`` task).
 
     Args:
         bridge: The :class:`NativeBridge` implementation to route native calls
             through.
     """
-    global _bridge
-    _bridge = bridge
+    _bridge.set(bridge)
 
 
 def uninstall_bridge() -> None:
-    """Remove the installed bridge, restoring the off-platform state.
+    """Remove the installed bridge for the current context (off-platform state).
 
     Used by tests and by session teardown so a stale bridge never leaks across
-    apps.
+    apps. Resets the context-local bridge to ``None`` in the calling context.
     """
-    global _bridge
-    _bridge = None
+    _bridge.set(None)
 
 
 def current_bridge() -> NativeBridge:
-    """Return the installed bridge, raising if none is present.
+    """Return the bridge installed in the current context, raising if none.
 
     Returns:
-        The process-wide :class:`NativeBridge`.
+        The context-local :class:`NativeBridge`.
 
     Raises:
-        BrowserUnavailableError: If no bridge has been installed.
+        BrowserUnavailableError: If no bridge has been installed in this context.
     """
-    if _bridge is None:
+    bridge = _bridge.get()
+    if bridge is None:
         raise BrowserUnavailableError(
             "no native bridge installed (off-platform, or bootstrap incomplete)"
         )
-    return _bridge
+    return bridge
 
 
 def native_call(capability: str, args: dict[str, Any], call_id: str) -> dict[str, Any]:

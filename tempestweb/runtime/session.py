@@ -189,13 +189,12 @@ class AppSession(Generic[S]):
         screen.
 
         Note:
-            ``install_bridge`` is process-global (see
-            :mod:`tempestweb.native.dispatch`). For the single-session-per-process
-            path this is correct; with multiple concurrent server sessions the last
-            ``start()`` wins for the dispatch-module path, so a session always uses
-            its **own** bridge through :meth:`native_call`. Cross-session isolation
-            of ``await native.*`` is a known limitation tracked for the
-            session-local context-var bridge follow-up.
+            ``install_bridge`` stores the bridge in a context-local variable (see
+            :mod:`tempestweb.native.dispatch`). Because this ``start`` is awaited
+            from the session's own ``run`` task, the bridge is isolated to that
+            connection's asyncio context: concurrent server sessions each resolve
+            ``await native.*`` through their **own** bridge, never clobbering one
+            another. :meth:`native_call` also uses this session's bridge directly.
         """
         self.app = App(
             state=self._state_factory(),

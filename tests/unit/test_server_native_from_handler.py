@@ -171,6 +171,48 @@ async def test_close_uninstalls_the_bridge() -> None:
         current_bridge()
 
 
+async def test_concurrent_sessions_isolate_their_bridges() -> None:
+    """Two concurrent Mode-B sessions each see their **own** bridge.
+
+    Regression guard for the context-local bridge: ``install_bridge`` used to be
+    process-global, so the last session to ``start()`` clobbered every other
+    session's ``await native.*`` path. Now each session runs in its own asyncio
+    task (as the SSE/WS endpoints drive it), so each ``current_bridge()`` resolves
+    to that session's bridge even while the other is concurrently mounted.
+    """
+    transport_a = SSETransport(ping_interval=10.0)
+    session_a: AppSession[EmptyState] = AppSession(make_state, view, transport_a)
+    transport_b = SSETransport(ping_interval=10.0)
+    session_b: AppSession[EmptyState] = AppSession(make_state, view, transport_b)
+
+    both_mounted = asyncio.Event()
+    mounted = 0
+    seen: dict[str, Any] = {}
+
+    async def drive(session: AppSession[EmptyState], label: str) -> None:
+        """Mount a session in its own task, then read the bridge once both are up."""
+        nonlocal mounted
+        await session.start()
+        # Park until BOTH sessions have installed their bridge, so a process-wide
+        # bridge would already have been overwritten by the second start().
+        mounted += 1
+        if mounted == 2:
+            both_mounted.set()
+        await asyncio.wait_for(both_mounted.wait(), 1.0)
+        seen[label] = current_bridge()
+
+    # gather wraps each coroutine in its own Task (own context copy) — exactly how
+    # the server drives one task per connection.
+    await asyncio.gather(drive(session_a, "a"), drive(session_b, "b"))
+
+    assert seen["a"] is session_a._bridge  # noqa: SLF001 — asserting isolation
+    assert seen["b"] is session_b._bridge  # noqa: SLF001 — asserting isolation
+    assert seen["a"] is not seen["b"]
+
+    await session_a.close()
+    await session_b.close()
+
+
 async def test_mode_a_ffi_bridge_install_resolves_in_process() -> None:
     """Installing an FFIBridge (as the WASM bootstrap does) wires the chain.
 

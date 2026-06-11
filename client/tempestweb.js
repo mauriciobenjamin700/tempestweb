@@ -61,6 +61,9 @@ export function mount(root, transport, initialNode) {
   const unbind = bindEvents(root, transport);
   const virtualization = installVirtualization(root, transport);
   const router = installRouter(transport);
+  // Reserve off-window scroll space for any virtualized list in the initial tree,
+  // once the browser has laid the window out (so item heights can be measured).
+  scheduleFrame(virtualization.refresh);
 
   transport.onPatches((patches) => {
     // Partition the batch: overlay-layer patches (path starts with "overlay")
@@ -80,13 +83,9 @@ export function mount(root, transport, initialNode) {
     if (overlayPatches.length > 0) {
       applyPatches(overlayHost(), overlayPatches);
     }
-    // A slid virtualized window replaced a list's children — re-anchor scroll on
-    // the next frame (once the new window is laid out) so it doesn't oscillate.
-    if (typeof globalThis.requestAnimationFrame === "function") {
-      globalThis.requestAnimationFrame(() => virtualization.reanchor());
-    } else {
-      Promise.resolve().then(() => virtualization.reanchor());
-    }
+    // A slid virtualized window replaced a list's children — recompute its
+    // off-window spacers on the next frame (once the new window is laid out).
+    scheduleFrame(virtualization.refresh);
   });
 
   return {
@@ -103,4 +102,17 @@ export function mount(root, transport, initialNode) {
       }
     },
   };
+}
+
+/**
+ * Run `fn` after the browser has laid out (rAF when available, else a microtask).
+ * @param {() => void} fn
+ * @returns {void}
+ */
+function scheduleFrame(fn) {
+  if (typeof globalThis.requestAnimationFrame === "function") {
+    globalThis.requestAnimationFrame(() => fn());
+  } else {
+    Promise.resolve().then(fn);
+  }
 }

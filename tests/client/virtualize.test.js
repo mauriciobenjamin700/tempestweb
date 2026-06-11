@@ -1,4 +1,4 @@
-// Tests for client/virtualize.js — lazy viewport marking + edge-paging scroll.
+// Tests for client/virtualize.js — marking, scroll→window mapping, spacers.
 // jsdom has no layout, so item/scroll metrics are stubbed via defineProperty.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -32,65 +32,64 @@ function lazyViewport(dom, { count, windowSize, start, rendered, h }) {
   return el;
 }
 
-/** Stub a viewport's scroll metrics (jsdom reports 0 for all of them). */
-function stubScroll(el, { scrollTop, clientHeight, scrollHeight }) {
-  el.scrollTop = scrollTop;
-  Object.defineProperty(el, "clientHeight", { value: clientHeight, configurable: true });
-  Object.defineProperty(el, "scrollHeight", { value: scrollHeight, configurable: true });
-}
-
 test("buildElement marks a LazyColumn as a scroll viewport with metadata", () => {
   const dom = freshDom();
   globalThis.document = dom.document;
-  const el = lazyViewport(dom, { count: 1000, windowSize: 10, start: 0, rendered: 10, h: 20 });
+  const el = lazyViewport(dom, { count: 1000, windowSize: 30, start: 0, rendered: 30, h: 20 });
   assert.equal(el.getAttribute("data-tw-item-count"), "1000");
-  assert.equal(el.getAttribute("data-tw-window-size"), "10");
+  assert.equal(el.getAttribute("data-tw-window-size"), "30");
   assert.equal(el.getAttribute("data-tw-window-start"), "0");
   assert.equal(el.style.overflowY, "auto");
 });
 
-test("scrolling to the bottom edge pages the window forward", () => {
+test("scrolling maps scrollTop to a window start (with leading context)", () => {
   const dom = freshDom();
   globalThis.document = dom.document;
-  const el = lazyViewport(dom, { count: 1000, windowSize: 10, start: 0, rendered: 10, h: 20 });
+  globalThis.CSS = dom.window.CSS;
+  const el = lazyViewport(dom, { count: 1000, windowSize: 30, start: 0, rendered: 30, h: 20 });
   const transport = mockTransport();
   installVirtualization(dom.root, transport);
 
-  // window 10 items * 20px = 200 content; viewport 100 tall; scrolled to bottom.
-  stubScroll(el, { scrollTop: 100, clientHeight: 100, scrollHeight: 200 });
+  el.scrollTop = 2000; // 2000 / 20 = item 100 at the top
   el.dispatchEvent(new dom.window.Event("scroll", { bubbles: false }));
 
   assert.equal(transport.events.length, 1);
-  // page = floor(10/2) = 5 -> next window [5, 15).
+  // lead = floor(30/3) = 10 -> start = 100 - 10 = 90.
   assert.deepEqual(transport.events[0], {
     type: "scroll",
     key: "L",
-    payload: { start: 5, end: 15 },
+    payload: { start: 90, end: 120 },
   });
 });
 
-test("scrolling back to the top edge pages the window backward", () => {
+test("scrolling that does not change the window reports nothing", () => {
   const dom = freshDom();
   globalThis.document = dom.document;
-  const el = lazyViewport(dom, { count: 1000, windowSize: 10, start: 40, rendered: 10, h: 20 });
+  globalThis.CSS = dom.window.CSS;
+  const el = lazyViewport(dom, { count: 1000, windowSize: 30, start: 0, rendered: 30, h: 20 });
   const transport = mockTransport();
   installVirtualization(dom.root, transport);
 
-  stubScroll(el, { scrollTop: 0, clientHeight: 100, scrollHeight: 200 });
-  el.dispatchEvent(new dom.window.Event("scroll", { bubbles: false }));
-
-  assert.equal(transport.events.length, 1);
-  assert.deepEqual(transport.events[0], { type: "scroll", key: "L", payload: { start: 35, end: 45 } });
-});
-
-test("scrolling in the middle (no edge) reports nothing", () => {
-  const dom = freshDom();
-  globalThis.document = dom.document;
-  const el = lazyViewport(dom, { count: 1000, windowSize: 10, start: 40, rendered: 10, h: 20 });
-  const transport = mockTransport();
-  installVirtualization(dom.root, transport);
-
-  stubScroll(el, { scrollTop: 60, clientHeight: 100, scrollHeight: 200 });
+  el.scrollTop = 100; // top item 5; start = max(0, 5-10) = 0 == current
   el.dispatchEvent(new dom.window.Event("scroll", { bubbles: false }));
   assert.equal(transport.events.length, 0);
 });
+
+test("refresh writes proportional spacer rules for the full item_count", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  const el = lazyViewport(dom, { count: 1000, windowSize: 30, start: 40, rendered: 30, h: 20 });
+  const v = installVirtualization(dom.root, transportNoop());
+  v.refresh();
+
+  const sheet = dom.document.getElementById("tw-virt-styles");
+  assert.ok(sheet, "stylesheet created");
+  // before = start*extent = 40*20 = 800; after = (1000-40-30)*20 = 18600.
+  assert.match(sheet.textContent, /::before\{content:"";display:block;height:800px\}/);
+  assert.match(sheet.textContent, /::after\{content:"";display:block;height:18600px\}/);
+});
+
+function transportNoop() {
+  return { onPatches() {}, sendEvent() {}, async close() {} };
+}

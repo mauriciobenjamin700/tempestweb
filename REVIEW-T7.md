@@ -1,122 +1,88 @@
-# REVIEW-T7 — Conformance harness
+# REVIEW-T7 — Conformance harness (independent adversarial QA)
 
 **Reviewer:** skeptical QA (run-it-don't-trust-it)
 **Branch:** `feat/conformance`
 **Worktree:** `/home/mauriciobenjamin700/projects/my/tempestweb-T7`
-**HEAD at review:** `48d5982 wip(T7): uncommitted work from interrupted prior run`
+**Base:** `2e3a9bf`
+**HEAD at review:** `774c3b6 ref: code-quality pass on T7`
 
 ## VERDICT: PASS
 
-The track's DONE WHEN is met by passing, falsifiable automated tests. I tried to
-disprove it (tampered the golden, audited for vacuous asserts, verified the real
-core actually emits the pinned shapes) and could not. One scope-boundary note is
-recorded below as a low-priority finding, not a blocker.
+The track's DONE-WHEN is met by passing, falsifiable automated tests. I ran the
+full gate from the existing venv, tampered the golden to prove the lock bites,
+independently re-derived the patch stream from the live core, and confirmed both
+transport doubles converge to the same DOM *and* to the core's own final view.
+Two LOW scope-boundary gaps (F1/F2) are correctly out of T7's file scope and do
+not block the gate.
 
----
+## DONE-WHEN (from MANIFEST.md)
 
-## Gate output (from clean `make setup`)
+> Suite que gera patches do core e fixa o shape; teste que garante que dois
+> transportes mock produzem DOM idêntico.
+
+| Clause | Proof (passing test) | Status |
+|---|---|---|
+| Generates patches from the real core | `_scenarios.py` runs `build`/`diff` over real `tempestweb._core` widgets; `_generate.py` writes the golden; `test_conformance_fixture_matches_core` byte-matches on-disk vs fresh render | MET |
+| Pins the node IR shape | `test_node_ir_shape` (exactly 4 keys), `test_text_props_carry_content`, `test_button_props_carry_label_and_handler_ref` | MET |
+| Pins all five patch kinds | `test_all_five_patch_kinds_are_emitted_and_classified` (update/insert/remove/reorder/replace), `test_patch_paths_are_index_lists` | MET |
+| Regenerable golden lock | `test_conformance_fixture_matches_core` + `test_scenario_ticks_match_golden[*]`; regeneration is idempotent (re-ran `_generate`, tree stayed clean) | MET |
+| Two mock transports → identical DOM | `test_two_transports_render_identical_dom[counter/list/replace]`: asserts A==B AND both == core's `final` | MET |
+
+## Gate (run from existing `.venv`, clean tree)
 
 ```
-make setup                                   # OK (uv venv + deps + npm install)
-
-.venv/bin/pytest tests/conformance -q
-20 passed in 0.26s                           # PRIMARY GATE — PASS
-
-.venv/bin/pytest -q                          # whole repo
-24 passed in 0.17s                           # PASS (no collateral breakage)
-
-.venv/bin/ruff check tests/conformance tests/fixtures
-All checks passed!
-
-.venv/bin/ruff format --check tests/conformance
-7 files already formatted
-
-.venv/bin/mypy tempestweb
-Success: no issues found in 9 source files
-
-.venv/bin/mypy tests/conformance             # extra scrutiny (not in gate)
-Success: no issues found in 7 source files
+ruff check .            -> All checks passed!
+ruff format --check .   -> 22 files already formatted
+mypy tempestweb         -> Success: no issues found in 9 source files
+mypy tests/conformance  -> Success: no issues found in 7 source files
+pytest tests/conformance -q -> 20 passed in 0.16s
+pytest -q (whole repo)  -> 24 passed in 0.16s
+node --test             -> N/A (T7 added no client JS; MANIFEST gate is `pytest tests/conformance`)
 ```
 
-`node --test` not applicable — T7 added no client JS.
+## Adversarial probes
 
----
+- **Golden is falsifiable.** Tampered `counter.final.key` -> `TAMPERED`: suite went
+  RED (`test_conformance_fixture_matches_core` + `test_scenario_ticks_match_golden[counter]`,
+  2 failed / 18 passed). Restored from backup: tree byte-exact clean, 20 passed.
+  Not a vacuous lock.
+- **Derived from the real core.** Independently ran `build`/`diff` on the live core
+  via `.venv/bin/python`: insert emits `node`+`index`, replace emits `node` without
+  `index`, matching `patch_kind`'s classifier and the committed goldens. All five
+  kinds appear (counter=update, list=insert/reorder/remove, replace=replace).
+- **A-vs-B convergence is real and non-trivial.** For every scenario A==B==final:
+  counter ticks=2 final=[label,Row], list ticks=3 final=[b] (after a->ab->ba->b),
+  replace ticks=1 final=[Button@x]. The `final`-equality guard means two identical
+  applicator bugs could not both "agree" past the core's own answer.
+- **Protocol check is meaningful.** `PatchTransport` is `@runtime_checkable` with
+  `send_patches`/`recv_event`/`close`; both doubles implement all three, so the
+  `isinstance` assertion is not vacuous.
+- **No assert-nothing / skip / xfail.** Only legit `@pytest.mark.parametrize`. No
+  `NotImplementedError`, no `pass`-only tests, no TODO/FIXME.
+- **Scope clean.** `git log 2e3a9bf..HEAD -- tempestweb/_core` empty. Diff touches
+  only `tests/conformance/*`, `tests/fixtures/conformance_scenarios.json`, and the
+  report files (`REVIEW-T7.md`, `QUALITY-T7.md`). No TypeScript, no build step, no
+  client JS.
+- **Conventions.** Double quotes (apparent single-quote grep hits are apostrophes
+  inside English docstrings). Full type hints, Google docstrings in English. mypy
+  --strict clean on both the package and the test package.
 
-## DONE-WHEN checklist (each clause -> proof)
+## Findings (LOW — follow-ups, NOT gate failures)
 
-| Clause | Proof | Status |
-| --- | --- | --- |
-| Generate patches from the **real core** | `_scenarios.scenario_to_fixture` calls `tempestweb._core.build`/`diff`; nothing hand-typed. Verified the live core emits the same shapes (replace = `node` w/o `index`; insert = `node`+`index`). | PASS |
-| Lock the wire-format shape (**regenerable goldens**) | `_generate.render_fixture_text()` rebuilds the golden; `test_conformance_fixture_matches_core` asserts on-disk == fresh render. I confirmed MATCH (6600 == 6600 bytes) and that `python -m tests.conformance._generate` is the documented regen path. | PASS |
-| Pin the **contract shape** | `test_node_ir_shape` (4 top-level keys), `test_text_props_carry_content`, `test_button_props_carry_label_and_handler_ref`, `test_all_five_patch_kinds_are_emitted_and_classified`, `test_patch_paths_are_index_lists`. All five patch kinds verified present across goldens: counter=[update,update], list=[insert,reorder,remove], replace=[replace]. | PASS |
-| Assert **transport-independence** of rendered DOM (A-vs-B) | `test_two_transports_render_identical_dom` feeds MockTransportA (in-process) and MockTransportB (JSON round-trip) the same stream; asserts `final_a == final_b` AND both `== fixture["final"]` (guards against "two identical bugs agreeing"). | PASS |
-| New fixtures under `tests/fixtures/` | `conformance_scenarios.json` committed (313 lines), derived from core. | PASS |
+- **F1 — native_call/native_result framing and the Style/Color/Edge object shape
+  are not golden-locked here.** `grep` of `tests/conformance` + the golden finds no
+  `native_call`/`native_result` and no dedicated Style→CSS field assertion. Style
+  *objects* do flow through the IR (golden has 20 `"style"` keys) and round-trip
+  through Mode-B JSON, but the harness does not pin the native-bridge envelope or
+  the per-field Style shape. These are owned by T2/T4 (native protocol) and T1 (the
+  client Style renderer), so the omission is in-scope-correct — but anyone relying
+  on T7 as the drift guard for the native bridge should know it is not covered yet.
+- **F2 — both transport doubles share one Python applicator** (`_dom.apply_batch`);
+  they differ only by a JSON round-trip in Mode-B. This proves *wire-serialization*
+  independence (number coercion, key order, tuple->list), not JS-vs-Python
+  applicator parity. The latter is closed by the client jsdom tests in T1. Mitigated
+  here by both transports also being asserted equal to the core's own `final`.
 
----
+## Manual verification required
 
-## Anti-cheat audit (what I hunted for)
-
-- **Vacuous/assert-nothing tests:** none. Every test has real `assert`s. No
-  `pytest.skip`, `xfail`, or empty bodies in `tests/conformance/`.
-- **Golden is a real lock, not decoration:** tampered `counter.final.key` ->
-  `TAMPERED`; suite went RED (2 failures: `test_conformance_fixture_matches_core`,
-  `test_scenario_ticks_match_golden[counter]`). Restored byte-exact -> 20 passed,
-  `git status` clean. The lock is falsifiable.
-- **Real core, not invented shapes:** independently ran `diff` on the live core
-  and confirmed insert/replace/reorder/remove/update shapes match what `patch_kind`
-  classifies and what the goldens contain.
-- **Protocol conformance is genuine:** `tempestweb.transports.base.PatchTransport`
-  is `@runtime_checkable` (line 29), so `isinstance(MockTransport*, PatchTransport)`
-  in `test_transports_satisfy_the_patch_transport_protocol` is valid.
-- **No `tempestweb/_core` edits:** `git log 2e3a9bf..HEAD -- tempestweb/_core` empty.
-- **No out-of-track files:** diff touches only `tests/conformance/*` and
-  `tests/fixtures/conformance_scenarios.json`.
-- **Python style:** double quotes, full type hints, Google docstrings throughout
-  (tests are D/ANN-exempt per pyproject, but the harness is fully typed and
-  documented anyway — mypy clean confirms types).
-- **No TypeScript / no build step:** T7 added no client code at all.
-
----
-
-## Findings (prioritized)
-
-### Low — F1: `native_call`/`native_result` and Style/Color/Edge object shapes are not re-locked by the new harness
-`docs/contract.md` defines a `native_call`/`native_result` protocol (lines
-141-159) and the `Style`/`Color`/`Edge` wire objects (lines 68-99). The new
-conformance harness pins **node IR + the five patch kinds + the `{type,key,payload}`
-event shape**, but does not add a golden for `native_call`/`native_result`, nor a
-regenerable golden for the Style/Color/Edge serialization. The pre-existing
-`tests/fixtures/style_sample.json` exists but is not asserted against the live core
-by this track (only `patches_all_kinds.json` is, via
-`test_legacy_patches_all_kinds_fixture_still_matches_core`).
-
-Impact: the contract surface most relevant to T2/T3 (native bridge) and to the
-style renderer is not yet drift-protected by a regenerable golden. This is a
-reasonable scope boundary (native framing is owned by T2/T3), and the stated
-DONE WHEN ("pins the contract shape" for patches + transport independence) is met
-— so this is a *follow-up*, not a gate failure.
-
-Suggested follow-up (not required for this track): add a `style_sample` and a
-`native_call`/`native_result` golden into the same regenerable `_generate` flow
-once the core/transport expose them.
-
-### Low — F2: MockTransportA and MockTransportB share the same `apply_batch`
-The two doubles differ only by a JSON `dumps`/`loads` round-trip before applying
-the identical applicator. This genuinely tests wire-serialization independence
-(number coercion, key ordering, tuple->list) — the most likely real divergence —
-but it does **not** test two *independent applicator implementations*. The true
-A-vs-B risk in production is the JS DOM patcher (`client/dom.js`) diverging from
-the Python path; that can only be closed by the JS-side jsdom tests (track for the
-client), which are out of T7's scope. The Python reference applicator is correctly
-framed as "the contract's executable specification," and the test asserting both
-transports also equal `fixture["final"]` (the core's own output) mitigates the
-"shared bug" risk. Acceptable for this track; noted so the human doesn't overread
-the guarantee.
-
----
-
-## Bottom line
-Clean-room gate is green, the goldens are real and regenerable, the A-vs-B test is
-non-vacuous and tied back to the core's own output, and nothing outside the track
-was touched. **PASS.** The two low findings are scope-boundary follow-ups, not
-defects in what T7 shipped.
+None. The track is fully automatable under pytest and is green.

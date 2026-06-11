@@ -18,9 +18,29 @@ from __future__ import annotations
 from typing import Any
 
 from tempest_core import App, Widget
+from tempest_core.navigation import routes_from_path
 from tempest_core.widgets.events import Event, EventValidationError, parse_event
 
-__all__ = ["coerce_event", "apply_scroll"]
+__all__ = ["coerce_event", "apply_scroll", "apply_navigate"]
+
+
+def apply_navigate(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload
+    """Resolve a deep-link / browser navigation into the app's nav stack.
+
+    The client reports the document path on load and on ``popstate`` (back/
+    forward); this resets the app's navigation stack to the routes that path
+    resolves to (``routes_from_path``), so ``view`` re-renders the linked screen
+    with its back stack intact. A malformed payload is ignored.
+
+    Args:
+        app: The application whose navigation stack to reset.
+        payload: The wire payload, expected to carry a string ``path``.
+    """
+    if not isinstance(payload, dict):
+        return
+    path = payload.get("path")
+    if isinstance(path, str) and path:
+        app.reset(routes_from_path(path))
 
 
 def apply_scroll(app: App[Any], key: str, payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload

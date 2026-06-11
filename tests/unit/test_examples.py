@@ -103,6 +103,7 @@ EXAMPLE_NAMES = [
     "gesture_demo",
     "a11y_demo",
     "list_demo",
+    "router_demo",
 ]
 
 

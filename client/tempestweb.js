@@ -8,6 +8,7 @@
 
 import { applyPatches, buildElement } from "./dom.js";
 import { bindEvents } from "./events.js";
+import { installRouter } from "./router.js";
 import { installVirtualization } from "./virtualize.js";
 
 /**
@@ -59,6 +60,7 @@ export function mount(root, transport, initialNode) {
 
   const unbind = bindEvents(root, transport);
   const virtualization = installVirtualization(root, transport);
+  const router = installRouter(transport);
 
   transport.onPatches((patches) => {
     // Partition the batch: overlay-layer patches (path starts with "overlay")
@@ -92,6 +94,7 @@ export function mount(root, transport, initialNode) {
     unmount() {
       unbind();
       virtualization.dispose();
+      router.dispose();
       if (tree.parentNode === root) {
         root.removeChild(tree);
       }

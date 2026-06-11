@@ -13,7 +13,6 @@ theme:
   name: material
   language: pt-BR
   features:
-    - navigation.instant
     - navigation.tracking
     - navigation.sections
     - navigation.top
@@ -42,6 +41,16 @@ theme:
   icon:
     repo: fontawesome/brands/github
 
+# Source design docs live next to the code and are linked from the rendered
+# pages via their GitHub blob URLs. They are not built into the site (they use
+# repo-relative links that do not resolve under --strict).
+exclude_docs: |
+  plan.md
+  roadmap.md
+  contract.md
+  arquitetura.md
+  agents/
+
 plugins:
   - search:
       lang:
@@ -68,16 +77,14 @@ plugins:
             "3. Patches on the wire": "3. Patches na rede"
             "4. Running both modes": "4. Rodando os dois modos"
             "Wire contract": "Contrato de fronteira"
-            "Roadmap (PWA & SSE)": "Roadmap (PWA e SSE)"
-            Reference: Referência
+            Capabilities: Capacidades
+            "PWA & offline": "PWA e offline"
+            Observability: Observabilidade
+            "Roadmap & design docs": "Roadmap e docs de design"
         - locale: en
           name: English (US)
           build: true
           site_name: tempestweb
-          nav_translations:
-            Início: Home
-            Instalação: Installation
-            Arquitetura: Architecture
 
 markdown_extensions:
   - admonition
@@ -116,5 +123,8 @@ nav:
       - "2. State and handlers": tutorial/state.md
       - "3. Patches on the wire": tutorial/patches.md
       - "4. Running both modes": tutorial/modes.md
-  - Wire contract: contract.md
-  - Roadmap (PWA & SSE): roadmap.md
+  - Wire contract: wire-contract.md
+  - Capabilities: capabilities.md
+  - PWA & offline: pwa.md
+  - Observability: observability.md
+  - Roadmap & design docs: design-docs.md

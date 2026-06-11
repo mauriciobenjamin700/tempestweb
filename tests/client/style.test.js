@@ -43,6 +43,26 @@ test("empty style object yields an empty string", () => {
   assert.equal(styleToCss({}), "");
 });
 
+test("transition maps to the CSS transition shorthand (E.4)", () => {
+  const css = styleToCss({
+    transition: { duration_ms: 200, curve: "ease-in-out", delay_ms: 50 },
+  });
+  assert.ok(css.includes("transition: all 200ms ease-in-out 50ms"), css);
+});
+
+test("transition with a zero delay omits the delay term", () => {
+  const css = styleToCss({
+    transition: { duration_ms: 120, curve: "linear", delay_ms: 0 },
+  });
+  assert.ok(css.includes("transition: all 120ms linear"), css);
+  assert.ok(!css.includes("0ms 0ms"), css);
+});
+
+test("bounce/elastic curves fall back to overshooting cubic-beziers", () => {
+  const bounce = styleToCss({ transition: { duration_ms: 100, curve: "bounce", delay_ms: 0 } });
+  assert.ok(bounce.includes("cubic-bezier("), bounce);
+});
+
 test("colorToRgba renders {r,g,b,a} as rgba(...)", () => {
   assert.equal(colorToRgba({ r: 10, g: 20, b: 30, a: 0.5 }), "rgba(10, 20, 30, 0.5)");
 });

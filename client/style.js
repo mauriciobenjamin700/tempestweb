@@ -206,6 +206,30 @@ const TEXT_DECORATION = Object.freeze({
   "line-through": "line-through",
 });
 
+// Core easing curves -> CSS transition-timing-function. The first five are CSS
+// keywords; bounce/elastic have no keyword, so approximate them with the same
+// overshooting cubic-beziers the native renderers use.
+const CURVE_CSS = Object.freeze({
+  linear: "linear",
+  ease: "ease",
+  "ease-in": "ease-in",
+  "ease-out": "ease-out",
+  "ease-in-out": "ease-in-out",
+  bounce: "cubic-bezier(0.68, -0.55, 0.27, 1.55)",
+  elastic: "cubic-bezier(0.68, -0.6, 0.32, 1.6)",
+});
+
+/**
+ * Translate a serialized Transition into a CSS `transition` shorthand.
+ * @param {{duration_ms:number, curve:string, delay_ms:number}} transition
+ * @returns {string} e.g. "all 200ms ease-in-out 50ms"
+ */
+function transitionToCss(transition) {
+  const curve = CURVE_CSS[transition.curve] ?? transition.curve;
+  const delay = transition.delay_ms ? ` ${transition.delay_ms}ms` : "";
+  return `all ${transition.duration_ms}ms ${curve}${delay}`;
+}
+
 /**
  * Translate a serialized Style into a CSS string (declarations joined by "; ").
  *
@@ -324,6 +348,11 @@ export function styleToCss(style) {
   }
   if (style.aspect_ratio != null) {
     rules.push(`aspect-ratio: ${style.aspect_ratio}`);
+  }
+
+  // Implicit animation: tween changed visual properties on the next rebuild.
+  if (style.transition != null) {
+    rules.push(`transition: ${transitionToCss(style.transition)}`);
   }
 
   return rules.join("; ");

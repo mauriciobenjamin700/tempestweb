@@ -179,6 +179,34 @@ export function resolveClickUrl(notificationData, action, fallbackUrl = "/") {
   return fallbackUrl;
 }
 
+/**
+ * Apply the Badging API based on a push payload, where supported.
+ *
+ * A numeric `data.badge_count` (or top-level `badge_count`) sets the app icon
+ * badge; `0` clears it. Degrades silently where the Badging API is absent.
+ *
+ * @param {Object} data        Parsed push JSON.
+ * @param {Object} [navigatorLike]   Object exposing setAppBadge/clearAppBadge
+ *        (defaults to the global `navigator`; injectable for tests).
+ * @returns {Promise<void>}
+ */
+export async function applyBadge(data, navigatorLike) {
+  const nav =
+    navigatorLike ?? (typeof navigator !== "undefined" ? navigator : undefined);
+  if (!nav) return;
+  const raw = data && (data.badge_count ?? (data.data && data.data.badge_count));
+  if (typeof raw !== "number" || Number.isNaN(raw)) return;
+  try {
+    if (raw > 0 && typeof nav.setAppBadge === "function") {
+      await nav.setAppBadge(raw);
+    } else if (raw <= 0 && typeof nav.clearAppBadge === "function") {
+      await nav.clearAppBadge();
+    }
+  } catch {
+    // Badging is best-effort; never let it break the push handler.
+  }
+}
+
 // --- Worker lifecycle (guarded so this file is also importable in tests) -----
 
 if (typeof self !== "undefined" && typeof self.addEventListener === "function") {
@@ -235,6 +263,7 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
             notification.options,
           );
         }
+        await applyBadge(data);
       })(),
     );
   });

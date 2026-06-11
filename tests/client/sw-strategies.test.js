@@ -6,6 +6,7 @@ import {
   stalecaches,
   buildNotification,
   resolveClickUrl,
+  applyBadge,
 } from "../../client/sw/sw.js";
 
 const ORIGIN = "https://app.example";
@@ -74,4 +75,43 @@ test("resolveClickUrl: action url wins over data.url", () => {
 test("resolveClickUrl: falls back when nothing matches", () => {
   assert.equal(resolveClickUrl({}, null, "/fallback"), "/fallback");
   assert.equal(resolveClickUrl(null, "x", "/fallback"), "/fallback");
+});
+
+test("applyBadge: sets a positive count via the Badging API", async () => {
+  let set = null;
+  let cleared = false;
+  const nav = {
+    setAppBadge: async (n) => {
+      set = n;
+    },
+    clearAppBadge: async () => {
+      cleared = true;
+    },
+  };
+  await applyBadge({ badge_count: 3 }, nav);
+  assert.equal(set, 3);
+  assert.equal(cleared, false);
+});
+
+test("applyBadge: clears the badge on zero/negative", async () => {
+  let cleared = false;
+  const nav = {
+    setAppBadge: async () => {},
+    clearAppBadge: async () => {
+      cleared = true;
+    },
+  };
+  await applyBadge({ badge_count: 0 }, nav);
+  assert.equal(cleared, true);
+});
+
+test("applyBadge: reads badge_count nested under data", async () => {
+  let set = null;
+  await applyBadge({ data: { badge_count: 7 } }, { setAppBadge: async (n) => (set = n) });
+  assert.equal(set, 7);
+});
+
+test("applyBadge: no-op when no count or unsupported (no throw)", async () => {
+  await applyBadge({ title: "hi" }, { setAppBadge: async () => assert.fail("should not set") });
+  await applyBadge({ badge_count: 2 }, {}); // unsupported nav: must not throw
 });

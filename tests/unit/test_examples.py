@@ -10,6 +10,7 @@ initial mount.
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import sys
 from pathlib import Path
@@ -92,7 +93,7 @@ def _types(node: Node) -> set[str]:
     return {n.type for n in _walk(node)}
 
 
-EXAMPLE_NAMES = ["counter", "todo", "form", "fetch"]
+EXAMPLE_NAMES = ["counter", "todo", "form", "fetch", "async_demo"]
 
 
 @pytest.mark.parametrize("name", EXAMPLE_NAMES)
@@ -386,6 +387,20 @@ async def test_fetch_error_phase_surfaces_message() -> None:
     error_nodes = [n for n in _walk(node) if n.key == "error"]
     assert error_nodes
     assert "network down" in str(error_nodes[0].props.get("content", ""))
+
+
+async def test_async_demo_handler_is_async_and_commits_after_await() -> None:
+    """The async_demo ``load`` handler is async and commits state after awaiting."""
+    module = _load_example("async_demo")
+    app = _make_app(module)
+
+    assert app.state.status == "idle"
+    handler = _find_handler(module.view(app), "load", "on_click")
+    assert asyncio.iscoroutinefunction(handler)
+
+    await handler()
+    assert app.state.status == "done"
+    assert app.state.loads == 1
 
 
 def _find_handler(widget: Any, key: str, attr: str) -> Any:  # noqa: ANN401 — opaque tree

@@ -5,7 +5,7 @@ format every transport carries is documented in ``docs/contract.md`` and pinned
 by the golden fixtures under ``tests/fixtures/``.
 
 - :class:`~tempestweb.transports.base.PatchTransport` — the Protocol both modes satisfy.
-- :class:`~tempestweb.transports.wasm.WasmTransport` — Mode A (in-process, ``pyodide.ffi``).
+- :class:`~tempestweb.transports.wasm.WasmTransport` — Mode A (``pyodide.ffi``).
 - :class:`~tempestweb.transports.websocket.WebSocketTransport` — Mode B over WS.
 - :class:`~tempestweb.transports.sse.SSETransport` — Mode B over SSE + HTTP POST.
 - Envelope encoders and the ``Envelope``/``Patch``/``Event`` type aliases.

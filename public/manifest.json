@@ -49,11 +49,16 @@
   "tempestweb/devserver/__init__.py",
   "tempestweb/native/__init__.py",
   "tempestweb/runtime/__init__.py",
+  "tempestweb/runtime/serialize.py",
+  "tempestweb/runtime/session.py",
   "tempestweb/runtime/wasm.py",
   "tempestweb/runtime/wasm_main.py",
   "tempestweb/server/__init__.py",
+  "tempestweb/server/app.py",
   "tempestweb/transports/__init__.py",
   "tempestweb/transports/base.py",
+  "tempestweb/transports/sse.py",
   "tempestweb/transports/wasm.py",
+  "tempestweb/transports/websocket.py",
   "examples/counter/app.py"
 ]

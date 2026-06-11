@@ -29,7 +29,12 @@ import asyncio
 from collections.abc import Callable
 from typing import Any
 
-from tempestweb.transports.base import Event, Patch, TransportClosedError
+from tempestweb.transports.base import (
+    Event,
+    NativeResult,
+    Patch,
+    TransportClosedError,
+)
 
 __all__ = ["WasmTransport"]
 
@@ -61,6 +66,7 @@ class WasmTransport:
         """
         self._deliver: DeliverPatches = deliver
         self._events: asyncio.Queue[Event] = asyncio.Queue()
+        self._native_result_handler: Callable[[NativeResult], None] | None = None
         self.closed: bool = False
 
     async def send_patches(self, patches: list[Patch]) -> None:
@@ -118,6 +124,41 @@ class WasmTransport:
         if self.closed:
             raise TransportClosedError("wasm transport is closed")
         self._events.put_nowait(event)
+
+    async def send_native_call(
+        self, call_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Proxy a native capability call — not used in Mode A.
+
+        In Mode A the Python runtime resolves native capabilities **in-process**
+        over ``pyodide.ffi`` (same browser tab), so they never travel through the
+        transport (see ``docs/contract.md``). This method exists to satisfy the
+        :class:`~tempestweb.transports.base.PatchTransport` Protocol.
+
+        Args:
+            call_id: Correlation id matching the awaited ``native_result``.
+            capability: Stable capability name.
+            args: JSON-able arguments for the capability.
+
+        Raises:
+            NotImplementedError: Always — Mode A does not proxy native calls.
+        """
+        raise NotImplementedError(
+            "Mode A resolves native calls in-process via pyodide.ffi; the WASM "
+            "transport does not proxy them (see docs/contract.md)."
+        )
+
+    def on_native_result(self, handler: Callable[[NativeResult], None]) -> None:
+        """Register the sink for inbound ``native_result`` envelopes.
+
+        Stored for Protocol conformance; in Mode A no ``native_result`` is ever
+        routed through the transport (native calls resolve in-process), so the
+        handler is not invoked.
+
+        Args:
+            handler: Callback receiving each JSON-able ``native_result`` payload.
+        """
+        self._native_result_handler = handler
 
     async def close(self) -> None:
         """Tear down the transport, unblocking any pending :meth:`recv_event`.

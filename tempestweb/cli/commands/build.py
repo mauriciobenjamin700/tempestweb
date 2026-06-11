@@ -63,6 +63,7 @@ _WASM_PACKAGE_PARTS: tuple[str, ...] = (
     "runtime",
     "transports",
     "native",
+    "components",
 )
 
 # PWA assets emitted into every artifact (manifest + service worker + icons).

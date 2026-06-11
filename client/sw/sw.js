@@ -207,6 +207,71 @@ export async function applyBadge(data, navigatorLike) {
   }
 }
 
+/**
+ * Build the `push` event handler (P3), extracted so it is unit-testable.
+ *
+ * The returned handler parses the push payload, shows the notification (unless a
+ * `transform` drops it) and applies the app badge. Injectable `registration` /
+ * `navigator` keep it testable without a live ServiceWorkerGlobalScope.
+ *
+ * @param {Object} [opts]
+ * @param {ServiceWorkerRegistration} [opts.registration]
+ *        The registration to show notifications on (default: self.registration).
+ * @param {Object} [opts.navigator]   Badging target (default: global navigator).
+ * @param {string} [opts.defaultTitle]   Fallback notification title.
+ * @param {string} [opts.defaultIcon]    Fallback notification icon URL.
+ * @param {(d: Object) => ({title: string, options: Object}|null)} [opts.transform]
+ *        Optional shaper; return null to suppress the notification.
+ * @returns {(event: Object) => Promise<void>} The push handler body.
+ */
+export function installPushHandler(opts = {}) {
+  return async function onPush(event) {
+    /** @type {Object} */
+    let data = {};
+    try {
+      data = event.data ? event.data.json() : {};
+    } catch {
+      data = { body: event.data ? event.data.text() : "" };
+    }
+    const notification = buildNotification(data, opts);
+    if (notification) {
+      const reg =
+        opts.registration ??
+        (typeof self !== "undefined" ? self.registration : undefined);
+      if (reg) {
+        await reg.showNotification(notification.title, notification.options);
+      }
+    }
+    await applyBadge(data, opts.navigator);
+  };
+}
+
+/**
+ * Build the `notificationclick` event handler (P3), extracted for unit testing.
+ *
+ * The returned handler closes the notification, resolves the deep-link URL and
+ * focuses/opens a client window on it. `focusOrOpen` is injectable so the routing
+ * can be asserted without a live `clients` registry.
+ *
+ * @param {Object} [opts]
+ * @param {string} [opts.fallbackUrl]   URL when the payload carries no deep link.
+ * @param {(url: string) => Promise<void>} [opts.focusOrOpen]
+ *        Override the focus/open routine (default: the worker's focusOrOpen).
+ * @returns {(event: Object) => Promise<void>} The notificationclick handler body.
+ */
+export function installNotificationClickHandler(opts = {}) {
+  const open = opts.focusOrOpen ?? focusOrOpen;
+  const fallback = opts.fallbackUrl ?? "/";
+  return async function onNotificationClick(event) {
+    if (event.notification && typeof event.notification.close === "function") {
+      event.notification.close();
+    }
+    const data = event.notification ? event.notification.data : {};
+    const url = resolveClickUrl(data, event.action || null, fallback);
+    await open(url);
+  };
+}
+
 // --- Worker lifecycle (guarded so this file is also importable in tests) -----
 
 if (typeof self !== "undefined" && typeof self.addEventListener === "function") {
@@ -246,36 +311,14 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
     event.respondWith(handleFetch(request, strategy));
   });
 
+  const onPush = installPushHandler();
   self.addEventListener("push", (event) => {
-    event.waitUntil(
-      (async () => {
-        /** @type {Object} */
-        let data = {};
-        try {
-          data = event.data ? event.data.json() : {};
-        } catch {
-          data = { body: event.data ? event.data.text() : "" };
-        }
-        const notification = buildNotification(data);
-        if (notification) {
-          await self.registration.showNotification(
-            notification.title,
-            notification.options,
-          );
-        }
-        await applyBadge(data);
-      })(),
-    );
+    event.waitUntil(onPush(event));
   });
 
+  const onNotificationClick = installNotificationClickHandler();
   self.addEventListener("notificationclick", (event) => {
-    event.notification.close();
-    const url = resolveClickUrl(
-      event.notification.data,
-      event.action || null,
-      "/",
-    );
-    event.waitUntil(focusOrOpen(url));
+    event.waitUntil(onNotificationClick(event));
   });
 
   // Background Sync: replay the durable offline queue when connectivity returns.

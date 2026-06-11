@@ -77,6 +77,8 @@ from tempestweb.native.notifications import (
     NotificationPermission,
     notify,
     request_permission,
+    subscribe,
+    unsubscribe,
 )
 from tempestweb.native.share import (
     ShareOutcome,
@@ -147,4 +149,6 @@ __all__ = [
     "NotificationPermission",
     "notify",
     "request_permission",
+    "subscribe",
+    "unsubscribe",
 ]

@@ -89,3 +89,8 @@ def test_wasm_app_handle_exposes_js_contract() -> None:
     for name in ("initial_node_json", "push_event_json", "close"):
         assert callable(getattr(WasmAppHandle, name)), name
     assert callable(bootstrap)
+    # index.html calls handle(on_patches, window.__tempestweb_native__), so the
+    # bootstrap must accept the optional native ``dispatch`` arg as its 4th param.
+    params = list(inspect.signature(bootstrap).parameters)
+    assert params[:4] == ["state", "view", "on_patches", "dispatch"]
+    assert inspect.signature(bootstrap).parameters["dispatch"].default is None

@@ -96,6 +96,21 @@ class ProxyBridge:
         """
         return resolve_native_result(call_id, payload, self._pending)
 
+    def fail_pending(self, exc: BaseException) -> None:
+        """Settle every in-flight call with ``exc`` (without closing the bridge).
+
+        Lets the owner (e.g. a Mode-B session at teardown) fail outstanding calls
+        with a domain-specific error — such as a transport-closed error — instead
+        of the plain :class:`asyncio.CancelledError` that :meth:`close` raises.
+
+        Args:
+            exc: The exception to set on each not-yet-settled pending future.
+        """
+        for future in self._pending.values():
+            if not future.done():
+                future.set_exception(exc)
+        self._pending.clear()
+
     def close(self) -> None:
         """Close the bridge and cancel any in-flight calls."""
         self._closed = True

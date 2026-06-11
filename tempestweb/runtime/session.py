@@ -30,6 +30,12 @@ from typing import Any, Generic, TypeVar
 from tempestweb._core import App, Widget
 from tempestweb._core import Patch as CorePatch
 from tempestweb._core.widgets import handler_accepts_event
+from tempestweb.native.bridges import ProxyBridge
+from tempestweb.native.dispatch import (
+    install_bridge,
+    native_call,
+    uninstall_bridge,
+)
 from tempestweb.runtime.serialize import (
     patches_to_wire,
     resolve_handler,
@@ -86,8 +92,35 @@ class AppSession(Generic[S]):
         self._tasks: set[asyncio.Task[None]] = set()
         self._closed: bool = False
         self._native_seq: count[int] = count(1)
-        self._native_pending: dict[str, asyncio.Future[Any]] = {}
+        # The Mode-B native bridge: it owns the call_id -> Future registry and
+        # proxies each native_call down the transport. Its send_frame spawns the
+        # async transport send as a tracked task; its resolve() is fed by the
+        # transport's native_result sink. The session reuses this bridge for both
+        # its own public native_call() and the dispatch-module path
+        # (await native.<capability>()), so there is no duplicated proxy logic.
+        self._bridge: ProxyBridge = ProxyBridge(self._send_native_frame)
+        self._bridge_installed: bool = False
         transport.on_native_result(self._resolve_native_result)
+
+    def _send_native_frame(self, envelope: dict[str, Any]) -> None:
+        """Ship a ``native_call`` envelope to the client over the transport.
+
+        Wired into the :class:`ProxyBridge` as its synchronous ``send_frame``: the
+        bridge builds the envelope and registers its pending future, then calls
+        this to forward the frame. Sending is async, so the coroutine is spawned
+        as a tracked session task (cancelled on :meth:`close`).
+
+        Args:
+            envelope: The ``native_call`` envelope ``{"call_id", "capability",
+                "args", ...}`` produced by the bridge.
+        """
+        self._spawn(
+            self.transport.send_native_call(
+                str(envelope["call_id"]),
+                str(envelope["capability"]),
+                dict(envelope.get("args", {})),
+            )
+        )
 
     def _apply_patches(self, patches: list[CorePatch]) -> None:
         """App ``apply_patches`` callback: forward a rebuilt batch to the client.
@@ -119,16 +152,30 @@ class AppSession(Generic[S]):
         task.add_done_callback(self._tasks.discard)
 
     async def start(self) -> None:
-        """Mount the session: build the initial scene and send initial patches.
+        """Mount the session: install the bridge and send initial patches.
 
-        Builds the isolated app, records its initial scene, and pushes the initial
-        patch batch (a root replace) so the client renders the first screen.
+        Builds the isolated app, installs this session's :class:`ProxyBridge` as
+        the process-wide native bridge (so ``await native.<capability>()`` inside a
+        handler proxies to the client), records the initial scene, and pushes the
+        initial patch batch (a root replace) so the client renders the first
+        screen.
+
+        Note:
+            ``install_bridge`` is process-global (see
+            :mod:`tempestweb.native.dispatch`). For the single-session-per-process
+            path this is correct; with multiple concurrent server sessions the last
+            ``start()`` wins for the dispatch-module path, so a session always uses
+            its **own** bridge through :meth:`native_call`. Cross-session isolation
+            of ``await native.*`` is a known limitation tracked for the
+            session-local context-var bridge follow-up.
         """
         self.app = App(
             state=self._state_factory(),
             view=self._view,
             apply_patches=self._apply_patches,
         )
+        install_bridge(self._bridge)
+        self._bridge_installed = True
         scene = self.app.start()
         await self.transport.send_patches(scene_to_initial_patches(scene))
 
@@ -185,21 +232,19 @@ class AppSession(Generic[S]):
             TransportClosedError: If the connection drops before a result.
         """
         call_id = f"c{next(self._native_seq)}"
-        loop = asyncio.get_running_loop()
-        future: asyncio.Future[Any] = loop.create_future()
-        self._native_pending[call_id] = future
-        try:
-            await self.transport.send_native_call(call_id, capability, args)
-            return await future
-        finally:
-            self._native_pending.pop(call_id, None)
+        result = await self._bridge.call(native_call(capability, args, call_id))
+        if not result.get("ok", False):
+            raise NativeCallError(str(result.get("error")))
+        return result.get("value")
 
     def _resolve_native_result(self, result: NativeResult) -> None:
         """Resolve the awaitable for an inbound ``native_result`` envelope.
 
-        Registered as the transport's native-result sink. Matches ``call_id`` to
-        a pending future and settles it with the value or a
-        :class:`NativeCallError`. Unknown / stale ``call_id`` values are ignored.
+        Registered as the transport's native-result sink. Delegates to the
+        :class:`ProxyBridge`, which matches ``call_id`` to its pending future and
+        settles it with the full result payload. Unknown / stale ``call_id`` values
+        are ignored. The success/error split is applied by the awaiter
+        (:meth:`native_call` or the dispatch-module ``send_native_call``).
 
         Args:
             result: The JSON-able ``native_result`` payload.
@@ -207,14 +252,7 @@ class AppSession(Generic[S]):
         call_id = result.get("call_id")
         if not isinstance(call_id, str):
             return
-        future = self._native_pending.get(call_id)
-        if future is None or future.done():
-            return
-        if result.get("ok"):
-            future.set_result(result.get("value"))
-        else:
-            error = result.get("error")
-            future.set_exception(NativeCallError(str(error)))
+        self._bridge.resolve(call_id, result)
 
     async def run(self) -> None:
         """Serve the client until the transport closes.
@@ -243,10 +281,16 @@ class AppSession(Generic[S]):
         if self._closed:
             return
         self._closed = True
-        for future in self._native_pending.values():
-            if not future.done():
-                future.set_exception(TransportClosedError("session closed"))
-        self._native_pending.clear()
+        # Settle any in-flight native_call awaiters with the documented
+        # TransportClosedError before tearing the bridge down (the bridge's own
+        # close() would cancel them, but native_call() promises TransportClosedError
+        # on disconnect). Then close + uninstall the bridge so a stale process-wide
+        # bridge never leaks into the next session or test.
+        self._bridge.fail_pending(TransportClosedError("session closed"))
+        self._bridge.close()
+        if self._bridge_installed:
+            uninstall_bridge()
+            self._bridge_installed = False
         tasks = list(self._tasks)
         for task in tasks:
             task.cancel()

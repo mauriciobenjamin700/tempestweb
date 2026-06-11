@@ -68,7 +68,7 @@ derrubar o app. O resto da árvore segue vivo.
 
 ```python
 from tempestweb.observability import error_boundary
-from tempestweb._core import Text, Widget
+from tempest_core import Text, Widget
 
 
 @error_boundary(fallback=lambda err: Text(content=f"Algo quebrou: {err}"))

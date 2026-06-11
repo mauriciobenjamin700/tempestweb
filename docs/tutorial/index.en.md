@@ -54,8 +54,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.style import Edge
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.style import Edge
 
 
 @dataclass

@@ -1,0 +1,133 @@
+# Ready-made components
+
+You **don't** have to build a login form field by field. tempestweb ships
+ready-made, validated, good-looking-by-default components — you write the minimum,
+the component does the rest. 🚀
+
+Everything comes from one obvious place:
+
+```python
+from tempestweb.components import EmailField, PasswordField, LoginForm, validate_email
+```
+
+## Ready-made fields
+
+Each field is **controlled**: pass the current `value` and an `on_change` that
+stores the new text; pass `error` to show a validation message.
+
+```python
+from tempest_core import App, Column, Widget
+from tempestweb.components import EmailField
+
+
+def view(app: App[State]) -> Widget:
+    def set_email(value: str) -> None:
+        app.set_state(lambda s: setattr(s, "email", value))
+
+    return Column(
+        children=[
+            EmailField(
+                value=app.state.email,
+                on_change=set_email,
+                error=app.state.email_error,  # "" when valid
+                key="email",
+            ),
+        ],
+    )
+```
+
+The available fields:
+
+| Field | For | Validator |
+|---|---|---|
+| `EmailField` | E-mail (e-mail keyboard, icon) | `validate_email` |
+| `PasswordField` | Password (secure field) | — |
+| `PhoneField` | Masked BR phone `(99) 99999-9999` | `validate_phone` |
+| `CPFField` | Masked CPF | `validate_cpf` |
+| `CNPJField` | Masked CNPJ | `validate_cnpj` |
+| `AddressField` | Address | — |
+
+!!! tip "Validators return `None` when OK"
+    `validate_email("you@example.com")` returns `None`; an invalid value returns
+    the error message (a string). Store that string in the field's `error`:
+
+    ```python
+    error = validate_email(app.state.email) or ""
+    ```
+
+## A complete login form
+
+`LoginForm` composes email + password + a submit button in **one call**. You only
+keep the values in state; the form handles layout, labels and errors.
+
+```python
+from dataclasses import dataclass
+
+from tempest_core import App, Column, Text, Widget
+from tempestweb.components import LoginForm, validate_email
+
+
+@dataclass
+class LoginState:
+    email: str = ""
+    password: str = ""
+    email_error: str = ""
+    status: str = ""
+
+
+def make_state() -> LoginState:
+    return LoginState()
+
+
+def view(app: App[LoginState]) -> Widget:
+    def set_email(value: str) -> None:
+        app.set_state(lambda s: setattr(s, "email", value))
+
+    def set_password(value: str) -> None:
+        app.set_state(lambda s: setattr(s, "password", value))
+
+    def submit() -> None:
+        error = validate_email(app.state.email) or ""
+
+        def commit(s: LoginState) -> None:
+            s.email_error = error
+            s.status = "" if error else f"Welcome, {s.email}!"
+
+        app.set_state(commit)
+
+    return Column(
+        children=[
+            LoginForm(
+                email=app.state.email,
+                password=app.state.password,
+                on_email_change=set_email,
+                on_password_change=set_password,
+                on_submit=submit,
+                email_error=app.state.email_error,
+                title="Sign in",
+            ),
+            Text(content=app.state.status, key="status"),
+        ],
+    )
+```
+
+That's it. This is the `examples/login_demo` example — it runs the same in both
+modes:
+
+```bash
+tempestweb run --mode wasm     # Python in the browser (Pyodide)
+tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+```
+
+!!! info "Why controlled?"
+    State lives in the `App` (one source of truth), so the form keeps no hidden
+    state. You always know what's in the fields — and can pre-fill, clear or
+    validate them from outside whenever you want.
+
+## Recap
+
+- Import from `tempestweb.components` — fields and forms in one place.
+- Fields are **controlled**: `value` + `on_change` (+ optional `error`).
+- `LoginForm` is a whole form in one call; you just wire it to your state.
+- Validators (`validate_email`, `validate_phone`, …) return `None` when OK.
+- Everything renders the same in Mode A (WASM) and Mode B (server).

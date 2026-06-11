@@ -68,7 +68,7 @@ bringing the app down. The rest of the tree stays alive.
 
 ```python
 from tempestweb.observability import error_boundary
-from tempestweb._core import Text, Widget
+from tempest_core import Text, Widget
 
 
 @error_boundary(fallback=lambda err: Text(content=f"Something broke: {err}"))

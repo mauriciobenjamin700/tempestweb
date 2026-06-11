@@ -47,9 +47,21 @@ target-version = "py311"
 extend-exclude = ["tempestweb/_core"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "Q"]
-# Vendored core is a mechanical copy — do not lint it.
-exclude = ["tempestweb/_core/**"]
+# Mirrors tempestroid / tempest-fastapi-sdk: annotations (ANN) and docstrings (D)
+# are part of the gate, not optional.
+select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "Q", "ANN", "D"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests and examples are exempt from docstring/annotation ceremony.
+"tests/*" = ["D", "ANN"]
+"examples/*" = ["D"]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "double"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.format]
 quote-style = "double"

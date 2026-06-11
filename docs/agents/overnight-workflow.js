@@ -4,6 +4,7 @@ export const meta = {
     "Parallel build of tempestweb across independent tracks, each in its own git worktree/branch with a domain specialist, then an adversarial QA review per track.",
   phases: [
     { title: "Build", detail: "track specialists implement in parallel worktrees off main" },
+    { title: "Quality", detail: "tw-quality raises each branch to the docstring/typing/lint bar and applies fixes" },
     { title: "QA", detail: "tw-qa reviews each branch from scratch as it lands" },
   ],
 };
@@ -47,6 +48,23 @@ When scope is complete and green, write SUMMARY-${t.id}.md (what you built, what
 stubbed, what needs manual verification, suggested merge order) and make a final
 commit. Report: branch name, commit count, test status, and anything the human must
 verify by hand.`;
+}
+
+function qualityPrompt(t) {
+  return `Code-quality pass on track ${t.id} (branch ${t.branch}).
+
+  cd ${REPO}-${t.id}
+
+Raise this branch to the tempest-fastapi-sdk / tempestroid bar: Google docstrings
+on every public surface, full type annotations (ruff ANN + mypy --strict), lint
+clean under the full select set, ruff format clean, double quotes, idiomatic
+imports/collections/async, and complete accurate JSDoc on the client side. APPLY
+the fixes (ruff --fix + format for mechanical ones, then docstrings/types/idioms by
+hand) WITHOUT changing behavior or public signatures beyond adding types. Never
+edit tempestweb/_core/ and never touch files outside this track. Re-run the
+branch's own tests to confirm it stays green, then commit
+"ref: code-quality pass on ${t.id}". Defer anything needing a behavior change to
+QUALITY-${t.id}.md and report it.`;
 }
 
 function qaPrompt(t, buildReport) {
@@ -169,9 +187,10 @@ const TRACKS = [
 phase("Build");
 log(`Launching ${TRACKS.length} track specialists in parallel worktrees off main; each is QA-reviewed as it lands.`);
 
-// Pipeline: each track implements with its domain specialist, then tw-qa reviews
-// that branch from scratch — no barrier, so a finished track is reviewed while
-// others are still building.
+// Pipeline (no barrier): each track is implemented by its domain specialist, then
+// raised to the quality bar by tw-quality (which applies fixes), then adversarially
+// verified by tw-qa — all per-track, so a finished track flows through quality+QA
+// while other tracks are still building.
 const results = await pipeline(
   TRACKS,
   (t) =>
@@ -179,18 +198,25 @@ const results = await pipeline(
       (report) => ({ ...t, buildReport: report })
     ),
   (built) =>
-    agent(qaPrompt(built, built.buildReport), {
-      label: `qa:${built.id}`,
+    agent(qualityPrompt(built), {
+      label: `quality:${built.id}`,
+      phase: "Quality",
+      agentType: "tw-quality",
+    }).then((qualityReport) => ({ ...built, qualityReport })),
+  (checked) =>
+    agent(qaPrompt(checked, checked.buildReport), {
+      label: `qa:${checked.id}`,
       phase: "QA",
       agentType: "tw-qa",
-    }).then((review) => ({
-      id: built.id,
-      branch: built.branch,
-      buildReport: built.buildReport,
-      qaReview: review,
+    }).then((qaReview) => ({
+      id: checked.id,
+      branch: checked.branch,
+      buildReport: checked.buildReport,
+      qualityReport: checked.qualityReport,
+      qaReview,
     }))
 );
 
 const ok = results.filter(Boolean);
-log(`Done. ${ok.length}/${TRACKS.length} tracks built + QA-reviewed.`);
+log(`Done. ${ok.length}/${TRACKS.length} tracks built + quality-passed + QA-reviewed.`);
 return ok;

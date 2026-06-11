@@ -38,16 +38,26 @@ docs). Gate global: `make check` (ruff + mypy + pytest + JS jsdom).
 
 ## Especialistas (agentType) + estágio QA
 
-Cada track roda com um **agente especialista de projeto** (`.claude/agents/`), e
-toda branch passa por uma **revisão QA adversarial** assim que fecha (pipeline:
-implementa → `tw-qa` revisa do zero → `REVIEW-<ID>.md`).
+Cada track é um **pipeline de 3 estágios** (sem barreira — track que fecha flui pra
+qualidade+QA enquanto outros ainda constroem):
 
-| Especialista | Tracks | Foco |
+1. **build** — o especialista de domínio implementa o escopo.
+2. **quality** — `tw-quality` eleva ao padrão (docstrings google, tipagem forte
+   ANN+mypy strict, lint completo, idiomas) e **aplica fixes**, mantendo verde.
+3. **qa** — `tw-qa` revisa adversarialmente do zero e reporta (`REVIEW-<ID>.md`).
+
+| Especialista | Onde | Foco |
 |---|---|---|
-| **tw-python** | T2, T3, T4, T5, T8 | FastAPI/async/pydantic, mypy --strict, aspas duplas, docstrings EN |
-| **tw-js** | T1, T9 | JS puro (sem TS/framework/build), JSDoc, jsdom, contrato/fixtures |
-| **tw-docs** | T6 | MkDocs bilíngue tiangolo, `--strict`, deploy Pages, docs↔código |
-| **tw-qa** | T7 + revisão de **todas** as branches | roda o gate do zero, contesta o "feito quando", caça overclaim |
+| **tw-python** | build de T2, T3, T4, T5, T8 | FastAPI/async/pydantic, mypy --strict, aspas duplas, docstrings EN |
+| **tw-js** | build de T1, T9 | JS puro (sem TS/framework/build), JSDoc, jsdom, contrato/fixtures |
+| **tw-docs** | build de T6 | MkDocs bilíngue tiangolo, `--strict`, deploy Pages, docs↔código |
+| **tw-quality** | estágio quality de **toda** branch | padrão sdk/tempestroid: docstrings, tipagem, lint, boas práticas — aplica fixes |
+| **tw-qa** | T7 + estágio qa de **toda** branch | roda o gate do zero, contesta o "feito quando", caça overclaim |
+
+Gate do projeto já reflete o padrão: ruff `select` inclui `ANN` (anotações) + `D`
+(docstrings google), `flake8-quotes` double, `mypy --strict`. `make check` falha se
+faltar docstring ou tipo — então o padrão é enforçado automaticamente, e o
+`tw-quality` garante a qualidade idiomática que o linter não pega.
 
 `tw-docs` é dono permanente da doc: mantém o site sincronizado com o código e
 garante o build/deploy das Pages (não só na noite — sempre que a superfície muda).

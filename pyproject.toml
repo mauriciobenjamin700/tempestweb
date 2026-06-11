@@ -1,6 +1,6 @@
 [project]
 name = "tempestweb"
-version = "0.0.0"
+version = "0.1.0"
 description = "Build web apps in typed Python — one tree, a DOM renderer, two execution modes (WASM + server)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -52,8 +52,19 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["tempestweb"]
 
-# tempest-core is not yet on PyPI; resolve it from the sibling checkout until it
-# is published. Remove this source once `pip install tempest-core` works.
+# The pure-JS client lives at the repo root (shared, build-step-free). Ship it
+# inside the wheel under tempestweb/_client so `tempestweb build` finds it when
+# installed from PyPI (it is the leaf renderer copied into every artifact).
+[tool.hatch.build.targets.wheel.force-include]
+"client" = "tempestweb/_client"
+
+# The sdist also needs the client/ tree (it is outside the package dir).
+[tool.hatch.build.targets.sdist]
+include = ["tempestweb", "client", "README.md", "CHANGELOG.md", "pyproject.toml"]
+
+# tempest-core is not yet on PyPI; resolve it from the sibling checkout for local
+# dev. pip/PyPI ignore [tool.uv.sources]; the wheel only declares
+# `tempest-core>=0.1.0`, so publish tempest-core first. Remove once it is on PyPI.
 [tool.uv.sources]
 tempest-core = { path = "../tempest-core", editable = true }
 

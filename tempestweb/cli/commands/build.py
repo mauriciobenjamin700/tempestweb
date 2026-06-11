@@ -133,19 +133,28 @@ class BuildResult:
 
 
 def _client_dir() -> Path:
-    """Locate the repository's shared ``client/`` directory.
+    """Locate the shared pure-JS ``client/`` directory.
+
+    Prefers the copy shipped inside the installed package (``tempestweb/_client``,
+    force-included into the wheel); falls back to the repo-root ``client/`` when
+    running from a source checkout.
 
     Returns:
-        The absolute path to the ``client/`` directory shipped with tempestweb.
+        The absolute path to the client asset directory.
 
     Raises:
-        BuildError: If the client directory cannot be found.
+        BuildError: If neither location exists.
     """
-    # tempestweb/cli/commands/build.py -> repo root is three parents up.
-    candidate = Path(__file__).resolve().parents[3] / "client"
-    if not candidate.is_dir():
-        raise BuildError(f"shared client directory not found at {candidate}")
-    return candidate
+    here = Path(__file__).resolve()
+    packaged = here.parents[2] / "_client"  # tempestweb/_client (installed wheel)
+    if packaged.is_dir():
+        return packaged
+    source = here.parents[3] / "client"  # repo-root client/ (dev checkout)
+    if source.is_dir():
+        return source
+    raise BuildError(
+        f"client assets not found (looked in {packaged} and {source})"
+    )
 
 
 def _package_dir() -> Path:

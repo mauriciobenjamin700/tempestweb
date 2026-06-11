@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 from fastapi.testclient import TestClient
@@ -174,3 +175,84 @@ def test_sse_post_to_unknown_session_returns_404() -> None:
         json={"kind": "event", "data": {"type": "click", "key": "inc"}},
     )
     assert response.status_code == 404
+
+
+def _read_sse_frame(lines: Iterator[str]) -> tuple[int | None, dict]:
+    """Accumulate raw stream lines until a blank line, then parse one SSE block.
+
+    ``httpx``'s ``iter_lines`` strips the line terminators, so a block ends at the
+    first empty string. ``ping`` heartbeats (which carry no ``id:``) are skipped so
+    the caller only sees real ``patches`` frames.
+
+    Args:
+        lines: An iterator over the streaming response's text lines.
+
+    Returns:
+        The ``(id, json-data)`` pair for the next non-ping SSE event.
+
+    Raises:
+        AssertionError: If the stream ends before a non-ping frame arrives.
+    """
+    block: list[str] = []
+    for raw in lines:
+        if raw == "":
+            if not block:
+                continue
+            text = "\n".join(block)
+            block = []
+            if "event: ping" in text:
+                continue
+            return _parse_frame(text)
+        block.append(raw)
+    raise AssertionError("stream ended before a non-ping frame")
+
+
+def test_sse_endpoint_mount_then_post_click_yields_update() -> None:
+    """GET /sse mounts, POST /sse/{id} clicks, and the stream emits the Update.
+
+    This exercises the literal 'patches down EventSource + events up via POST' half
+    of the SSE contract through the real FastAPI app: ``_open_sse`` builds the
+    streaming response and drives the session, ``_handle_sse_post`` routes the
+    POSTed click into the session via ``feed_inbound`` and returns 204, and the
+    resulting ``Update`` patch comes back down the same event stream.
+    """
+    client = TestClient(create_app(make_state, view))
+    with client.stream("GET", "/sse?session=s1") as stream:
+        assert stream.status_code == 200
+        assert stream.headers["content-type"].startswith("text/event-stream")
+        lines = stream.iter_lines()
+
+        first_id, mount_env = _read_sse_frame(lines)
+        assert first_id == 1
+        assert mount_env["kind"] == "patches"
+        assert mount_env["data"][0]["path"] == []
+        assert _find_label_content(mount_env["data"][0]["node"]) == "Count: 0"
+
+        post = client.post(
+            "/sse/s1",
+            json={"kind": "event", "data": {"type": "click", "key": "inc"}},
+        )
+        assert post.status_code == 204
+
+        update_id, update_env = _read_sse_frame(lines)
+        assert update_id == 2
+        assert update_env["kind"] == "patches"
+        assert _label_set_props(update_env) == {"content": "Count: 1"}
+
+
+def _find_label_content(node: dict) -> str | None:
+    """Find the ``label`` node's ``content`` prop in a wire node tree.
+
+    Args:
+        node: A wire ``Node`` dict (``{type, key, props, children}``).
+
+    Returns:
+        The ``content`` of the node keyed ``label``, or ``None`` if absent.
+    """
+    if node.get("key") == "label":
+        return node["props"].get("content")
+    for child in node.get("children", []):
+        found = _find_label_content(child)
+        if found is not None:
+            return found
+    return None

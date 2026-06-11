@@ -34,7 +34,11 @@ from typing import Any, Generic, TypeVar
 
 from tempestweb._core import App, Node, Scene, Widget
 from tempestweb._core.core.ir import Patch
-from tempestweb.transports.base import Event, PatchTransport
+from tempestweb.transports.base import (
+    Event,
+    PatchTransport,
+    TransportClosedError,
+)
 from tempestweb.transports.base import Patch as WirePatch
 
 __all__ = ["WasmRuntime", "serialize_node", "serialize_patches"]
@@ -307,8 +311,6 @@ class WasmRuntime(Generic[S]):
         transport raises :class:`~tempestweb.transports.base.TransportClosedError`
         from :meth:`recv_event` (the page closed or the bridge tore down).
         """
-        from tempestweb.transports.base import TransportClosedError
-
         while True:
             try:
                 event = await self._transport.recv_event()

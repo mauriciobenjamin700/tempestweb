@@ -1,8 +1,9 @@
 # Contrato de fronteira (wire format)
 
 Este é o contrato entre o **Python** (reconciliador, vindo do core) e o **cliente
-JS** (que muta o DOM). É o **mesmo** nos dois modos (WASM e servidor) — só o
-transporte (`pyodide.ffi` vs WebSocket) muda. Pinado por golden fixtures em
+JS** (que muta o DOM). É o **mesmo** nos três transportes (`pyodide.ffi` no Modo A;
+WebSocket ou SSE no Modo B) — só o meio de transporte muda, nunca o shape dos
+dados. Pinado por golden fixtures em
 [`tests/fixtures/`](../tests/fixtures/), **derivadas do core real** (não
 inventadas). Qualquer agente que trabalhe no cliente JS ou nos transportes
 programa contra este documento e essas fixtures.
@@ -110,3 +111,50 @@ O lado Python resolve a `key` → handler do nó na árvore atual, valida o `pay
 O core já coalesce múltiplos `set_state` do mesmo tick num único `diff`. O
 transporte recebe **uma lista de patches por tick** — o cliente aplica a lista
 inteira antes do próximo frame.
+
+## Enquadramento por transporte (o payload é o mesmo)
+
+O shape de Node/Patch/Evento acima **não muda** entre transportes; muda só o
+envelope:
+
+- **WASM (Modo A):** chamada de função em-processo via `pyodide.ffi`. Python passa
+  a lista de patches (já JSON-able) direto ao cliente; eventos voltam por callback.
+- **WebSocket (Modo B):** cada mensagem WS é um JSON `{ "kind": "patches", "data":
+  [<Patch>...] }` (servidor→cliente) ou `{ "kind": "event", "data": <Evento> }`
+  (cliente→servidor). Bidirecional no mesmo canal.
+- **SSE (Modo B, B5):** o servidor responde `text/event-stream`. Cada tick é um
+  evento SSE cujo `data:` é o JSON da **mesma** lista de patches. Heartbeat: evento
+  nomeado `ping` em intervalo fixo. Como SSE é uni-direcional, os **eventos sobem
+  por HTTP POST** (corpo = `<Evento>`), correlacionados à sessão pela URL. Reconnect
+  usa `Last-Event-ID` para retomar do último tick.
+
+## Chamada nativa (capacidade `native/`, Modo B — proxy)
+
+O **4º cruzamento** da fronteira (além de IR→cliente, Evento→handler e Style). No
+**Modo A** uma capacidade `native/` chama a Web API direto no browser, sem rede —
+não há wire format. No **Modo B** a capacidade é **proxiada por um round-trip**: o
+Python no servidor "pede" e o cliente executa a Web API. Duas mensagens novas no
+transporte (WS ou SSE+POST):
+
+```json
+// servidor → cliente: pedido de capacidade nativa
+{ "kind": "native_call", "call_id": "c1", "capability": "geolocation.get", "args": {} }
+
+// cliente → servidor: resultado tipado (ou erro)
+{ "kind": "native_result", "call_id": "c1", "ok": true,  "value": { "lat": -23.5, "lon": -46.6 } }
+{ "kind": "native_result", "call_id": "c1", "ok": false, "error": "PermissionDenied" }
+```
+
+- `call_id` correlaciona pedido↔resultado (várias chamadas podem estar em voo).
+- `capability` é o nome estável (`geolocation.get`, `clipboard.read`,
+  `camera.capture`, …). `args`/`value` são **JSON-able**; binários (foto) vão como
+  base64 ou referência de blob.
+- O lado Python expõe isso como um **awaitable tipado** (`await geolocation.get()`):
+  manda `native_call`, suspende a task até o `native_result` casar o `call_id`,
+  valida o `value` com Pydantic e resolve. Erro vira exceção tipada.
+- `notifications.subscribe` (WebPush, P3) e `storage.*` (IndexedDB, P2) seguem o
+  mesmo envelope.
+
+> No Modo A o mesmo awaitable Python resolve em-processo (sem `native_call`/
+> `native_result`) — a **API Python é idêntica**, só o caminho muda. É a razão de a
+> assinatura tipada morar no contrato, não no transporte.

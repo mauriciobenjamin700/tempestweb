@@ -2,8 +2,10 @@
 
 tempestweb é o irmão web do [tempestroid](../../tempestroid): a mesma ideia de
 **uma árvore, múltiplos renderizadores**, com um renderizador-folha para o **DOM**
-e **dois transportes** de patch (FFI Pyodide e WebSocket) que dão origem aos dois
-modos de execução.
+e **três transportes** de patch (FFI Pyodide no Modo A; WebSocket **ou** SSE no
+Modo B) por trás de dois modos de execução. Sobre essa base há camadas
+compartilhadas: **capacidades `native/`** (Trilho N), **PWA/offline/WebPush**
+(Trilho P) e **observabilidade/produção** (Trilho O).
 
 ## A ideia central
 
@@ -26,17 +28,22 @@ modos de execução.
 O **reconciliador** (Python, vindo do `tempest-core`) e o **cliente JS** são os
 mesmos nos dois modos. A única coisa que muda é a **camada de transporte**.
 
-## As quatro camadas
+## As camadas
 
 | Camada | O que faz | Onde vive |
 |---|---|---|
 | **Core** | IR, diff/patch, estado, estilo, widgets | `tempest-core` (pacote PyPI extraído do tempestroid) |
 | **Renderizador-folha** | Aplica patches no DOM, traduz `Style → CSS`, captura eventos | `client/` — JavaScript puro |
-| **Transporte** | Leva patches Python→JS e eventos JS→Python | `tempestweb/transports/{wasm,websocket}.py` + `client/transport-*.js` |
+| **Transporte** | Leva patches Python→JS e eventos JS→Python | `tempestweb/transports/{wasm,websocket,sse}.py` + `client/transport-{wasm,ws,sse}.js` |
 | **Runtime / host** | Hospeda o Python | Pyodide no browser (A) · FastAPI + tempest-fastapi-sdk (B) |
+| **Capacidades (`native/`)** | Web APIs como awaitables tipados — http, audio, share, geo, clipboard, storage, camera | `tempestweb/native/*` + glue JS (Trilho N) |
+| **PWA / offline** | Manifest, service worker, app-shell em cache, IndexedDB, WebPush | `tempestweb/pwa/*`, `client/{sw,offline,push,pwa}/*` (Trilho P) |
+| **Observabilidade** | Telemetry, logger, error boundary, feature flags, auth — padrão adapter | `tempestweb/observability/*` (Trilho O) |
 
-A divergência entre os dois modos fica **trancada na camada de transporte**. Tudo
-acima (o app Python) e tudo abaixo (o cliente JS que muta o DOM) é compartilhado.
+A divergência entre os dois modos fica **trancada na camada de transporte** (e, nas
+capacidades, no fato de o Modo B proxiar a chamada nativa por um round-trip). Tudo
+acima (o app Python) e tudo abaixo (o cliente JS que muta o DOM) é compartilhado;
+PWA e observabilidade são iguais nos dois modos.
 
 ## Por que o renderizador é o mesmo nos dois modos
 
@@ -110,9 +117,10 @@ A maior parte do código é idêntica, mas duas coisas vazam para o app:
   remoto. A regra async-first (handler → estado → rebuild coalescido) absorve isso,
   mas é bom saber.
 - **`native/` (capacidades).** É onde os modos mais divergem. No Modo A tudo é Web
-  API no browser. No Modo B, decide-se o que roda no servidor (DB, push) e o que é
-  sempre no cliente (camera, geolocation) — estes últimos proxiados por um
-  round-trip WebSocket.
+  API no browser (chamada em-processo). No Modo B, decide-se o que roda no servidor
+  (DB, push) e o que é sempre no cliente (camera, geolocation) — estes últimos
+  proxiados por um round-trip (WS ou SSE+POST) via o protocolo `native_call`/
+  `native_result` (ver `contract.md`). A **API Python é idêntica** nos dois modos.
 
 ## Conformância A ↔ B
 

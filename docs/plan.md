@@ -238,7 +238,7 @@ framework — `<script type="module">` direto.
 
 Python no browser. Prova o core no browser + o cliente JS, sem servidor.
 
-### Trilho B — Modo servidor (FastAPI + WS) — DEPOIS
+### Trilho B — Modo servidor (FastAPI + WS/SSE) — DEPOIS
 
 Python no servidor. Reusa o cliente JS inteiro do Trilho W, troca o transporte
 por WebSocket.
@@ -353,7 +353,7 @@ sequencial. Trilho 0 antecede tudo; Trilho W pode correr em paralelo ao A após 
   geolocation, clipboard, notifications, storage; camera depois.
   *Feito quando:* `await geolocation.get()` retorna no Python rodando no browser.
 
-### Trilho B — Modo servidor (FastAPI + WS) — DEPOIS
+### Trilho B — Modo servidor (FastAPI + WS/SSE) — DEPOIS
 
 - **B0 — Host servidor.** FastAPI + tempest-fastapi-sdk com endpoint WebSocket;
   ao conectar, o servidor roda `view()` e envia os patches iniciais.

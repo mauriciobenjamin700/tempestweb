@@ -23,10 +23,14 @@ por WebSocket.
   define o `PatchTransport` Protocol — a fronteira A vs B.
 - **Cliente em `client/`** — **JavaScript PURO**. Sem TypeScript, sem framework,
   sem etapa de build. ES modules (`<script type="module">`). É o **mesmo** código
-  nos dois modos; só a impl de transporte difere (`transport-wasm.js` vs
-  `transport-ws.js`).
-- Layout do pacote Python: `transports/`, `runtime/`, `server/` (FastAPI, Modo B),
-  `native/`, `devserver/`, `cli/`. `main.py`/CLI: `tempestweb` → `cli.main:main`.
+  nos dois modos; só a impl de transporte difere (`transport-wasm.js` ·
+  `transport-ws.js` · `transport-sse.js`). Subpastas PWA/offline:
+  `client/{pwa,sw,offline,push,native}/`.
+- Layout do pacote Python: `transports/` (wasm/websocket/sse), `runtime/`,
+  `server/` (FastAPI, Modo B), `native/` (capacidades, Trilho N), `observability/`
+  (telemetry/logger/error_boundary/feature_flags/auth, Trilho O), `pwa/` (manifest/
+  ícones, Trilho P), `devserver/`, `cli/`. `main.py`/CLI: `tempestweb` →
+  `cli.main:main`.
 
 ## Convenções (herdam do CLAUDE.md global)
 

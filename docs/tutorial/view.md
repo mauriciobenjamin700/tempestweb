@@ -75,7 +75,7 @@ Style(gap=8.0, padding=Edge.all(16))  # gap: 8px; padding: 16px;
 !!! info "Style → CSS é quase identidade"
     O `Style` foi desenhado copiando o vocabulário do CSS (flexbox, box model,
     tipografia). A tradução vive no cliente (`client/style.js`) e é compartilhada
-    pelos dois modos. Detalhe completo no [contrato](../contract.md#style).
+    pelos dois modos. Detalhe completo no [contrato de fronteira](../wire-contract.md#3-style).
 
 ## A árvore completa do counter
 

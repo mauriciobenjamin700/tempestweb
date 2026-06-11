@@ -1,0 +1,313 @@
+{
+  "counter": {
+    "final": {
+      "children": [
+        {
+          "children": [],
+          "key": "label",
+          "props": {
+            "content": "Count: 2",
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "style": null
+          },
+          "type": "Text"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "key": "dec",
+              "props": {
+                "focus_order": null,
+                "focusable": null,
+                "label": "-",
+                "on_click": null,
+                "semantics": null,
+                "style": null
+              },
+              "type": "Button"
+            },
+            {
+              "children": [],
+              "key": "inc",
+              "props": {
+                "focus_order": null,
+                "focusable": null,
+                "label": "+",
+                "on_click": null,
+                "semantics": null,
+                "style": null
+              },
+              "type": "Button"
+            }
+          ],
+          "key": null,
+          "props": {
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "style": null
+          },
+          "type": "Row"
+        }
+      ],
+      "key": "root",
+      "props": {
+        "focus_order": null,
+        "focusable": null,
+        "semantics": null,
+        "style": null
+      },
+      "type": "Column"
+    },
+    "initial": {
+      "children": [
+        {
+          "children": [],
+          "key": "label",
+          "props": {
+            "content": "Count: 0",
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "style": null
+          },
+          "type": "Text"
+        },
+        {
+          "children": [
+            {
+              "children": [],
+              "key": "dec",
+              "props": {
+                "focus_order": null,
+                "focusable": null,
+                "label": "-",
+                "on_click": null,
+                "semantics": null,
+                "style": null
+              },
+              "type": "Button"
+            },
+            {
+              "children": [],
+              "key": "inc",
+              "props": {
+                "focus_order": null,
+                "focusable": null,
+                "label": "+",
+                "on_click": null,
+                "semantics": null,
+                "style": null
+              },
+              "type": "Button"
+            }
+          ],
+          "key": null,
+          "props": {
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "style": null
+          },
+          "type": "Row"
+        }
+      ],
+      "key": "root",
+      "props": {
+        "focus_order": null,
+        "focusable": null,
+        "semantics": null,
+        "style": null
+      },
+      "type": "Column"
+    },
+    "name": "counter",
+    "ticks": [
+      [
+        {
+          "path": [
+            0
+          ],
+          "set_props": {
+            "content": "Count: 1"
+          },
+          "unset_props": []
+        }
+      ],
+      [
+        {
+          "path": [
+            0
+          ],
+          "set_props": {
+            "content": "Count: 2"
+          },
+          "unset_props": []
+        }
+      ]
+    ]
+  },
+  "list": {
+    "final": {
+      "children": [
+        {
+          "children": [],
+          "key": "b",
+          "props": {
+            "content": "b",
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "style": null
+          },
+          "type": "Text"
+        }
+      ],
+      "key": "root",
+      "props": {
+        "focus_order": null,
+        "focusable": null,
+        "semantics": null,
+        "style": null
+      },
+      "type": "Column"
+    },
+    "initial": {
+      "children": [
+        {
+          "children": [],
+          "key": "a",
+          "props": {
+            "content": "a",
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "style": null
+          },
+          "type": "Text"
+        }
+      ],
+      "key": "root",
+      "props": {
+        "focus_order": null,
+        "focusable": null,
+        "semantics": null,
+        "style": null
+      },
+      "type": "Column"
+    },
+    "name": "list",
+    "ticks": [
+      [
+        {
+          "index": 1,
+          "node": {
+            "children": [],
+            "key": "b",
+            "props": {
+              "content": "b",
+              "focus_order": null,
+              "focusable": null,
+              "semantics": null,
+              "style": null
+            },
+            "type": "Text"
+          },
+          "path": []
+        }
+      ],
+      [
+        {
+          "order": [
+            1,
+            0
+          ],
+          "path": []
+        }
+      ],
+      [
+        {
+          "index": 1,
+          "path": []
+        }
+      ]
+    ]
+  },
+  "replace": {
+    "final": {
+      "children": [
+        {
+          "children": [],
+          "key": "x",
+          "props": {
+            "focus_order": null,
+            "focusable": null,
+            "label": "a",
+            "on_click": null,
+            "semantics": null,
+            "style": null
+          },
+          "type": "Button"
+        }
+      ],
+      "key": "root",
+      "props": {
+        "focus_order": null,
+        "focusable": null,
+        "semantics": null,
+        "style": null
+      },
+      "type": "Column"
+    },
+    "initial": {
+      "children": [
+        {
+          "children": [],
+          "key": "x",
+          "props": {
+            "content": "a",
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "style": null
+          },
+          "type": "Text"
+        }
+      ],
+      "key": "root",
+      "props": {
+        "focus_order": null,
+        "focusable": null,
+        "semantics": null,
+        "style": null
+      },
+      "type": "Column"
+    },
+    "name": "replace",
+    "ticks": [
+      [
+        {
+          "node": {
+            "children": [],
+            "key": "x",
+            "props": {
+              "focus_order": null,
+              "focusable": null,
+              "label": "a",
+              "on_click": null,
+              "semantics": null,
+              "style": null
+            },
+            "type": "Button"
+          },
+          "path": [
+            0
+          ]
+        }
+      ]
+    ]
+  }
+}

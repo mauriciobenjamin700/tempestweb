@@ -431,7 +431,7 @@ def server_decode_jwt(token: str, secret: str, **kwargs: Any) -> dict[str, Any]:
     """
     try:
         from tempest_fastapi_sdk import JWTUtils  # type: ignore[import-not-found]
-    except ImportError as exc:  # pragma: no cover - exercised only without the SDK
+    except ImportError as exc:
         raise RuntimeError(
             "server_decode_jwt requires tempest-fastapi-sdk; install the "
             "[auth] extra to verify tokens on the server."

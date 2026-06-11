@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import builtins
 import json
+import sys
 import time
+import types
+from typing import Any
 
 import pytest
 
@@ -16,6 +20,7 @@ from tempestweb.observability import (
     decode_jwt,
     is_jwt_expired,
     route_guard,
+    server_decode_jwt,
 )
 
 
@@ -229,3 +234,73 @@ async def test_refresh_failure_propagates_and_allows_retry() -> None:
     token = await queue.refresh()
     assert token == "recovered"
     assert store.token == "recovered"
+
+
+# --- server_decode_jwt (Mode B SDK bridge) -------------------------------------
+
+
+def test_server_decode_jwt_verifies_via_sdk_and_coerces_to_dict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The SDK's ``JWTUtils.decode`` result is returned coerced to a plain dict.
+
+    ``tempest_fastapi_sdk`` is an optional, server-only dependency not installed
+    in this worktree, so we inject a fake module into ``sys.modules`` to exercise
+    the success path. The fake ``decode`` returns a ``dict`` *subclass* to prove
+    the ``dict(result)`` coercion produces a plain ``dict``.
+    """
+    captured: dict[str, Any] = {}
+
+    class _Claims(dict[str, Any]):
+        """A dict subclass standing in for the SDK's decode return value."""
+
+    class _FakeJWTUtils:
+        """Minimal stand-in for ``tempest_fastapi_sdk.JWTUtils``."""
+
+        @staticmethod
+        def decode(token: str, secret: str, **kwargs: Any) -> _Claims:
+            """Record the call and return claims as a dict subclass."""
+            captured["token"] = token
+            captured["secret"] = secret
+            captured["kwargs"] = kwargs
+            return _Claims({"sub": "u1", "role": "admin"})
+
+    fake_module = types.ModuleType("tempest_fastapi_sdk")
+    fake_module.JWTUtils = _FakeJWTUtils  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "tempest_fastapi_sdk", fake_module)
+
+    result = server_decode_jwt("a.b.c", "s3cr3t", algorithms=["HS256"])
+
+    assert result == {"sub": "u1", "role": "admin"}
+    assert type(result) is dict  # coerced away from the _Claims subclass
+    assert captured == {
+        "token": "a.b.c",
+        "secret": "s3cr3t",
+        "kwargs": {"algorithms": ["HS256"]},
+    }
+
+
+def test_server_decode_jwt_raises_runtimeerror_when_sdk_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A clear ``RuntimeError`` is raised when ``tempest_fastapi_sdk`` is missing."""
+    monkeypatch.delitem(sys.modules, "tempest_fastapi_sdk", raising=False)
+
+    real_import = builtins.__import__
+
+    def _blocking_import(
+        name: str,
+        globals_: dict[str, Any] | None = None,
+        locals_: dict[str, Any] | None = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> types.ModuleType:
+        """Raise ``ImportError`` for the SDK; defer everything else."""
+        if name == "tempest_fastapi_sdk":
+            raise ImportError("No module named 'tempest_fastapi_sdk'")
+        return real_import(name, globals_, locals_, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", _blocking_import)
+
+    with pytest.raises(RuntimeError, match="requires tempest-fastapi-sdk"):
+        server_decode_jwt("a.b.c", "s3cr3t")

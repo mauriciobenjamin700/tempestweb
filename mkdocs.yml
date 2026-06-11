@@ -76,6 +76,30 @@ plugins:
             "2. State and handlers": "2. Estado e handlers"
             "3. Patches on the wire": "3. Patches na rede"
             "4. Running both modes": "4. Rodando os dois modos"
+            Examples: Exemplos
+            "Example gallery": "Galeria de exemplos"
+            Stopwatch: Cronômetro
+            "Temperature converter": "Conversor de temperatura"
+            "Data table": "Tabela de dados"
+            "Login form": "Formulário de login"
+            "Signup wizard": "Wizard de cadastro"
+            "Brazilian registration": "Cadastro brasileiro"
+            "Quiz with score": "Quiz com pontuação"
+            "Tabbed profile": "Perfil com abas"
+            "Dashboard app shell": "Dashboard app shell"
+            "Drawer navigation & routing": "Drawer de navegação e rotas"
+            "Onboarding carousel": "Onboarding carousel"
+            "Image gallery": "Galeria de imagens"
+            "Chat UI": "Chat UI"
+            "Search with autocomplete": "Busca com autocomplete"
+            "Kanban board": "Kanban board"
+            "Settings panel": "Painel de configurações"
+            "Rating & review": "Avaliação e review"
+            "FAQ accordion": "FAQ accordion"
+            "Notification center": "Central de notificações"
+            "Theme switcher": "Alternador de tema"
+            "Internationalized greeting": "Saudação internacionalizada"
+            "Sketch pad (canvas)": "Sketch pad (canvas)"
             "Wire contract": "Contrato de fronteira"
             Capabilities: Capacidades
             "PWA & offline": "PWA e offline"
@@ -123,6 +147,30 @@ nav:
       - "2. State and handlers": tutorial/state.md
       - "3. Patches on the wire": tutorial/patches.md
       - "4. Running both modes": tutorial/modes.md
+  - Examples:
+      - "Example gallery": examples/index.md
+      - Stopwatch: examples/stopwatch.md
+      - "Temperature converter": examples/temperature-converter.md
+      - "Data table": examples/data-table.md
+      - "Login form": examples/login-form.md
+      - "Signup wizard": examples/signup-wizard.md
+      - "Brazilian registration": examples/br-cadastro.md
+      - "Quiz with score": examples/quiz-app.md
+      - "Tabbed profile": examples/tabs-profile.md
+      - "Dashboard app shell": examples/dashboard-shell.md
+      - "Drawer navigation & routing": examples/router-drawer.md
+      - "Onboarding carousel": examples/onboarding-carousel.md
+      - "Image gallery": examples/image-gallery.md
+      - "Chat UI": examples/chat-ui.md
+      - "Search with autocomplete": examples/search-autocomplete.md
+      - "Kanban board": examples/kanban-board.md
+      - "Settings panel": examples/settings-panel.md
+      - "Rating & review": examples/rating-review.md
+      - "FAQ accordion": examples/faq-accordion.md
+      - "Notification center": examples/notification-center.md
+      - "Theme switcher": examples/theme-switcher.md
+      - "Internationalized greeting": examples/i18n-greeting.md
+      - "Sketch pad (canvas)": examples/sketch-canvas.md
   - Wire contract: wire-contract.md
   - Capabilities: capabilities.md
   - PWA & offline: pwa.md

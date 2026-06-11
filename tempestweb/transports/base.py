@@ -19,6 +19,9 @@ JSON *envelope* tagging the payload with a ``kind``:
 - ``{"kind": "event", "data": <Event>}`` — client → server, one user event.
 - ``{"kind": "native_call", "call_id", "capability", "args"}`` — server → client.
 - ``{"kind": "native_result", "call_id", "ok", "value"|"error"}`` — client → server.
+- ``{"kind": "navigate", "path": "<route>"}`` — server → client, sync the URL
+  when the app navigated imperatively (the reverse of the inbound ``navigate``
+  event).
 
 The envelope shape is identical for WebSocket and SSE; only the framing differs.
 """
@@ -45,7 +48,7 @@ NativeCall = dict[str, Any]
 NativeResult = dict[str, Any]
 
 #: The discriminator values a Mode B wire envelope may carry.
-EnvelopeKind = Literal["patches", "event", "native_call", "native_result"]
+EnvelopeKind = Literal["patches", "event", "native_call", "native_result", "navigate"]
 
 #: A wire envelope: a JSON-able dict tagged by ``kind`` (see module docstring).
 Envelope = dict[str, Any]
@@ -73,6 +76,23 @@ def encode_event(event: Event) -> Envelope:
         The envelope ``{"kind": "event", "data": event}``.
     """
     return {"kind": "event", "data": event}
+
+
+def encode_navigate(path: str) -> Envelope:
+    """Wrap an imperative app navigation in a ``navigate`` envelope (server → client).
+
+    The reverse of the inbound ``navigate`` event: when the app's ``view``
+    navigates (the top route changed), the server tells the client the new path
+    so it can sync the URL via ``history.pushState`` (back/forward + bookmarks
+    stay correct without a round-trip echoing the path back).
+
+    Args:
+        path: The new top-route path (e.g. ``"/settings"``).
+
+    Returns:
+        The envelope ``{"kind": "navigate", "path": path}``.
+    """
+    return {"kind": "navigate", "path": path}
 
 
 def encode_native_call(call_id: str, capability: str, args: dict[str, Any]) -> Envelope:
@@ -136,6 +156,21 @@ class PatchTransport(Protocol):
 
         Args:
             patches: JSON-able patch dicts, in apply order. May be empty (no-op).
+
+        Raises:
+            TransportClosedError: If the underlying channel is gone.
+        """
+        ...
+
+    async def send_navigate(self, path: str) -> None:
+        """Tell the client the app navigated to ``path`` (view → URL).
+
+        Sent when the app's top route changes so the client can ``pushState`` the
+        new URL. The reverse of the inbound ``navigate`` event. A transport whose
+        client never syncs the URL may treat this as a no-op.
+
+        Args:
+            path: The new top-route path.
 
         Raises:
             TransportClosedError: If the underlying channel is gone.

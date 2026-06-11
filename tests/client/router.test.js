@@ -12,8 +12,9 @@ function mockTransport() {
 /** A minimal fake window with a settable location.pathname and popstate listener. */
 function fakeWindow(pathname) {
   const listeners = {};
-  return {
+  const win = {
     location: { pathname },
+    pushed: [],
     addEventListener(type, fn) {
       (listeners[type] ??= []).push(fn);
     },
@@ -24,6 +25,13 @@ function fakeWindow(pathname) {
       for (const fn of listeners[type] ?? []) fn();
     },
   };
+  win.history = {
+    pushState(state, title, path) {
+      win.pushed.push(path);
+      win.location.pathname = path;
+    },
+  };
+  return win;
 }
 
 test("installRouter reports the initial path as a navigate event", () => {
@@ -64,4 +72,25 @@ test("installRouter is a no-op without a window", () => {
   const router = installRouter(transport, null);
   assert.equal(transport.events.length, 0);
   router.dispose();
+  router.navigateTo("/x"); // also a no-op, must not throw
+});
+
+test("navigateTo pushes a new URL (view -> URL) without re-reporting", () => {
+  const transport = mockTransport();
+  const win = fakeWindow("/");
+  const router = installRouter(transport, win);
+  router.navigateTo("/settings");
+  assert.deepEqual(win.pushed, ["/settings"]);
+  assert.equal(win.location.pathname, "/settings");
+  // pushState fires no popstate, so no extra navigate event was reported.
+  assert.equal(transport.events.length, 1); // only the initial "/" report
+});
+
+test("navigateTo is a no-op when the URL already matches (post round-trip)", () => {
+  const transport = mockTransport();
+  const win = fakeWindow("/about");
+  const router = installRouter(transport, win);
+  // The server confirms the path the URL already drove — no duplicate history.
+  router.navigateTo("/about");
+  assert.deepEqual(win.pushed, []);
 });

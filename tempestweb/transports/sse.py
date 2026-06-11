@@ -35,6 +35,7 @@ from tempestweb.transports.base import (
     Patch,
     TransportClosedError,
     encode_native_call,
+    encode_navigate,
     encode_patches,
 )
 
@@ -91,6 +92,17 @@ class SSETransport:
         if not patches:
             return
         self._enqueue(encode_patches(patches))
+
+    async def send_navigate(self, path: str) -> None:
+        """Queue a ``navigate`` envelope for the SSE stream (view → URL).
+
+        Args:
+            path: The new top-route path the app navigated to.
+
+        Raises:
+            TransportClosedError: If the transport has been closed.
+        """
+        self._enqueue(encode_navigate(path))
 
     async def send_native_call(
         self, call_id: str, capability: str, args: dict[str, Any]

@@ -82,6 +82,27 @@ test("sse transport ignores ping heartbeats", () => {
   assert.equal(batches.length, 0);
 });
 
+test("sse transport routes a navigate envelope to onNavigate", () => {
+  let source;
+  const Impl = class extends FakeEventSource {
+    constructor(url) {
+      super(url);
+      source = this;
+    }
+  };
+  const transport = createSSETransport({
+    session: "s1",
+    EventSourceImpl: Impl,
+    fetchImpl: makeFetch([]),
+  });
+
+  const paths = [];
+  transport.onNavigate((p) => paths.push(p));
+  source.serverSend({ kind: "navigate", path: "/about" });
+
+  assert.deepEqual(paths, ["/about"]);
+});
+
 test("sse transport POSTs events to the per-session url", async () => {
   const posts = [];
   const Impl = class extends FakeEventSource {};

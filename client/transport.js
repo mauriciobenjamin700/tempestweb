@@ -39,6 +39,9 @@
  *           Register the callback that receives each tick's patch batch.
  * @property {(event: TWEvent) => void} sendEvent
  *           Send a user event back to the Python side.
+ * @property {((handler: (path: string) => void) => void)} [onNavigate]
+ *           Optional (Mode B): register a callback fired when the app navigates
+ *           imperatively, so the client can sync the browser URL (view → URL).
  * @property {() => Promise<void>} close
  *           Tear down the transport.
  */

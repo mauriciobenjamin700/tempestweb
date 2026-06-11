@@ -89,11 +89,56 @@ Sources:
 
 ---
 
+## What this track built (A1 + A3)
+
+Pure-Python (mypy `--strict` + ruff clean, all pytest-covered headless):
+
+- `tempestweb/transports/wasm.py` — `WasmTransport`, an in-process
+  `PatchTransport` over a `deliver` callable + an asyncio event queue. No
+  Pyodide import; the FFI is the only seam and lives in the bootstrap.
+- `tempestweb/runtime/wasm.py` — `WasmRuntime` drives the vendored `App`'s
+  coalesced rebuild loop over a transport. `serialize_node`/`serialize_patches`
+  lower the IR to the JSON-able wire shape: handler callables are **nulled out**
+  (per `docs/contract.md`; the fixture's `on_click: null`), `Style`/`Color`/
+  `Edge` lower via pydantic. Events route by `(key, "on_" + type)` → handler,
+  arity-checked, async-awaited. A handler registry is refreshed after every
+  build so removed nodes can't fire.
+- `tempestweb/runtime/wasm_main.py` — `bootstrap()` + `WasmAppHandle`, the
+  Python the browser runs. Patches/events cross the FFI as **JSON strings** (so
+  no Pyodide proxy dicts leak into JS). Pyodide-free import → still type-checked.
+
+Client (JS, jsdom-tested with `node --test`):
+
+- `client/transport-wasm.js` — `createWasmTransport(bridge)`, the Mode A
+  `Transport` impl. Buffers patch batches that arrive before `onPatches()`
+  registers; `sendEvent`→`bridge.pushEvent`; `close()` idempotent.
+
+Bootstrap (live-browser, A3):
+
+- `public/index.html` — loads Pyodide (`pyodide.mjs`, pinned `v314.0.0`),
+  `loadPackage(["pydantic"])`, writes the package into the Pyodide FS from
+  `public/manifest.json`, imports the app module, calls `bootstrap`, wires the
+  JSON-string bridge to `createWasmTransport`, and mounts via T1's
+  `client/tempestweb.js` (with a console-logging fallback if T1 isn't merged).
+- `public/gen_manifest.py` — regenerates `public/manifest.json` (the buildless
+  file list); run it when the package's file set changes.
+
+The exact bootstrap Python flow (namespace-import `examples.counter.app` →
+`bootstrap` → click → `Count: 1` patch) is verified headless by
+`tests/unit/test_wasm_main.py` and was also run standalone against the real
+example app. The only thing that cannot run in CI here is Pyodide-in-a-browser.
+
 ## Manual verification (live Pyodide — requires a real browser)
 
-The pure-Python glue (runtime + transport) is unit-tested headless. The live
-in-browser path (A0/A1 "feito quando") needs a browser with WASM and cannot run in
-CI here. Steps to verify by hand:
+The pure-Python glue (runtime + transport + entrypoint) and the JS transport are
+unit-tested headless. The live in-browser path (A0/A1 "feito quando") needs a
+browser with WASM and cannot run in CI here. Steps to verify by hand:
+
+0. (Only if the package's file set changed) regenerate the FS manifest:
+
+   ```bash
+   python public/gen_manifest.py
+   ```
 
 1. From the repo root, serve the project over HTTP (Pyodide needs same-origin
    fetch; `file://` will not work):
@@ -105,20 +150,27 @@ CI here. Steps to verify by hand:
 2. Open <http://127.0.0.1:8000/public/index.html> in a modern browser.
 
 3. Expected on load:
-   - The splash shows "Loading Pyodide…", then "Loading pydantic…", then the
-     counter mounts.
-   - The DOM shows `Count: 0` with `-` and `+` buttons.
-   - The browser console logs the initial patch batch produced **in the browser**
-     by the vendored reconciler (proves A0: core + pydantic_core ran in WASM).
+   - The splash shows "Loading Pyodide…" → "Loading pydantic…" → "Loading
+     tempestweb…" → "Building app…", then clears.
+   - The browser console logs `initial node from WASM:` (the IR built **in the
+     browser** by the vendored reconciler) — proves A0: core + pydantic_core ran
+     in WASM.
+   - With T1 merged: the DOM shows `Count: 0` with `-` and `+` buttons. Without
+     T1: a fallback paragraph explains the renderer isn't wired yet, and the wire
+     traffic is in the console (still enough to confirm A0).
 
-4. Click `+` / `-`:
-   - `Count:` updates with **zero network** (proves A1: in-process `pyodide.ffi`
-     transport round-trips an event → Python handler → patch → DOM).
+4. Click `+` / `-` (needs T1's renderer for the visible DOM update):
+   - The console logs `patch batch from WASM:` with the `set_props.content`
+     update, and `Count:` updates with **zero network** — proves A1: the
+     in-process `pyodide.ffi` transport round-trips an event → Python handler →
+     patch → DOM.
 
-5. Confirm in the Network tab that after the Pyodide/pydantic assets load, clicking
-   the buttons issues **no further requests**.
+5. Confirm in the Network tab that after the Pyodide/pydantic assets load,
+   clicking the buttons issues **no further requests**.
 
-> Until T1's real `client/dom.js`/`client/tempestweb.js` land, `public/index.html`
-> uses them by ES-module import; if T1 is not yet merged, the bootstrap still loads
-> Pyodide and logs the patch batch to the console (step 3's last bullet), which is
-> enough to confirm A0. Full visual counter (step 4) needs T1 merged.
+> Dependency on T1: `public/index.html` imports `client/tempestweb.js` for the
+> DOM renderer. That module is W1/W3 (Track T1) and is currently a stub; until it
+> lands, the bootstrap still loads Pyodide and logs the initial node + every patch
+> batch to the console, which is enough to confirm A0/A1 at the wire level. The
+> visual counter (step 4's DOM) needs T1 merged. Suggested merge order: **T1
+> (DOM renderer) → T3 (this) → T2 (server)**.

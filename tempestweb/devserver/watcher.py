@@ -131,11 +131,21 @@ class FileWatcher:
             self.handle_batch(batch)
 
 
-async def _watchfiles_stream(root: Path) -> ChangeStream:
+async def _watchfiles_stream(
+    root: Path,
+    *,
+    force_polling: bool = False,
+) -> ChangeStream:
     """Adapt :func:`watchfiles.awatch` into a path-only change stream.
 
     Args:
         root: The directory to watch.
+        force_polling: Force the polling backend instead of native filesystem
+            events. Defaults to ``False`` (native). Polling is slower but works
+            on filesystems where native notifications are unreliable (network
+            mounts, some container/WSL setups). The keyword is optional, so the
+            function still satisfies the ``Callable[[Path], ChangeStream]``
+            ``stream_factory`` contract when called positionally.
 
     Yields:
         Each batch as a sequence of changed absolute paths (the ``Change`` kind
@@ -153,5 +163,5 @@ async def _watchfiles_stream(root: Path) -> ChangeStream:
             '`pip install "tempestweb[cli]"`'
         ) from exc
 
-    async for changes in awatch(root):
+    async for changes in awatch(root, force_polling=force_polling):
         yield [path for _change, path in changes]

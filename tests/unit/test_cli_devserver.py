@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import functools
 from collections.abc import AsyncIterator, Sequence
+from importlib.util import find_spec
 from pathlib import Path
+
+import pytest
 
 from tempestweb.devserver import (
     DEFAULT_WATCH_SUFFIXES,
@@ -12,6 +17,12 @@ from tempestweb.devserver import (
     ReloadEvent,
     ReloadKind,
     ReloadSignal,
+)
+from tempestweb.devserver.watcher import _watchfiles_stream
+
+requires_watchfiles = pytest.mark.skipif(
+    find_spec("watchfiles") is None,
+    reason="watchfiles is only installed with the [cli] extra",
 )
 
 
@@ -139,3 +150,43 @@ async def test_watcher_run_rejects_both_stream_and_factory(tmp_path: Path) -> No
     except ValueError:
         raised = True
     assert raised
+
+
+@requires_watchfiles
+async def test_watcher_run_reloads_on_real_file_write(tmp_path: Path) -> None:
+    # Drive the PRODUCTION stream factory (_watchfiles_stream -> watchfiles.awatch)
+    # with a real on-disk write, proving the full reload loop end to end rather
+    # than just the injected-stream path.
+    signal = ReloadSignal()
+    seen: list[ReloadEvent] = []
+    signal.subscribe(seen.append)
+    watcher = FileWatcher(tmp_path, signal)
+
+    target = tmp_path / "app.py"
+    target.write_text("x = 1\n")
+
+    # Force the polling backend so the test is deterministic regardless of the
+    # host filesystem's native-notification support (network mounts, WSL, etc.).
+    # functools.partial keeps the Callable[[Path], ChangeStream] factory shape.
+    factory = functools.partial(_watchfiles_stream, force_polling=True)
+    run_task = asyncio.ensure_future(watcher.run(stream_factory=factory))
+    # Let awatch establish its filesystem watch before we touch the file.
+    await asyncio.sleep(0.5)
+
+    try:
+        # Keep rewriting until at least one reload lands. Re-writing each tick
+        # makes the test robust against any single poll window being missed
+        # during the watch's startup, without relying on native FS events.
+        for tick in range(100):
+            if seen:
+                break
+            target.write_text(f"x = {tick}\n")
+            await asyncio.sleep(0.1)
+    finally:
+        run_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await run_task
+
+    assert seen, "a real file write did not produce a reload event"
+    assert seen[-1].kind is ReloadKind.RESTART
+    assert any("app.py" in path for event in seen for path in event.paths)

@@ -43,8 +43,12 @@ loop works in typed Python, with pytest coverage. All gates green
   `RELOAD` reserved).
 - **`watcher.py`** — `FileWatcher` turns filesystem changes into reload events,
   filtering by suffix (`.py/.html/.css/.js`) and relativizing paths. Default
-  stream is a `watchfiles.awatch` adapter; tests inject a deterministic async
-  stream. Verified live against a real file edit through the production loop.
+  stream is the `watchfiles.awatch` adapter `_watchfiles_stream`; tests also
+  inject a deterministic async stream for the suffix/relativize/dedup logic.
+  The production factory is covered by `test_watcher_run_reloads_on_real_file_write`,
+  which drives `watcher.run(stream_factory=_watchfiles_stream)` against a real
+  `tmp_path` file write (polling backend forced so the loop is deterministic on
+  any filesystem, incl. WSL/network mounts).
 
 ## Bugs fixed while building
 
@@ -67,10 +71,12 @@ loop works in typed Python, with pytest coverage. All gates green
     pytest -q                          # 68 passed
     pytest tests/unit/test_cli*.py -q  # 66 passed (the track gate)
 
-DONE-WHEN, confirmed by automated tests + a manual binary run:
+DONE-WHEN, confirmed by automated tests:
 - `tempestweb new X` creates a runnable project tree.
-- dev watcher detects a change and emits a reload (injected-stream tests and a
-  live `watchfiles` edit).
+- dev watcher detects a change and emits a reload — covered by injected-stream
+  tests (`handle_batch` / `run`) **and** a real-file integration test that drives
+  the production `_watchfiles_stream` factory through `watcher.run` (no manual
+  step needed; see `test_watcher_run_reloads_on_real_file_write`).
 - `build --mode wasm|server` produces the expected artifact layout.
 
 ## What is stubbed (owned by other tracks — clearly marked in code)

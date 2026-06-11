@@ -29,6 +29,7 @@ from tempestweb._core.widgets import (
     FormState,
     Input,
     Text,
+    Validator,
 )
 from tempestweb._core.widgets.events import TextChangeEvent
 
@@ -59,7 +60,7 @@ def make_state() -> FormDataState:
     return FormDataState()
 
 
-def _require(message: str) -> Any:  # noqa: ANN401 — returns a typed Validator callable
+def _require(message: str) -> Validator:
     """Build a validator rejecting empty/blank values.
 
     Args:
@@ -75,7 +76,7 @@ def _require(message: str) -> Any:  # noqa: ANN401 — returns a typed Validator
     return rule
 
 
-def _min_length(length: int, message: str) -> Any:  # noqa: ANN401 — typed Validator
+def _min_length(length: int, message: str) -> Validator:
     """Build a validator enforcing a minimum length.
 
     Args:

@@ -10,7 +10,6 @@ loop is fully exercisable and testable today.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -70,7 +69,7 @@ class DevSession:
 
 
 def create_dev_session(
-    project_root: str | os.PathLike[str],
+    project_root: str | Path,
     *,
     mode: str | None = None,
     verify: bool = True,

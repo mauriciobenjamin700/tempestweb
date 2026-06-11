@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-__all__ = ["VALID_MODES", "ProjectConfig", "load_config"]
+__all__ = ["VALID_MODES", "ConfigError", "ProjectConfig", "load_config"]
 
 # The two execution modes the CLI drives (docs/plan.md §1.1).
 VALID_MODES: tuple[str, ...] = ("wasm", "server")

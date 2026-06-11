@@ -129,7 +129,7 @@ def _tempestweb_toml(name: str) -> str:
     Returns:
         A minimal project config the CLI reads for defaults.
     """
-    return f'''\
+    return f"""\
 # tempestweb project configuration.
 [project]
 name = "{name}"
@@ -140,7 +140,7 @@ entrypoint = "app.py"
 mode = "{DEFAULT_MODE}"
 host = "127.0.0.1"
 port = 8000
-'''
+"""
 
 
 def _readme(name: str) -> str:

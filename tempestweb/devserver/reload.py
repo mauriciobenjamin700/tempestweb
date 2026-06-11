@@ -20,12 +20,12 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 __all__ = ["ReloadKind", "ReloadEvent", "ReloadSignal"]
 
 
-class ReloadKind(str, Enum):
+class ReloadKind(StrEnum):
     """The kind of reload a change should trigger.
 
     Attributes:

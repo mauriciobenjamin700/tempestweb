@@ -15,9 +15,10 @@ output and as the entrypoint each transport will drive.
 from __future__ import annotations
 
 import importlib.util
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from tempestweb._core import App, Node, Widget, build
 

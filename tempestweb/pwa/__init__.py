@@ -21,7 +21,9 @@ from tempestweb.pwa.manifest import (
     DEFAULT_ICONS,
     ManifestOptions,
     build_manifest,
+    default_extras,
     emit_manifest,
+    validate_extras,
     validate_installable,
     write_manifest,
 )
@@ -32,9 +34,11 @@ __all__: list[str] = [
     "IconSpec",
     "ManifestOptions",
     "build_manifest",
+    "default_extras",
     "emit_icons",
     "emit_manifest",
     "placeholder_png",
+    "validate_extras",
     "validate_installable",
     "write_manifest",
 ]

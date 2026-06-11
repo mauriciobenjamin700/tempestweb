@@ -141,6 +141,80 @@ export function emitManifest(manifest, indent = 2) {
 }
 
 /**
+ * Validate the P5 manifest extras (shortcuts / share_target / file_handlers).
+ *
+ * These are progressive enhancements with uneven browser support, so this is a
+ * shape check, not an install requirement. Returns the list of problems; empty
+ * means the extras that ARE present are well-formed.
+ *
+ * @param {Object} manifest A manifest object.
+ * @returns {string[]} Human-readable problems ([] when the extras are valid).
+ */
+export function validateExtras(manifest) {
+  /** @type {string[]} */
+  const errors = [];
+  if (!manifest || typeof manifest !== "object") return ["manifest must be an object"];
+
+  if (manifest.shortcuts !== undefined) {
+    if (!Array.isArray(manifest.shortcuts)) {
+      errors.push("shortcuts must be an array");
+    } else {
+      manifest.shortcuts.forEach((s, i) => {
+        if (!s || typeof s.name !== "string") errors.push(`shortcuts[${i}].name is required`);
+        if (!s || typeof s.url !== "string") errors.push(`shortcuts[${i}].url is required`);
+      });
+    }
+  }
+
+  if (manifest.share_target !== undefined) {
+    const st = manifest.share_target;
+    if (!st || typeof st !== "object") {
+      errors.push("share_target must be an object");
+    } else {
+      if (typeof st.action !== "string") errors.push("share_target.action is required");
+      const method = (st.method ?? "GET").toUpperCase();
+      if (method === "POST" && typeof st.enctype !== "string") {
+        errors.push('share_target with method POST requires an enctype');
+      }
+    }
+  }
+
+  if (manifest.file_handlers !== undefined) {
+    if (!Array.isArray(manifest.file_handlers)) {
+      errors.push("file_handlers must be an array");
+    } else {
+      manifest.file_handlers.forEach((h, i) => {
+        if (!h || typeof h.action !== "string") errors.push(`file_handlers[${i}].action is required`);
+        if (!h || typeof h.accept !== "object") errors.push(`file_handlers[${i}].accept is required`);
+      });
+    }
+  }
+
+  return errors;
+}
+
+/**
+ * The default P5 extras a freshly-scaffolded app ships: a "Home" shortcut, a
+ * POST share target, and a CSV file handler. References only — routes are wired
+ * by the host app (share_target pairs with native.share, N2).
+ * @type {{shortcuts: ManifestShortcut[], share_target: Object, file_handlers: Object[]}}
+ */
+export const DEFAULT_EXTRAS = {
+  shortcuts: [
+    { name: "Home", short_name: "Home", url: "/", description: "Open the app home" },
+  ],
+  share_target: {
+    action: "/share-target",
+    method: "POST",
+    enctype: "multipart/form-data",
+    params: { title: "title", text: "text", url: "url" },
+  },
+  file_handlers: [
+    { action: "/open", accept: { "text/csv": [".csv"] } },
+  ],
+};
+
+/**
  * Check whether a manifest object meets the baseline install criteria used by
  * Chromium/Lighthouse. Returns the list of problems; empty means installable.
  *

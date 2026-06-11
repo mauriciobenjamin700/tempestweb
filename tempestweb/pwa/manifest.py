@@ -213,3 +213,84 @@ def validate_installable(manifest: dict[str, Any]) -> list[str]:
     if not any("any" in str(icon.get("purpose", "any")).split() for icon in icons):
         errors.append('at least one icon must have purpose "any"')
     return errors
+
+
+def default_extras() -> dict[str, Any]:
+    """Return the default P5 manifest extras a scaffolded app ships.
+
+    A "Home" shortcut, a POST share target and a CSV file handler. References
+    only — the host app wires the routes (share_target pairs with native.share).
+
+    Returns:
+        A dict with ``shortcuts``, ``share_target`` and ``file_handlers``.
+    """
+    return {
+        "shortcuts": [
+            {
+                "name": "Home",
+                "short_name": "Home",
+                "url": "/",
+                "description": "Open the app home",
+            }
+        ],
+        "share_target": {
+            "action": "/share-target",
+            "method": "POST",
+            "enctype": "multipart/form-data",
+            "params": {"title": "title", "text": "text", "url": "url"},
+        },
+        "file_handlers": [{"action": "/open", "accept": {"text/csv": [".csv"]}}],
+    }
+
+
+def validate_extras(manifest: dict[str, Any]) -> list[str]:
+    """Validate the P5 manifest extras (shortcuts/share_target/file_handlers).
+
+    Progressive enhancements with uneven browser support, so this is a shape
+    check, not an install requirement. Mirrors ``validateExtras`` in
+    ``client/pwa/manifest.js``.
+
+    Args:
+        manifest: A manifest (or extras) object.
+
+    Returns:
+        Human-readable problems; empty when present extras are well-formed.
+    """
+    errors: list[str] = []
+    if not isinstance(manifest, dict):
+        return ["manifest must be an object"]
+
+    shortcuts = manifest.get("shortcuts")
+    if shortcuts is not None:
+        if not isinstance(shortcuts, list):
+            errors.append("shortcuts must be an array")
+        else:
+            for i, s in enumerate(shortcuts):
+                if not isinstance(s, dict) or not isinstance(s.get("name"), str):
+                    errors.append(f"shortcuts[{i}].name is required")
+                if not isinstance(s, dict) or not isinstance(s.get("url"), str):
+                    errors.append(f"shortcuts[{i}].url is required")
+
+    share_target = manifest.get("share_target")
+    if share_target is not None:
+        if not isinstance(share_target, dict):
+            errors.append("share_target must be an object")
+        else:
+            if not isinstance(share_target.get("action"), str):
+                errors.append("share_target.action is required")
+            method = str(share_target.get("method", "GET")).upper()
+            if method == "POST" and not isinstance(share_target.get("enctype"), str):
+                errors.append("share_target with method POST requires an enctype")
+
+    file_handlers = manifest.get("file_handlers")
+    if file_handlers is not None:
+        if not isinstance(file_handlers, list):
+            errors.append("file_handlers must be an array")
+        else:
+            for i, h in enumerate(file_handlers):
+                if not isinstance(h, dict) or not isinstance(h.get("action"), str):
+                    errors.append(f"file_handlers[{i}].action is required")
+                if not isinstance(h, dict) or not isinstance(h.get("accept"), dict):
+                    errors.append(f"file_handlers[{i}].accept is required")
+
+    return errors

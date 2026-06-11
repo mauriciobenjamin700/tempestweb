@@ -5,7 +5,9 @@ import {
   buildManifest,
   emitManifest,
   validateInstallable,
+  validateExtras,
   DEFAULT_ICONS,
+  DEFAULT_EXTRAS,
 } from "../../client/pwa/manifest.js";
 
 test("buildManifest fills installable defaults", () => {
@@ -87,4 +89,39 @@ test("validateInstallable flags missing pieces", () => {
     ],
   };
   assert.ok(validateInstallable(onlyMaskable).includes('at least one icon must have purpose "any"'));
+});
+
+// --- P5 extras ----------------------------------------------------------------
+
+test("DEFAULT_EXTRAS is well-formed and still installable when merged", () => {
+  assert.deepEqual(validateExtras(DEFAULT_EXTRAS), []);
+  const m = buildManifest(DEFAULT_EXTRAS);
+  assert.deepEqual(validateInstallable(m), []);
+  assert.deepEqual(validateExtras(m), []);
+  assert.equal(m.share_target.enctype, "multipart/form-data");
+  assert.equal(m.shortcuts[0].url, "/");
+  assert.equal(m.file_handlers[0].accept["text/csv"][0], ".csv");
+});
+
+test("validateExtras passes when no extras are present", () => {
+  assert.deepEqual(validateExtras(buildManifest()), []);
+});
+
+test("validateExtras flags a malformed shortcut", () => {
+  const errors = validateExtras({ shortcuts: [{ name: "ok", url: "/x" }, { url: "/y" }] });
+  assert.ok(errors.some((e) => e.includes("shortcuts[1].name")));
+});
+
+test("validateExtras requires enctype for a POST share_target", () => {
+  const bad = validateExtras({ share_target: { action: "/s", method: "POST" } });
+  assert.ok(bad.some((e) => e.includes("enctype")));
+  const ok = validateExtras({
+    share_target: { action: "/s", method: "POST", enctype: "multipart/form-data" },
+  });
+  assert.deepEqual(ok, []);
+});
+
+test("validateExtras flags a malformed file_handler", () => {
+  const errors = validateExtras({ file_handlers: [{ accept: { "text/csv": [".csv"] } }] });
+  assert.ok(errors.some((e) => e.includes("file_handlers[0].action")));
 });

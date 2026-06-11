@@ -14,9 +14,11 @@ from tempestweb.pwa import (
     DEFAULT_ICON_SPECS,
     ManifestOptions,
     build_manifest,
+    default_extras,
     emit_icons,
     emit_manifest,
     placeholder_png,
+    validate_extras,
     validate_installable,
     write_manifest,
 )
@@ -142,3 +144,36 @@ def test_maskable_icon_has_inset() -> None:
     assert plain != masked
     # Both remain byte-valid PNGs of the same dimensions.
     assert _read_png_dimensions(plain) == _read_png_dimensions(masked) == (192, 192)
+
+
+def test_default_extras_is_well_formed_and_installable() -> None:
+    """default_extras validates and a manifest built from it stays installable."""
+    extras = default_extras()
+    assert validate_extras(extras) == []
+    opts = ManifestOptions(
+        shortcuts=extras["shortcuts"],
+        share_target=extras["share_target"],
+        file_handlers=extras["file_handlers"],
+    )
+    manifest = build_manifest(opts)
+    assert validate_installable(manifest) == []
+    assert validate_extras(manifest) == []
+    assert manifest["share_target"]["enctype"] == "multipart/form-data"
+    assert manifest["file_handlers"][0]["accept"]["text/csv"] == [".csv"]
+
+
+def test_validate_extras_passes_when_absent() -> None:
+    """No extras present is valid."""
+    assert validate_extras(build_manifest()) == []
+
+
+def test_validate_extras_flags_malformed_extras() -> None:
+    """The extras validator flags bad shortcuts/share_target/file_handlers."""
+    bad_shortcut = validate_extras({"shortcuts": [{"url": "/y"}]})
+    assert any("shortcuts[0].name" in e for e in bad_shortcut)
+
+    bad_share = validate_extras({"share_target": {"action": "/s", "method": "POST"}})
+    assert any("enctype" in e for e in bad_share)
+
+    bad_fh = validate_extras({"file_handlers": [{"accept": {"text/csv": [".csv"]}}]})
+    assert any("file_handlers[0].action" in e for e in bad_fh)

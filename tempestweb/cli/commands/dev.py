@@ -1,15 +1,17 @@
-"""``tempestweb dev`` — watch the project and trigger reloads.
+"""``tempestweb dev`` — watch the project, rebuild, and livereload the browser.
 
 Wires a :class:`~tempestweb.devserver.FileWatcher` to a
-:class:`~tempestweb.devserver.ReloadSignal` and attaches a *reload handler*. The
-handler is the only mode-specific seam: in Mode A it reloads the browser tab, in
-Mode B it restarts the server session. Until those transports land (Tracks T3 /
-T2), the CLI attaches a :class:`StubTransport` that records reloads, so the dev
-loop is fully exercisable and testable today.
+:class:`~tempestweb.devserver.ReloadSignal`. :func:`serve_dev` is the live Mode A
+loop: it builds the wasm bundle, serves it over the dev HTTP app (with a browser
+livereload channel), and on every watched change rebuilds the bundle and pushes a
+reload to the tab. :func:`create_dev_session` keeps the lighter watch-only wiring
+(a :class:`StubTransport` that records reloads) for unit tests and for inspecting
+the watch loop without binding a socket.
 """
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,7 +19,13 @@ from tempestweb.cli.config import VALID_MODES, ProjectConfig, load_config
 from tempestweb.cli.loader import load_app
 from tempestweb.devserver import FileWatcher, ReloadEvent, ReloadSignal
 
-__all__ = ["DevError", "DevSession", "StubTransport", "create_dev_session"]
+__all__ = [
+    "DevError",
+    "DevSession",
+    "StubTransport",
+    "create_dev_session",
+    "serve_dev",
+]
 
 
 class DevError(RuntimeError):
@@ -120,3 +128,73 @@ def create_dev_session(
         watcher=watcher,
         transport=transport,
     )
+
+
+async def serve_dev(
+    project_root: str | Path,
+    *,
+    mode: str | None = None,
+    host: str | None = None,
+    port: int | None = None,
+) -> None:
+    """Build, serve and livereload a Mode A project until stopped (blocking).
+
+    Builds the wasm bundle once, serves it over the dev HTTP app with a browser
+    livereload channel, and runs the file watcher. On every reload-worthy change
+    the bundle is rebuilt **before** the browser is told to reload, so the tab
+    always picks up the fresh build. A rebuild that fails (e.g. a syntax error in
+    the edited app) is reported and skipped — the last good bundle keeps serving.
+
+    Args:
+        project_root: The project directory.
+        mode: Execution mode. Only ``"wasm"`` is served here; ``"server"`` is
+            served by ``tempestweb run --mode server`` (the built FastAPI host).
+        host: Override the bind address. Defaults to the project config's host.
+        port: Override the bind port. Defaults to the project config's port.
+
+    Raises:
+        DevError: If the mode is invalid/unsupported or the initial build fails.
+    """
+    from tempestweb.cli.commands.build import BuildError, build_artifact
+    from tempestweb.devserver import create_dev_app, make_server
+
+    config = load_config(project_root)
+    resolved_mode = mode or config.mode
+    if resolved_mode not in VALID_MODES:
+        raise DevError(f"invalid mode {resolved_mode!r}; expected one of {VALID_MODES}")
+    if resolved_mode != "wasm":
+        raise DevError(
+            "dev livereload serves Mode A (wasm); for Mode B use "
+            "`tempestweb run --mode server` (uvicorn hosts the built app)."
+        )
+
+    try:
+        result = build_artifact(project_root, mode=resolved_mode)
+    except Exception as exc:  # noqa: BLE001 - normalize to DevError
+        raise DevError(f"initial build failed: {exc}") from exc
+    out_dir = result.out_dir
+
+    signal = ReloadSignal()
+
+    def rebuild(event: ReloadEvent) -> None:
+        """Rebuild the bundle into the served dir before the browser reloads."""
+        try:
+            build_artifact(project_root, mode=resolved_mode, out_dir=out_dir)
+        except BuildError as exc:
+            print(f"tempestweb dev: rebuild failed, keeping last build: {exc}")
+
+    # Subscribed (not a waiter): trigger() runs callbacks before resolving the
+    # livereload SSE waiters, so the rebuild completes before the tab reloads.
+    signal.subscribe(rebuild)
+
+    app = create_dev_app(out_dir, signal)
+    bind_host = host or config.host
+    bind_port = port if port is not None else config.port
+    server = make_server(app, bind_host, bind_port)
+    watcher = FileWatcher(config.root, signal)
+
+    print(
+        f"tempestweb dev: serving {config.name} at http://{bind_host}:{bind_port} "
+        f"(mode={resolved_mode}); edit a file to reload. Ctrl-C to stop."
+    )
+    await asyncio.gather(server.serve(), watcher.run())

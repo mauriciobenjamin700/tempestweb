@@ -18,6 +18,7 @@ from tempestweb.cli.commands.dev import (
     DevSession,
     StubTransport,
     create_dev_session,
+    serve_dev,
 )
 from tempestweb.cli.commands.new import NewError, create_project
 from tempestweb.cli.commands.run import RunError, RunPlan, prepare_run, serve_run
@@ -37,5 +38,6 @@ __all__ = [
     "create_dev_session",
     "create_project",
     "prepare_run",
+    "serve_dev",
     "serve_run",
 ]

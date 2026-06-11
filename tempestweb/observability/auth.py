@@ -32,6 +32,7 @@ Example:
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import binascii
 import json
@@ -340,7 +341,7 @@ class RefreshQueue:
         """
         self._store: AuthStore = store
         self._refresh_fn: RefreshFn = refresh_fn
-        self._pending: Awaitable[str] | None = None
+        self._pending: asyncio.Future[str] | None = None
         self._calls: int = 0
 
     @property
@@ -358,11 +359,12 @@ class RefreshQueue:
     async def refresh(self) -> str:
         """Return a fresh token, coalescing concurrent callers into one renewal.
 
-        The first caller starts the renewal and stores the in-flight awaitable;
-        concurrent callers await that same awaitable instead of starting their
-        own. When it settles the in-flight slot is cleared so a future expiry
-        triggers a new renewal. If the renewal raises, the error propagates to
-        all waiters and the slot is cleared so a retry is possible.
+        The first caller schedules the real renewal as a single
+        :class:`asyncio.Task` and stores it; every concurrent caller awaits that
+        same task instead of starting its own. The task resolves once for all
+        waiters, then the in-flight slot is cleared so a future expiry triggers a
+        new renewal. If the renewal raises, the exception propagates to every
+        waiter and the slot is cleared so a retry is possible.
 
         Returns:
             The new access token.
@@ -373,10 +375,10 @@ class RefreshQueue:
         if self._pending is not None:
             return await self._pending
 
-        coro: Awaitable[str] = self._run()
-        self._pending = coro
+        task: asyncio.Task[str] = asyncio.ensure_future(self._run())
+        self._pending = task
         try:
-            return await coro
+            return await task
         finally:
             self._pending = None
 

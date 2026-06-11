@@ -19,6 +19,7 @@ clearly-marked placeholders so the layout is verifiable today.
 from __future__ import annotations
 
 import shutil
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -42,11 +43,27 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "transport.js",
 )
 
+# Name of the zipped tempestweb package shipped in a wasm artifact and unpacked
+# into the Pyodide virtual filesystem by the bootstrap.
+WASM_PACKAGE_ARCHIVE: str = "tempestweb-pkg.zip"
+
+# Subpackages of ``tempestweb`` the Mode A runtime needs in the browser. The
+# server/CLI/devserver stacks (and their Starlette/uvicorn deps) are omitted —
+# Pyodide neither has them nor needs them to run ``view()`` in the tab.
+_WASM_PACKAGE_PARTS: tuple[str, ...] = (
+    "__init__.py",
+    "_core",
+    "runtime",
+    "transports",
+    "native",
+)
+
 # Files a wasm artifact must contain, relative to the artifact root.
 WASM_ARTIFACT_FILES: tuple[str, ...] = (
     "index.html",
     "app.py",
     "bootstrap.js",
+    WASM_PACKAGE_ARCHIVE,
     *(f"client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
 )
 
@@ -91,6 +108,46 @@ def _client_dir() -> Path:
     if not candidate.is_dir():
         raise BuildError(f"shared client directory not found at {candidate}")
     return candidate
+
+
+def _package_dir() -> Path:
+    """Locate the installed ``tempestweb`` package directory.
+
+    Returns:
+        The absolute path to the ``tempestweb`` package (the parent of this
+        ``cli/commands`` module, two levels up).
+    """
+    # tempestweb/cli/commands/build.py -> the package root is two parents up.
+    return Path(__file__).resolve().parents[2]
+
+
+def _zip_package(dest: Path) -> None:
+    """Zip the Mode A subset of the ``tempestweb`` package into ``dest``.
+
+    The archive carries ``tempestweb/<part>`` entries for each part in
+    :data:`_WASM_PACKAGE_PARTS`, excluding ``__pycache__``. The Pyodide bootstrap
+    unpacks it into the virtual filesystem's working directory (on ``sys.path``),
+    so ``import tempestweb`` resolves in the browser.
+
+    Args:
+        dest: The ``.zip`` path to write.
+
+    Raises:
+        BuildError: If an expected package part is missing.
+    """
+    package = _package_dir()
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
+        for part in _WASM_PACKAGE_PARTS:
+            source = package / part
+            if not source.exists():
+                raise BuildError(f"missing package part: {source}")
+            if source.is_file():
+                archive.write(source, f"tempestweb/{part}")
+                continue
+            for path in sorted(source.rglob("*")):
+                if path.is_dir() or "__pycache__" in path.parts:
+                    continue
+                archive.write(path, f"tempestweb/{path.relative_to(package)}")
 
 
 def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
@@ -143,11 +200,22 @@ def _index_html(name: str) -> str:
 """
 
 
-def _bootstrap_js(name: str) -> str:
-    """Render the wasm bootstrap entrypoint.
+# Pyodide release the wasm bootstrap loads from the CDN. CPython 3.14.2; ships a
+# prebuilt emscripten ``pydantic_core`` wheel in its own package index, so the
+# vendored core's only hard dependency loads via ``loadPackage`` (NOT PyPI
+# micropip — PyPI has no emscripten wheel). See docs/agents/reports/NOTES-T3.md.
+WASM_PYODIDE_VERSION: str = "v314.0.0"
 
-    The live Pyodide loading is owned by Track T3 (Mode A); this placeholder
-    pins the artifact's entrypoint shape so the layout is verifiable today.
+
+def _bootstrap_js(name: str) -> str:
+    """Render the live wasm bootstrap entrypoint (Mode A, Pyodide).
+
+    The emitted module loads Pyodide + ``pydantic`` from the CDN, unpacks the
+    zipped ``tempestweb`` package and writes ``app.py`` into the Pyodide virtual
+    filesystem, builds the app in-process via
+    :func:`tempestweb.runtime.wasm_main.bootstrap`, and mounts the shared client
+    onto ``#app`` through ``transport-wasm.js`` — Python runs in the same tab, so
+    the transport is an in-process bridge with no network.
 
     Args:
         name: The project name.
@@ -156,17 +224,69 @@ def _bootstrap_js(name: str) -> str:
         The bootstrap module source.
     """
     return f"""\
-// bootstrap.js — wasm artifact entrypoint for "{name}".
+// bootstrap.js — live wasm artifact entrypoint for "{name}" (Mode A, Pyodide).
 //
-// PHASE A3 (Track T3): load Pyodide, install the vendored core wheel, run
-// app.py, then mount() the shared client onto #app via transport-wasm.js.
+// Loads Pyodide + pydantic, installs the tempestweb package and app.py into the
+// Pyodide virtual FS, builds the app in-process and mounts the shared client.
 import {{ mount }} from "./client/tempestweb.js";
+import {{ createWasmTransport }} from "./client/transport-wasm.js";
+
+const PYODIDE_BASE = "https://cdn.jsdelivr.net/pyodide/{WASM_PYODIDE_VERSION}/full/";
+
+// Python entry: build the app and hand back a _start(on_patches, dispatch) hook.
+const PY_GLUE = `
+import app
+from tempestweb.runtime.wasm_main import bootstrap
+
+def _start(on_patches, dispatch):
+    return bootstrap(app.make_state(), app.view, on_patches, dispatch)
+
+_start
+`;
 
 export async function boot() {{
-  throw new Error("A3: Pyodide bootstrap is provided by Track T3");
+  const root = document.getElementById("app");
+
+  // 1. Load Pyodide and pydantic (the vendored core's only hard dependency).
+  const {{ loadPyodide }} = await import(PYODIDE_BASE + "pyodide.mjs");
+  const pyodide = await loadPyodide({{ indexURL: PYODIDE_BASE }});
+  await pyodide.loadPackage(["pydantic"]);
+
+  // 2. Install the tempestweb package + the app module into the virtual FS.
+  const pkgZip = await (await fetch("./{WASM_PACKAGE_ARCHIVE}")).arrayBuffer();
+  pyodide.unpackArchive(pkgZip, "zip");
+  const appSource = await (await fetch("./app.py")).text();
+  pyodide.FS.writeFile("app.py", appSource, {{ encoding: "utf8" }});
+
+  // 3. Build the app in Python; _start wires on_patches and returns the handle.
+  const start = pyodide.runPython(PY_GLUE);
+
+  // 4. In-process bridge: Python delivers patches as a JSON string; events go
+  //    back as JSON strings. No network — Python runs in this tab.
+  let deliverToTransport = null;
+  const onPatches = (patchesJson) => {{
+    if (deliverToTransport) deliverToTransport(JSON.parse(patchesJson));
+  }};
+  const handle = start(onPatches, null); // counter uses no native capability
+
+  const bridge = {{
+    onDeliver(handler) {{
+      deliverToTransport = handler;
+    }},
+    pushEvent(event) {{
+      handle.push_event_json(JSON.stringify(event));
+    }},
+    close() {{
+      handle.close();
+    }},
+  }};
+
+  const transport = createWasmTransport(bridge);
+  const initialNode = JSON.parse(handle.initial_node_json());
+  mount(root, transport, initialNode);
 }}
 
-void mount;
+boot();
 """
 
 
@@ -281,6 +401,7 @@ def _build_wasm(out: Path, client: Path, name: str, app_source: str) -> tuple[st
     (out / "index.html").write_text(_index_html(name), encoding="utf-8")
     (out / "bootstrap.js").write_text(_bootstrap_js(name), encoding="utf-8")
     (out / "app.py").write_text(app_source, encoding="utf-8")
+    _zip_package(out / WASM_PACKAGE_ARCHIVE)
     _copy_client(client, out / "client", "transport-wasm.js")
     return tuple(sorted(WASM_ARTIFACT_FILES))
 

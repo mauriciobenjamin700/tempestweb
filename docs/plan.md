@@ -37,12 +37,15 @@ renderizador-folha (DOM) e dois transportes de patch (FFI Pyodide e WebSocket).
 | Onde o Python roda | No browser do usuário | No servidor |
 | Análogo conhecido | PyScript / Pyodide | Phoenix LiveView / Streamlit |
 | Transporte de patch | FFI Pyodide (em-processo) | WebSocket |
-| Offline | Sim (depois do load) | Não (precisa do servidor) |
+| Offline | Sim, pleno (após o load roda sem servidor) | Parcial (precisa do servidor p/ reconciliar; só leitura de cache + fila offline) |
 | Cold start | Pesado (~6–10 MB WASM) | Leve (HTML + cliente JS) |
 | Latência por interação | Zero (local) | Round-trip de rede |
 | Wheels nativas | Build emscripten (de-risk) | Wheels normais (servidor) |
 | SEO / first paint | Fraco (hidrata depois) | Forte (server-render) |
 | Casa com o stack web | Não usa FastAPI | Usa FastAPI + tempest-fastapi-sdk |
+| Transporte de patch (alt.) | — | WebSocket **ou** SSE (B5) |
+| Instalável (PWA) | Sim — alvo natural (Trilho P) | Sim — install shell + push |
+| WebPush | Sim (subscribe no browser; envio por qualquer servidor) | Sim (servidor é dono do endpoint) |
 
 Os dois são **alvos de produção reais** — diferente do tempestroid, onde o Qt é só
 simulador de dev. Aqui A e B são produtos que se entregam ao usuário final.

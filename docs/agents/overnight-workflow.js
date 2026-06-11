@@ -1,46 +1,41 @@
 export const meta = {
   name: "tempestweb-overnight",
   description:
-    "Parallel build of tempestweb across 8 independent tracks, each in its own git worktree/branch, committing incrementally.",
-  phases: [{ title: "Build", detail: "8 track agents in parallel worktrees off main" }],
+    "Parallel build of tempestweb across independent tracks, each in its own git worktree/branch with a domain specialist, then an adversarial QA review per track.",
+  phases: [
+    { title: "Build", detail: "track specialists implement in parallel worktrees off main" },
+    { title: "QA", detail: "tw-qa reviews each branch from scratch as it lands" },
+  ],
 };
 
 const REPO = "/home/mauriciobenjamin700/projects/my/tempestweb";
 
-// Shared preamble injected into every track agent. Self-sufficient: the agent
-// starts with fresh context, so everything it needs is spelled out here.
-function preamble(t) {
-  return `You are an autonomous build agent working OVERNIGHT, unsupervised. Track ${t.id}.
+// Shared preamble injected into every implement agent. Self-sufficient: the agent
+// starts with fresh context, so everything it needs is spelled out here. The
+// domain conventions live in the specialist's own system prompt (agentType).
+function buildPrompt(t) {
+  return `You are building tempestweb OVERNIGHT, unsupervised. Track ${t.id}.
 
 REPO: ${REPO} (a git repo; base branch "main" is clean and green).
 YOUR WORKTREE: ${REPO}-${t.id}
 YOUR BRANCH: ${t.branch}
 
-STEP 0 — set up your isolated worktree (do this exactly, with absolute paths):
+STEP 0 — set up your isolated worktree (exactly, with absolute paths):
   git -C ${REPO} worktree add -b ${t.branch} ${REPO}-${t.id} main
   cd ${REPO}-${t.id}
   make setup            # uv venv + deps + npm install (uv cache makes this fast)
-Then do ALL your work inside ${REPO}-${t.id}. Never touch the main checkout.
+Then do ALL your work inside ${REPO}-${t.id}. Never touch the main checkout or
+another track's files. Do NOT git push and do NOT merge. Leave your branch with all
+work committed; do NOT remove your worktree.
 
-READ FIRST (in your worktree): CLAUDE.md, docs/plan.md, docs/roadmap.md,
-docs/contract.md, docs/agents/MANIFEST.md. The contract + golden fixtures in
-tests/fixtures/ are the source of truth for the Python<->client wire format.
+READ FIRST: CLAUDE.md, docs/plan.md, docs/roadmap.md, docs/contract.md,
+docs/agents/MANIFEST.md. The contract + golden fixtures in tests/fixtures/ are truth.
 
-HARD RULES:
-- Do NOT edit tempestweb/_core/** (mechanical vendored copy).
-- Do NOT edit files owned by other tracks (see MANIFEST). Stay in your dir/files.
-- Program against the documented contract/interfaces. Where you need another
-  track's runtime, STUB/MOCK it against the interface — integration happens later.
-- Every commit must leave your branch with green automated tests. Run the
-  verification below before each commit. Commit GRANULARLY (one logical step =
-  one conventional commit: feat:/fix:/test:/docs:/ref:/chore:). End each commit
-  message with: Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-- If something needs a real browser/device to verify, write the code + every test
-  you CAN automate, and record what needs manual verification in NOTES-${t.id}.md.
-- If blocked on a design decision, write the options + your choice in NOTES-${t.id}.md
-  and proceed — do not stop the whole track.
-- Do NOT git push. Do NOT merge into main or any other branch. Do NOT remove your
-  worktree. Leave your branch with all work committed.
+COMMIT GRANULARLY (conventional commits). Every commit must leave the branch green —
+run the verification below before each commit. If something needs a real browser/
+device, write every automatable test and record manual steps in NOTES-${t.id}.md. If
+blocked on a design decision, record options + your choice in NOTES-${t.id}.md and
+proceed — never stall the track.
 
 YOUR SCOPE: ${t.scope}
 
@@ -48,19 +43,43 @@ DONE WHEN: ${t.done}
 
 VERIFICATION (must pass before each commit): ${t.verify}
 
-Work thoroughly through the whole scope, committing as you go. When the scope is
-complete and verification is green, write a short SUMMARY-${t.id}.md (what you
-built, what's stubbed, what needs manual verification, suggested merge order) and
-make a final commit. Then report: branch name, number of commits, test status,
-and anything the human must verify by hand.`;
+When scope is complete and green, write SUMMARY-${t.id}.md (what you built, what is
+stubbed, what needs manual verification, suggested merge order) and make a final
+commit. Report: branch name, commit count, test status, and anything the human must
+verify by hand.`;
+}
+
+function qaPrompt(t, buildReport) {
+  return `Adversarial QA review of track ${t.id} (branch ${t.branch}).
+
+Go to the worktree and review from a clean state:
+  cd ${REPO}-${t.id}
+
+The DONE-WHEN you must contest (from docs/agents/MANIFEST.md):
+${t.done}
+
+The implement agent reported:
+---
+${buildReport ?? "(no report — the build agent may have failed; verify what exists on the branch)"}
+---
+
+Run the full applicable gate from scratch (make setup if needed; ruff, mypy,
+pytest, and node --test as they apply to this track), check every done-when clause
+against an actual passing test, and hunt for untested/overclaimed work, edits to
+tempestweb/_core, files touched outside the track, and convention violations
+(single quotes / missing types / missing docstrings in Python; TypeScript or a
+build step in the client). Write REVIEW-${t.id}.md with the VERDICT, the gate
+output, the done-when checklist, and prioritized findings, then commit it. Report
+the verdict and top findings. Do not implement fixes.`;
 }
 
 const TRACKS = [
   {
     id: "T1",
     branch: "feat/client-render",
+    agent: "tw-js",
     scope:
-      "Pure-JS client renderer (NO TypeScript, NO framework, NO build step). Implement client/dom.js (buildElement + applyPatches for all 5 patch kinds), client/style.js (styleToCss covering flex/box-model/border/background/color/typography/dimensions; Color {r,g,b,a}->rgba, Edge->padding/margin; reference tempestroid Qt translator at ../tempestroid/tempestroid/renderers/qt/style_translator.py), client/events.js (delegated event capture -> transport.sendEvent, read data-tw-key set by dom.js), and wire client/tempestweb.js mount() against a mock transport. Add jsdom tests in tests/client/.",
+      "Pure-JS client renderer. Implement client/dom.js (buildElement + applyPatches for all 5 patch kinds; set data-tw-key on elements), client/style.js (styleToCss covering flex/box-model/border/background/color/typography/dimensions; Color {r,g,b,a}->rgba, Edge->padding/margin), client/events.js (delegated capture -> transport.sendEvent reading data-tw-key), and wire client/tempestweb.js mount() against a mock transport. jsdom tests in tests/client/.",
     done:
       "Building DOM from tests/fixtures/node_initial.json then applying tests/fixtures/patches_all_kinds.json yields the expected DOM; tests/fixtures/style_sample.json maps to the expected CSS; a click on a Button calls the mock transport's sendEvent with the right key.",
     verify: 'node --test "tests/client/**/*.test.js"',
@@ -68,8 +87,9 @@ const TRACKS = [
   {
     id: "T2",
     branch: "feat/mode-server",
+    agent: "tw-python",
     scope:
-      "Mode B (server), phases B0-B2 + B5(SSE). Implement tempestweb/server/ (FastAPI + WebSocket host using tempest-fastapi-sdk patterns where natural), tempestweb/transports/websocket.py (PatchTransport over WS), tempestweb/transports/sse.py (B5: patches server->client via EventSource, events client->server via HTTP POST, SAME PatchTransport interface), tempestweb/runtime/session.py (per-connection session: connect=mount, disconnect=unmount, cancel orphan tasks), client/transport-ws.js and client/transport-sse.js (both implement the transport.js interface). Reconciler from tempestweb._core (build/diff). pytest with a WS test client and an SSE/POST test client.",
+      "Mode B (server), phases B0-B2 + B5(SSE). Implement tempestweb/server/ (FastAPI + WebSocket host using tempest-fastapi-sdk patterns where natural), tempestweb/transports/websocket.py (PatchTransport over WS), tempestweb/transports/sse.py (B5: patches server->client via EventSource, events client->server via HTTP POST, SAME PatchTransport interface), tempestweb/runtime/session.py (per-connection session: connect=mount, disconnect=unmount, cancel orphan tasks), client/transport-ws.js and client/transport-sse.js (both implement the transport.js interface). Reconciler from tempestweb._core. pytest with WS and SSE/POST test clients.",
     done:
       "A test client connects over WS, receives initial patches for the counter, sends a click, and receives the resulting Update patch; the SSE transport delivers the same patch stream via EventSource + POST; two connections keep independent state.",
     verify: "pytest tests/unit/test_server*.py -q",
@@ -77,17 +97,19 @@ const TRACKS = [
   {
     id: "T3",
     branch: "feat/mode-wasm",
+    agent: "tw-python",
     scope:
-      "Mode A (WASM/Pyodide). FIRST research the CURRENT state of pydantic-core in Pyodide (it is post-knowledge-cutoff — use web search) and record findings in NOTES-T3.md. Implement public/index.html bootstrap that loads Pyodide + the vendored core + an app.py and produces patches in the browser; tempestweb/runtime/wasm.py (Python-side glue) and tempestweb/transports/wasm.py (PatchTransport over pyodide.ffi); client/transport-wasm.js. Pure-Python logic must be pytest-covered; the live browser path is documented for manual verification.",
+      "Mode A (WASM/Pyodide). FIRST research the CURRENT state of pydantic-core in Pyodide (post knowledge-cutoff — use web search) and record findings in NOTES-T3.md. Implement public/index.html bootstrap (loads Pyodide + vendored core + an app.py, produces patches in the browser), tempestweb/runtime/wasm.py (Python-side glue), tempestweb/transports/wasm.py (PatchTransport over pyodide.ffi), client/transport-wasm.js. Pure-Python logic must be pytest-covered; the live browser path is documented for manual verification.",
     done:
-      "transport-wasm.js + wasm.py implement the interface; the bootstrap is complete and documented. Pure-Python units are green. Live Pyodide run is documented in NOTES-T3.md for manual check.",
+      "transport-wasm.js + wasm.py implement the interface; the bootstrap is complete and documented. Pure-Python units are green. Live Pyodide run is documented in NOTES-T3.md.",
     verify: "pytest tests/unit/test_wasm*.py -q",
   },
   {
     id: "T4",
     branch: "feat/native-web",
+    agent: "tw-python",
     scope:
-      "Web capability adapters in tempestweb/native/ as typed awaitables: geolocation, clipboard, notifications, storage (mirror tempestroid/native naming where it maps). Add client/native.js glue calling the Web APIs (navigator.*). Document the Mode-A (browser) vs Mode-B (proxied over WS round-trip) split. pytest with mocked Web APIs.",
+      "Web capability adapters in tempestweb/native/ as typed awaitables: geolocation, clipboard, notifications, storage (mirror tempestroid/native naming where it maps). client/native.js glue calling navigator.*. Document the Mode-A (browser) vs Mode-B (proxied over WS round-trip) split. pytest with mocked Web APIs.",
     done:
       "Each capability has a typed Python awaitable wrapper + JS glue; signatures are async; the client/server split is documented.",
     verify: "pytest tests/unit/test_native*.py -q",
@@ -95,8 +117,9 @@ const TRACKS = [
   {
     id: "T5",
     branch: "feat/cli-devloop",
+    agent: "tw-python",
     scope:
-      "Flesh out tempestweb/cli/ (new/dev/build/run subcommands — keep cli/main.py's parser shape) and tempestweb/devserver/ (file watcher + reload signal, transport-agnostic). `new` scaffolds a runnable project; `dev` watches and triggers reload (against a stub transport); `build --mode wasm|server` produces the right artifact shape. pytest coverage.",
+      "Flesh out tempestweb/cli/ (new/dev/build/run — keep cli/main.py's parser shape) and tempestweb/devserver/ (file watcher + reload signal, transport-agnostic). `new` scaffolds a runnable project; `dev` watches and triggers reload (stub transport); `build --mode wasm|server` produces the right artifact shape. pytest coverage.",
     done:
       "tempestweb new X creates a runnable project tree; dev watcher detects a change and emits a reload; build --mode produces the expected artifact layout.",
     verify: "pytest tests/unit/test_cli*.py -q",
@@ -104,17 +127,19 @@ const TRACKS = [
   {
     id: "T6",
     branch: "feat/docs-site",
+    agent: "tw-docs",
     scope:
-      "Bilingual MkDocs site (PT-BR default + EN-US under /en/) in the tiangolo/FastAPI didactic style, with mkdocs-static-i18n + Material + a header language switch, and .github/workflows/docs.yml for Pages. Pages: landing, installation, architecture (reuse docs/arquitetura.md), a progressive tutorial building the counter, and the wire contract. Do NOT rewrite docs/plan.md/roadmap.md/contract.md content — link to them.",
+      "Bilingual MkDocs site (PT-BR default + EN-US under /en/) in the tiangolo/FastAPI didactic style: mkdocs-material + mkdocs-static-i18n + header language switch, and .github/workflows/docs.yml for Pages (build_type: workflow). Pages: landing, installation, architecture (link docs/arquitetura.md), a progressive tutorial building the counter, the wire contract, and placeholders for PWA/SSE. Do NOT rewrite docs/plan.md/roadmap.md/contract.md — link to them. Point the README banner at the Pages URL (PT + EN).",
     done:
-      "uv run mkdocs build --strict passes with zero warnings; language switch present; tutorial covers the counter end to end.",
+      "uv run mkdocs build --strict passes with zero warnings; language switch present; tutorial covers the counter end to end; docs.yml deploy workflow present.",
     verify: "uv run mkdocs build --strict",
   },
   {
     id: "T7",
     branch: "feat/conformance",
+    agent: "tw-qa",
     scope:
-      "Conformance harness in tests/conformance/: generate patches from the real core and lock the wire-format shape (regenerable goldens); a test asserting that two mock transports fed the same patch stream produce identical DOM (the A-vs-B guarantee). Add any new fixtures under tests/fixtures/.",
+      "Conformance harness in tests/conformance/: generate patches from the real core and lock the wire-format shape (regenerable goldens); a test asserting two mock transports fed the same patch stream produce identical DOM (the A-vs-B guarantee). New fixtures under tests/fixtures/.",
     done:
       "A pytest suite pins the contract shape and asserts transport-independence of the rendered DOM.",
     verify: "pytest tests/conformance -q",
@@ -122,8 +147,9 @@ const TRACKS = [
   {
     id: "T8",
     branch: "feat/examples",
+    agent: "tw-python",
     scope:
-      "Additional example apps under examples/ (todo-list, a form, an async fetch view) exercising the core widget API (inputs, lists, forms). Each is a view(app)->Widget module like examples/counter/app.py. Add tests/unit/test_examples.py that imports each, builds the view, and validates the tree.",
+      "Additional example apps under examples/ (todo-list, a form, an async fetch view) exercising the core widget API (inputs, lists, forms). Each is a view(app)->Widget module like examples/counter/app.py. tests/unit/test_examples.py imports each, builds the view, validates the tree.",
     done:
       "Each example imports, build(view()) validates and yields a tree; input/list/form widgets are exercised.",
     verify: "pytest tests/unit/test_examples.py -q",
@@ -131,27 +157,40 @@ const TRACKS = [
   {
     id: "T9",
     branch: "feat/pwa-offline-webpush",
+    agent: "tw-js",
     scope:
-      "Trilho P — PWA / offline-first / WebPush (parity with tempest-react-sdk). Own files: client/pwa/ (manifest.webmanifest emitter, sw.js service worker, register.js), tempestweb/server/webpush.py (VAPID via tempest-fastapi-sdk[webpush] patterns), tests/unit/test_pwa*.py. P0: manifest (display=standalone, theme_color, start_url, maskable icons) — installable. P1: service worker precaches the app-shell (client JS always; in Mode A also Pyodide + core wheel + app.py) cache-first — app opens offline after first load. P2: per-resource strategies (stale-while-revalidate assets, network-first data) + an offline event queue with replay-on-reconnect for Mode B. P3: WebPush — native notifications.subscribe()/permission as awaitables, SW push handler, server-side send (pywebpush). Stub the client/build integration against interfaces; do not edit other tracks' files.",
+      "Trilho P — PWA / offline-first / WebPush. Own files: client/pwa/ (manifest.webmanifest emitter, sw.js service worker, register.js), tempestweb/server/webpush.py (VAPID via tempest-fastapi-sdk[webpush] patterns), tests/unit/test_pwa*.py. P0: installable manifest (standalone, theme_color, start_url, maskable icons). P1: service worker precaches the app-shell (client JS always; Mode A also Pyodide + core wheel + app.py) cache-first -> offline after first load. P2: per-resource strategies (stale-while-revalidate assets, network-first data) + offline event queue with replay-on-reconnect (Mode B). P3: WebPush — native notifications.subscribe()/permission awaitables, SW push handler, server-side send (pywebpush). Stub client/build integration against interfaces.",
     done:
-      "manifest is valid JSON and installable-shaped; sw.js passes node --check and has precache + fetch strategy; webpush VAPID subscribe/send logic is unit-tested (pywebpush mocked); offline queue replay is unit-tested. Live install/push documented in NOTES-T9.md for manual verification.",
-    verify: "pytest tests/unit/test_pwa*.py -q && node --check client/pwa/sw.js",
+      "manifest is valid JSON and installable-shaped; sw.js passes node --check and has precache + fetch strategy; webpush VAPID subscribe/send is unit-tested (pywebpush mocked); offline queue replay is unit-tested. Live install/push documented in NOTES-T9.md.",
+    verify: 'pytest tests/unit/test_pwa*.py -q && node --check client/pwa/sw.js',
   },
 ];
 
 phase("Build");
-log(`Launching ${TRACKS.length} track agents in parallel worktrees off main.`);
+log(`Launching ${TRACKS.length} track specialists in parallel worktrees off main; each is QA-reviewed as it lands.`);
 
-const results = await parallel(
-  TRACKS.map((t) => () =>
-    agent(preamble(t), { label: t.id, phase: "Build" }).then((report) => ({
-      id: t.id,
-      branch: t.branch,
-      report,
+// Pipeline: each track implements with its domain specialist, then tw-qa reviews
+// that branch from scratch — no barrier, so a finished track is reviewed while
+// others are still building.
+const results = await pipeline(
+  TRACKS,
+  (t) =>
+    agent(buildPrompt(t), { label: `build:${t.id}`, phase: "Build", agentType: t.agent }).then(
+      (report) => ({ ...t, buildReport: report })
+    ),
+  (built) =>
+    agent(qaPrompt(built, built.buildReport), {
+      label: `qa:${built.id}`,
+      phase: "QA",
+      agentType: "tw-qa",
+    }).then((review) => ({
+      id: built.id,
+      branch: built.branch,
+      buildReport: built.buildReport,
+      qaReview: review,
     }))
-  )
 );
 
 const ok = results.filter(Boolean);
-log(`Done. ${ok.length}/${TRACKS.length} tracks reported back.`);
+log(`Done. ${ok.length}/${TRACKS.length} tracks built + QA-reviewed.`);
 return ok;

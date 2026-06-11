@@ -36,6 +36,22 @@ docs). Gate global: `make check` (ruff + mypy + pytest + JS jsdom).
 | **T8** | `feat/examples` | `examples/**` (exceto counter), `tests/unit/test_examples.py` | Mais exemplos: todo-list, formulário, fetch async — exercitando a API de widgets do core | Cada exemplo importa, `build(view())` valida e produz árvore; cobre widgets de input/lista/form | `pytest tests/unit/test_examples.py` verde |
 | **T9** | `feat/pwa-offline-webpush` | `client/pwa/*`, `tempestweb/server/webpush.py`, `tests/unit/test_pwa*.py` | Trilho P: P0 (manifest instalável), P1 (service worker + app-shell offline-first), P2 (estratégias + fila offline/replay), P3 (WebPush VAPID) | manifest válido/instalável; `sw.js` passa `node --check` com precache+fetch; lógica WebPush e fila offline com teste unitário (pywebpush mockado); install/push ao vivo em `NOTES-T9.md` | `pytest tests/unit/test_pwa*.py` + `node --check client/pwa/sw.js` |
 
+## Especialistas (agentType) + estágio QA
+
+Cada track roda com um **agente especialista de projeto** (`.claude/agents/`), e
+toda branch passa por uma **revisão QA adversarial** assim que fecha (pipeline:
+implementa → `tw-qa` revisa do zero → `REVIEW-<ID>.md`).
+
+| Especialista | Tracks | Foco |
+|---|---|---|
+| **tw-python** | T2, T3, T4, T5, T8 | FastAPI/async/pydantic, mypy --strict, aspas duplas, docstrings EN |
+| **tw-js** | T1, T9 | JS puro (sem TS/framework/build), JSDoc, jsdom, contrato/fixtures |
+| **tw-docs** | T6 | MkDocs bilíngue tiangolo, `--strict`, deploy Pages, docs↔código |
+| **tw-qa** | T7 + revisão de **todas** as branches | roda o gate do zero, contesta o "feito quando", caça overclaim |
+
+`tw-docs` é dono permanente da doc: mantém o site sincronizado com o código e
+garante o build/deploy das Pages (não só na noite — sempre que a superfície muda).
+
 ## Dependências (para o merge da manhã, não para a execução)
 
 - T3 (wasm) e T2 (server) consomem o cliente real do **T1** na integração. Durante

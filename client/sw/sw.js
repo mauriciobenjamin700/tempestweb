@@ -344,7 +344,7 @@ async function focusOrOpen(url) {
  * Replay the offline queue from a Background Sync event.
  *
  * Delegates to the page's sync module shape by posting a REPLAY message to all
- * clients (the queue lives in IndexedDB owned by client/pwa/sync.js). When no
+ * clients (the queue lives in IndexedDB owned by client/offline/sync.js). When no
  * client is open, the worker has no network helper here; the queue stays durable
  * and replays on the next open. P2.
  *

@@ -174,7 +174,7 @@ export function validateExtras(manifest) {
       if (typeof st.action !== "string") errors.push("share_target.action is required");
       const method = (st.method ?? "GET").toUpperCase();
       if (method === "POST" && typeof st.enctype !== "string") {
-        errors.push('share_target with method POST requires an enctype');
+        errors.push("share_target with method POST requires an enctype");
       }
     }
   }

@@ -107,7 +107,10 @@ async def test_request_post_not_retried_without_key() -> None:
     bridge = ScriptedBridge([_resp(503)])
     install_bridge(bridge)
     res = await http.request(
-        "POST", "/api/items", json={"a": 1}, retry=RetryOptions(attempts=3),
+        "POST",
+        "/api/items",
+        json={"a": 1},
+        retry=RetryOptions(attempts=3),
         sleep=_noop_sleep,
     )
     # A bare POST is unsafe to retry -> single attempt, returns the 503.

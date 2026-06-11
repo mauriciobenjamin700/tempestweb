@@ -16,7 +16,7 @@ export async function notificationsNotify(args, deps) {
   const Ctor = deps.Notification || /** @type {any} */ (globalThis).Notification;
   if (!Ctor) throw new CapabilityError("unavailable", "Notification is not available");
   if (Ctor.permission === "granted") {
-    // eslint-disable-next-line no-new
+    // Constructed for its side effect: showing the notification.
     new Ctor(args.title || "", { body: args.body || "" });
   }
   return {};

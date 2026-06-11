@@ -9,10 +9,10 @@ import { CapabilityError } from "./index.js";
 /**
  * Normalize a `Headers`/object into a lower-cased plain object.
  * @param {Headers|Object|undefined} headers
- * @returns {Object<string,string>}
+ * @returns {Object.<string,string>}
  */
 function headersToObject(headers) {
-  /** @type {Object<string,string>} */
+  /** @type {Object.<string,string>} */
   const out = {};
   if (!headers) return out;
   if (typeof headers.forEach === "function") {

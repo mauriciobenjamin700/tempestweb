@@ -40,9 +40,9 @@ export async function shareShare(args, deps) {
   try {
     await nav.share(data);
     return { outcome: "shared" };
-  } catch (err) {
-    // AbortError means the user dismissed the sheet — a normal outcome.
-    if (err && err.name === "AbortError") return { outcome: "cancelled" };
+  } catch {
+    // A rejection (AbortError when the user dismisses the sheet, or any other
+    // share failure) is treated as a normal "cancelled" outcome, never an error.
     return { outcome: "cancelled" };
   }
 }

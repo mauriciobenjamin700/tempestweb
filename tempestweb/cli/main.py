@@ -91,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Artifact output directory (default: <project>/dist/<mode>).",
     )
+    build.add_argument(
+        "--offline",
+        action="store_true",
+        help="Vendor the Pyodide runtime + wheels so wasm boots offline "
+        "(downloads them at build time).",
+    )
 
     run = sub.add_parser("run", help="Build and serve the app locally.")
     run.add_argument("--mode", choices=["wasm", "server"], default="wasm")
@@ -105,6 +111,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Override the bind port.",
+    )
+    run.add_argument(
+        "--offline",
+        action="store_true",
+        help="Build the wasm bundle with a vendored, offline-capable Pyodide.",
     )
 
     return parser
@@ -171,7 +182,9 @@ def _cmd_build(args: argparse.Namespace) -> int:
         Process exit code.
     """
     try:
-        result = build_artifact(args.path, mode=args.mode, out_dir=args.out)
+        result = build_artifact(
+            args.path, mode=args.mode, out_dir=args.out, offline=args.offline
+        )
     except BuildError as exc:
         print(f"tempestweb build: {exc}", file=sys.stderr)
         return 1
@@ -200,6 +213,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
             mode=args.mode,
             host=args.host,
             port=args.port,
+            offline=args.offline,
         )
     except RunError as exc:
         print(f"tempestweb run: {exc}", file=sys.stderr)

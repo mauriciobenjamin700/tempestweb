@@ -56,6 +56,7 @@ def prepare_run(
     mode: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    offline: bool = False,
 ) -> RunPlan:
     """Build the artifact and compute the bind plan for serving it.
 
@@ -64,6 +65,8 @@ def prepare_run(
         mode: ``"wasm"`` or ``"server"``. Defaults to the project config's mode.
         host: Override the bind address. Defaults to the project config's host.
         port: Override the bind port. Defaults to the project config's port.
+        offline: When ``True`` (wasm), vendor an offline-capable Pyodide into the
+            built bundle. See :func:`~tempestweb.cli.commands.build.build_artifact`.
 
     Returns:
         A :class:`RunPlan` with the built artifact and bind address.
@@ -73,7 +76,7 @@ def prepare_run(
     """
     config: ProjectConfig = load_config(project_root)
     try:
-        build = build_artifact(project_root, mode=mode)
+        build = build_artifact(project_root, mode=mode, offline=offline)
     except Exception as exc:  # noqa: BLE001 - normalize to RunError
         raise RunError(str(exc)) from exc
 

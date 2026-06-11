@@ -117,6 +117,64 @@ def test_wasm_service_worker_placeholders_are_filled(tmp_path: Path) -> None:
     assert "/manifest.webmanifest" in precache
 
 
+def test_wasm_default_build_loads_pyodide_from_cdn(tmp_path: Path) -> None:
+    """A non-offline build points the bootstrap at the jsdelivr CDN."""
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="wasm")
+    bootstrap = (result.out_dir / "bootstrap.js").read_text(encoding="utf-8")
+    assert "https://cdn.jsdelivr.net/pyodide/" in bootstrap
+    assert "./pyodide/" not in bootstrap
+    assert not (result.out_dir / "pyodide").exists()
+    assert not any(f.startswith("pyodide/") for f in result.files)
+
+
+def test_wasm_offline_build_vendors_and_precaches_pyodide(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An offline build vendors Pyodide locally, points the bootstrap at it, and
+    precaches it — without hitting the network (the vendor step is stubbed)."""
+    import json
+    import sys
+
+    vendored = ["pyodide-lock.json", "pyodide.mjs", "pyodide.asm.wasm"]
+
+    def fake_vendor(
+        out_dir: Path,
+        *,
+        version: str,
+        packages: tuple[str, ...],
+        fetch: object = None,
+    ) -> list[str]:
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        for name in vendored:
+            (Path(out_dir) / name).write_bytes(b"stub")
+        return vendored
+
+    build_module = sys.modules["tempestweb.cli.commands.build"]
+    monkeypatch.setattr(build_module, "vendor_pyodide", fake_vendor)
+
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="wasm", offline=True)
+
+    # Bootstrap loads from the local vendored copy, not the CDN.
+    bootstrap = (result.out_dir / "bootstrap.js").read_text(encoding="utf-8")
+    assert 'const PYODIDE_BASE = "./pyodide/";' in bootstrap
+    assert "cdn.jsdelivr.net" not in bootstrap
+
+    # The vendored files exist and are listed in the build result.
+    for name in vendored:
+        assert (result.out_dir / "pyodide" / name).is_file()
+        assert f"pyodide/{name}" in result.files
+
+    # The service worker precaches the vendored runtime so it boots offline.
+    sw = (result.out_dir / "sw.js").read_text(encoding="utf-8")
+    start = sw.index('"[')
+    end = sw.index(']"', start) + 2
+    precache = json.loads(json.loads(sw[start:end]))
+    assert "/pyodide/pyodide.asm.wasm" in precache
+    assert "/pyodide/pyodide-lock.json" in precache
+
+
 def test_wasm_embeds_app_source(tmp_path: Path) -> None:
     root = _project(tmp_path)
     result = build_artifact(root, mode="wasm")

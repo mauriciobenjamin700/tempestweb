@@ -105,6 +105,7 @@ EXAMPLE_NAMES = [
     "list_demo",
     "router_demo",
     "login_demo",
+    "geo_demo",
 ]
 
 

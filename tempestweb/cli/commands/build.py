@@ -49,6 +49,20 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "router.js",
 )
 
+# Native capability bridge modules (client/native/*.js), copied into the wasm
+# artifact so the in-process FFI dispatch (geolocation/clipboard/http/…) resolves.
+_NATIVE_ASSETS: tuple[str, ...] = (
+    "index.js",
+    "audio.js",
+    "camera.js",
+    "clipboard.js",
+    "geolocation.js",
+    "http.js",
+    "notifications.js",
+    "share.js",
+    "storage.js",
+)
+
 # Name of the zipped tempestweb package shipped in a wasm artifact and unpacked
 # into the Pyodide virtual filesystem by the bootstrap.
 WASM_PACKAGE_ARCHIVE: str = "tempestweb-pkg.zip"
@@ -89,6 +103,8 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     WASM_PACKAGE_ARCHIVE,
     *_PWA_FILES,
     *(f"client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
+    *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
+    "client/push/web-push-client.js",
 )
 
 # Files a server artifact must contain, relative to the artifact root.
@@ -346,6 +362,7 @@ def _bootstrap_js(name: str) -> str:
 // Pyodide virtual FS, builds the app in-process and mounts the shared client.
 import {{ mount }} from "./client/tempestweb.js";
 import {{ createWasmTransport }} from "./client/transport-wasm.js";
+import {{ installNativeBridge }} from "./client/native/index.js";
 
 const PYODIDE_BASE = "https://cdn.jsdelivr.net/pyodide/{WASM_PYODIDE_VERSION}/full/";
 
@@ -392,7 +409,17 @@ export async function boot() {{
       history.pushState({{}}, "", path);
     }}
   }};
-  const handle = start(onPatches, null, onNavigate);
+
+  // Native capabilities (geolocation/clipboard/http/…): expose the in-process
+  // dispatch on window, and bridge it to Python as a JSON-string seam (so the
+  // envelope crosses the FFI cleanly, no proxy conversion).
+  installNativeBridge(globalThis);
+  const onNative = async (envelopeJson) => {{
+    const result = await globalThis.__tempestweb_native__(JSON.parse(envelopeJson));
+    return JSON.stringify(result);
+  }};
+
+  const handle = start(onPatches, onNative, onNavigate);
 
   const bridge = {{
     onDeliver(handler) {{
@@ -528,6 +555,22 @@ def _build_wasm(out: Path, client: Path, name: str, app_source: str) -> tuple[st
     (out / "app.py").write_text(app_source, encoding="utf-8")
     _zip_package(out / WASM_PACKAGE_ARCHIVE)
     _copy_client(client, out / "client", "transport-wasm.js")
+    # Native capability bridge (geolocation/clipboard/http/…) for the in-process
+    # FFI dispatch the bootstrap installs.
+    native_dest = out / "client" / "native"
+    native_dest.mkdir(parents=True, exist_ok=True)
+    for asset in _NATIVE_ASSETS:
+        source = client / "native" / asset
+        if not source.is_file():
+            raise BuildError(f"missing native asset: {source}")
+        shutil.copyfile(source, native_dest / asset)
+    # The notifications bridge imports the WebPush client from client/push/.
+    push_source = client / "push" / "web-push-client.js"
+    if not push_source.is_file():
+        raise BuildError(f"missing push asset: {push_source}")
+    push_dest = out / "client" / "push"
+    push_dest.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(push_source, push_dest / "web-push-client.js")
     # App-shell the service worker precaches for an offline second load. The
     # Pyodide runtime itself loads from the CDN (cross-origin) and is out of scope
     # for this precache; the local shell + package payload are cached.

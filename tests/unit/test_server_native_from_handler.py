@@ -180,10 +180,10 @@ async def test_mode_a_ffi_bridge_install_resolves_in_process() -> None:
     """
     seen: list[dict[str, Any]] = []
 
-    async def fake_dispatch(envelope: dict[str, Any]) -> dict[str, Any]:
+    async def fake_dispatch(envelope_json: str) -> str:
         """Stand in for the Pyodide-proxied window.__tempestweb_native__."""
-        seen.append(envelope)
-        return {"ok": True, "value": {"text": "clip"}}
+        seen.append(json.loads(envelope_json))
+        return json.dumps({"ok": True, "value": {"text": "clip"}})
 
     install_bridge(FFIBridge(fake_dispatch))
 

@@ -38,12 +38,13 @@ __all__ = ["WasmAppHandle", "bootstrap"]
 
 S = TypeVar("S")
 
-#: The in-process FFI dispatch the JS side injects (the Pyodide proxy of
-#: ``window.__tempestweb_native__(envelope)``). It forwards a ``native_call``
-#: envelope to ``client/native/index.js`` and resolves to its ``native_result``.
-#: Typed as a plain awaitable callable so this module stays Pyodide-free and
-#: type-checkable off-browser; the live value is a ``pyodide.ffi`` proxy.
-NativeDispatch = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
+#: The in-process FFI dispatch the JS side injects. It forwards a ``native_call``
+#: envelope (as a **JSON string**) to ``client/native/index.js`` and resolves to
+#: its ``native_result`` envelope (also a JSON string). Strings cross ``pyodide.ffi``
+#: cleanly (no proxy conversion); the generated ``bootstrap.js`` parses/stringifies
+#: around ``window.__tempestweb_native__``. Typed plainly so this module stays
+#: Pyodide-free and type-checkable off-browser.
+NativeDispatch = Callable[[str], Awaitable[str]]
 
 
 class WasmAppHandle(Generic[S]):

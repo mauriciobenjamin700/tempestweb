@@ -103,9 +103,9 @@ async def test_bootstrap_installs_ffi_bridge_when_dispatch_given() -> None:
     uninstall_bridge()
     seen: list[dict[str, Any]] = []
 
-    async def dispatch(envelope: dict[str, Any]) -> dict[str, Any]:
-        seen.append(envelope)
-        return {"ok": True, "value": {"text": "hi"}}
+    async def dispatch(envelope_json: str) -> str:
+        seen.append(json.loads(envelope_json))
+        return json.dumps({"ok": True, "value": {"text": "hi"}})
 
     handle: WasmAppHandle[CounterState] = bootstrap(
         CounterState(), counter_view, lambda _json: None, dispatch

@@ -1,19 +1,24 @@
 # REVIEW-T10 — adversarial QA of Track T10 (Trilho O — observability)
 
-**Branch:** `feat/observability` · **Base:** `2e3a9bf` · **Reviewer stance:** skeptical QA, run-don't-trust.
+**Branch:** `feat/observability` · **Base:** `main` · **Reviewer stance:** skeptical QA, run-don't-trust.
+**Round:** 2 (re-QA after fix round 1, commit `26af6a7`).
 
-## VERDICT: PASS-WITH-GAPS
+## VERDICT: PASS
 
 The four done-when clauses are each backed by a real, passing automated test. The
-full project gate is green from a clean checkout. The implementation does not edit
-`tempestweb/_core/`, touches only the track's own dirs, and the agent's manual-check
-notes are honest. The single substantive gap is that `server_decode_jwt` — public
-exported surface — has **zero test coverage** on both its branches; it is, however,
-out of the strict T10 (client-side) done-when scope, so it does not sink the track.
+full project gate is green from a clean checkout. The single substantive gap from
+round 1 — `server_decode_jwt` being exported but untested on both branches — is now
+**genuinely closed**: two real unit tests cover the success path (injected fake
+`JWTUtils`, asserting forwarded args + `dict()` coercion off a dict subclass) and
+the SDK-absent path (`RuntimeError` with the documented message), and the
+`# pragma: no cover` was removed. No edits to `tempestweb/_core/`, nothing touched
+outside the track, no TS/build introduced (Python-only track). The remaining items
+(P2 vendor-SDK shapes, P3 live DOM effect) are honest, documented manual deferrals
+that are out of the automatable scope of this track.
 
 ---
 
-## Gate output (run from clean state)
+## Gate output (run from clean state, this worktree)
 
 ```
 $ uv run ruff check .
@@ -26,11 +31,11 @@ $ uv run mypy tempestweb
 Success: no issues found in 15 source files          EXIT 0
 
 $ uv run pytest -q
-58 passed in 0.18s                                   EXIT 0
+60 passed in 0.17s                                   EXIT 0
 
 $ uv run pytest tests/unit/test_observability*.py -q
-54 passed in 0.19s
-  test_observability_auth.py            19 passed
+56 passed in 0.19s
+  test_observability_auth.py            21 passed
   test_observability_error_boundary.py   7 passed
   test_observability_feature_flags.py   10 passed
   test_observability_logger.py           8 passed
@@ -38,7 +43,7 @@ $ uv run pytest tests/unit/test_observability*.py -q
 ```
 
 The scope-target command from the MANIFEST (`pytest tests/unit/test_observability*.py`)
-is **green**.
+is **green** (56 tests, up from 54 — the 2 new JWT tests landed).
 
 ---
 
@@ -46,58 +51,63 @@ is **green**.
 
 | Clause | Status | Proof |
 |--------|--------|-------|
-| Each provider exposes a minimal interface + ≥1 working adapter | PASS | O0 `TelemetryAdapter` Protocol + Console/Sentry/PostHog; O1 `LoggerSink` + `console_sink`; O2 `ErrorBoundary` + `default_fallback`; O3 `FeatureFlagsAdapter` Protocol + InMemory/GrowthBook/LaunchDarkly; O4 `AuthStore`/`RefreshQueue`. All 38 `__all__` names resolve (verified by import). |
-| Swapping adapters changes no call sites | PASS | `test_swapping_adapter_changes_no_call_sites` exists in **both** telemetry (line 91) and feature_flags (line 63): one `emit(provider)` / `read(provider)` fn drives two different backends unchanged. |
-| Per-provider unit tests pass with third-party instances mocked | PASS | Sentry/PostHog via `MagicMock` with `assert_called_once_with` on real method names; GrowthBook/LaunchDarkly via `MagicMock`; console via injected sink. 54 tests, every one asserts (AST-checked; the 3 "no-assert" hits are `pytest.raises` context managers — real assertions). |
-| Refresh queue serializes concurrent refresh into a single renewal | PASS | `test_concurrent_refreshes_collapse_into_single_renewal`: 5 real `asyncio.create_task` callers, an `Event` holds the renewal open so waiters pile up, asserts `refresh_calls == 1` and all 5 get the same token. Reset-after-settle and failure-then-retry also covered. Not faked. |
+| Each provider exposes a minimal interface + ≥1 working adapter | PASS | O0 `TelemetryAdapter` Protocol + Console/Sentry/PostHog; O1 `LoggerSink` + console sink; O2 `ErrorBoundary` + `default_fallback`; O3 `FeatureFlagsAdapter` Protocol + InMemory/GrowthBook/LaunchDarkly; O4 `AuthStore`/`RefreshQueue`. All exported names resolve (import-verified). |
+| Swapping adapters changes no call sites | PASS | `test_swapping_adapter_changes_no_call_sites` in telemetry (line 91) and feature_flags (line 63): a single `emit(provider)` / `read(provider)` fn drives two **distinct** backends (Console vs Recording; InMemory vs GrowthBook-mock) unchanged, and asserts each backend's distinct effect. |
+| Per-provider unit tests pass with third-party instances mocked | PASS | Sentry (`capture_message`/`set_user`), PostHog (`capture`/`identify`), GrowthBook (`get_feature_value`), LaunchDarkly (`variation`) all via `MagicMock` + `assert_called_once_with`/`assert_any_call` on real method names. Console/in-memory via injected sink. All 56 tests assert (the 2 AST "no-assert" hits are mock `assert_called_*` calls — real assertions). |
+| Refresh queue serializes concurrent refresh into a single renewal | PASS | `test_concurrent_refreshes_collapse_into_single_renewal`: 5 real `asyncio.create_task` callers, an `Event` holds the renewal open so waiters pile up; asserts `refresh_calls == 1` and all 5 get the same token. Independently re-probed a **late-arriving** caller (joins after the renewal starts, before it settles) → still coalesced to 1 call. Reset-after-settle and failure-then-retry also covered. Not faked. |
+
+---
+
+## Round-1 gap closure (verified)
+
+- **P1 — `server_decode_jwt` untested public surface → CLOSED.**
+  - `test_server_decode_jwt_verifies_via_sdk_and_coerces_to_dict`: injects a fake
+    `tempest_fastapi_sdk` module via `sys.modules`, returns a `dict` *subclass*,
+    asserts `type(result) is dict` (coercion) and the exact forwarded
+    `{token, secret, kwargs}`. Real success-path coverage.
+  - `test_server_decode_jwt_raises_runtimeerror_when_sdk_absent`: blocks the SDK
+    import via a patched `builtins.__import__`, asserts the `RuntimeError` message
+    (`match="requires tempest-fastapi-sdk"`). Real error-path coverage.
+  - `# pragma: no cover` removed from `auth.py:434` (confirmed: grep finds no
+    `pragma: no cover` anywhere in the track). The branch is now actually exercised.
 
 ---
 
 ## Convention audit
 
-- **No `tempestweb/_core/` edits** — `git diff --name-only 2e3a9bf HEAD -- tempestweb/_core/` is empty. ✅
-- **No files touched outside the track** — diff is confined to `tempestweb/observability/*`, `tests/unit/test_observability*.py`, `QUALITY-T10.md`, `SUMMARY-T10.md`. ✅
-- **No single-quote string literals** — all `'` hits are apostrophes in prose/docstrings or doctest output (`'off'`); flake8-quotes (Q) passes. ✅
-- **Full typing / docstrings** — mypy `--strict` clean over 15 files; ruff `ANN`+`D` (google) clean. The 3 `Any` params (`sink`, injected vendor clients) carry `# noqa: ANN401` justifications. ✅
-- **No skip/xfail/NotImplementedError behind green tests** — the only `...` hits are Protocol method bodies + docstring examples; no stubbed behavior. ✅
-- **Empty-collection convention** — N/A (no collection-returning lookups in this track). 
-- **Client JS** — N/A (T10 is Python-only; no TS/build introduced). ✅
+- **No `tempestweb/_core/` edits** — `git diff --name-only main...HEAD -- tempestweb/_core/` is empty. ✅
+- **No files touched outside the track** — diff confined to `tempestweb/observability/*`, `tests/unit/test_observability*.py`, `NOTES-T10.md`, `QUALITY-T10.md`, `SUMMARY-T10.md`, `REVIEW-T10.md`. ✅
+- **No single-quote string literals** — all `'` hits are apostrophes/doctest output inside docstrings; flake8-quotes (Q) passes under ruff. ✅
+- **Full typing / docstrings** — mypy `--strict` clean over 15 files; ruff `ANN`+`D` (google) clean. The `Any` params (`sink`, injected vendor clients, JWT kwargs) carry justified `# noqa: ANN401`. ✅
+- **No skip/xfail/NotImplementedError/pragma behind green tests** — grep finds none. The only `...` are Protocol bodies + docstring examples. ✅
+- **Empty-collection convention** — N/A (no collection-returning lookups). ✅
+- **Client JS** — N/A (T10 is Python-only; no `.js`/`client/` files touched, no TS/build). ✅
 
 ---
 
 ## Findings (prioritized)
 
-### P1 — `server_decode_jwt` is untested public surface (the only real gap)
-- Exported in `__all__` (line 110 of `__init__.py`) but **no test references it**.
-- Both branches are uncovered: the ImportError branch carries `# pragma: no cover`,
-  and the success path requires `tempest_fastapi_sdk`, which is **not installed** in
-  this worktree (`ModuleNotFoundError` confirmed).
-- The agent flags this honestly in SUMMARY note #2. It is also outside the strict
-  T10 done-when (client-side providers); the MANIFEST treats server SDK use as a
-  server concern. Hence a gap, not a failure.
-- **Close it by:** adding a unit test that monkeypatches/injects a fake `JWTUtils`
-  (or `sys.modules["tempest_fastapi_sdk"]`) to exercise the success path and the
-  `dict(result)` coercion, plus an explicit test of the `RuntimeError` message on
-  the SDK-absent branch (drop the `pragma: no cover` once tested).
+### P2 — Vendor adapters assume SDK method shapes, unverified against real versions (manual deferral, documented)
+- Sentry/PostHog/GrowthBook/LaunchDarkly asserted only against mocks. A real-SDK
+  signature mismatch is local to one adapter and never touches the provider Protocol
+  or call sites. Concrete per-SDK verification steps are recorded in `NOTES-T10.md`
+  (§P2). Acceptable for a night build; confirm against pinned versions before prod.
+- **Not a blocker** — this is an inherent limit of mocking absent third-party SDKs,
+  flagged honestly, with reproducible steps.
 
-### P2 — Vendor adapters assume SDK method shapes, unverified against real versions
-- Sentry (`capture_message`/`set_user`), PostHog (`capture`/`identify`), GrowthBook
-  (`get_feature_value`), LaunchDarkly (`variation`) are asserted only against mocks.
-- Honestly flagged (SUMMARY manual-check #1). Low risk by design — a mismatch is
-  local to one adapter and the provider/call sites are unaffected — but it remains a
-  contract assumption, not a verified fact. Acceptable for a night build; confirm
-  against pinned SDK versions before production.
-
-### P3 — Error boundary's live DOM effect is unverifiable here (expected)
+### P3 — Error boundary live DOM effect unverifiable here (manual deferral, documented)
 - `ErrorBoundary.render()` Python behavior is fully tested (fallback returned, no
-  raise, report hook fires, telemetry wiring). The visual "broken subtree shows
-  fallback while the rest keeps rendering" needs the T1 client patcher in a browser.
-- Correctly deferred to post-merge manual verification (SUMMARY #3). No overclaim.
+  raise, report hook fires with `error_type`/`message`/`stack`, custom fallback,
+  decorator, telemetry reporter). The visual "broken subtree shows fallback while
+  the rest renders" needs the T1 client patcher in a browser. Steps in `NOTES-T10.md`
+  (§P3). No overclaim.
+- **Not a blocker** — correctly out of this track's automatable scope.
 
 ---
 
 ## Bottom line
-Solid, idiomatic, well-tested track. Done-when is genuinely met for all five
-client-side providers with non-trivial tests (the concurrent-refresh test in
-particular is real, not a rubber stamp). Ship after closing P1 (a small test) and
-honoring the P2/P3 manual checks before production.
+Round-1's only real gap is closed with honest tests and the `pragma` removed. The
+done-when is genuinely met for all five client-side providers; the concurrent-refresh
+guarantee survives an independent late-caller race probe; the gate is fully green from
+clean. P2/P3 are documented manual deferrals, not unverified claims. **PASS** — ship
+after honoring the P2/P3 manual checks before production.

@@ -1,5 +1,9 @@
 # tempestweb
 
+📚 **Documentation:** [Português (Brasil)](https://mauriciobenjamin700.github.io/tempestweb/)
+· [English (US)](https://mauriciobenjamin700.github.io/tempestweb/en/) — bilingual
+docs site (PT-BR default + EN-US), deployed to GitHub Pages.
+
 > Build web apps in **typed Python**. One declarative widget tree, a **DOM**
 > renderer, and **two execution modes** that share 100% of the application code:
 > **Mode A (WASM)** runs your Python in the browser via Pyodide; **Mode B

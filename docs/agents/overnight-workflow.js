@@ -21,8 +21,7 @@ REPO: ${REPO} (a git repo; base branch "main" is clean and green).
 YOUR WORKTREE: ${REPO}-${t.id}
 YOUR BRANCH: ${t.branch}
 
-STEP 0 — set up your isolated worktree (exactly, with absolute paths):
-  git -C ${REPO} worktree add -b ${t.branch} ${REPO}-${t.id} main
+STEP 0 — your isolated worktree ALREADY EXISTS (pre-created on branch ${t.branch}):
   cd ${REPO}-${t.id}
   make setup            # uv venv + deps + npm install (uv cache makes this fast)
 Then do ALL your work inside ${REPO}-${t.id}. Never touch the main checkout or

@@ -65,6 +65,47 @@ test("mount wires events so a button click reaches sendEvent with its key", () =
   assert.equal(transport.events[0].type, "click");
 });
 
+test("mount without an initial node mounts from the first root-replace patch", () => {
+  // Mode B: the server sends the initial scene as the first batch — a single
+  // root Replace (path []) carrying the whole tree. mount() consumes it.
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const transport = mockTransport();
+  mount(dom.root, transport);
+
+  // Nothing is mounted until the first batch arrives.
+  assert.equal(dom.root.children.length, 0);
+
+  transport.push([{ path: [], node: fixture("node_initial.json") }]);
+  assert.equal(dom.root.children.length, 1);
+  assert.equal(dom.root.children[0].children[0].textContent, "Count: 0");
+});
+
+test("deferred mount applies patches that follow the initial root replace", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const transport = mockTransport();
+  mount(dom.root, transport);
+
+  // First batch carries the root replace and is consumed as the initial tree.
+  transport.push([{ path: [], node: fixture("node_initial.json") }]);
+  // A later batch updates it like any other patch stream.
+  transport.push(fixture("patches_count_0_to_1.json"));
+  assert.equal(dom.root.children[0].children[0].textContent, "Count: 1");
+});
+
+test("deferred mount throws when the first patch is not a root replace", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const transport = mockTransport();
+  mount(dom.root, transport);
+
+  assert.throws(
+    () => transport.push([{ path: [], index: 0 }]),
+    /expected a root Replace/,
+  );
+});
+
 test("unmount removes the tree and stops events", () => {
   const dom = freshDom();
   globalThis.document = dom.document;

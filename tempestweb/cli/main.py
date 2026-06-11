@@ -22,6 +22,7 @@ from tempestweb.cli.commands import (
     create_dev_session,
     create_project,
     prepare_run,
+    serve_run,
 )
 
 __all__ = ["main", "build_parser"]
@@ -184,8 +185,9 @@ def _cmd_build(args: argparse.Namespace) -> int:
 def _cmd_run(args: argparse.Namespace) -> int:
     """Handle ``tempestweb run``.
 
-    Builds the artifact and prints the bind plan. Actually serving the artifact
-    is owned by Tracks T2/T3, so this command stops at "ready to serve".
+    Builds the artifact, then serves it. Mode B (server) starts the real FastAPI
+    WS/SSE host under uvicorn (blocking until Ctrl-C). Mode A (wasm) serving is
+    owned by Track T3, so it stops at "ready to serve".
 
     Args:
         args: Parsed arguments for the ``run`` subcommand.
@@ -204,11 +206,23 @@ def _cmd_run(args: argparse.Namespace) -> int:
         print(f"tempestweb run: {exc}", file=sys.stderr)
         return 1
     print(f"Built {plan.build.mode} artifact at {plan.build.out_dir}")
-    print(f"Ready to serve at {plan.url}")
-    print(
-        "tempestweb run: serving is provided by the transports (Tracks T2/T3); "
-        "the artifact is built and the bind plan is ready."
-    )
+
+    if plan.build.mode != "server":
+        print(f"Ready to serve at {plan.url}")
+        print(
+            "tempestweb run: wasm serving is provided by the Pyodide bootstrap "
+            "(Track T3); the artifact is built and the bind plan is ready."
+        )
+        return 0
+
+    print(f"Serving at {plan.url} (Ctrl-C to stop)")
+    try:
+        serve_run(plan)
+    except RunError as exc:
+        print(f"tempestweb run: {exc}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:  # pragma: no cover - interactive only
+        print("\nStopped.")
     return 0
 
 

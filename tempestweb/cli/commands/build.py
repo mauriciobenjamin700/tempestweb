@@ -10,10 +10,12 @@ surrounding shell differ:
   entrypoint, the project's ``app.py`` and the shared JS client served as static
   assets.
 
-This phase produces the **artifact layout** (the right files in the right
-places) and copies the shared client. The live transport glue (Pyodide bootstrap
-internals, the WebSocket host) is owned by Tracks T3/T2 and is stubbed here with
-clearly-marked placeholders so the layout is verifiable today.
+The **server** artifact is live: its ``server.py`` builds the real FastAPI host
+from :func:`tempestweb.server.create_app` (WebSocket + SSE), serves the shared
+client under ``/static`` and an ``index.html`` shell at ``/`` that mounts the app
+over a WebSocket transport — ``python server.py`` (or ``uvicorn server:app``)
+serves a working app. The **wasm** artifact's Pyodide bootstrap glue is still
+owned by Track T3 and is stubbed here with a clearly-marked placeholder.
 """
 
 from __future__ import annotations
@@ -54,6 +56,7 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
 SERVER_ARTIFACT_FILES: tuple[str, ...] = (
     "server.py",
     "app.py",
+    "index.html",
     *(f"static/{asset}" for asset in (*_CLIENT_ASSETS, "transport-ws.js")),
 )
 
@@ -170,11 +173,50 @@ void mount;
 """
 
 
-def _server_py(name: str) -> str:
-    """Render the server artifact's FastAPI entrypoint.
+def _index_html_server(name: str) -> str:
+    """Render the ``index.html`` shell for a server artifact (Mode B).
 
-    The live WebSocket host is owned by Track T2 (Mode B); this placeholder pins
-    the artifact's entrypoint shape so the layout is verifiable today.
+    The shell mounts the shared client over a WebSocket transport pointed at the
+    same origin's ``/ws`` endpoint. ``mount`` is called without an initial node:
+    the server sends the initial scene as the first patch batch (a root
+    ``Replace``), which the client consumes as the initial tree.
+
+    Args:
+        name: The project name (page title).
+
+    Returns:
+        The HTML document that boots the app in the browser.
+    """
+    return f"""\
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{name}</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import {{ mount }} from "./static/tempestweb.js";
+      import {{ createWebSocketTransport }} from "./static/transport-ws.js";
+
+      const scheme = location.protocol === "https:" ? "wss://" : "ws://";
+      const transport = createWebSocketTransport(scheme + location.host + "/ws");
+      mount(document.getElementById("app"), transport);
+    </script>
+  </body>
+</html>
+"""
+
+
+def _server_py(name: str) -> str:
+    """Render the server artifact's FastAPI entrypoint (Mode B, live).
+
+    The emitted module imports the sibling ``app.py``, builds the real FastAPI
+    host via :func:`tempestweb.server.create_app` (WebSocket + SSE routes), mounts
+    the shared client under ``/static`` and serves ``index.html`` at ``/``. It is
+    runnable directly (``python server.py``) or via ``uvicorn server:app``.
 
     Args:
         name: The project name.
@@ -183,13 +225,55 @@ def _server_py(name: str) -> str:
         The server entrypoint source.
     """
     return f'''\
-"""server.py — server artifact entrypoint for "{name}".
+"""server.py — server artifact entrypoint for "{name}" (Mode B).
 
-PHASE B0 (Track T2): build the FastAPI app (tempest-fastapi-sdk patterns),
-mount the WebSocket endpoint that drives `app.view`, and serve ./static.
+Builds the FastAPI host that drives ``app.view`` over WebSocket/SSE (the
+tempestweb server engine), serves the shared client under ``/static`` and the
+``index.html`` shell at ``/``. Run with ``python server.py`` or
+``uvicorn server:app``.
 """
 
 from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from tempestweb.server import create_app
+
+_HERE = Path(__file__).resolve().parent
+# The project's ``app.py`` sits next to this file; import it by name.
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
+import app as _project  # noqa: E402
+
+
+def build() -> FastAPI:
+    """Build the FastAPI app: WS/SSE engine + static client + index shell.
+
+    Returns:
+        The configured FastAPI application.
+    """
+    api = create_app(_project.make_state, _project.view, title="{name}")
+    api.mount(
+        "/static",
+        StaticFiles(directory=str(_HERE / "static")),
+        name="static",
+    )
+
+    @api.get("/")
+    async def index() -> FileResponse:
+        """Serve the app shell that mounts the client over WebSocket."""
+        return FileResponse(str(_HERE / "index.html"))
+
+    return api
+
+
+app = build()
 
 
 def run(host: str = "127.0.0.1", port: int = 8000) -> None:
@@ -198,11 +282,10 @@ def run(host: str = "127.0.0.1", port: int = 8000) -> None:
     Args:
         host: Bind address (127.0.0.1 for local; 0.0.0.0 for LAN access).
         port: Bind port.
-
-    Raises:
-        NotImplementedError: The live host is provided by Track T2.
     """
-    raise NotImplementedError("B0: server host is provided by Track T2")
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":
@@ -301,5 +384,6 @@ def _build_server(
     """
     (out / "server.py").write_text(_server_py(name), encoding="utf-8")
     (out / "app.py").write_text(app_source, encoding="utf-8")
+    (out / "index.html").write_text(_index_html_server(name), encoding="utf-8")
     _copy_client(client, out / "static", "transport-ws.js")
     return tuple(sorted(SERVER_ARTIFACT_FILES))

@@ -1,21 +1,24 @@
 """``tempestweb run`` — build then serve the app locally.
 
-``run`` is ``build`` followed by serving the produced artifact. The build half is
-real today; the serving half differs by mode (a static file server for wasm, the
-FastAPI host for server) and is owned by Tracks T3 / T2. :func:`prepare_run`
-produces the artifact and the bind plan (:class:`RunPlan`); a real server plugs
-into that plan to do the actual serving.
+``run`` is ``build`` followed by serving the produced artifact. :func:`prepare_run`
+produces the artifact and the bind plan (:class:`RunPlan`); :func:`serve_run`
+serves it. **Mode B (server)** is live: it imports the built ``server.py`` (the
+real FastAPI WS/SSE host) and runs it under uvicorn — the same artifact a
+deployment would run. **Mode A (wasm)** serving still depends on the Pyodide
+bootstrap glue owned by Track T3, so :func:`serve_run` reports that and stops.
 """
 
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 from pathlib import Path
+from types import ModuleType
 
 from tempestweb.cli.commands.build import BuildResult, build_artifact
 from tempestweb.cli.config import ProjectConfig, load_config
 
-__all__ = ["RunError", "RunPlan", "prepare_run"]
+__all__ = ["RunError", "RunPlan", "prepare_run", "serve_run"]
 
 
 class RunError(RuntimeError):
@@ -78,3 +81,52 @@ def prepare_run(
         host=host or config.host,
         port=port if port is not None else config.port,
     )
+
+
+def _load_artifact_server(out_dir: Path) -> ModuleType:
+    """Import the built ``server.py`` module from a server artifact.
+
+    Args:
+        out_dir: The server artifact root (contains ``server.py``).
+
+    Returns:
+        The imported artifact server module (exposing ``app`` and ``run``).
+
+    Raises:
+        RunError: If the module cannot be located or imported.
+    """
+    server_path = out_dir / "server.py"
+    spec = importlib.util.spec_from_file_location(
+        "tempestweb_artifact_server", server_path
+    )
+    if spec is None or spec.loader is None:
+        raise RunError(f"cannot import built server at {server_path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as exc:  # noqa: BLE001 - surface any import-time failure
+        raise RunError(f"failed to import built server: {exc}") from exc
+    return module
+
+
+def serve_run(plan: RunPlan) -> None:
+    """Serve a built artifact according to its bind plan (blocking).
+
+    For **server** mode this imports the artifact's ``server.py`` — the real
+    FastAPI WS/SSE host — and runs it under uvicorn at ``plan.host:plan.port``.
+    The call blocks until the server is stopped (Ctrl-C).
+
+    Args:
+        plan: The run plan produced by :func:`prepare_run`.
+
+    Raises:
+        RunError: If the artifact is not a server artifact (wasm serving is owned
+            by Track T3) or the built server cannot be imported.
+    """
+    if plan.build.mode != "server":
+        raise RunError(
+            f"serving mode {plan.build.mode!r} is not available yet "
+            "(wasm Pyodide bootstrap is owned by Track T3)"
+        )
+    server = _load_artifact_server(plan.build.out_dir)
+    server.run(plan.host, plan.port)

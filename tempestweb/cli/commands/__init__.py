@@ -20,7 +20,7 @@ from tempestweb.cli.commands.dev import (
     create_dev_session,
 )
 from tempestweb.cli.commands.new import NewError, create_project
-from tempestweb.cli.commands.run import RunError, RunPlan, prepare_run
+from tempestweb.cli.commands.run import RunError, RunPlan, prepare_run, serve_run
 
 __all__ = [
     "SERVER_ARTIFACT_FILES",
@@ -37,4 +37,5 @@ __all__ = [
     "create_dev_session",
     "create_project",
     "prepare_run",
+    "serve_run",
 ]

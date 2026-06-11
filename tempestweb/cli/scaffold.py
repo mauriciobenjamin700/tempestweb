@@ -56,7 +56,7 @@ def _app_py() -> str:
         A runnable counter app exposing ``make_state`` and ``view``.
     """
     return '''\
-"""{{ app entrypoint }} — runs unchanged in both modes.
+"""Application entrypoint — runs unchanged in both modes.
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
     tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)

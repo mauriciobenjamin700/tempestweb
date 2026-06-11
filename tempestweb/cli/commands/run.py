@@ -2,9 +2,9 @@
 
 ``run`` is ``build`` followed by serving the produced artifact. The build half is
 real today; the serving half differs by mode (a static file server for wasm, the
-FastAPI host for server) and is owned by Tracks T3 / T2, so :func:`prepare_run`
-produces the artifact and the bind plan, and :func:`serve_artifact` is the seam
-that a real server fills in.
+FastAPI host for server) and is owned by Tracks T3 / T2. :func:`prepare_run`
+produces the artifact and the bind plan (:class:`RunPlan`); a real server plugs
+into that plan to do the actual serving.
 """
 
 from __future__ import annotations

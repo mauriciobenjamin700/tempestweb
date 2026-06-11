@@ -7,6 +7,8 @@ import {
   buildNotification,
   resolveClickUrl,
   applyBadge,
+  installPushHandler,
+  installNotificationClickHandler,
 } from "../../client/sw/sw.js";
 
 const ORIGIN = "https://app.example";
@@ -114,4 +116,79 @@ test("applyBadge: reads badge_count nested under data", async () => {
 test("applyBadge: no-op when no count or unsupported (no throw)", async () => {
   await applyBadge({ title: "hi" }, { setAppBadge: async () => assert.fail("should not set") });
   await applyBadge({ badge_count: 2 }, {}); // unsupported nav: must not throw
+});
+
+// --- installPushHandler / installNotificationClickHandler (P3) ------------
+
+test("installPushHandler: shows the notification and applies the badge", async () => {
+  let shown = null;
+  let badge = null;
+  const registration = {
+    showNotification: async (title, options) => {
+      shown = { title, options };
+    },
+  };
+  const navigator = { setAppBadge: async (n) => (badge = n) };
+  const onPush = installPushHandler({ registration, navigator });
+  const event = {
+    data: { json: () => ({ title: "Hi", body: "yo", badge_count: 2 }) },
+  };
+  await onPush(event);
+  assert.equal(shown.title, "Hi");
+  assert.equal(shown.options.body, "yo");
+  assert.equal(badge, 2);
+});
+
+test("installPushHandler: a transform returning null suppresses the notification", async () => {
+  let shown = false;
+  const registration = { showNotification: async () => (shown = true) };
+  const onPush = installPushHandler({ registration, transform: () => null });
+  await onPush({ data: { json: () => ({ silent: true }) } });
+  assert.equal(shown, false);
+});
+
+test("installPushHandler: malformed payload falls back to text body (no throw)", async () => {
+  let shown = null;
+  const registration = {
+    showNotification: async (title, options) => (shown = { title, options }),
+  };
+  const onPush = installPushHandler({ registration });
+  const event = {
+    data: {
+      json: () => {
+        throw new Error("bad json");
+      },
+      text: () => "plain",
+    },
+  };
+  await onPush(event);
+  assert.equal(shown.options.body, "plain");
+});
+
+test("installNotificationClickHandler: closes and routes to the deep link", async () => {
+  let closed = false;
+  let opened = null;
+  const onClick = installNotificationClickHandler({
+    focusOrOpen: async (url) => (opened = url),
+  });
+  const event = {
+    action: null,
+    notification: { data: { url: "/orders/9" }, close: () => (closed = true) },
+  };
+  await onClick(event);
+  assert.equal(closed, true);
+  assert.equal(opened, "/orders/9");
+});
+
+test("installNotificationClickHandler: action url wins, falls back otherwise", async () => {
+  let opened = null;
+  const open = async (url) => (opened = url);
+  const onClick = installNotificationClickHandler({ focusOrOpen: open, fallbackUrl: "/home" });
+  await onClick({
+    action: "open",
+    notification: { data: { url: "/x", actions: { open: "/deep" } }, close: () => {} },
+  });
+  assert.equal(opened, "/deep");
+  await onClick({ action: null, notification: { data: {}, close: () => {} } });
+  assert.equal(opened, "/home");
 });

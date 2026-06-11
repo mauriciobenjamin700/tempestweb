@@ -202,3 +202,24 @@ async def test_notifications_notify_and_permission() -> None:
 
     perm = await notifications.request_permission()
     assert perm is NotificationPermission.GRANTED
+
+
+async def test_notifications_subscribe_returns_subscription() -> None:
+    bridge = RecordingBridge(
+        {"endpoint": "https://push.example/x", "keys": {"p256dh": "p"}}
+    )
+    install_bridge(bridge)
+    sub = await notifications.subscribe("VAPID_KEY")
+    assert bridge.last is not None
+    assert bridge.last["capability"] == "notifications.subscribe"
+    assert bridge.last["args"] == {"vapid_public_key": "VAPID_KEY"}
+    assert sub == {"endpoint": "https://push.example/x", "keys": {"p256dh": "p"}}
+
+
+async def test_notifications_unsubscribe_returns_bool() -> None:
+    bridge = RecordingBridge({"unsubscribed": True})
+    install_bridge(bridge)
+    ok = await notifications.unsubscribe()
+    assert bridge.last is not None
+    assert bridge.last["capability"] == "notifications.unsubscribe"
+    assert ok is True

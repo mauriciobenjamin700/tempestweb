@@ -17,7 +17,12 @@ import { geolocationGet } from "./geolocation.js";
 import { clipboardRead, clipboardWrite } from "./clipboard.js";
 import { storageGet, storageList, storagePut, storageRemove } from "./storage.js";
 import { cameraCapture } from "./camera.js";
-import { notificationsNotify, notificationsRequestPermission } from "./notifications.js";
+import {
+  notificationsNotify,
+  notificationsRequestPermission,
+  notificationsSubscribe,
+  notificationsUnsubscribe,
+} from "./notifications.js";
 
 /**
  * @typedef {Object} NativeCall
@@ -71,6 +76,8 @@ export const HANDLERS = {
   "camera.capture": cameraCapture,
   "notifications.notify": notificationsNotify,
   "notifications.request_permission": notificationsRequestPermission,
+  "notifications.subscribe": notificationsSubscribe,
+  "notifications.unsubscribe": notificationsUnsubscribe,
 };
 
 /**

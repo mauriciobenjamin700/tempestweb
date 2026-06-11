@@ -7,17 +7,28 @@ local notification; the web adds an explicit permission gate, so
 ``client/native/notifications.js`` drives ``Notification.requestPermission`` and
 the ``new Notification(title, { body })`` constructor.
 
-WebPush subscriptions (P3) are out of this module's scope — they share the
-``native_call`` envelope but live in ``tempestweb/pwa`` (Track T9).
+WebPush subscriptions (P3) ride the **same** ``native_call`` envelope:
+:func:`subscribe` / :func:`unsubscribe` ask the client to run the browser-side
+``pushManager`` flow (via ``client/push/web-push-client.js``) and hand the raw
+subscription back. The framework does not decide your endpoint schema — persist
+the returned subscription server-side however you like. The server-side WebPush
+*send* path lives in ``tempestweb/server/webpush.py`` (Track T9).
 """
 
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
 
 from tempestweb.native.dispatch import send_native_call
 
-__all__ = ["NotificationPermission", "notify", "request_permission"]
+__all__ = [
+    "NotificationPermission",
+    "notify",
+    "request_permission",
+    "subscribe",
+    "unsubscribe",
+]
 
 
 class NotificationPermission(StrEnum):
@@ -66,3 +77,44 @@ async def request_permission() -> NotificationPermission:
     """
     value = await send_native_call("notifications.request_permission", {})
     return NotificationPermission(str(value.get("permission", "default")))
+
+
+async def subscribe(vapid_public_key: str) -> dict[str, Any]:
+    """Subscribe to WebPush, returning the raw browser subscription (P3).
+
+    Asks the client to run the browser-side push flow (ensure permission, create
+    or reuse the ``pushManager`` subscription) with the given VAPID public key, and
+    hands the subscription JSON back. Persist it server-side however your app likes
+    (the framework does not own the endpoint schema).
+
+    Args:
+        vapid_public_key: The base64url-encoded VAPID application server key.
+
+    Returns:
+        The push subscription as a JSON-able dict (``endpoint``, ``keys``, ...).
+
+    Raises:
+        NativeError: If push is unsupported, permission is denied, or no service
+            worker registration is available.
+        BrowserUnavailableError: If called with no native bridge installed.
+    """
+    return await send_native_call(
+        "notifications.subscribe", {"vapid_public_key": vapid_public_key}
+    )
+
+
+async def unsubscribe() -> bool:
+    """Cancel the current WebPush subscription, if any (P3).
+
+    Asks the client to unsubscribe from ``pushManager``. Returns whether a
+    subscription was actually cancelled (``False`` when none existed).
+
+    Returns:
+        ``True`` if a subscription was cancelled, ``False`` otherwise.
+
+    Raises:
+        NativeError: If the unsubscribe call fails in the browser.
+        BrowserUnavailableError: If called with no native bridge installed.
+    """
+    value = await send_native_call("notifications.unsubscribe", {})
+    return bool(value.get("unsubscribed", False))

@@ -56,6 +56,8 @@ test("HANDLERS covers every documented capability name", () => {
     "camera.capture",
     "notifications.notify",
     "notifications.request_permission",
+    "notifications.subscribe",
+    "notifications.unsubscribe",
   ];
   for (const name of expected) assert.equal(typeof HANDLERS[name], "function", name);
 });
@@ -289,6 +291,89 @@ test("notifications.notify: constructs a Notification only when granted", async 
   });
   assert.equal(res.ok, true);
   assert.equal(constructed, 1);
+});
+
+// --- notifications: WebPush subscribe/unsubscribe (P3) --------------------
+
+/** A fake PushSubscription returning a JSON shape. */
+function fakeSubscription(endpoint = "https://push.example/abc") {
+  return {
+    endpoint,
+    toJSON: () => ({ endpoint, keys: { p256dh: "p", auth: "a" } }),
+    unsubscribe: async () => true,
+  };
+}
+
+test("notifications.subscribe: runs the push flow and returns the subscription", async () => {
+  let current = null;
+  const registration = {
+    pushManager: {
+      getSubscription: async () => current,
+      subscribe: async () => {
+        current = fakeSubscription();
+        return current;
+      },
+    },
+  };
+  const deps = {
+    navigator: { serviceWorker: {} },
+    Notification: { permission: "granted", requestPermission: async () => "granted" },
+    registration,
+  };
+  const res = await dispatch(
+    call("notifications.subscribe", { vapid_public_key: "KEY" }),
+    deps,
+  );
+  assert.equal(res.ok, true);
+  assert.equal(res.value.endpoint, "https://push.example/abc");
+  assert.deepEqual(res.value.keys, { p256dh: "p", auth: "a" });
+});
+
+test("notifications.subscribe: missing vapid_public_key is invalid_argument", async () => {
+  const res = await dispatch(call("notifications.subscribe", {}), {
+    navigator: { serviceWorker: {} },
+    Notification: { permission: "granted" },
+    registration: { pushManager: {} },
+  });
+  assert.equal(res.ok, false);
+  assert.equal(res.error, "invalid_argument");
+});
+
+test("notifications.subscribe: denied permission maps to permission_denied", async () => {
+  const deps = {
+    navigator: { serviceWorker: {} },
+    Notification: { permission: "denied", requestPermission: async () => "denied" },
+    registration: { pushManager: { getSubscription: async () => null } },
+  };
+  const res = await dispatch(
+    call("notifications.subscribe", { vapid_public_key: "KEY" }),
+    deps,
+  );
+  assert.equal(res.ok, false);
+  assert.equal(res.error, "permission_denied");
+});
+
+test("notifications.unsubscribe: cancels an existing subscription", async () => {
+  const sub = fakeSubscription();
+  const deps = {
+    navigator: { serviceWorker: {} },
+    Notification: { permission: "granted" },
+    registration: { pushManager: { getSubscription: async () => sub } },
+  };
+  const res = await dispatch(call("notifications.unsubscribe"), deps);
+  assert.equal(res.ok, true);
+  assert.equal(res.value.unsubscribed, true);
+});
+
+test("notifications.unsubscribe: false when there is no subscription", async () => {
+  const deps = {
+    navigator: { serviceWorker: {} },
+    Notification: { permission: "granted" },
+    registration: { pushManager: { getSubscription: async () => null } },
+  };
+  const res = await dispatch(call("notifications.unsubscribe"), deps);
+  assert.equal(res.ok, true);
+  assert.equal(res.value.unsubscribed, false);
 });
 
 // --- camera (jsdom canvas stub) -------------------------------------------

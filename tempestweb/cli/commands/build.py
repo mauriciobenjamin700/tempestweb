@@ -152,9 +152,7 @@ def _client_dir() -> Path:
     source = here.parents[3] / "client"  # repo-root client/ (dev checkout)
     if source.is_dir():
         return source
-    raise BuildError(
-        f"client assets not found (looked in {packaged} and {source})"
-    )
+    raise BuildError(f"client assets not found (looked in {packaged} and {source})")
 
 
 def _package_dir() -> Path:

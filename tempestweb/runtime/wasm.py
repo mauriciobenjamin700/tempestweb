@@ -35,6 +35,7 @@ from typing import Any, Generic, TypeVar
 from tempest_core import App, Node, Scene, Widget
 from tempest_core.core.ir import Patch
 
+from tempestweb.runtime.events import coerce_event
 from tempestweb.transports.base import (
     Event,
     PatchTransport,
@@ -152,18 +153,19 @@ def serialize_patches(patches: list[Patch]) -> list[WirePatch]:
 
 
 def _collect_handlers(
-    node: Node, registry: dict[str, dict[str, Callable[..., Any]]]
+    node: Node, registry: dict[str, tuple[str, dict[str, Callable[..., Any]]]]
 ) -> None:
-    """Record every keyed node's handler callables into ``registry``.
+    """Record every keyed node's widget type and handler callables.
 
-    Walks the IR tree; for each node that has a ``key``, stores its handler
-    props (``on_*`` callables) under that key so an incoming event can resolve
-    its handler by ``(key, on_<type>)``. Nodes without a key cannot receive
+    Walks the IR tree; for each node that has a ``key``, stores its widget type
+    tag and handler props (``on_*`` callables) under that key so an incoming
+    event can resolve its handler by ``(key, on_<type>)`` and coerce the payload
+    into the typed event the widget declares. Nodes without a key cannot receive
     events (the wire event addresses widgets by key) and are skipped.
 
     Args:
         node: The root IR node to walk.
-        registry: The accumulator mapping ``key`` → ``{prop: handler}``.
+        registry: The accumulator mapping ``key`` → ``(widget_type, {prop: handler})``.
     """
     if node.key is not None:
         handlers = {
@@ -172,7 +174,7 @@ def _collect_handlers(
             if _is_handler(name, value)
         }
         if handlers:
-            registry[node.key] = handlers
+            registry[node.key] = (node.type, handlers)
     for child in node.children:
         _collect_handlers(child, registry)
 
@@ -214,7 +216,7 @@ class WasmRuntime(Generic[S]):
             transport: The patch transport carrying patches out and events in.
         """
         self._transport: PatchTransport = transport
-        self._handlers: dict[str, dict[str, Callable[..., Any]]] = {}
+        self._handlers: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
         self._app: App[S] = App(
             state=state,
             view=view,
@@ -255,7 +257,7 @@ class WasmRuntime(Generic[S]):
         Args:
             scene: The most recently built scene.
         """
-        registry: dict[str, dict[str, Callable[..., Any]]] = {}
+        registry: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
         _collect_handlers(scene.root, registry)
         for overlay in scene.overlays:
             _collect_handlers(overlay, registry)
@@ -294,14 +296,16 @@ class WasmRuntime(Generic[S]):
         event_type = event.get("type")
         if not isinstance(key, str) or not isinstance(event_type, str):
             return
-        handlers = self._handlers.get(key)
-        if handlers is None:
+        entry = self._handlers.get(key)
+        if entry is None:
             return
+        node_type, handlers = entry
         handler = handlers.get(f"{_HANDLER_PREFIX}{event_type}")
         if handler is None:
             return
         payload: Any = event.get("payload", {})
-        result = handler(payload) if _accepts_arg(handler) else handler()
+        arg = coerce_event(node_type, event_type, payload)
+        result = handler(arg) if _accepts_arg(handler) else handler()
         if inspect.isawaitable(result):
             await result
 

@@ -214,8 +214,12 @@ async def test_dispatch_event_unknown_type_is_ignored() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dispatch_event_passes_payload_to_arg_handler() -> None:
-    """A handler that accepts an argument receives the raw payload dict."""
+async def test_dispatch_event_coerces_payload_to_typed_event() -> None:
+    """An arg-accepting handler receives the typed event the widget declares.
+
+    ``Button.on_click`` is schema'd as a ``TapEvent``, so the wire payload is
+    validated into one (``event.x``) rather than handed over as a raw dict.
+    """
     received: list[Any] = []
 
     def view(_app: App[None]) -> Widget:
@@ -225,7 +229,8 @@ async def test_dispatch_event_passes_payload_to_arg_handler() -> None:
     runtime: WasmRuntime[None] = WasmRuntime(None, view, transport)
     runtime.start()
     await runtime.dispatch_event({"type": "click", "key": "b", "payload": {"x": 1.0}})
-    assert received == [{"x": 1.0}]
+    assert len(received) == 1
+    assert received[0].x == 1.0
 
 
 @pytest.mark.asyncio

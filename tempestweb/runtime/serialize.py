@@ -35,6 +35,7 @@ __all__ = [
     "patches_to_wire",
     "scene_to_initial_patches",
     "resolve_handler",
+    "find_node_type",
 ]
 
 #: Maps a wire event ``type`` (``docs/contract.md``) to the candidate handler prop
@@ -187,6 +188,29 @@ def _find_node_by_key(node: Node, key: str) -> Node | None:
         if found is not None:
             return found
     return None
+
+
+def find_node_type(scene: Scene, key: str) -> str | None:
+    """Return the widget type tag of the keyed node in a scene.
+
+    Searches the root tree then the overlay layer, mirroring
+    :func:`resolve_handler`, so an event's payload can be coerced into the typed
+    event the matched widget declares.
+
+    Args:
+        scene: The session's current scene.
+        key: The widget key the event addresses.
+
+    Returns:
+        The node's ``type`` tag, or ``None`` when no node matches the key.
+    """
+    target = _find_node_by_key(scene.root, key)
+    if target is None:
+        for overlay in scene.overlays:
+            target = _find_node_by_key(overlay, key)
+            if target is not None:
+                break
+    return target.type if target is not None else None
 
 
 def resolve_handler(

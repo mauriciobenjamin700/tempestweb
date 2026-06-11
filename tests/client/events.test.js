@@ -123,3 +123,58 @@ test("the unbind function detaches all listeners", () => {
     .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   assert.equal(transport.events.length, 0);
 });
+
+/** Build a keyed GestureDetector element under a fresh root. */
+function mountGesture() {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const node = {
+    type: "GestureDetector",
+    key: "g",
+    props: {},
+    children: [{ type: "Text", key: "t", props: { content: "swipe me" }, children: [] }],
+  };
+  const el = buildElement(node);
+  dom.root.appendChild(el);
+  return { dom, el };
+}
+
+test("a quick pointer press/release over a GestureDetector emits a tap", () => {
+  const { dom, el } = mountGesture();
+  const transport = mockTransport();
+  bindEvents(dom.root, transport);
+
+  el.dispatchEvent(new dom.window.MouseEvent("pointerdown", { bubbles: true, clientX: 10, clientY: 10 }));
+  el.dispatchEvent(new dom.window.MouseEvent("pointerup", { bubbles: true, clientX: 12, clientY: 11 }));
+
+  assert.equal(transport.events.length, 1);
+  assert.equal(transport.events[0].type, "tap");
+  assert.equal(transport.events[0].key, "g");
+});
+
+test("a horizontal drag over a GestureDetector emits a directional swipe", () => {
+  const { dom, el } = mountGesture();
+  const transport = mockTransport();
+  bindEvents(dom.root, transport);
+
+  el.dispatchEvent(new dom.window.MouseEvent("pointerdown", { bubbles: true, clientX: 10, clientY: 10 }));
+  el.dispatchEvent(new dom.window.MouseEvent("pointerup", { bubbles: true, clientX: 90, clientY: 14 }));
+
+  assert.equal(transport.events.length, 1);
+  assert.deepEqual(transport.events[0], {
+    type: "swipe",
+    key: "g",
+    payload: { direction: "right", dx: 80, dy: 4 },
+  });
+});
+
+test("pointer gestures on a non-GestureDetector element are ignored", () => {
+  const { dom, tree } = mountCounter();
+  const transport = mockTransport();
+  bindEvents(dom.root, transport);
+
+  const incButton = tree.querySelector("[data-tw-key=\"inc\"]");
+  incButton.dispatchEvent(new dom.window.MouseEvent("pointerdown", { bubbles: true, clientX: 0, clientY: 0 }));
+  incButton.dispatchEvent(new dom.window.MouseEvent("pointerup", { bubbles: true, clientX: 0, clientY: 0 }));
+  assert.equal(transport.events.length, 0);
+});

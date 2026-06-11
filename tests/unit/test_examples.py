@@ -100,6 +100,7 @@ EXAMPLE_NAMES = [
     "async_demo",
     "overlay_demo",
     "anim_demo",
+    "gesture_demo",
 ]
 
 

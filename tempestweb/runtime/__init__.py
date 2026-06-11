@@ -11,8 +11,10 @@ See ``docs/plan.md`` (Trilhos A e B) and ``docs/contract.md``.
 
 from __future__ import annotations
 
+from tempestweb.runtime.events import coerce_event
 from tempestweb.runtime.serialize import (
     EVENT_TYPE_TO_HANDLER_PROPS,
+    find_node_type,
     node_to_wire,
     patch_to_wire,
     patches_to_wire,
@@ -30,6 +32,8 @@ __all__ = [
     "WasmAppHandle",
     "WasmRuntime",
     "bootstrap",
+    "coerce_event",
+    "find_node_type",
     "node_to_wire",
     "patch_to_wire",
     "patches_to_wire",

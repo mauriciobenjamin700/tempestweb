@@ -37,7 +37,9 @@ from tempestweb.native.dispatch import (
     native_call,
     uninstall_bridge,
 )
+from tempestweb.runtime.events import coerce_event
 from tempestweb.runtime.serialize import (
+    find_node_type,
     patches_to_wire,
     resolve_handler,
     scene_to_initial_patches,
@@ -208,7 +210,8 @@ class AppSession(Generic[S]):
         if handler is None:
             return
         payload = event.get("payload", {})
-        result = handler(payload) if handler_accepts_event(handler) else handler()
+        arg = coerce_event(find_node_type(scene, key), event_type, payload)
+        result = handler(arg) if handler_accepts_event(handler) else handler()
         if asyncio.iscoroutine(result):
             await result
 

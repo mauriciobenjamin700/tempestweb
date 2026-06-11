@@ -1,11 +1,11 @@
 export const meta = {
   name: "tempestweb-overnight",
   description:
-    "Parallel build of tempestweb across independent tracks, each in its own git worktree/branch with an inlined domain-specialist persona, then a quality pass and an adversarial QA review per track.",
+    "Parallel build of tempestweb across independent tracks, each in its own git worktree/branch with an inlined domain-specialist persona, then a quality pass and an adversarial QA review per track, with up to 2 auto-fix + re-QA rounds when QA finds gaps.",
   phases: [
     { title: "Build", detail: "track specialists implement in parallel worktrees off main" },
     { title: "Quality", detail: "raise each branch to the docstring/typing/lint bar and apply fixes" },
-    { title: "QA", detail: "review each branch from scratch as it lands" },
+    { title: "QA", detail: "adversarial review; auto-fix + re-QA up to 2 rounds on gaps" },
   ],
 };
 
@@ -43,7 +43,24 @@ You do NOT implement features. Write REVIEW-<ID>.md (VERDICT PASS/PASS-WITH-GAPS
 
 const COMMON = `You are working on tempestweb OVERNIGHT, unsupervised. Commit GRANULARLY with conventional commits (feat:/fix:/ref:/test:/docs:/chore:), and end every commit message with:
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Do NOT git push and do NOT merge into any branch. Never claim something works without a passing test; if a step needs a real browser/device, write every automatable test and record manual steps in NOTES-<ID>.md. Read CLAUDE.md, docs/plan.md, docs/contract.md and docs/agents/MANIFEST.md first.`;
+Do NOT git push and do NOT merge into any branch. Never claim something works without a passing test; if a step needs a real browser/device, write every automatable test and record manual steps in NOTES-<ID>.md. Read CLAUDE.md, docs/plan.md, docs/contract.md and docs/agents/MANIFEST.md first (they are current — the contract now includes the native_call/native_result protocol and the per-transport framing).`;
+
+// Structured verdict so the script can decide whether to auto-fix and re-QA.
+const QA_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    verdict: { type: "string", enum: ["PASS", "PASS-WITH-GAPS", "FAIL"] },
+    summary: { type: "string", description: "One-paragraph blunt verdict." },
+    gaps: {
+      type: "array",
+      items: { type: "string" },
+      description: "Concrete, actionable gaps to close. Empty when PASS.",
+    },
+    gate_output: { type: "string", description: "Key lines of the actual gate run." },
+  },
+  required: ["verdict", "summary", "gaps"],
+};
 
 function buildPrompt(t) {
   return `${t.persona}
@@ -55,6 +72,8 @@ Your isolated worktree ALREADY EXISTS on branch ${t.branch}:
   cd ${REPO}-${t.id}
   make setup
 Do ALL work inside ${REPO}-${t.id}. Never touch the main checkout or another track's files. Leave your branch with all work committed; do not remove your worktree.
+
+BEFORE you start: run \`git log --oneline -15\` on your branch. This track MAY ALREADY HAVE COMMITTED WORK from an earlier interrupted run. If so, CONTINUE from where it stopped — do NOT redo or rewrite work that is already committed and green. Run the verification first; only build what is missing.
 
 SCOPE: ${t.scope}
 
@@ -89,7 +108,20 @@ The implement agent reported:
 ---
 ${buildReport ?? "(no report — verify what actually exists on the branch)"}
 ---
-Run the full applicable gate from scratch, check every done-when clause against a passing test, hunt for untested/overclaimed work and convention violations, then write and commit REVIEW-${t.id}.md and report the verdict. Do not implement fixes.`;
+Run the full applicable gate from scratch, check every done-when clause against a passing test, hunt for untested/overclaimed work and convention violations, then write and commit REVIEW-${t.id}.md. Do not implement fixes. Return the structured verdict (verdict + summary + concrete gaps + key gate output).`;
+}
+
+function fixPrompt(t, qaReview, round) {
+  const gaps = (qaReview.gaps ?? []).map((g, i) => `  ${i + 1}. ${g}`).join("\n");
+  return `${t.persona}
+
+${COMMON}
+
+TASK — close QA gaps on track ${t.id} (branch ${t.branch}) — round ${round}.
+  cd ${REPO}-${t.id}
+The adversarial QA returned verdict ${qaReview.verdict}. Close THESE gaps and nothing else (no scope creep beyond track ${t.id}; never edit tempestweb/_core/** or other tracks' files):
+${gaps || "  (QA listed no concrete gaps — re-read REVIEW-" + t.id + ".md and fix what it flags.)"}
+Re-run the verification (${t.verify}) until green, then commit "fix: address QA round-${round} gaps on ${t.id}". Report exactly what you changed.`;
 }
 
 const TRACKS = [
@@ -108,7 +140,7 @@ const TRACKS = [
     branch: "feat/mode-server",
     persona: PY,
     scope:
-      "Mode B (server), phases B0-B2 + B5(SSE). Implement tempestweb/server/ (FastAPI + WebSocket host using tempest-fastapi-sdk patterns where natural), tempestweb/transports/websocket.py (PatchTransport over WS), tempestweb/transports/sse.py (B5: patches server->client via EventSource, events client->server via HTTP POST, SAME PatchTransport interface), tempestweb/runtime/session.py (per-connection session: connect=mount, disconnect=unmount, cancel orphan tasks), client/transport-ws.js and client/transport-sse.js. Reconciler from tempestweb._core. pytest with WS and SSE/POST test clients.",
+      "Mode B (server), phases B0-B2 + B5(SSE). Implement tempestweb/server/ (FastAPI + WebSocket host using tempest-fastapi-sdk patterns where natural), tempestweb/transports/websocket.py (PatchTransport over WS), tempestweb/transports/sse.py (B5: patches server->client via EventSource, events client->server via HTTP POST, SAME PatchTransport interface; ping heartbeat, Last-Event-ID reconnect), tempestweb/runtime/session.py (per-connection session: connect=mount, disconnect=unmount, cancel orphan tasks), client/transport-ws.js and client/transport-sse.js. Wire envelopes per docs/contract.md ({kind:patches|event|native_call|native_result}). Reconciler from tempestweb._core. pytest with WS and SSE/POST test clients.",
     done:
       "A test client connects over WS, receives initial patches for the counter, sends a click, and receives the resulting Update patch; the SSE transport delivers the same patch stream via EventSource + POST; two connections keep independent state.",
     verify: "pytest tests/unit/test_server*.py -q",
@@ -118,7 +150,7 @@ const TRACKS = [
     branch: "feat/mode-wasm",
     persona: PY,
     scope:
-      "Mode A (WASM/Pyodide). FIRST research the CURRENT state of pydantic-core in Pyodide (post knowledge-cutoff — use web search) and record findings in NOTES-T3.md. Implement public/index.html bootstrap (loads Pyodide + vendored core + an app.py, produces patches in the browser), tempestweb/runtime/wasm.py (Python-side glue), tempestweb/transports/wasm.py (PatchTransport over pyodide.ffi), client/transport-wasm.js. Pure-Python logic must be pytest-covered; the live browser path is documented for manual verification.",
+      "Mode A (WASM/Pyodide). FIRST research the CURRENT state of pydantic-core in Pyodide (post knowledge-cutoff — use web search) and record findings in NOTES-T3.md (this may already be done — check git log). Implement public/index.html bootstrap (loads Pyodide + vendored core + an app.py, produces patches in the browser), tempestweb/runtime/wasm.py (Python-side glue), tempestweb/transports/wasm.py (PatchTransport over pyodide.ffi), client/transport-wasm.js. Pure-Python logic must be pytest-covered; the live browser path is documented for manual verification.",
     done:
       "transport-wasm.js + wasm.py implement the interface; the bootstrap is complete and documented. Pure-Python units are green. Live Pyodide run is documented in NOTES-T3.md.",
     verify: "pytest tests/unit/test_wasm*.py -q",
@@ -128,9 +160,9 @@ const TRACKS = [
     branch: "feat/native-web",
     persona: PY,
     scope:
-      "Web capability adapters in tempestweb/native/ as typed awaitables: geolocation, clipboard, notifications, storage (mirror tempestroid/native naming where it maps). client/native.js glue calling navigator.*. Document the Mode-A (browser) vs Mode-B (proxied over WS round-trip) split. pytest with mocked Web APIs.",
+      "Track N — capability adapters in tempestweb/native/ as typed awaitables, with client/native/* glue. N0 http (request with retry+backoff, generate_idempotency_key, upload-with-progress, poll — this is the base of the offline replay in T9), N1 audio (play/stop), N2 share (share + is_share_supported with graceful fallback), N3 geolocation/clipboard/storage (storage layered over IndexedDB), N4 camera (capture). Mode A calls the Web API in-process; Mode B PROXIES via the native_call/native_result protocol in docs/contract.md — document the split. pytest with mocked Web APIs/HTTP.",
     done:
-      "Each capability has a typed Python awaitable wrapper + JS glue; signatures are async; the client/server split is documented.",
+      "Each capability is a typed Python awaitable + JS glue; http retries with backoff and dedupes via idempotency key; the Mode A vs Mode B (proxied) split is documented; tests pass with mocked Web APIs.",
     verify: "pytest tests/unit/test_native*.py -q",
   },
   {
@@ -138,7 +170,7 @@ const TRACKS = [
     branch: "feat/cli-devloop",
     persona: PY,
     scope:
-      "Flesh out tempestweb/cli/ (new/dev/build/run — keep cli/main.py's parser shape) and tempestweb/devserver/ (file watcher + reload signal, transport-agnostic). `new` scaffolds a runnable project; `dev` watches and triggers reload (stub transport); `build --mode wasm|server` produces the right artifact shape. pytest coverage.",
+      "Flesh out tempestweb/cli/ (new/dev/build/run — keep cli/main.py's parser shape) and tempestweb/devserver/ (file watcher + reload signal, transport-agnostic). `new` scaffolds a runnable project; `dev` watches and triggers reload (stub transport); `build --mode wasm|server` produces the right artifact shape (the wasm artifact is the PWA app-shell base for T9). pytest coverage.",
     done:
       "tempestweb new X creates a runnable project tree; dev watcher detects a change and emits a reload; build --mode produces the expected artifact layout.",
     verify: "pytest tests/unit/test_cli*.py -q",
@@ -148,7 +180,7 @@ const TRACKS = [
     branch: "feat/docs-site",
     persona: DOCS,
     scope:
-      "Bilingual MkDocs site (PT-BR default + EN-US under /en/) in the tiangolo style: mkdocs-material + mkdocs-static-i18n + header language switch, and .github/workflows/docs.yml for Pages. Pages: landing, installation, architecture (link docs/arquitetura.md), a progressive tutorial building the counter, the wire contract, and placeholders for PWA/SSE. Do NOT rewrite docs/plan.md/roadmap.md/contract.md — link to them. Point the README banner at the Pages URL (PT + EN).",
+      "Bilingual MkDocs site (PT-BR default + EN-US under /en/) in the tiangolo style: mkdocs-material + mkdocs-static-i18n + header language switch, and .github/workflows/docs.yml for Pages. Pages: landing, installation, architecture (link docs/arquitetura.md), a progressive tutorial building the counter, the wire contract, and pages for PWA/offline/WebPush (Track P), capabilities (Track N) and observability (Track O). Do NOT rewrite docs/plan.md/roadmap.md/contract.md — link to them. Point the README banner at the Pages URL (PT + EN).",
     done:
       "uv run mkdocs build --strict passes with zero warnings; language switch present; tutorial covers the counter end to end; docs.yml deploy workflow present.",
     verify: "uv run mkdocs build --strict",
@@ -178,15 +210,27 @@ const TRACKS = [
     branch: "feat/pwa-offline-webpush",
     persona: JS,
     scope:
-      "Trilho P — PWA / offline-first / WebPush. Own files: client/pwa/ (manifest.webmanifest emitter, sw.js service worker, register.js), tempestweb/server/webpush.py (VAPID via tempest-fastapi-sdk[webpush] patterns), tests/unit/test_pwa*.py. P0: installable manifest. P1: service worker precaches the app-shell (client JS always; Mode A also Pyodide + core wheel + app.py) cache-first -> offline after first load. P2: per-resource strategies + offline event queue with replay-on-reconnect (Mode B). P3: WebPush — native notifications.subscribe()/permission awaitables, SW push handler, server-side send (pywebpush). Stub client/build integration against interfaces.",
+      "Track P — PWA / offline-first / WebPush, full P0-P5. Own files: client/pwa/ (install-prompt.js), client/sw/ (sw.js worker + register.js), client/offline/ (store.js IndexedDB owner-scoped + sync.js queue/Background Sync), client/push/ (web-push-client.js), tempestweb/pwa/ (manifest.webmanifest + icon emitter), tempestweb/server/webpush.py (VAPID via tempest-fastapi-sdk[webpush] patterns), tests/unit/test_pwa*.py. P0: installable manifest + soft install-prompt. P1: service worker precaches the app-shell (client JS always; Mode A also Pyodide + core wheel + app.py) cache-first -> offline after first load + update lifecycle (onUpdate/skipWaiting, cache cleanup on activate). P2: IndexedDB store + storage.persist() + per-resource strategies + offline mutation queue with Background Sync + replay-on-reconnect (Mode B). P3: WebPush — client browser-flow (subscribe/unsubscribe/isSubscribed via native notifications.subscribe()), server owns the endpoint + subscription store (clean 410), SW push handler + notification click->DeepLink + actions + Badging, server-side send (pywebpush). P4: PWA gate in CI (Lighthouse PWA + offline + push e2e wired). P5: manifest extras (shortcuts/share_target/file handlers). Stub client/build integration against interfaces.",
     done:
-      "manifest is valid JSON and installable-shaped; sw.js passes node --check and has precache + fetch strategy; webpush VAPID subscribe/send is unit-tested (pywebpush mocked); offline queue replay is unit-tested. Live install/push documented in NOTES-T9.md.",
-    verify: 'pytest tests/unit/test_pwa*.py -q && node --check client/pwa/sw.js',
+      "manifest is valid JSON and installable-shaped; sw.js passes node --check and has precache + fetch strategy + update lifecycle; webpush VAPID subscribe/send is unit-tested (pywebpush mocked); offline queue replay is unit-tested; the CI PWA gate job is present; manifest extras present. Live install/push documented in NOTES-T9.md.",
+    verify: "pytest tests/unit/test_pwa*.py -q && node --check client/sw/sw.js",
+  },
+  {
+    id: "T10",
+    branch: "feat/observability",
+    persona: PY,
+    scope:
+      "Track O — production/observability providers in tempestweb/observability/, ALL using the adapter pattern (tiny interface, swap backend without touching app code). O0 telemetry (provider + console/sentry/posthog adapters; track/identify). O1 logger (create_logger with pluggable sinks + console_sink, typed LogLevel). O2 error_boundary (render-error fallback widget/decorator + report hook into telemetry; complements the core's state rollback). O3 feature_flags (provider + in_memory/growthbook/launchdarkly adapters; is_enabled/get/on_change). O4 auth (auth store + route guard + decode_jwt/is_jwt_expired + refresh queue that serializes concurrent refresh; server side reuses tempest-fastapi-sdk JWTUtils). Third-party SDKs (sentry/posthog/growthbook/launchdarkly) are NOT dependencies — each adapter wraps an injected instance. pytest with the third-party instances mocked.",
+    done:
+      "Each provider exposes a minimal interface + at least one working adapter; swapping adapters changes no call sites; per-provider unit tests pass with third-party instances mocked; refresh queue serializes concurrent refresh into a single renewal.",
+    verify: "pytest tests/unit/test_observability*.py -q",
   },
 ];
 
 phase("Build");
-log(`Launching ${TRACKS.length} track specialists (inlined personas) in parallel pre-created worktrees; each flows build -> quality -> qa.`);
+log(
+  `Launching ${TRACKS.length} track specialists (inlined personas) in parallel pre-created worktrees; each flows build -> quality -> qa, with up to 2 auto-fix + re-QA rounds on gaps.`
+);
 
 const results = await pipeline(
   TRACKS,
@@ -199,18 +243,49 @@ const results = await pipeline(
     agent(qualityPrompt(built), { label: `quality:${built.id}`, phase: "Quality" }).then(
       (qualityReport) => ({ ...built, qualityReport })
     ),
-  (checked) =>
-    agent(qaPrompt(checked, checked.buildReport), { label: `qa:${checked.id}`, phase: "QA" }).then(
-      (qaReview) => ({
-        id: checked.id,
-        branch: checked.branch,
-        buildReport: checked.buildReport,
-        qualityReport: checked.qualityReport,
-        qaReview,
-      })
-    )
+  async (checked) => {
+    let qaReview = await agent(qaPrompt(checked, checked.buildReport), {
+      label: `qa:${checked.id}`,
+      phase: "QA",
+      schema: QA_SCHEMA,
+    });
+    let rounds = 0;
+    const history = [qaReview];
+    while (
+      qaReview &&
+      (qaReview.verdict === "FAIL" || qaReview.verdict === "PASS-WITH-GAPS") &&
+      rounds < 2
+    ) {
+      rounds += 1;
+      log(`${checked.id}: QA ${qaReview.verdict} -> auto-fix round ${rounds}`);
+      await agent(fixPrompt(checked, qaReview, rounds), {
+        label: `fix:${checked.id}#${rounds}`,
+        phase: "QA",
+      });
+      qaReview = await agent(qaPrompt(checked, `(re-QA after fix round ${rounds})`), {
+        label: `re-qa:${checked.id}#${rounds}`,
+        phase: "QA",
+        schema: QA_SCHEMA,
+      });
+      history.push(qaReview);
+    }
+    return {
+      id: checked.id,
+      branch: checked.branch,
+      buildReport: checked.buildReport,
+      qualityReport: checked.qualityReport,
+      qaReview,
+      qaRounds: rounds,
+      finalVerdict: qaReview ? qaReview.verdict : "UNKNOWN",
+    };
+  }
 );
 
 const ok = results.filter(Boolean);
-log(`Done. ${ok.length}/${TRACKS.length} tracks built + quality-passed + QA-reviewed.`);
+const passed = ok.filter((r) => r.finalVerdict === "PASS").length;
+const gaps = ok.filter((r) => r.finalVerdict === "PASS-WITH-GAPS").length;
+const failed = ok.filter((r) => r.finalVerdict === "FAIL").length;
+log(
+  `Done. ${ok.length}/${TRACKS.length} tracks processed. PASS=${passed} PASS-WITH-GAPS=${gaps} FAIL=${failed}.`
+);
 return ok;

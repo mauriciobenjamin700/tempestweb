@@ -26,6 +26,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, cast
 
+from pydantic import BaseModel
+
 from tempestweb._core import Insert, Node, Patch, Remove, Replace, Scene, Update
 
 __all__ = [
@@ -66,9 +68,16 @@ def _json_safe(value: Any) -> Any:  # noqa: ANN401 — walks arbitrary IR prop v
         value: Any prop value drawn from a node's ``props``.
 
     Returns:
-        A JSON-able value: callables become ``None``; dicts and lists are walked
-        recursively; everything else is returned unchanged.
+        A JSON-able value: callables become ``None``; Pydantic models (styles,
+        colors, edges, …) are dumped with ``model_dump(mode="json")`` to their
+        contract wire shape; dicts and lists are walked recursively; everything
+        else is returned unchanged.
     """
+    if isinstance(value, BaseModel):
+        # Style/Color/Edge and friends are Pydantic models; lower them to their
+        # JSON wire shape (the same shape the golden fixtures carry) instead of
+        # leaking the live model object, which is not JSON-serializable.
+        return value.model_dump(mode="json")
     if callable(value):
         return None
     if isinstance(value, dict):

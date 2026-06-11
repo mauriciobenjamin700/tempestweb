@@ -31,6 +31,9 @@ const TAG_BY_TYPE = Object.freeze({
   Stack: "div",
   Text: "span",
   Button: "button",
+  Input: "input",
+  Checkbox: "input",
+  Image: "img",
 });
 
 /**
@@ -85,11 +88,58 @@ function applyProps(el, props) {
       el.removeAttribute("style");
     }
   }
+  const type = el.getAttribute(TYPE_ATTR);
+  // Text-bearing props. A Checkbox is an <input> and cannot hold text, so its
+  // label rides as an accessible name instead of textContent.
   if ("content" in props) {
     el.textContent = props.content == null ? "" : String(props.content);
   }
   if ("label" in props) {
-    el.textContent = props.label == null ? "" : String(props.label);
+    if (type === "Checkbox") {
+      el.setAttribute("aria-label", props.label == null ? "" : String(props.label));
+    } else {
+      el.textContent = props.label == null ? "" : String(props.label);
+    }
+  }
+  applyControlProps(el, type, props);
+}
+
+/**
+ * Apply form-control / media props (Input, Checkbox, Image) onto an element.
+ *
+ * Maps the widget's typed props onto the right DOM property/attribute so the
+ * control is actually interactive (a real <input> holding `value`, a checkbox
+ * reflecting `checked`, an <img> pointing at `src`). No-ops for other types.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type (from the data-tw-type attribute).
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyControlProps(el, type, props) {
+  if (type === "Input") {
+    el.setAttribute("type", props.secure ? "password" : "text");
+    if ("value" in props) {
+      el.value = props.value == null ? "" : String(props.value);
+    }
+    if ("placeholder" in props && props.placeholder != null) {
+      el.setAttribute("placeholder", String(props.placeholder));
+    }
+    if (props.max_length != null) {
+      el.setAttribute("maxlength", String(props.max_length));
+    }
+  } else if (type === "Checkbox") {
+    el.setAttribute("type", "checkbox");
+    if ("checked" in props) {
+      el.checked = Boolean(props.checked);
+    }
+  } else if (type === "Image") {
+    if ("src" in props && props.src != null) {
+      el.setAttribute("src", String(props.src));
+    }
+    if ("alt" in props && props.alt != null) {
+      el.setAttribute("alt", String(props.alt));
+    }
   }
 }
 

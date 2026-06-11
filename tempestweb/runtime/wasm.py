@@ -71,25 +71,46 @@ def _is_handler(name: str, value: object) -> bool:
     return name.startswith(_HANDLER_PREFIX) and callable(value)
 
 
-def _serialize_props(props: dict[str, Any]) -> dict[str, Any]:
-    """Serialize a node's props, nulling out handler callables.
+def _sanitize_prop(value: Any) -> Any:  # noqa: ANN401 — walks arbitrary prop values
+    """Recursively null callables in a prop value so it is JSON-serializable.
 
-    Per ``docs/contract.md``, handlers do not cross the boundary: the client
-    only needs to know a handler exists (so it can attach a DOM listener), never
-    the function itself. A present handler serializes to ``null`` — the same
-    shape the golden fixtures record — and the real callable stays on the Python
-    side, addressable by the node's ``key``.
+    Any callable becomes ``None`` (no function crosses the wire — see
+    ``docs/contract.md``); dicts and lists are walked so a callable nested inside
+    a structured prop (e.g. a form field's validator) is nulled too; everything
+    else (including ``Style``/``Color``/``Edge`` Pydantic models, which
+    ``model_dump`` lowers later) is returned unchanged.
+
+    Args:
+        value: A prop value drawn from a node's props.
+
+    Returns:
+        The value with every callable replaced by ``None``.
+    """
+    if callable(value):
+        return None
+    if isinstance(value, dict):
+        return {key: _sanitize_prop(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_prop(item) for item in value]
+    return value
+
+
+def _serialize_props(props: dict[str, Any]) -> dict[str, Any]:
+    """Serialize a node's props, nulling out every callable (handlers, validators).
+
+    Per ``docs/contract.md``, functions do not cross the boundary: the client only
+    needs to know a handler exists (so it can attach a DOM listener), never the
+    function itself. Every callable — an ``on_*`` handler or a callable nested in a
+    structured prop such as a form validator — serializes to ``None``; the real
+    callables stay on the Python side, addressable by the node's ``key``.
 
     Args:
         props: The node's raw props, possibly carrying callables.
 
     Returns:
-        A JSON-able props dict with every handler replaced by ``None``.
+        A JSON-able props dict with every callable replaced by ``None``.
     """
-    out: dict[str, Any] = {}
-    for name, value in props.items():
-        out[name] = None if _is_handler(name, value) else value
-    return out
+    return {name: _sanitize_prop(value) for name, value in props.items()}
 
 
 def serialize_node(node: Node) -> dict[str, Any]:

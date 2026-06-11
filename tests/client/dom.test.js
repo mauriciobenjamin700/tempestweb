@@ -136,3 +136,50 @@ test("applyPatches throws on an unrecognized patch shape", () => {
   const root = buildElement(fixture("node_initial.json"));
   assert.throws(() => applyPatches(root, [{ path: [] }]), TypeError);
 });
+
+test("Input builds a real <input> carrying value/placeholder (E.6)", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "email",
+    props: { value: "a@b.com", placeholder: "Email", secure: false },
+    children: [],
+  });
+  assert.equal(el.tagName, "INPUT");
+  assert.equal(el.getAttribute("type"), "text");
+  assert.equal(el.value, "a@b.com");
+  assert.equal(el.getAttribute("placeholder"), "Email");
+});
+
+test("a secure Input renders type=password", () => {
+  withDocument();
+  const el = buildElement({ type: "Input", key: "pw", props: { secure: true }, children: [] });
+  assert.equal(el.getAttribute("type"), "password");
+});
+
+test("Checkbox builds an <input type=checkbox> reflecting checked", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Checkbox",
+    key: "c",
+    props: { checked: true, label: "Agree" },
+    children: [],
+  });
+  assert.equal(el.tagName, "INPUT");
+  assert.equal(el.getAttribute("type"), "checkbox");
+  assert.equal(el.checked, true);
+  assert.equal(el.getAttribute("aria-label"), "Agree");
+});
+
+test("Image builds an <img> with src/alt", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Image",
+    key: "pic",
+    props: { src: "/cat.png", alt: "a cat" },
+    children: [],
+  });
+  assert.equal(el.tagName, "IMG");
+  assert.equal(el.getAttribute("src"), "/cat.png");
+  assert.equal(el.getAttribute("alt"), "a cat");
+});

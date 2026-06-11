@@ -8,7 +8,7 @@ exposes two callables, mirroring the canonical counter example:
 
 This module loads that file, validates the contract, and offers a render helper
 that proves the project is *runnable* by building its initial widget tree into a
-core :class:`~tempestweb._core.Node`. The CLI uses this both to validate scaffold
+core :class:`~tempest_core.Node`. The CLI uses this both to validate scaffold
 output and as the entrypoint each transport will drive.
 """
 
@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from tempestweb._core import App, Node, Widget, build
+from tempest_core import App, Node, Widget, build
 
 __all__ = ["LoadedApp", "ProjectLoadError", "load_app", "render_initial_tree"]
 
@@ -104,15 +104,15 @@ def render_initial_tree(loaded: LoadedApp) -> Node:
     """Build the project's initial widget tree into a core IR node.
 
     This is the cheapest possible proof that a project is runnable: it builds the
-    initial state, calls ``view`` with a minimal :class:`~tempestweb._core.App`
-    handle, and reconciles the result into a :class:`~tempestweb._core.Node`. No
+    initial state, calls ``view`` with a minimal :class:`~tempest_core.App`
+    handle, and reconciles the result into a :class:`~tempest_core.Node`. No
     transport, browser or server is involved.
 
     Args:
         loaded: A project loaded via :func:`load_app`.
 
     Returns:
-        The reconciled root :class:`~tempestweb._core.Node` of the initial view.
+        The reconciled root :class:`~tempest_core.Node` of the initial view.
 
     Raises:
         ProjectLoadError: If ``view`` does not return a widget or building the

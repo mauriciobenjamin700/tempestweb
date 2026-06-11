@@ -24,8 +24,8 @@ from typing import Any, Generic, TypeVar
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.websockets import WebSocket
+from tempest_core import App, Widget
 
-from tempestweb._core import App, Widget
 from tempestweb.runtime.session import AppSession
 from tempestweb.transports.base import PatchTransport
 from tempestweb.transports.sse import SSETransport

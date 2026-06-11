@@ -1,7 +1,7 @@
 """Per-connection application session (Mode B lifecycle).
 
 A :class:`AppSession` is the server-side runtime for **one** connected client. It
-owns an isolated :class:`~tempestweb._core.App` (so two connections never share
+owns an isolated :class:`~tempest_core.App` (so two connections never share
 state), a :class:`~tempestweb.transports.base.PatchTransport`, and the structured
 set of async tasks spawned while serving that client.
 
@@ -27,9 +27,10 @@ from contextlib import suppress
 from itertools import count
 from typing import Any, Generic, TypeVar
 
-from tempestweb._core import App, Widget
-from tempestweb._core import Patch as CorePatch
-from tempestweb._core.widgets import handler_accepts_event
+from tempest_core import App, Widget
+from tempest_core import Patch as CorePatch
+from tempest_core.widgets import handler_accepts_event
+
 from tempestweb.native.bridges import ProxyBridge
 from tempestweb.native.dispatch import (
     install_bridge,
@@ -60,7 +61,7 @@ class NativeCallError(RuntimeError):
 class AppSession(Generic[S]):
     """Drives one client connection: state, transport, and task lifecycle.
 
-    Each session builds its own :class:`~tempestweb._core.App` from a factory, so
+    Each session builds its own :class:`~tempest_core.App` from a factory, so
     connections are fully isolated — a ``set_state`` in one never affects another.
 
     Type Args:

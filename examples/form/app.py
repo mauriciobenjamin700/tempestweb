@@ -6,11 +6,11 @@ modes::
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
     tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
-It demonstrates the form layer of the core: a :class:`~tempestweb._core.widgets.Form`
-aggregating two :class:`~tempestweb._core.widgets.FormField` wrappers, each
-wrapping an :class:`~tempestweb._core.widgets.Input`, with typed
-:data:`~tempestweb._core.widgets.Validator` rules that run purely in Python. The
-form gates its :class:`~tempestweb._core.widgets.events.SubmitEvent` on
+It demonstrates the form layer of the core: a :class:`~tempest_core.widgets.Form`
+aggregating two :class:`~tempest_core.widgets.FormField` wrappers, each
+wrapping an :class:`~tempest_core.widgets.Input`, with typed
+:data:`~tempest_core.widgets.Validator` rules that run purely in Python. The
+form gates its :class:`~tempest_core.widgets.events.SubmitEvent` on
 :meth:`Form.validate`, mirroring each error back onto its field.
 """
 
@@ -19,9 +19,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import (
+from tempest_core import App, Style, Widget
+from tempest_core.style import Edge
+from tempest_core.widgets import (
     Button,
     Column,
     Form,
@@ -31,7 +31,7 @@ from tempestweb._core.widgets import (
     Text,
     Validator,
 )
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core.widgets.events import TextChangeEvent
 
 
 @dataclass

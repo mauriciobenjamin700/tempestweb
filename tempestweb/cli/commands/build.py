@@ -49,10 +49,11 @@ WASM_PACKAGE_ARCHIVE: str = "tempestweb-pkg.zip"
 
 # Subpackages of ``tempestweb`` the Mode A runtime needs in the browser. The
 # server/CLI/devserver stacks (and their Starlette/uvicorn deps) are omitted —
-# Pyodide neither has them nor needs them to run ``view()`` in the tab.
+# Pyodide neither has them nor needs them to run ``view()`` in the tab. The
+# renderer-agnostic core lives in the separate ``tempest_core`` package, bundled
+# alongside (see :func:`_zip_package`).
 _WASM_PACKAGE_PARTS: tuple[str, ...] = (
     "__init__.py",
-    "_core",
     "runtime",
     "transports",
     "native",
@@ -121,13 +122,65 @@ def _package_dir() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _zip_package(dest: Path) -> None:
-    """Zip the Mode A subset of the ``tempestweb`` package into ``dest``.
+def _tempest_core_dir() -> Path:
+    """Locate the installed ``tempest_core`` package directory.
 
-    The archive carries ``tempestweb/<part>`` entries for each part in
-    :data:`_WASM_PACKAGE_PARTS`, excluding ``__pycache__``. The Pyodide bootstrap
-    unpacks it into the virtual filesystem's working directory (on ``sys.path``),
-    so ``import tempestweb`` resolves in the browser.
+    Returns:
+        The absolute path to the ``tempest_core`` package.
+
+    Raises:
+        BuildError: If ``tempest_core`` is not importable.
+    """
+    try:
+        import tempest_core
+    except ImportError as exc:  # pragma: no cover - dependency is declared
+        raise BuildError(f"tempest_core is not installed: {exc}") from exc
+    file = tempest_core.__file__
+    if file is None:  # pragma: no cover - namespace package guard
+        raise BuildError("tempest_core has no __init__ to locate")
+    return Path(file).resolve().parent
+
+
+def _zip_tree(
+    archive: zipfile.ZipFile,
+    root: Path,
+    top: str,
+    parts: tuple[str, ...] | None,
+) -> None:
+    """Write a package subtree into ``archive`` under ``top/``.
+
+    Args:
+        archive: The open zip archive to write into.
+        root: The package's parent directory (entries are relative to it).
+        top: The top-level package name the entries live under (e.g. ``tempestweb``).
+        parts: Either ``None`` (the whole ``root/top`` tree) or the part names
+            under ``root/top`` to include.
+
+    Raises:
+        BuildError: If an expected part is missing.
+    """
+    names = [top] if parts is None else [f"{top}/{part}" for part in parts]
+    for name in names:
+        source = root / name
+        if not source.exists():
+            raise BuildError(f"missing package part: {source}")
+        if source.is_file():
+            archive.write(source, name)
+            continue
+        for path in sorted(source.rglob("*")):
+            if path.is_dir() or "__pycache__" in path.parts:
+                continue
+            archive.write(path, str(path.relative_to(root)))
+
+
+def _zip_package(dest: Path) -> None:
+    """Zip the Mode A Python payload (tempestweb subset + tempest_core) into ``dest``.
+
+    The archive carries the Mode A subset of ``tempestweb``
+    (:data:`_WASM_PACKAGE_PARTS`) and the whole ``tempest_core`` package, excluding
+    ``__pycache__``. The Pyodide bootstrap unpacks it into the virtual filesystem's
+    working directory (on ``sys.path``), so ``import tempestweb`` and
+    ``import tempest_core`` both resolve in the browser.
 
     Args:
         dest: The ``.zip`` path to write.
@@ -135,19 +188,11 @@ def _zip_package(dest: Path) -> None:
     Raises:
         BuildError: If an expected package part is missing.
     """
-    package = _package_dir()
+    tempestweb_root = _package_dir().parent
+    tempest_core_root = _tempest_core_dir().parent
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
-        for part in _WASM_PACKAGE_PARTS:
-            source = package / part
-            if not source.exists():
-                raise BuildError(f"missing package part: {source}")
-            if source.is_file():
-                archive.write(source, f"tempestweb/{part}")
-                continue
-            for path in sorted(source.rglob("*")):
-                if path.is_dir() or "__pycache__" in path.parts:
-                    continue
-                archive.write(path, f"tempestweb/{path.relative_to(package)}")
+        _zip_tree(archive, tempestweb_root, "tempestweb", _WASM_PACKAGE_PARTS)
+        _zip_tree(archive, tempest_core_root, "tempest_core", None)
 
 
 def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:

@@ -7,10 +7,10 @@ modes::
     tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 It demonstrates the value-bearing widgets of the core: a single-line
-:class:`~tempestweb._core.widgets.Input` to type a new item, a virtualized
-:class:`~tempestweb._core.widgets.LazyColumn` to render the list (only the
+:class:`~tempest_core.widgets.Input` to type a new item, a virtualized
+:class:`~tempest_core.widgets.LazyColumn` to render the list (only the
 visible window is materialized into the IR), and a per-row
-:class:`~tempestweb._core.widgets.Checkbox` to toggle completion. The
+:class:`~tempest_core.widgets.Checkbox` to toggle completion. The
 application never names a transport — that is the whole point.
 """
 
@@ -18,9 +18,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import (
+from tempest_core import App, Style, Widget
+from tempest_core.style import Edge
+from tempest_core.widgets import (
     Button,
     Checkbox,
     Column,
@@ -29,7 +29,7 @@ from tempestweb._core.widgets import (
     Row,
     Text,
 )
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core.widgets.events import TextChangeEvent
 
 
 @dataclass

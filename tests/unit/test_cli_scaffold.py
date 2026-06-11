@@ -44,7 +44,7 @@ def test_scaffold_app_py_defines_contract(tmp_path: Path) -> None:
     app_src = (result.root / "app.py").read_text(encoding="utf-8")
     assert "def make_state(" in app_src
     assert "def view(" in app_src
-    assert "from tempestweb._core import" in app_src
+    assert "from tempest_core import" in app_src
 
 
 def test_scaffold_refuses_non_empty_dir(tmp_path: Path) -> None:

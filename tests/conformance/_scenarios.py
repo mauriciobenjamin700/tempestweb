@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tempestweb._core import Button, Column, Row, Text, Widget, build, diff
+from tempest_core import Button, Column, Row, Text, Widget, build, diff
 
 
 def counter_views() -> list[Widget]:

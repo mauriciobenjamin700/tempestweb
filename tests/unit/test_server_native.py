@@ -15,8 +15,8 @@ import json
 from dataclasses import dataclass
 
 import pytest
+from tempest_core import App, Text, Widget
 
-from tempestweb._core import App, Text, Widget
 from tempestweb.runtime.session import AppSession, NativeCallError
 from tempestweb.transports.sse import SSETransport
 

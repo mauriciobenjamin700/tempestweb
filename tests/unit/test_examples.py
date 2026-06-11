@@ -18,9 +18,8 @@ from types import ModuleType
 from typing import Any
 
 import pytest
-
-from tempestweb._core import App, Node, build, diff
-from tempestweb._core.widgets.events import TextChangeEvent, ToggleEvent
+from tempest_core import App, Node, build, diff
+from tempest_core.widgets.events import TextChangeEvent, ToggleEvent
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 

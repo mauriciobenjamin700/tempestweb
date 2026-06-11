@@ -64,15 +64,17 @@ def test_wasm_bootstrap_is_live(tmp_path: Path) -> None:
 
 
 def test_wasm_package_archive_carries_runtime(tmp_path: Path) -> None:
-    """The bundled package zip carries the core + runtime the browser imports."""
+    """The bundled zip carries the tempestweb runtime + the tempest_core engine."""
     root = _project(tmp_path)
     result = build_artifact(root, mode="wasm")
     with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
         names = set(archive.namelist())
     assert "tempestweb/__init__.py" in names
-    assert "tempestweb/_core/__init__.py" in names
     assert "tempestweb/runtime/wasm_main.py" in names
     assert "tempestweb/transports/wasm.py" in names
+    # The renderer-agnostic core now ships as the separate tempest_core package.
+    assert "tempest_core/__init__.py" in names
+    assert "tempest_core/core/reconciler.py" in names
     # No bytecode leaks into the artifact.
     assert not any("__pycache__" in name for name in names)
 

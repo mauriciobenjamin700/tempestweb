@@ -1,9 +1,9 @@
 """In-browser entrypoint for Mode A — the Python code Pyodide runs to start.
 
-``public/index.html`` loads Pyodide, writes the ``tempestweb`` package and the
-app module into the virtual filesystem, then calls :func:`bootstrap` to wire the
-app to the JS client over ``pyodide.ffi``. This module is the Python end of that
-seam:
+The generated ``bootstrap.js`` (from ``tempestweb build --mode wasm``) loads
+Pyodide, unpacks the ``tempestweb`` + ``tempest_core`` packages and the app module
+into the virtual filesystem, then calls :func:`bootstrap` to wire the app to the JS
+client over ``pyodide.ffi``. This module is the Python end of that seam:
 
 #. construct a :class:`~tempestweb.transports.wasm.WasmTransport` whose
    ``deliver`` sink is the JS ``onPatches`` callback (passed in as a Pyodide
@@ -27,7 +27,8 @@ import json
 from collections.abc import Awaitable, Callable
 from typing import Any, Generic, TypeVar
 
-from tempestweb._core import App, Widget
+from tempest_core import App, Widget
+
 from tempestweb.native.bridges import FFIBridge
 from tempestweb.native.dispatch import install_bridge, uninstall_bridge
 from tempestweb.runtime.wasm import WasmRuntime
@@ -127,7 +128,7 @@ def bootstrap(
     When ``dispatch`` is provided, an :class:`FFIBridge` is installed so that
     ``await native.<capability>()`` inside a handler resolves **in-process** through
     ``client/native/index.js`` — no network hop. The dispatch callable is the one
-    Pyodide-aware seam: the JS bootstrap glue (``public/index.html``) exposes
+    Pyodide-aware seam: the generated ``bootstrap.js`` glue exposes
     ``window.__tempestweb_native__`` via :func:`installNativeBridge` and passes its
     Pyodide proxy in here, so this module never imports ``pyodide`` itself and stays
     type-checkable off-browser.

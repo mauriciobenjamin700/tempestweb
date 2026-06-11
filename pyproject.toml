@@ -7,9 +7,9 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Mauricio Benjamin", email = "mauricio.benjamin@reloverelations.com" }]
 dependencies = [
-    # Core model engine. Currently vendored under tempestweb/_core/; this will be
-    # replaced by a `tempest-core` dependency once that package is extracted.
-    "pydantic>=2.0",
+    # Renderer-agnostic UI core (IR/reconciler/state/style/widgets), extracted from
+    # the former vendored tempestweb/_core/. pydantic comes transitively via it.
+    "tempest-core>=0.1.0",
 ]
 
 [project.optional-dependencies]
@@ -51,6 +51,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["tempestweb"]
+
+# tempest-core is not yet on PyPI; resolve it from the sibling checkout until it
+# is published. Remove this source once `pip install tempest-core` works.
+[tool.uv.sources]
+tempest-core = { path = "../tempest-core", editable = true }
 
 [tool.ruff]
 line-length = 88

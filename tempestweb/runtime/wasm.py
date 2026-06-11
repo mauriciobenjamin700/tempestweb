@@ -5,8 +5,8 @@ vendored reconciler builds and diffs the widget tree, and the resulting patches
 cross to the JS DOM renderer in-process via ``pyodide.ffi`` (no network). This
 module is the Python-side glue that:
 
-#. owns the :class:`~tempestweb._core.App`,
-#. **serializes** each freshly built :class:`~tempestweb._core.core.ir.Node`
+#. owns the :class:`~tempest_core.App`,
+#. **serializes** each freshly built :class:`~tempest_core.core.ir.Node`
    tree (and every patch) into the plain JSON-able shape the client expects,
    stripping the non-serializable handler callables,
 #. keeps a **handler registry** keyed by widget ``key`` so an event arriving
@@ -32,8 +32,9 @@ import inspect
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar
 
-from tempestweb._core import App, Node, Scene, Widget
-from tempestweb._core.core.ir import Patch
+from tempest_core import App, Node, Scene, Widget
+from tempest_core.core.ir import Patch
+
 from tempestweb.transports.base import (
     Event,
     PatchTransport,
@@ -179,7 +180,7 @@ def _collect_handlers(
 class WasmRuntime(Generic[S]):
     """Drives a tempestweb app in Mode A, bridging the core to a transport.
 
-    The runtime wires the vendored :class:`~tempestweb._core.App` to a
+    The runtime wires the vendored :class:`~tempest_core.App` to a
     :class:`~tempestweb.transports.base.PatchTransport`: the app's coalesced
     rebuild loop produces patches, which the runtime serializes and pushes to the
     client via :meth:`PatchTransport.send_patches`; the client's events flow back
@@ -225,7 +226,7 @@ class WasmRuntime(Generic[S]):
         """The underlying core app.
 
         Returns:
-            The :class:`~tempestweb._core.App` this runtime drives.
+            The :class:`~tempest_core.App` this runtime drives.
         """
         return self._app
 

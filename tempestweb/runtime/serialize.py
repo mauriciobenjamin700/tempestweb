@@ -1,7 +1,7 @@
 """Wire serialization and handler resolution for Mode B.
 
-The reconciler (in :mod:`tempestweb._core`) produces :class:`~tempestweb._core.Node`
-trees and :class:`~tempestweb._core.Patch` operations whose ``props`` may carry
+The reconciler (in :mod:`tempest_core`) produces :class:`~tempest_core.Node`
+trees and :class:`~tempest_core.Patch` operations whose ``props`` may carry
 **live handler objects** (the Python callables wired by the app's ``view``). Those
 callables are not JSON-serializable and must never cross the wire — the client only
 needs to know a widget *has* a handler by its stable ``key``, then routes the event
@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, cast
 
-from tempestweb._core import Insert, Node, Patch, Remove, Replace, Scene, Update
+from tempest_core import Insert, Node, Patch, Remove, Replace, Scene, Update
 
 __all__ = [
     "EVENT_TYPE_TO_HANDLER_PROPS",
@@ -40,7 +40,7 @@ __all__ = [
 #: Maps a wire event ``type`` (``docs/contract.md``) to the candidate handler prop
 #: names a node may declare for it, in priority order. The client sends short DOM
 #: event names; widgets declare ``on_<verb>`` props (see each widget's
-#: ``event_schemas`` in :mod:`tempestweb._core`). The first prop present on the
+#: ``event_schemas`` in :mod:`tempest_core`). The first prop present on the
 #: target node (and non-``None``) wins.
 EVENT_TYPE_TO_HANDLER_PROPS: dict[str, tuple[str, ...]] = {
     "click": ("on_click",),
@@ -105,7 +105,7 @@ def patch_to_wire(patch: Patch) -> dict[str, Any]:
     Each patch kind is built explicitly rather than via a blanket
     ``model_dump`` — the IR carries **live handler callables** inside
     ``Update.set_props`` and inside the ``node`` of
-    :class:`~tempestweb._core.Insert` / :class:`~tempestweb._core.Replace`, which
+    :class:`~tempest_core.Insert` / :class:`~tempest_core.Replace`, which
     Pydantic cannot serialize. :func:`node_to_wire` and :func:`_json_safe` strip
     those handlers to ``None`` (see ``docs/contract.md``). ``path`` tuples become
     lists.
@@ -151,7 +151,7 @@ def scene_to_initial_patches(scene: Scene) -> list[dict[str, Any]]:
     """Build the initial patch batch that mounts a scene from an empty root.
 
     The client mounts by applying patches to an empty document. We model the
-    initial mount as a single :class:`~tempestweb._core.Replace` at the root
+    initial mount as a single :class:`~tempest_core.Replace` at the root
     (``path == []``) carrying the whole built tree, which the DOM renderer (W1)
     applies to materialize the screen. Overlays, when present, follow as inserts
     under the reserved ``"overlay"`` path.

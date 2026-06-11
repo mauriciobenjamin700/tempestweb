@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from tempest_core import App, Button, Column, Row, Style, Text, Widget, build
+from tempest_core.style import Edge
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget, build
-from tempestweb._core.style import Edge
 from tempestweb.runtime import WasmRuntime, serialize_node, serialize_patches
 from tempestweb.transports import WasmTransport
 
@@ -109,7 +109,7 @@ def test_serialize_node_lowers_style_to_dict() -> None:
 
 def test_serialize_patches_update_shape() -> None:
     """An Update patch keeps path/set_props/unset_props and is JSON-able."""
-    from tempestweb._core import diff
+    from tempest_core import diff
 
     old = build(Text(content="Count: 0", key="label"))
     new = build(Text(content="Count: 1", key="label"))
@@ -122,7 +122,7 @@ def test_serialize_patches_update_shape() -> None:
 
 def test_serialize_patches_insert_node_is_sanitized() -> None:
     """An Insert patch's embedded node has its handlers nulled out."""
-    from tempestweb._core import diff
+    from tempest_core import diff
 
     old = build(Column(children=[Text(content="a", key="a")]))
     new = build(
@@ -140,7 +140,7 @@ def test_serialize_patches_insert_node_is_sanitized() -> None:
 
 def test_serialize_patches_set_props_strips_handlers() -> None:
     """A handler appearing in an Update's set_props is nulled out."""
-    from tempestweb._core import diff
+    from tempest_core import diff
 
     old = build(Button(label="+", key="b"))
     new = build(Button(label="+", on_click=lambda: None, key="b"))

@@ -15,9 +15,9 @@ in-process bridge:
   :meth:`recv_event` hands it to the runtime's event loop.
 
 The transport never imports Pyodide: it is a pure asyncio object whose two ends
-are a callable and a queue. :func:`bridge_to_pyodide` documents how the live
-``public/index.html`` bootstrap connects those two ends to the JS client over
-``pyodide.ffi`` — the only Pyodide-aware seam, kept out of the unit-tested core.
+are a callable and a queue. :func:`bridge_to_pyodide` documents how the generated
+``bootstrap.js`` connects those two ends to the JS client over ``pyodide.ffi`` —
+the only Pyodide-aware seam, kept out of the unit-tested core.
 
 This implements the :class:`~tempestweb.transports.base.PatchTransport` Protocol;
 the wire format is identical to Mode B's (see ``docs/contract.md``).

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from tempestweb._core import Column, Text, Widget
+from tempest_core import Column, Text, Widget
+
 from tempestweb.observability import (
     ErrorBoundary,
     ErrorInfo,

@@ -24,6 +24,7 @@ from tempestweb.cli.commands import (
     create_dev_session,
     create_project,
     prepare_run,
+    serve_run,
 )
 from tempestweb.cli.config import (
     VALID_MODES,
@@ -77,5 +78,6 @@ __all__ = [
     "prepare_run",
     "render_files",
     "render_initial_tree",
+    "serve_run",
     "scaffold_project",
 ]

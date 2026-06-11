@@ -1,4 +1,4 @@
-// Tests for client/pwa/register.js — P1 register + update lifecycle.
+// Tests for client/sw/register.js — P1 register + update lifecycle.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -6,7 +6,7 @@ import {
   skipWaiting,
   unregisterAllServiceWorkers,
   isServiceWorkerSupported,
-} from "../../client/pwa/register.js";
+} from "../../client/sw/register.js";
 
 /** Minimal EventTarget-ish mock with addEventListener + dispatch. */
 function emitter() {

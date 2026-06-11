@@ -13,6 +13,10 @@
 // (dom/style/events/tempestweb + the active transport), index.html and icons; in
 // Mode A also the Pyodide runtime, the tempest-core wheel and app.py. See
 // ../../docs/plan.md §7 P1 for the contract.
+//
+// Files: client/sw/sw.js (this worker) + client/sw/register.js (registration).
+// The offline queue lives in client/offline/{store,sync}.js; this worker only
+// pings open clients to replay it (see replayFromSync).
 
 /* global self, caches, clients, fetch, Response, Request, URL */
 

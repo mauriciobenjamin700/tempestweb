@@ -1,4 +1,4 @@
-// Tests for the pure helpers in client/pwa/sw.js — P1/P2/P3 logic.
+// Tests for the pure helpers in client/sw/sw.js — P1/P2/P3 logic.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -6,7 +6,7 @@ import {
   stalecaches,
   buildNotification,
   resolveClickUrl,
-} from "../../client/pwa/sw.js";
+} from "../../client/sw/sw.js";
 
 const ORIGIN = "https://app.example";
 const SHELL = ["/", "/index.html", "/client/tempestweb.js", "/client/dom.js"];

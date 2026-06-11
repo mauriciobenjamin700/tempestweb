@@ -23,6 +23,15 @@ from tempestweb.observability.error_boundary import (
     telemetry_reporter,
     with_error_boundary,
 )
+from tempestweb.observability.feature_flags import (
+    ChangeListener,
+    FeatureFlagsAdapter,
+    FeatureFlagsProvider,
+    FlagValue,
+    GrowthBookFeatureFlagsAdapter,
+    InMemoryFeatureFlagsAdapter,
+    LaunchDarklyFeatureFlagsAdapter,
+)
 from tempestweb.observability.logger import (
     Logger,
     LoggerSink,
@@ -59,4 +68,11 @@ __all__ = [
     "default_fallback",
     "with_error_boundary",
     "telemetry_reporter",
+    "FlagValue",
+    "ChangeListener",
+    "FeatureFlagsAdapter",
+    "FeatureFlagsProvider",
+    "InMemoryFeatureFlagsAdapter",
+    "GrowthBookFeatureFlagsAdapter",
+    "LaunchDarklyFeatureFlagsAdapter",
 ]

@@ -106,9 +106,9 @@ app_mod = importlib.import_module("${moduleName}")
 state = app_mod.make_state()
 _handle = None
 
-def _start(on_patches):
+def _start(on_patches, dispatch=None):
     global _handle
-    _handle = bootstrap(state, app_mod.view, on_patches)
+    _handle = bootstrap(state, app_mod.view, on_patches, dispatch)
     return _handle
 
 _start
@@ -128,6 +128,15 @@ _start
 
         const { createWasmTransport } = await import("../client/transport-wasm.js");
 
+        // Install the in-process native bridge: this exposes
+        // window.__tempestweb_native__(envelope), an async dispatch into
+        // client/native/index.js that runs the matching Web API and resolves a
+        // native_result. The SAME glue serves Mode B (over the transport); here
+        // its dispatch is handed straight to Python's FFIBridge so
+        // `await native.<capability>()` resolves in-process — no network hop.
+        const { installNativeBridge } = await import("../client/native/index.js");
+        installNativeBridge(window);
+
         // Build the pyodide.ffi bridge: patches cross IN as a JSON string from
         // Python; events cross OUT as a JSON string to Python's push_event_json.
         let deliverHandler = () => {};
@@ -137,8 +146,10 @@ _start
           deliverHandler(patches);
         };
 
-        // Start the Python app, handing it the JS patch sink.
-        const pyHandle = handle(onPatchesFromPython);
+        // Start the Python app, handing it the JS patch sink AND the in-process
+        // native dispatch (window.__tempestweb_native__) so the FFIBridge is
+        // installed for `await native.<capability>()`.
+        const pyHandle = handle(onPatchesFromPython, window.__tempestweb_native__);
 
         const bridge = {
           onDeliver: (cb) => {

@@ -82,3 +82,60 @@ async def test_close_stops_the_event_loop() -> None:
     await handle.close()
     # A second close must not raise (transport close is idempotent).
     await handle.close()
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_installs_ffi_bridge_when_dispatch_given() -> None:
+    """Passing a dispatch installs an FFIBridge so native calls resolve in-process.
+
+    This is the Mode A leg of the "bridge never installed" regression: without the
+    install, ``await native.<capability>()`` raised BrowserUnavailableError in the
+    browser. The fake dispatch stands in for the Pyodide proxy of
+    ``window.__tempestweb_native__``.
+    """
+    from tempestweb.native import (
+        BrowserUnavailableError,
+        current_bridge,
+        send_native_call,
+        uninstall_bridge,
+    )
+
+    uninstall_bridge()
+    seen: list[dict[str, Any]] = []
+
+    async def dispatch(envelope: dict[str, Any]) -> dict[str, Any]:
+        seen.append(envelope)
+        return {"ok": True, "value": {"text": "hi"}}
+
+    handle: WasmAppHandle[CounterState] = bootstrap(
+        CounterState(), counter_view, lambda _json: None, dispatch
+    )
+    try:
+        value = await send_native_call("clipboard.read", {})
+        assert value == {"text": "hi"}
+        assert seen[0]["capability"] == "clipboard.read"
+    finally:
+        # close() must uninstall the bridge so no state leaks across apps/tests.
+        await handle.close()
+    with pytest.raises(BrowserUnavailableError):
+        current_bridge()
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_without_dispatch_installs_no_bridge() -> None:
+    """Omitting dispatch leaves the process bridge-free (apps with no native use)."""
+    from tempestweb.native import (
+        BrowserUnavailableError,
+        current_bridge,
+        uninstall_bridge,
+    )
+
+    uninstall_bridge()
+    handle: WasmAppHandle[CounterState] = bootstrap(
+        CounterState(), counter_view, lambda _json: None
+    )
+    try:
+        with pytest.raises(BrowserUnavailableError):
+            current_bridge()
+    finally:
+        await handle.close()

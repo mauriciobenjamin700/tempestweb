@@ -28,6 +28,8 @@ dev = [
     "mypy>=1.10",
     "pytest>=8",
     "pytest-asyncio>=0.23",
+    # Test client for the FastAPI/Starlette app (WebSocket + HTTP/SSE).
+    "httpx>=0.27",
 ]
 
 [project.scripts]

@@ -122,6 +122,7 @@ def bootstrap(
     view: Callable[[App[S]], Widget],
     on_patches: Callable[[str], Any],
     dispatch: NativeDispatch | None = None,
+    on_navigate: Callable[[str], Any] | None = None,
 ) -> WasmAppHandle[S]:
     """Wire an app to the JS client and start it.
 
@@ -144,6 +145,8 @@ def bootstrap(
             wrapping it is installed; when ``None`` (e.g. an app that uses no native
             capability), no bridge is installed and a native call would raise
             :class:`~tempestweb.native.dispatch.BrowserUnavailableError`.
+        on_navigate: Optional JS callback invoked with the new top-route path when
+            the app navigates, so the client can ``history.pushState`` (view → URL).
 
     Returns:
         A :class:`WasmAppHandle` the JS side drives.
@@ -154,7 +157,7 @@ def bootstrap(
         on_patches(json.dumps(patches))
 
     transport = WasmTransport(deliver)
-    runtime: WasmRuntime[S] = WasmRuntime(state, view, transport)
+    runtime: WasmRuntime[S] = WasmRuntime(state, view, transport, on_navigate)
     bridge_installed = False
     if dispatch is not None:
         install_bridge(FFIBridge(dispatch))

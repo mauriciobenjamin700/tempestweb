@@ -354,8 +354,10 @@ const PY_GLUE = `
 import app
 from tempestweb.runtime.wasm_main import bootstrap
 
-def _start(on_patches, dispatch):
-    return bootstrap(app.make_state(), app.view, on_patches, dispatch)
+def _start(on_patches, dispatch, on_navigate):
+    return bootstrap(
+        app.make_state(), app.view, on_patches, dispatch, on_navigate
+    )
 
 _start
 `;
@@ -383,7 +385,14 @@ export async function boot() {{
   const onPatches = (patchesJson) => {{
     if (deliverToTransport) deliverToTransport(JSON.parse(patchesJson));
   }};
-  const handle = start(onPatches, null); // counter uses no native capability
+  // View -> URL: push the new path when the app navigates (no popstate fires, so
+  // no loop with the router's URL -> view reporting).
+  const onNavigate = (path) => {{
+    if (path && location.pathname !== path) {{
+      history.pushState({{}}, "", path);
+    }}
+  }};
+  const handle = start(onPatches, null, onNavigate);
 
   const bridge = {{
     onDeliver(handler) {{

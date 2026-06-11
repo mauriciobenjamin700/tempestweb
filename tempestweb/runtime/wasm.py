@@ -228,6 +228,7 @@ class WasmRuntime(Generic[S]):
         state: S,
         view: Callable[[App[S]], Widget],
         transport: PatchTransport,
+        on_navigate: Callable[[str], Any] | None = None,
     ) -> None:
         """Initialize the runtime.
 
@@ -235,9 +236,15 @@ class WasmRuntime(Generic[S]):
             state: The initial application state.
             view: Builds the widget tree from the app (reads ``app.state``).
             transport: The patch transport carrying patches out and events in.
+            on_navigate: Optional callback invoked with the new top-route path
+                whenever the app's navigation changes (so the client can sync the
+                URL via ``history.pushState``). The reverse of the ``navigate``
+                event (URL → view).
         """
         self._transport: PatchTransport = transport
         self._handlers: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
+        self._on_navigate: Callable[[str], Any] | None = on_navigate
+        self._last_path: str = "/"
         self._app: App[S] = App(
             state=state,
             view=view,
@@ -300,6 +307,14 @@ class WasmRuntime(Generic[S]):
             self._refresh_handlers(scene)
         wire = serialize_patches(patches)
         asyncio.ensure_future(self._transport.send_patches(wire))
+        # View → URL: when the app navigated (top route changed), tell the client
+        # so it can push the new path onto history (the reverse of the navigate
+        # event). No-op when the path is unchanged or no sink is wired.
+        if self._on_navigate is not None:
+            path = self._app.nav.top.name
+            if path != self._last_path:
+                self._last_path = path
+                self._on_navigate(path)
 
     async def dispatch_event(self, event: Event) -> None:
         """Route one client event to its Python handler and invoke it.

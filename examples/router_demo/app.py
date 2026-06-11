@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Column, Style, Text, Widget
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.navigation import Route
 from tempest_core.style import Edge
 
 
@@ -48,10 +49,26 @@ def view(app: App[RouterState]) -> Widget:
     else:
         screen = Text(content="Home screen", key="screen")
 
+    def go(path: str) -> None:
+        app.push(Route(name=path))
+
     return Column(
         style=Style(gap=8.0, padding=Edge.all(16)),
         children=[
             Text(content=f"Route: {route}", key="route"),
             screen,
+            Row(
+                style=Style(gap=4.0),
+                children=[
+                    Button(
+                        label="Details",
+                        on_click=lambda: go("/details"),
+                        key="nav-details",
+                    ),
+                    Button(
+                        label="About", on_click=lambda: go("/about"), key="nav-about"
+                    ),
+                ],
+            ),
         ],
     )

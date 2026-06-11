@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, cast
 
-from tempestweb._core import Insert, Node, Patch, Replace, Scene, Update
+from tempestweb._core import Insert, Node, Patch, Remove, Replace, Scene, Update
 
 __all__ = [
     "EVENT_TYPE_TO_HANDLER_PROPS",
@@ -102,10 +102,13 @@ def node_to_wire(node: Node) -> dict[str, Any]:
 def patch_to_wire(patch: Patch) -> dict[str, Any]:
     """Lower a single patch to its JSON-able wire shape.
 
-    For :class:`~tempestweb._core.Insert` / :class:`~tempestweb._core.Replace`
-    the embedded ``node`` is re-serialized through :func:`node_to_wire`; for
-    :class:`~tempestweb._core.Update` the ``set_props`` are stripped of handlers.
-    ``path`` tuples become lists (per the contract).
+    Each patch kind is built explicitly rather than via a blanket
+    ``model_dump`` — the IR carries **live handler callables** inside
+    ``Update.set_props`` and inside the ``node`` of
+    :class:`~tempestweb._core.Insert` / :class:`~tempestweb._core.Replace`, which
+    Pydantic cannot serialize. :func:`node_to_wire` and :func:`_json_safe` strip
+    those handlers to ``None`` (see ``docs/contract.md``). ``path`` tuples become
+    lists.
 
     Args:
         patch: An IR patch produced by ``diff`` / ``diff_scene``.
@@ -113,15 +116,23 @@ def patch_to_wire(patch: Patch) -> dict[str, Any]:
     Returns:
         A JSON-able patch dict matching ``docs/contract.md``.
     """
-    dumped: dict[str, Any] = patch.model_dump(mode="json")
-    dumped["path"] = list(dumped.get("path", []))
-    if isinstance(patch, (Insert, Replace)):
-        dumped["node"] = node_to_wire(patch.node)
-    elif isinstance(patch, Update):
-        dumped["set_props"] = {
-            name: _json_safe(value) for name, value in patch.set_props.items()
+    path: list[Any] = list(patch.path)
+    if isinstance(patch, Update):
+        return {
+            "path": path,
+            "set_props": {
+                name: _json_safe(value) for name, value in patch.set_props.items()
+            },
+            "unset_props": list(patch.unset_props),
         }
-    return dumped
+    if isinstance(patch, Insert):
+        return {"path": path, "index": patch.index, "node": node_to_wire(patch.node)}
+    if isinstance(patch, Replace):
+        return {"path": path, "node": node_to_wire(patch.node)}
+    if isinstance(patch, Remove):
+        return {"path": path, "index": patch.index}
+    # Reorder is the only remaining kind.
+    return {"path": path, "order": list(patch.order)}
 
 
 def patches_to_wire(patches: list[Patch]) -> list[dict[str, Any]]:

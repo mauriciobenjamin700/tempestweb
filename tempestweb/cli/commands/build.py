@@ -10,14 +10,17 @@ surrounding shell differ:
   entrypoint, the project's ``app.py`` and the shared JS client served as static
   assets.
 
-This phase produces the **artifact layout** (the right files in the right
-places) and copies the shared client. The live transport glue (Pyodide bootstrap
-internals, the WebSocket host) is owned by Tracks T3/T2 and is stubbed here with
-clearly-marked placeholders so the layout is verifiable today.
+The **wasm** artifact is live: it loads Pyodide + ``tempest_core`` and runs the
+app in the browser, and ships the full PWA layer (``manifest.webmanifest``, icons,
+and a service worker whose app-shell precache is injected at build time) so the
+shell installs and opens offline. The **server** artifact's live FastAPI host is
+carried on a separate track and is still stubbed here.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import shutil
 import zipfile
 from dataclasses import dataclass, field
@@ -25,6 +28,7 @@ from pathlib import Path
 
 from tempestweb.cli.config import VALID_MODES, ProjectConfig, load_config
 from tempestweb.cli.loader import load_app, render_initial_tree
+from tempestweb.pwa import ManifestOptions, emit_icons, write_manifest
 
 __all__ = [
     "WASM_ARTIFACT_FILES",
@@ -59,12 +63,28 @@ _WASM_PACKAGE_PARTS: tuple[str, ...] = (
     "native",
 )
 
+# PWA assets emitted into every artifact (manifest + service worker + icons).
+_PWA_ICON_FILES: tuple[str, ...] = (
+    "icon-192.png",
+    "icon-512.png",
+    "maskable-192.png",
+    "maskable-512.png",
+    "apple-touch-icon.png",
+)
+_PWA_FILES: tuple[str, ...] = (
+    "manifest.webmanifest",
+    "sw.js",
+    "register.js",
+    *(f"icons/{icon}" for icon in _PWA_ICON_FILES),
+)
+
 # Files a wasm artifact must contain, relative to the artifact root.
 WASM_ARTIFACT_FILES: tuple[str, ...] = (
     "index.html",
     "app.py",
     "bootstrap.js",
     WASM_PACKAGE_ARCHIVE,
+    *_PWA_FILES,
     *(f"client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
 )
 
@@ -195,6 +215,45 @@ def _zip_package(dest: Path) -> None:
         _zip_tree(archive, tempest_core_root, "tempest_core", None)
 
 
+def _build_pwa(out: Path, client: Path, name: str, precache: tuple[str, ...]) -> None:
+    """Emit the PWA layer (manifest + icons + service worker) into ``out``.
+
+    Writes ``manifest.webmanifest`` and the icon set, then copies the shared
+    service worker with its build-time placeholders filled: ``__CACHE_VERSION__``
+    becomes a content hash of the precache list and ``"__PRECACHE_MANIFEST__"``
+    becomes the JSON app-shell list the worker caches on install. ``register.js``
+    is copied verbatim for the page to register the worker.
+
+    Args:
+        out: The artifact root.
+        client: The shared ``client/`` directory.
+        name: The project name (manifest ``name``/``short_name``).
+        precache: The app-shell URLs the service worker precaches (cache-first).
+
+    Raises:
+        BuildError: If the service worker source is missing.
+    """
+    write_manifest(
+        out / "manifest.webmanifest",
+        ManifestOptions(name=name, short_name=name[:12]),
+    )
+    emit_icons(out / "icons")
+
+    sw_source = client / "sw" / "sw.js"
+    register_source = client / "sw" / "register.js"
+    if not sw_source.is_file() or not register_source.is_file():
+        raise BuildError(f"missing service worker sources under {client / 'sw'}")
+
+    version = "tw-" + hashlib.sha1("|".join(precache).encode("utf-8")).hexdigest()[:12]
+    sw = sw_source.read_text(encoding="utf-8")
+    sw = sw.replace("__CACHE_VERSION__", version)
+    # Replace the quoted placeholder with a JS string literal carrying the JSON
+    # array, so the worker's ``JSON.parse(injected)`` yields the app-shell list.
+    sw = sw.replace('"__PRECACHE_MANIFEST__"', json.dumps(json.dumps(list(precache))))
+    (out / "sw.js").write_text(sw, encoding="utf-8")
+    shutil.copyfile(register_source, out / "register.js")
+
+
 def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
     """Copy the shared client assets plus a mode-specific transport into ``dest``.
 
@@ -236,10 +295,19 @@ def _index_html(name: str) -> str:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#111111" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   </head>
   <body>
     <div id="app"></div>
     <script type="module" src="./bootstrap.js"></script>
+    <script type="module">
+      import {{ registerServiceWorker }} from "./register.js";
+      if ("serviceWorker" in navigator) {{
+        registerServiceWorker({{ url: "/sw.js" }});
+      }}
+    </script>
   </body>
 </html>
 """
@@ -448,6 +516,20 @@ def _build_wasm(out: Path, client: Path, name: str, app_source: str) -> tuple[st
     (out / "app.py").write_text(app_source, encoding="utf-8")
     _zip_package(out / WASM_PACKAGE_ARCHIVE)
     _copy_client(client, out / "client", "transport-wasm.js")
+    # App-shell the service worker precaches for an offline second load. The
+    # Pyodide runtime itself loads from the CDN (cross-origin) and is out of scope
+    # for this precache; the local shell + package payload are cached.
+    precache = (
+        "/",
+        "/index.html",
+        "/manifest.webmanifest",
+        "/bootstrap.js",
+        "/register.js",
+        "/app.py",
+        f"/{WASM_PACKAGE_ARCHIVE}",
+        *(f"/client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
+    )
+    _build_pwa(out, client, name, precache)
     return tuple(sorted(WASM_ARTIFACT_FILES))
 
 

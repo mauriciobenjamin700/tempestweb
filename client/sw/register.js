@@ -13,6 +13,8 @@
 /**
  * @typedef {Object} RegisterOptions
  * @property {string} [url]                          SW script URL. Default "/sw.js".
+ * @property {"module"|"classic"} [type]             Worker type. Default "module"
+ *           (the worker ships as an ES module that exports test helpers).
  * @property {string} [scope]                        Registration scope.
  * @property {(reg: ServiceWorkerRegistration) => void} [onUpdate]
  *           Called when a new worker is installed and waiting.
@@ -62,11 +64,15 @@ export async function registerServiceWorker(options = {}) {
     return null;
   }
   const url = options.url ?? "/sw.js";
+  // The worker is shipped as an ES module (it `export`s helpers for unit tests),
+  // so it must be registered with `type: "module"` — a classic worker fails to
+  // evaluate `export`. Callers may override via `options.type`.
+  const registerOptions = { type: options.type ?? "module" };
+  if (options.scope) {
+    registerOptions.scope = options.scope;
+  }
   try {
-    const registration = await container.register(
-      url,
-      options.scope ? { scope: options.scope } : undefined,
-    );
+    const registration = await container.register(url, registerOptions);
 
     // A worker already waiting at registration time is an available update.
     if (registration.waiting && container.controller) {

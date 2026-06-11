@@ -79,6 +79,44 @@ def test_wasm_package_archive_carries_runtime(tmp_path: Path) -> None:
     assert not any("__pycache__" in name for name in names)
 
 
+def test_wasm_emits_installable_manifest(tmp_path: Path) -> None:
+    """The wasm artifact ships an installable manifest linked from index.html."""
+    import json
+
+    from tempestweb.pwa import validate_installable
+
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="wasm")
+    manifest = json.loads(
+        (result.out_dir / "manifest.webmanifest").read_text(encoding="utf-8")
+    )
+    assert validate_installable(manifest) == []
+    assert manifest["display"] == "standalone"
+    html = (result.out_dir / "index.html").read_text(encoding="utf-8")
+    assert 'rel="manifest"' in html
+    assert "register.js" in html  # the page registers the service worker
+
+
+def test_wasm_service_worker_placeholders_are_filled(tmp_path: Path) -> None:
+    """The emitted sw.js has its precache list and cache version injected."""
+    import json
+
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="wasm")
+    sw = (result.out_dir / "sw.js").read_text(encoding="utf-8")
+    # The quoted code placeholders must be gone (a comment may still name them).
+    assert '"__PRECACHE_MANIFEST__"' not in sw
+    assert '"__CACHE_VERSION__"' not in sw
+    # A content-hashed cache version was injected.
+    assert "tw-" in sw
+    # The precache list parses and carries the app-shell entrypoints.
+    start = sw.index('"[')
+    end = sw.index(']"', start) + 2
+    precache = json.loads(json.loads(sw[start:end]))
+    assert "/index.html" in precache
+    assert "/manifest.webmanifest" in precache
+
+
 def test_wasm_embeds_app_source(tmp_path: Path) -> None:
     root = _project(tmp_path)
     result = build_artifact(root, mode="wasm")

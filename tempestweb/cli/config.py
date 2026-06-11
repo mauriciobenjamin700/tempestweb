@@ -12,10 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-__all__ = ["VALID_MODES", "ConfigError", "ProjectConfig", "load_config"]
+from tempestweb.core.constants import VALID_MODES
 
-# The two execution modes the CLI drives (docs/plan.md §1.1).
-VALID_MODES: tuple[str, ...] = ("wasm", "server")
+__all__ = ["VALID_MODES", "ConfigError", "ProjectConfig", "load_config"]
 
 
 class ConfigError(RuntimeError):

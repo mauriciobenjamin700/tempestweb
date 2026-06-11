@@ -10,6 +10,7 @@ initial mount.
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import sys
 from pathlib import Path
@@ -17,9 +18,8 @@ from types import ModuleType
 from typing import Any
 
 import pytest
-
-from tempestweb._core import App, Node, build, diff
-from tempestweb._core.widgets.events import TextChangeEvent, ToggleEvent
+from tempest_core import App, Node, build, diff
+from tempest_core.widgets.events import TextChangeEvent, ToggleEvent
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"
 
@@ -127,6 +127,15 @@ EXAMPLE_NAMES = [
     "error-boundary",
     "auth-jwt",
     "pwa-webpush",
+    "async_demo",
+    "overlay_demo",
+    "anim_demo",
+    "gesture_demo",
+    "a11y_demo",
+    "list_demo",
+    "router_demo",
+    "login_demo",
+    "geo_demo",
 ]
 
 
@@ -421,6 +430,20 @@ async def test_fetch_error_phase_surfaces_message() -> None:
     error_nodes = [n for n in _walk(node) if n.key == "error"]
     assert error_nodes
     assert "network down" in str(error_nodes[0].props.get("content", ""))
+
+
+async def test_async_demo_handler_is_async_and_commits_after_await() -> None:
+    """The async_demo ``load`` handler is async and commits state after awaiting."""
+    module = _load_example("async_demo")
+    app = _make_app(module)
+
+    assert app.state.status == "idle"
+    handler = _find_handler(module.view(app), "load", "on_click")
+    assert asyncio.iscoroutinefunction(handler)
+
+    await handler()
+    assert app.state.status == "done"
+    assert app.state.loads == 1
 
 
 def _find_handler(widget: Any, key: str, attr: str) -> Any:  # noqa: ANN401 — opaque tree

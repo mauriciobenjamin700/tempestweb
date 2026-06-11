@@ -24,6 +24,10 @@ import json
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
+from tempestweb.core.constants import (
+    DEFAULT_SSE_PING_INTERVAL,
+    DEFAULT_SSE_REPLAY_BUFFER,
+)
 from tempestweb.transports.base import (
     Envelope,
     Event,
@@ -37,10 +41,10 @@ from tempestweb.transports.base import (
 __all__ = ["SSETransport"]
 
 #: Heartbeat interval (seconds) between ``ping`` events on the SSE stream.
-DEFAULT_PING_INTERVAL: float = 15.0
+DEFAULT_PING_INTERVAL: float = DEFAULT_SSE_PING_INTERVAL
 
 #: How many recent envelopes to retain for ``Last-Event-ID`` replay.
-DEFAULT_REPLAY_BUFFER: int = 256
+DEFAULT_REPLAY_BUFFER: int = DEFAULT_SSE_REPLAY_BUFFER
 
 
 class SSETransport:

@@ -1,7 +1,7 @@
 """O2 — Error boundary: catch render errors, show a fallback, report the crash.
 
 A view's ``render`` can raise. Without a boundary one bad subtree takes the whole
-app down. :class:`ErrorBoundary` is a core :class:`~tempestweb._core.Component`
+app down. :class:`ErrorBoundary` is a core :class:`~tempest_core.Component`
 that wraps a subtree: when the wrapped builder raises during render, the boundary
 swallows the exception, renders a **fallback** widget in its place (so the rest
 of the app keeps rendering), and invokes a **report** hook with the error — which
@@ -12,7 +12,7 @@ restores consistent state after a failed event; the boundary contains a failed
 *render* so a single broken branch does not blank the screen.
 
 Example:
-    >>> from tempestweb._core import Text
+    >>> from tempest_core import Text
     >>> reported: list[ErrorInfo] = []
     >>> def broken() -> Text:
     ...     raise ValueError("boom")
@@ -38,8 +38,8 @@ from dataclasses import dataclass
 from functools import wraps
 
 from pydantic import Field
+from tempest_core import Column, Component, Text, Widget
 
-from tempestweb._core import Column, Component, Text, Widget
 from tempestweb.observability.telemetry import TelemetryProvider
 
 __all__ = [
@@ -110,7 +110,7 @@ def default_fallback(info: ErrorInfo) -> Widget:
         info: The captured render failure.
 
     Returns:
-        A :class:`~tempestweb._core.Column` showing a generic apology and the
+        A :class:`~tempest_core.Column` showing a generic apology and the
         error type (never the raw stack, which goes to the report hook).
     """
     return Column(

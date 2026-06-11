@@ -8,7 +8,7 @@ modes::
 
 It demonstrates async-first handlers: pressing *Load* runs an ``async`` handler
 that flips the view into a loading state (rendering a
-:class:`~tempestweb._core.widgets.Spinner`), awaits an I/O-bound fetch, then
+:class:`~tempest_core.widgets.Spinner`), awaits an I/O-bound fetch, then
 calls :meth:`App.set_state` again with the result — idle → loading → loaded/error.
 The ``fetch`` callable is injected so the example is deterministic under test
 (the real app would pass ``native.http.request``); the view never blocks the
@@ -21,9 +21,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import (
+from tempest_core import App, Style, Widget
+from tempest_core.style import Edge
+from tempest_core.widgets import (
     Button,
     Column,
     LazyColumn,

@@ -5,8 +5,8 @@ vendored reconciler builds and diffs the widget tree, and the resulting patches
 cross to the JS DOM renderer in-process via ``pyodide.ffi`` (no network). This
 module is the Python-side glue that:
 
-#. owns the :class:`~tempestweb._core.App`,
-#. **serializes** each freshly built :class:`~tempestweb._core.core.ir.Node`
+#. owns the :class:`~tempest_core.App`,
+#. **serializes** each freshly built :class:`~tempest_core.core.ir.Node`
    tree (and every patch) into the plain JSON-able shape the client expects,
    stripping the non-serializable handler callables,
 #. keeps a **handler registry** keyed by widget ``key`` so an event arriving
@@ -32,8 +32,10 @@ import inspect
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar
 
-from tempestweb._core import App, Node, Scene, Widget
-from tempestweb._core.core.ir import Patch
+from tempest_core import App, Node, Scene, Widget
+from tempest_core.core.ir import Patch
+
+from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
 from tempestweb.transports.base import (
     Event,
     PatchTransport,
@@ -69,25 +71,46 @@ def _is_handler(name: str, value: object) -> bool:
     return name.startswith(_HANDLER_PREFIX) and callable(value)
 
 
-def _serialize_props(props: dict[str, Any]) -> dict[str, Any]:
-    """Serialize a node's props, nulling out handler callables.
+def _sanitize_prop(value: Any) -> Any:  # noqa: ANN401 — walks arbitrary prop values
+    """Recursively null callables in a prop value so it is JSON-serializable.
 
-    Per ``docs/contract.md``, handlers do not cross the boundary: the client
-    only needs to know a handler exists (so it can attach a DOM listener), never
-    the function itself. A present handler serializes to ``null`` — the same
-    shape the golden fixtures record — and the real callable stays on the Python
-    side, addressable by the node's ``key``.
+    Any callable becomes ``None`` (no function crosses the wire — see
+    ``docs/contract.md``); dicts and lists are walked so a callable nested inside
+    a structured prop (e.g. a form field's validator) is nulled too; everything
+    else (including ``Style``/``Color``/``Edge`` Pydantic models, which
+    ``model_dump`` lowers later) is returned unchanged.
+
+    Args:
+        value: A prop value drawn from a node's props.
+
+    Returns:
+        The value with every callable replaced by ``None``.
+    """
+    if callable(value):
+        return None
+    if isinstance(value, dict):
+        return {key: _sanitize_prop(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_prop(item) for item in value]
+    return value
+
+
+def _serialize_props(props: dict[str, Any]) -> dict[str, Any]:
+    """Serialize a node's props, nulling out every callable (handlers, validators).
+
+    Per ``docs/contract.md``, functions do not cross the boundary: the client only
+    needs to know a handler exists (so it can attach a DOM listener), never the
+    function itself. Every callable — an ``on_*`` handler or a callable nested in a
+    structured prop such as a form validator — serializes to ``None``; the real
+    callables stay on the Python side, addressable by the node's ``key``.
 
     Args:
         props: The node's raw props, possibly carrying callables.
 
     Returns:
-        A JSON-able props dict with every handler replaced by ``None``.
+        A JSON-able props dict with every callable replaced by ``None``.
     """
-    out: dict[str, Any] = {}
-    for name, value in props.items():
-        out[name] = None if _is_handler(name, value) else value
-    return out
+    return {name: _sanitize_prop(value) for name, value in props.items()}
 
 
 def serialize_node(node: Node) -> dict[str, Any]:
@@ -151,18 +174,19 @@ def serialize_patches(patches: list[Patch]) -> list[WirePatch]:
 
 
 def _collect_handlers(
-    node: Node, registry: dict[str, dict[str, Callable[..., Any]]]
+    node: Node, registry: dict[str, tuple[str, dict[str, Callable[..., Any]]]]
 ) -> None:
-    """Record every keyed node's handler callables into ``registry``.
+    """Record every keyed node's widget type and handler callables.
 
-    Walks the IR tree; for each node that has a ``key``, stores its handler
-    props (``on_*`` callables) under that key so an incoming event can resolve
-    its handler by ``(key, on_<type>)``. Nodes without a key cannot receive
+    Walks the IR tree; for each node that has a ``key``, stores its widget type
+    tag and handler props (``on_*`` callables) under that key so an incoming
+    event can resolve its handler by ``(key, on_<type>)`` and coerce the payload
+    into the typed event the widget declares. Nodes without a key cannot receive
     events (the wire event addresses widgets by key) and are skipped.
 
     Args:
         node: The root IR node to walk.
-        registry: The accumulator mapping ``key`` → ``{prop: handler}``.
+        registry: The accumulator mapping ``key`` → ``(widget_type, {prop: handler})``.
     """
     if node.key is not None:
         handlers = {
@@ -171,7 +195,7 @@ def _collect_handlers(
             if _is_handler(name, value)
         }
         if handlers:
-            registry[node.key] = handlers
+            registry[node.key] = (node.type, handlers)
     for child in node.children:
         _collect_handlers(child, registry)
 
@@ -179,7 +203,7 @@ def _collect_handlers(
 class WasmRuntime(Generic[S]):
     """Drives a tempestweb app in Mode A, bridging the core to a transport.
 
-    The runtime wires the vendored :class:`~tempestweb._core.App` to a
+    The runtime wires the vendored :class:`~tempest_core.App` to a
     :class:`~tempestweb.transports.base.PatchTransport`: the app's coalesced
     rebuild loop produces patches, which the runtime serializes and pushes to the
     client via :meth:`PatchTransport.send_patches`; the client's events flow back
@@ -204,6 +228,7 @@ class WasmRuntime(Generic[S]):
         state: S,
         view: Callable[[App[S]], Widget],
         transport: PatchTransport,
+        on_navigate: Callable[[str], Any] | None = None,
     ) -> None:
         """Initialize the runtime.
 
@@ -211,9 +236,15 @@ class WasmRuntime(Generic[S]):
             state: The initial application state.
             view: Builds the widget tree from the app (reads ``app.state``).
             transport: The patch transport carrying patches out and events in.
+            on_navigate: Optional callback invoked with the new top-route path
+                whenever the app's navigation changes (so the client can sync the
+                URL via ``history.pushState``). The reverse of the ``navigate``
+                event (URL → view).
         """
         self._transport: PatchTransport = transport
-        self._handlers: dict[str, dict[str, Callable[..., Any]]] = {}
+        self._handlers: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
+        self._on_navigate: Callable[[str], Any] | None = on_navigate
+        self._last_path: str = "/"
         self._app: App[S] = App(
             state=state,
             view=view,
@@ -225,7 +256,7 @@ class WasmRuntime(Generic[S]):
         """The underlying core app.
 
         Returns:
-            The :class:`~tempestweb._core.App` this runtime drives.
+            The :class:`~tempest_core.App` this runtime drives.
         """
         return self._app
 
@@ -254,7 +285,7 @@ class WasmRuntime(Generic[S]):
         Args:
             scene: The most recently built scene.
         """
-        registry: dict[str, dict[str, Callable[..., Any]]] = {}
+        registry: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
         _collect_handlers(scene.root, registry)
         for overlay in scene.overlays:
             _collect_handlers(overlay, registry)
@@ -276,6 +307,14 @@ class WasmRuntime(Generic[S]):
             self._refresh_handlers(scene)
         wire = serialize_patches(patches)
         asyncio.ensure_future(self._transport.send_patches(wire))
+        # View → URL: when the app navigated (top route changed), tell the client
+        # so it can push the new path onto history (the reverse of the navigate
+        # event). No-op when the path is unchanged or no sink is wired.
+        if self._on_navigate is not None:
+            path = self._app.nav.top.name
+            if path != self._last_path:
+                self._last_path = path
+                self._on_navigate(path)
 
     async def dispatch_event(self, event: Event) -> None:
         """Route one client event to its Python handler and invoke it.
@@ -293,14 +332,22 @@ class WasmRuntime(Generic[S]):
         event_type = event.get("type")
         if not isinstance(key, str) or not isinstance(event_type, str):
             return
-        handlers = self._handlers.get(key)
-        if handlers is None:
+        if event_type == "scroll":
+            apply_scroll(self._app, key, event.get("payload", {}))
             return
+        if event_type == "navigate":
+            apply_navigate(self._app, event.get("payload", {}))
+            return
+        entry = self._handlers.get(key)
+        if entry is None:
+            return
+        node_type, handlers = entry
         handler = handlers.get(f"{_HANDLER_PREFIX}{event_type}")
         if handler is None:
             return
         payload: Any = event.get("payload", {})
-        result = handler(payload) if _accepts_arg(handler) else handler()
+        arg = coerce_event(node_type, event_type, payload)
+        result = handler(arg) if _accepts_arg(handler) else handler()
         if inspect.isawaitable(result):
             await result
 

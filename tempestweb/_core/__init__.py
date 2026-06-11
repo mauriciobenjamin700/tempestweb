@@ -1,89 +1,48 @@
-"""Vendored renderer-agnostic core from tempestroid.
+"""Back-compat shim: ``tempestweb._core`` re-exports the extracted ``tempest_core``.
 
-This package is a **temporary vendored copy** of tempestroid's renderer-agnostic
-engine: the IR, reconciler, state model, style model, widgets, components and the
-cross-cutting helpers (animation, i18n, navigation, theme, validators). It carries
-no platform-coupled code (no Qt, no JNI, no Android) so it imports cleanly under
-CPython, Pyodide and a headless server.
+The renderer-agnostic engine was extracted from the former vendored
+``tempestweb/_core/`` into the standalone ``tempest-core`` package. This shim keeps
+the historical import path working so existing code (and the example gallery) can
+still ``from tempestweb._core import …`` / ``from tempestweb._core.<sub> import …``
+unchanged. New code should import from ``tempest_core`` directly.
 
-It will be replaced by a proper ``tempest-core`` PyPI dependency once that package
-is extracted from tempestroid. Until then, ``tempestweb`` imports the engine from
-here so overnight work never has to touch the tempestroid repository.
-
-Do not edit modules under this package by hand — they are a mechanical copy. Fix
-upstream in tempestroid and re-vendor.
+It re-exports the public top-level API and aliases every ``tempest_core`` submodule
+under the ``tempestweb._core`` name in ``sys.modules``, so a submodule import like
+``tempestweb._core.components.brforms`` resolves to ``tempest_core.components.brforms``.
 """
 
-from tempestweb._core.animation import AnimationController
-from tempestweb._core.core import (
-    App,
-    Insert,
-    Node,
-    OverlayEntry,
-    Patch,
-    Path,
-    Remove,
-    Reorder,
-    Replace,
-    Scene,
-    Update,
-    build,
-    build_scene,
-    diff,
-    diff_scene,
-    event_catalog,
-    introspect,
-    widget_catalog,
-)
-from tempestweb._core.i18n import Locale, t, translate
-from tempestweb._core.navigation import NavStack, Route, routes_from_path
-from tempestweb._core.style import Style
-from tempestweb._core.theme import MediaQueryData, Theme, ThemeMode
-from tempestweb._core.widgets import (
-    Button,
-    Column,
-    Component,
-    Container,
-    Row,
-    Text,
-    Widget,
-)
+from __future__ import annotations
 
-__all__ = [
-    "AnimationController",
-    "App",
-    "Button",
-    "Column",
-    "Component",
-    "Container",
-    "Insert",
-    "Locale",
-    "MediaQueryData",
-    "NavStack",
-    "Node",
-    "OverlayEntry",
-    "Patch",
-    "Path",
-    "Remove",
-    "Reorder",
-    "Replace",
-    "Route",
-    "Row",
-    "Scene",
-    "Style",
-    "Text",
-    "Theme",
-    "ThemeMode",
-    "Update",
-    "Widget",
-    "build",
-    "build_scene",
-    "diff",
-    "diff_scene",
-    "event_catalog",
-    "introspect",
-    "routes_from_path",
-    "t",
-    "translate",
-    "widget_catalog",
-]
+import importlib
+import pkgutil
+import sys
+
+import tempest_core
+from tempest_core import *  # noqa: F401,F403 — re-export the public API
+
+__all__ = list(getattr(tempest_core, "__all__", []))
+
+
+def _alias_submodules() -> None:
+    """Register every ``tempest_core`` submodule under ``tempestweb._core.*``.
+
+    Pre-seeding ``sys.modules`` lets ``import tempestweb._core.<path>`` resolve to
+    the extracted package even though no such files exist under this shim.
+    """
+    prefix = f"{tempest_core.__name__}."
+    for info in pkgutil.walk_packages(tempest_core.__path__, prefix=prefix):
+        try:
+            module = importlib.import_module(info.name)
+        except ImportError:  # pragma: no cover - optional submodule
+            continue
+        alias = info.name.replace(tempest_core.__name__, __name__, 1)
+        sys.modules.setdefault(alias, module)
+        # Also expose it as an attribute on its parent so ``tempestweb._core.style``
+        # works (not just ``from tempestweb._core.style import …``).
+        parent_name, _, leaf = alias.rpartition(".")
+        parent = sys.modules.get(parent_name)
+        if parent is not None:
+            setattr(parent, leaf, module)
+
+
+_alias_submodules()

@@ -7,8 +7,8 @@ template — just plain, typed Python.
 ## The `view` function
 
 ```python
-from tempestweb._core import App, Column, Style, Text, Widget
-from tempestweb._core.style import Edge
+from tempest_core import App, Column, Style, Text, Widget
+from tempest_core.style import Edge
 
 
 def view(app: App[CounterState]) -> Widget:  # (1)!
@@ -82,8 +82,8 @@ Style(gap=8.0, padding=Edge.all(16))  # gap: 8px; padding: 16px;
 Putting container, text and buttons together:
 
 ```python
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.style import Edge
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.style import Edge
 
 
 def view(app: App[CounterState]) -> Widget:

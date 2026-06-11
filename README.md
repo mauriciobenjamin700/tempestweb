@@ -65,7 +65,8 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 
 | Path | What |
 |---|---|
-| `tempestweb/_core/` | Vendored renderer-agnostic engine (do not hand-edit). |
+| `tempest-core` (dependency) | Renderer-agnostic engine — IR/reconciler/state/style/widgets (`import tempest_core`), extracted from tempestroid. |
+| `tempestweb/components/` | Ready-to-use fields + forms (EmailField, PasswordField, PhoneField, LoginForm, …). |
 | `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`, `sse.py`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
 | `tempestweb/native/` | Web API capability adapters — http, audio, share, geo, clipboard, storage, camera (Track N). |

@@ -1,7 +1,7 @@
 """Per-connection application session (Mode B lifecycle).
 
 A :class:`AppSession` is the server-side runtime for **one** connected client. It
-owns an isolated :class:`~tempestweb._core.App` (so two connections never share
+owns an isolated :class:`~tempest_core.App` (so two connections never share
 state), a :class:`~tempestweb.transports.base.PatchTransport`, and the structured
 set of async tasks spawned while serving that client.
 
@@ -27,16 +27,19 @@ from contextlib import suppress
 from itertools import count
 from typing import Any, Generic, TypeVar
 
-from tempestweb._core import App, Widget
-from tempestweb._core import Patch as CorePatch
-from tempestweb._core.widgets import handler_accepts_event
+from tempest_core import App, Widget
+from tempest_core import Patch as CorePatch
+from tempest_core.widgets import handler_accepts_event
+
 from tempestweb.native.bridges import ProxyBridge
 from tempestweb.native.dispatch import (
     install_bridge,
     native_call,
     uninstall_bridge,
 )
+from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
 from tempestweb.runtime.serialize import (
+    find_node_type,
     patches_to_wire,
     resolve_handler,
     scene_to_initial_patches,
@@ -60,7 +63,7 @@ class NativeCallError(RuntimeError):
 class AppSession(Generic[S]):
     """Drives one client connection: state, transport, and task lifecycle.
 
-    Each session builds its own :class:`~tempestweb._core.App` from a factory, so
+    Each session builds its own :class:`~tempest_core.App` from a factory, so
     connections are fully isolated — a ``set_state`` in one never affects another.
 
     Type Args:
@@ -203,11 +206,18 @@ class AppSession(Generic[S]):
         event_type = event.get("type")
         if not isinstance(key, str) or not isinstance(event_type, str):
             return
+        if event_type == "scroll":
+            apply_scroll(self.app, key, event.get("payload", {}))
+            return
+        if event_type == "navigate":
+            apply_navigate(self.app, event.get("payload", {}))
+            return
         handler = resolve_handler(scene, key, event_type)
         if handler is None:
             return
         payload = event.get("payload", {})
-        result = handler(payload) if handler_accepts_event(handler) else handler()
+        arg = coerce_event(find_node_type(scene, key), event_type, payload)
+        result = handler(arg) if handler_accepts_event(handler) else handler()
         if asyncio.iscoroutine(result):
             await result
 

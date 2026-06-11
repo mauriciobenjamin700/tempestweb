@@ -31,6 +31,9 @@ const TAG_BY_TYPE = Object.freeze({
   Stack: "div",
   Text: "span",
   Button: "button",
+  Input: "input",
+  Checkbox: "input",
+  Image: "img",
 });
 
 /**
@@ -85,11 +88,130 @@ function applyProps(el, props) {
       el.removeAttribute("style");
     }
   }
+  const type = el.getAttribute(TYPE_ATTR);
+  // Text-bearing props. A Checkbox is an <input> and cannot hold text, so its
+  // label rides as an accessible name instead of textContent.
   if ("content" in props) {
     el.textContent = props.content == null ? "" : String(props.content);
   }
   if ("label" in props) {
-    el.textContent = props.label == null ? "" : String(props.label);
+    if (type === "Checkbox") {
+      el.setAttribute("aria-label", props.label == null ? "" : String(props.label));
+    } else {
+      el.textContent = props.label == null ? "" : String(props.label);
+    }
+  }
+  applyControlProps(el, type, props);
+  applyA11yProps(el, props);
+  applyLazyProps(el, type, props);
+}
+
+/**
+ * Apply accessibility props (semantics + focus) onto an element.
+ *
+ * Maps the core's renderer-agnostic a11y model to ARIA/DOM: ``semantics.label``
+ * → ``aria-label``, ``semantics.role`` → ``role``, ``semantics.hint`` →
+ * ``aria-description``; ``focus_order`` sets an explicit ``tabindex`` and
+ * ``focusable`` toggles a default one (``0`` to include, ``-1`` to exclude).
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyA11yProps(el, props) {
+  const sem = props.semantics;
+  if (sem != null && typeof sem === "object") {
+    if (sem.label != null) {
+      el.setAttribute("aria-label", String(sem.label));
+    }
+    if (sem.role != null) {
+      el.setAttribute("role", String(sem.role));
+    }
+    if (sem.hint != null) {
+      el.setAttribute("aria-description", String(sem.hint));
+    }
+  }
+  if (props.focus_order != null) {
+    el.setAttribute("tabindex", String(props.focus_order));
+  } else if (props.focusable === true) {
+    el.setAttribute("tabindex", "0");
+  } else if (props.focusable === false) {
+    el.setAttribute("tabindex", "-1");
+  }
+}
+
+/**
+ * Apply form-control / media props (Input, Checkbox, Image) onto an element.
+ *
+ * Maps the widget's typed props onto the right DOM property/attribute so the
+ * control is actually interactive (a real <input> holding `value`, a checkbox
+ * reflecting `checked`, an <img> pointing at `src`). No-ops for other types.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type (from the data-tw-type attribute).
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+// Virtualized list widgets: rendered as scroll viewports whose visible window
+// the runtime slides in response to scroll events (see client/virtualize.js).
+const LAZY_TYPES = Object.freeze(["LazyColumn", "LazyRow", "LazyGrid"]);
+
+/**
+ * Mark a virtualized list element and mirror its windowing metadata to data
+ * attributes so the scroll controller can compute the visible window.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyLazyProps(el, type, props) {
+  if (type == null || !LAZY_TYPES.includes(type)) {
+    return;
+  }
+  const horizontal = type === "LazyRow";
+  // A bounded, scrollable viewport: the app's Style sets the extent (e.g.
+  // height); overflow scrolls the materialized window, and scrolling past the
+  // edge slides the window (see client/virtualize.js). min-height:0 stops a flex
+  // parent from growing the viewport to fit its content instead of scrolling.
+  el.style.overflowY = horizontal ? "hidden" : "auto";
+  el.style.overflowX = horizontal ? "auto" : "hidden";
+  el.style.minHeight = "0";
+  if ("item_count" in props && props.item_count != null) {
+    el.setAttribute("data-tw-item-count", String(props.item_count));
+  }
+  if ("window_size" in props && props.window_size != null) {
+    el.setAttribute("data-tw-window-size", String(props.window_size));
+  }
+  // window is [start, end) when slid, or null (start at 0).
+  const start = Array.isArray(props.window) ? props.window[0] : 0;
+  el.setAttribute("data-tw-window-start", String(start ?? 0));
+}
+
+function applyControlProps(el, type, props) {
+  if (type === "Input") {
+    el.setAttribute("type", props.secure ? "password" : "text");
+    if ("value" in props) {
+      el.value = props.value == null ? "" : String(props.value);
+    }
+    if ("placeholder" in props && props.placeholder != null) {
+      el.setAttribute("placeholder", String(props.placeholder));
+    }
+    if (props.max_length != null) {
+      el.setAttribute("maxlength", String(props.max_length));
+    }
+  } else if (type === "Checkbox") {
+    el.setAttribute("type", "checkbox");
+    if ("checked" in props) {
+      el.checked = Boolean(props.checked);
+    }
+  } else if (type === "Image") {
+    if ("src" in props && props.src != null) {
+      el.setAttribute("src", String(props.src));
+    }
+    if ("alt" in props && props.alt != null) {
+      el.setAttribute("alt", String(props.alt));
+    }
   }
 }
 

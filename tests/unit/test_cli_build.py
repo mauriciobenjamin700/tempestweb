@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from tempestweb.cli import (
     build_artifact,
     scaffold_project,
 )
+from tempestweb.cli.commands.build import WASM_PACKAGE_ARCHIVE
 
 
 def _project(tmp_path: Path) -> Path:
@@ -47,6 +49,72 @@ def test_wasm_index_html_titles_project(tmp_path: Path) -> None:
     html = (result.out_dir / "index.html").read_text(encoding="utf-8")
     assert "<title>buildme</title>" in html
     assert 'src="./bootstrap.js"' in html
+
+
+def test_wasm_bootstrap_is_live(tmp_path: Path) -> None:
+    """The wasm bootstrap loads Pyodide and wires the WASM transport (not a stub)."""
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="wasm")
+    bootstrap = (result.out_dir / "bootstrap.js").read_text(encoding="utf-8")
+    assert "loadPyodide" in bootstrap
+    assert "createWasmTransport" in bootstrap
+    assert "loadPackage" in bootstrap
+    # The old placeholder must be gone.
+    assert "provided by Track T3" not in bootstrap
+
+
+def test_wasm_package_archive_carries_runtime(tmp_path: Path) -> None:
+    """The bundled zip carries the tempestweb runtime + the tempest_core engine."""
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="wasm")
+    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+        names = set(archive.namelist())
+    assert "tempestweb/__init__.py" in names
+    assert "tempestweb/runtime/wasm_main.py" in names
+    assert "tempestweb/transports/wasm.py" in names
+    # The renderer-agnostic core now ships as the separate tempest_core package.
+    assert "tempest_core/__init__.py" in names
+    assert "tempest_core/core/reconciler.py" in names
+    # No bytecode leaks into the artifact.
+    assert not any("__pycache__" in name for name in names)
+
+
+def test_wasm_emits_installable_manifest(tmp_path: Path) -> None:
+    """The wasm artifact ships an installable manifest linked from index.html."""
+    import json
+
+    from tempestweb.pwa import validate_installable
+
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="wasm")
+    manifest = json.loads(
+        (result.out_dir / "manifest.webmanifest").read_text(encoding="utf-8")
+    )
+    assert validate_installable(manifest) == []
+    assert manifest["display"] == "standalone"
+    html = (result.out_dir / "index.html").read_text(encoding="utf-8")
+    assert 'rel="manifest"' in html
+    assert "register.js" in html  # the page registers the service worker
+
+
+def test_wasm_service_worker_placeholders_are_filled(tmp_path: Path) -> None:
+    """The emitted sw.js has its precache list and cache version injected."""
+    import json
+
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="wasm")
+    sw = (result.out_dir / "sw.js").read_text(encoding="utf-8")
+    # The quoted code placeholders must be gone (a comment may still name them).
+    assert '"__PRECACHE_MANIFEST__"' not in sw
+    assert '"__CACHE_VERSION__"' not in sw
+    # A content-hashed cache version was injected.
+    assert "tw-" in sw
+    # The precache list parses and carries the app-shell entrypoints.
+    start = sw.index('"[')
+    end = sw.index(']"', start) + 2
+    precache = json.loads(json.loads(sw[start:end]))
+    assert "/index.html" in precache
+    assert "/manifest.webmanifest" in precache
 
 
 def test_wasm_embeds_app_source(tmp_path: Path) -> None:

@@ -8,6 +8,7 @@ no browser, no Pyodide, no FastAPI. They lock the wire shape against
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 import pytest
@@ -56,9 +57,9 @@ async def test_send_native_call_raises_without_bridge() -> None:
 async def test_ffi_bridge_resolves_value_in_process() -> None:
     seen: list[dict[str, Any]] = []
 
-    async def dispatch(envelope: dict[str, Any]) -> dict[str, Any]:
-        seen.append(envelope)
-        return {"ok": True, "value": {"text": "hello"}}
+    async def dispatch(envelope_json: str) -> str:
+        seen.append(json.loads(envelope_json))
+        return json.dumps({"ok": True, "value": {"text": "hello"}})
 
     install_bridge(FFIBridge(dispatch))
     value = await send_native_call("clipboard.read", {})
@@ -70,8 +71,10 @@ async def test_ffi_bridge_resolves_value_in_process() -> None:
 
 
 async def test_ffi_bridge_error_becomes_native_error() -> None:
-    async def dispatch(_: dict[str, Any]) -> dict[str, Any]:
-        return {"ok": False, "error": "permission_denied", "message": "blocked"}
+    async def dispatch(_: str) -> str:
+        return json.dumps(
+            {"ok": False, "error": "permission_denied", "message": "blocked"}
+        )
 
     install_bridge(FFIBridge(dispatch))
     with pytest.raises(NativeError) as exc:

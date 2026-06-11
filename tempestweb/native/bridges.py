@@ -20,6 +20,7 @@ Mode-A vs Mode-B split (see :mod:`tempestweb.native.dispatch`):
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -139,20 +140,25 @@ class FFIBridge:
 
     def __init__(
         self,
-        dispatch: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
+        dispatch: Callable[[str], Awaitable[str]],
     ) -> None:
         """Initialize the FFI bridge.
 
         Args:
-            dispatch: An awaitable callable forwarding the ``native_call`` envelope
-                to ``client/native/index.js`` and resolving to its ``native_result``
-                envelope. In a real browser this is the Pyodide-proxied ``window``
-                function; in tests it is a fake coroutine function.
+            dispatch: An awaitable callable that takes a ``native_call`` envelope as
+                a **JSON string** and resolves to the ``native_result`` envelope as
+                a JSON string. Strings are used (not dicts) because they cross the
+                Pyodide FFI boundary cleanly — no PyProxy/JsProxy conversion, the
+                same convention as the patch/event callbacks. In a real browser this
+                wraps ``window.__tempestweb_native__``; in tests it is a fake.
         """
-        self.dispatch: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]] = dispatch
+        self.dispatch: Callable[[str], Awaitable[str]] = dispatch
 
     async def call(self, envelope: dict[str, Any]) -> dict[str, Any]:
         """Dispatch a ``native_call`` envelope and await the JS promise result.
+
+        The envelope crosses to JS as a JSON string and the ``native_result`` comes
+        back as one, so nothing relies on FFI object conversion.
 
         Args:
             envelope: A ``native_call`` envelope carrying a ``call_id``.
@@ -160,5 +166,6 @@ class FFIBridge:
         Returns:
             The ``native_result`` envelope ``client/native/*.js`` resolved with.
         """
-        result: dict[str, Any] = await self.dispatch(envelope)
+        raw: str = await self.dispatch(json.dumps(envelope))
+        result: dict[str, Any] = json.loads(raw)
         return result

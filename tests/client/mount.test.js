@@ -65,6 +65,32 @@ test("mount wires events so a button click reaches sendEvent with its key", () =
   assert.equal(transport.events[0].type, "click");
 });
 
+test("overlay-path patches render into a lazy overlay layer, not the tree", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const transport = mockTransport();
+  mount(dom.root, transport, fixture("node_initial.json"));
+
+  // No overlay host until an overlay patch arrives (apps without overlays add
+  // no extra DOM): the tree is the only child.
+  assert.equal(dom.root.children.length, 1);
+  assert.equal(dom.root.querySelector("[data-tw-overlays]"), null);
+
+  // An insert at the reserved ["overlay"] path mounts an overlay (e.g. a dialog).
+  transport.push([
+    { path: ["overlay"], index: 0, node: fixture("node_initial.json") },
+  ]);
+  const overlayHost = dom.root.querySelector("[data-tw-overlays]");
+  assert.ok(overlayHost, "overlay host created on first overlay patch");
+  assert.equal(overlayHost.children.length, 1);
+  // The screen tree is untouched by overlay patches.
+  assert.equal(dom.root.children[0].children[0].textContent, "Count: 0");
+
+  // Removing the overlay clears the layer, leaving the tree in place.
+  transport.push([{ path: ["overlay"], index: 0 }]);
+  assert.equal(overlayHost.children.length, 0);
+});
+
 test("unmount removes the tree and stops events", () => {
   const dom = freshDom();
   globalThis.document = dom.document;

@@ -13,6 +13,16 @@ Modules:
 Import everything from this package level rather than from submodules.
 """
 
+from tempestweb.observability.error_boundary import (
+    ChildBuilder,
+    ErrorBoundary,
+    ErrorInfo,
+    ErrorReporter,
+    FallbackBuilder,
+    default_fallback,
+    telemetry_reporter,
+    with_error_boundary,
+)
 from tempestweb.observability.logger import (
     Logger,
     LoggerSink,
@@ -41,4 +51,12 @@ __all__ = [
     "Logger",
     "console_sink",
     "create_logger",
+    "ErrorInfo",
+    "ErrorReporter",
+    "FallbackBuilder",
+    "ChildBuilder",
+    "ErrorBoundary",
+    "default_fallback",
+    "with_error_boundary",
+    "telemetry_reporter",
 ]

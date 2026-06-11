@@ -1,11 +1,19 @@
 # Roadmap e fases
 
-O desenvolvimento segue um pré-requisito, um trilho compartilhado e dois trilhos
-de execução. **Trilho 0** extrai o `tempest-core` do tempestroid. **Trilho W** é o
-renderizador-folha web (cliente JS puro), compartilhado pelos dois modos.
-**Trilho A** é o **Modo WASM** (Pyodide, Python no browser) — construído primeiro.
-**Trilho B** é o **Modo servidor** (FastAPI + WebSocket) — depois. O plano completo
-está em [Plano de design](plan.md).
+O desenvolvimento segue um pré-requisito, dois trilhos compartilhados e dois
+trilhos de execução. **Trilho 0** extrai o `tempest-core` do tempestroid.
+**Trilho W** é o renderizador-folha web (cliente JS puro), compartilhado pelos
+dois modos. **Trilho A** é o **Modo WASM** (Pyodide, Python no browser) —
+construído primeiro. **Trilho B** é o **Modo servidor** (FastAPI + WebSocket/SSE)
+— depois. **Trilho P** é a camada **PWA / Offline-first / WebPush**, compartilhada
+pelos dois modos (instalável, app-shell em cache, notificações push). O plano
+completo está em [Plano de design](plan.md).
+
+> Paridade com o `tempest-react-sdk`: app **instalável** (PWA), **offline-first**
+> (service worker + app-shell em cache), push no servidor por **SSE** e
+> **WebPush** são metas de primeira classe, não polimento. O Modo A é o alvo
+> natural de PWA (Python no browser, offline após o load); o Modo B ganha install
+> shell + push do servidor.
 
 ## Trilho 0 — `tempest-core` (pré-requisito)
 
@@ -41,7 +49,7 @@ pelos Modos A e B.
 | A4 | `tempestweb dev` (modo A): watcher + reload da aba (hot restart) | ⬜ |
 | A5 | `native/` web (modo A): geolocation, clipboard, notifications, storage como awaitables | ⬜ |
 
-## Trilho B — Modo servidor (FastAPI + WS) — depois
+## Trilho B — Modo servidor (FastAPI + WS/SSE) — depois
 
 | Fase | Escopo | Status |
 |---|---|---|
@@ -50,6 +58,26 @@ pelos Modos A e B.
 | B2 | Sessão e ciclo de vida por conexão (connect=mount, disconnect=unmount, cancelamento de tasks) | ⬜ |
 | B3 | `native/` split cliente/servidor (camera/geo no cliente, proxiados por WS) | ⬜ |
 | B4 | `tempestweb dev` (modo B): reload do servidor + push aos clientes | ⬜ |
+| B5 | **Transporte SSE:** patches servidor→cliente via `EventSource`; eventos cliente→servidor via HTTP POST. `transports/sse.py` + `transport-sse.js`, mesma interface do W3. Alternativa ao WS para infra que bloqueia WebSocket | ⬜ |
+
+## Trilho P — PWA / Offline-first / WebPush (compartilhado)
+
+Camada instalável e offline, compartilhada pelos dois modos. Depende do cliente
+(W3) e do empacotamento (A3 para o app-shell WASM). O service worker (P1) é
+pré-requisito do WebPush (P3). Paridade com o `tempest-react-sdk`.
+
+| Fase | Escopo | Status |
+|---|---|---|
+| P0 | **Manifest + ícones:** `tempestweb build` emite `manifest.webmanifest` (`display: standalone`, `theme_color`, `start_url`, ícones maskable). App instalável ("Add to Home"). Lighthouse "installable" verde | ⬜ |
+| P1 | **Service worker + app-shell (base offline-first):** SW registrado faz precache do shell — cliente JS sempre; no Modo A também Pyodide + wheel do core + `app.py`. Cache-first no shell; app abre **offline após o 1º load**. Resolve também o cold-start do bundle WASM | ⬜ |
+| P2 | **Offline-first em runtime:** estratégias por recurso (stale-while-revalidate p/ assets, network-first p/ dados); fila de eventos offline + replay no reconnect (Modo B); banner online/offline ligado ao hook de conectividade do core | ⬜ |
+| P3 | **WebPush Notifications:** VAPID via `tempest-fastapi-sdk[webpush]`; `native/` expõe `notifications.subscribe()` + permissão como awaitables; SW recebe `push` e mostra a notificação; envio server-side (pywebpush). Funciona com a aba fechada | ⬜ |
+
+!!! note "PWA por modo"
+    **Modo A** é o alvo pleno: instalável + offline real (Python roda no browser,
+    sem servidor após o load). **Modo B** ganha install shell + WebPush; o offline
+    é parcial (precisa do servidor para reconciliar), então P2 cobre fila/replay de
+    eventos no reconnect. P0/P1/P3 são compartilhados; P2 tem ramo por modo.
 
 ## Pós-convergência
 
@@ -69,5 +97,8 @@ pelos Modos A e B.
 
 O mesmo `view()`/state roda nos dois modos sem mudar uma linha. `tempestweb build
 --mode wasm|server` escolhe o transporte. O cliente JS (Trilho W) é idêntico nos
-dois; só a implementação de transporte difere (`transport-wasm.js` vs
-`transport-ws.js`). `native/` tem dois backends por capacidade.
+três transportes; só a implementação difere (`transport-wasm.js` ·
+`transport-ws.js` · `transport-sse.js`), todas atrás da mesma interface do W3.
+`native/` tem dois backends por capacidade. A camada PWA/offline/WebPush (Trilho
+P) é compartilhada: o mesmo manifest + service worker servem os dois modos, com o
+ramo offline (P2) divergindo só no que cada modo consegue fazer sem servidor.

@@ -240,6 +240,21 @@ Python no browser. Prova o core no browser + o cliente JS, sem servidor.
 Python no servidor. Reusa o cliente JS inteiro do Trilho W, troca o transporte
 por WebSocket.
 
+### Trilho P — PWA / Offline-first / WebPush (compartilhado)
+
+Camada instalável e offline, paridade com o `tempest-react-sdk`, compartilhada
+pelos dois modos: manifest + ícones (app instalável), service worker + app-shell
+em cache (offline após o 1º load — no Modo A também resolve o cold-start do bundle
+WASM), estratégias offline-first em runtime com fila/replay de eventos no reconnect
+(Modo B), e WebPush (VAPID via `tempest-fastapi-sdk[webpush]`). Detalhe fase-a-fase
+(P0–P3) em [`roadmap.md`](roadmap.md).
+
+### Transporte SSE (B5)
+
+Além do WebSocket, o Modo B ganha um transporte **SSE**: patches servidor→cliente
+via `EventSource`, eventos cliente→servidor via HTTP POST — a **mesma** interface
+`PatchTransport`. Alternativa ao WS para infra que bloqueia WebSocket.
+
 **Convergência:** o mesmo `view()`/state roda em A e B. `tempestweb build --mode
 wasm|server` escolhe o transporte. `native/` ganha dois backends por capacidade.
 

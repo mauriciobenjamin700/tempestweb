@@ -44,7 +44,18 @@ __all__ = [
 
 
 class FlexDirection(StrEnum):
-    """Main-axis direction of a flex container (``flex-direction``)."""
+    """Main-axis direction of a flex container (``flex-direction``).
+
+    Picks which axis is the *main* axis along which children are laid out;
+    the perpendicular axis becomes the *cross* axis used by
+    :class:`AlignItems`.
+
+    Attributes:
+        ROW: Lay children out horizontally, left to right; the main axis is
+            horizontal and the cross axis vertical.
+        COLUMN: Lay children out vertically, top to bottom; the main axis is
+            vertical and the cross axis horizontal.
+    """
 
     ROW = "row"
     COLUMN = "column"
@@ -60,6 +71,14 @@ class FlexWrap(StrEnum):
     the Compose translator lowers it into the spec, while the Qt translator
     realizes wrapping imperatively in its flow-layout widget (see the conformance
     suite).
+
+    Attributes:
+        NOWRAP: Keep every child on a single main-axis line, shrinking or
+            overflowing rather than wrapping (the flex default).
+        WRAP: Allow children to flow onto additional lines once the current
+            line is full, stacking lines in the cross-axis direction.
+        WRAP_REVERSE: Wrap like :attr:`WRAP`, but stack the new lines in the
+            reverse cross-axis order (new lines appear before earlier ones).
     """
 
     NOWRAP = "nowrap"
@@ -68,7 +87,25 @@ class FlexWrap(StrEnum):
 
 
 class JustifyContent(StrEnum):
-    """Distribution of children along the main axis (``justify-content``)."""
+    """Distribution of children along the main axis (``justify-content``).
+
+    Controls how any free space on the main axis is allocated before,
+    between and after the children.
+
+    Attributes:
+        START: Pack children at the start of the main axis; free space sits
+            after the last child.
+        END: Pack children at the end of the main axis; free space sits
+            before the first child.
+        CENTER: Pack children together and center them on the main axis;
+            equal free space at both ends.
+        SPACE_BETWEEN: Spread children apart with equal space *between* them
+            and none at the edges; the first and last touch the edges.
+        SPACE_AROUND: Give each child equal space on both sides, so edge
+            gaps are half the size of the gaps between children.
+        SPACE_EVENLY: Distribute children with equal space everywhere,
+            including the two edges (all gaps identical).
+    """
 
     START = "start"
     END = "end"
@@ -79,7 +116,21 @@ class JustifyContent(StrEnum):
 
 
 class AlignItems(StrEnum):
-    """Alignment of children along the cross axis (``align-items``)."""
+    """Alignment of children along the cross axis (``align-items``).
+
+    Positions children on the axis perpendicular to
+    :class:`FlexDirection`'s main axis. Also used per-child via
+    :attr:`Style.align_self` to override the container's choice.
+
+    Attributes:
+        START: Align children to the start edge of the cross axis (top in a
+            row, left in a column).
+        END: Align children to the end edge of the cross axis (bottom in a
+            row, right in a column).
+        CENTER: Center each child on the cross axis.
+        STRETCH: Grow children to fill the container's cross-axis extent
+            when they have no fixed cross-axis size.
+    """
 
     START = "start"
     END = "end"
@@ -88,7 +139,15 @@ class AlignItems(StrEnum):
 
 
 class TextAlign(StrEnum):
-    """Horizontal text alignment (``text-align``)."""
+    """Horizontal text alignment (``text-align``).
+
+    Attributes:
+        LEFT: Align each line to the left edge of the text box.
+        CENTER: Center each line within the text box.
+        RIGHT: Align each line to the right edge of the text box.
+        JUSTIFY: Stretch inter-word spacing so each line (except the last)
+            fills the full width, flush on both edges.
+    """
 
     LEFT = "left"
     CENTER = "center"
@@ -97,7 +156,20 @@ class TextAlign(StrEnum):
 
 
 class FontWeight(IntEnum):
-    """Common font weights, matching the CSS numeric scale."""
+    """Common font weights, matching the CSS numeric scale.
+
+    Each member is the CSS/OpenType numeric weight; higher values render
+    thicker glyph strokes.
+
+    Attributes:
+        THIN: Weight 100 — the thinnest strokes (hairline).
+        LIGHT: Weight 300 — lighter than the regular text weight.
+        NORMAL: Weight 400 — the default body-text weight (regular).
+        MEDIUM: Weight 500 — slightly heavier than regular.
+        SEMIBOLD: Weight 600 — between medium and bold.
+        BOLD: Weight 700 — the standard bold weight for emphasis.
+        BLACK: Weight 900 — the heaviest strokes (extra bold).
+    """
 
     THIN = 100
     LIGHT = 300
@@ -115,6 +187,19 @@ class Curve(StrEnum):
     onto its native curve (Compose ``Easing``; Qt ``QEasingCurve``). The core's
     own :func:`~tempestroid.animation._apply_curve` also approximates each so the
     simulator/test clock can interpolate without a renderer.
+
+    Attributes:
+        LINEAR: Constant speed from start to end, with no acceleration.
+        EASE_IN: Start slow and accelerate toward the end.
+        EASE_OUT: Start fast and decelerate toward the end.
+        EASE_IN_OUT: Accelerate at the start and decelerate at the end
+            (symmetric ease).
+        EASE: The CSS default — a gentle ease that starts quickly then
+            slows, biased differently from ``EASE_IN_OUT``.
+        BOUNCE: Overshoot and settle with a bouncing motion near the end,
+            like an object dropping onto a surface.
+        ELASTIC: Overshoot and oscillate around the target before settling,
+            like a spring.
     """
 
     LINEAR = "linear"
@@ -127,14 +212,26 @@ class Curve(StrEnum):
 
 
 class FontStyle(StrEnum):
-    """Font slant (``font-style``)."""
+    """Font slant (``font-style``).
+
+    Attributes:
+        NORMAL: Upright glyphs with no slant (roman).
+        ITALIC: Slanted glyphs, using the font's italic/oblique variant.
+    """
 
     NORMAL = "normal"
     ITALIC = "italic"
 
 
 class TextDecoration(StrEnum):
-    """Text line decoration (``text-decoration``)."""
+    """Text line decoration (``text-decoration``).
+
+    Attributes:
+        NONE: No decorative line on the text.
+        UNDERLINE: Draw a line beneath the text.
+        LINE_THROUGH: Draw a line through the middle of the text
+            (strikethrough).
+    """
 
     NONE = "none"
     UNDERLINE = "underline"
@@ -142,14 +239,38 @@ class TextDecoration(StrEnum):
 
 
 class TextOverflow(StrEnum):
-    """How clipped text terminates (``text-overflow`` / Compose ``TextOverflow``)."""
+    """How clipped text terminates (``text-overflow`` / Compose ``TextOverflow``).
+
+    Applies when text exceeds its allotted space (e.g. past
+    :attr:`Style.max_lines`).
+
+    Attributes:
+        CLIP: Cut the overflowing text off sharply at the box edge, with no
+            marker.
+        ELLIPSIS: Truncate the text and append an ellipsis (``…``) to signal
+            that content was cut.
+    """
 
     CLIP = "clip"
     ELLIPSIS = "ellipsis"
 
 
 class GradientDirection(StrEnum):
-    """Direction of a linear gradient's color progression."""
+    """Direction of a linear gradient's color progression.
+
+    Names the axis and orientation along which the gradient's stops are
+    interpolated, from the first stop to the last.
+
+    Attributes:
+        TOP_BOTTOM: Progress vertically downward — first stop at the top,
+            last at the bottom.
+        BOTTOM_TOP: Progress vertically upward — first stop at the bottom,
+            last at the top.
+        LEFT_RIGHT: Progress horizontally rightward — first stop on the
+            left, last on the right.
+        RIGHT_LEFT: Progress horizontally leftward — first stop on the
+            right, last on the left.
+    """
 
     TOP_BOTTOM = "top-bottom"
     BOTTOM_TOP = "bottom-top"
@@ -165,6 +286,13 @@ class Position(StrEnum):
     pulls the child out of that flow and anchors it by its insets
     (:attr:`Style.top`/:attr:`Style.right`/:attr:`Style.bottom`/:attr:`Style.left`),
     modelled on Flutter's ``Positioned`` / CSS ``position: absolute``.
+
+    Attributes:
+        STATIC: The default — the child stays in the stack's normal overlap
+            flow and is aligned by :attr:`Style.stack_align`.
+        ABSOLUTE: Remove the child from the flow and anchor it by its insets
+            (:attr:`Style.top`/:attr:`Style.right`/:attr:`Style.bottom`/
+            :attr:`Style.left`), overlaid on top of the stack.
     """
 
     STATIC = "static"
@@ -178,6 +306,22 @@ class StackAlign(StrEnum):
     a vertical band (top/center/bottom) crossed with a horizontal band
     (start/center/end). Used only by ``Stack`` containers; ordinary flex
     containers keep using single-axis :class:`JustifyContent`/:class:`AlignItems`.
+
+    Each member pairs a vertical band (top/center/bottom) with a horizontal
+    band (start/center/end), where *start* is the leading edge (left in
+    left-to-right layouts) and *end* the trailing edge.
+
+    Attributes:
+        TOP_START: Pin children to the top edge and the leading side.
+        TOP_CENTER: Pin children to the top edge, centered horizontally.
+        TOP_END: Pin children to the top edge and the trailing side.
+        CENTER_START: Center children vertically, on the leading side.
+        CENTER: Center children on both axes.
+        CENTER_END: Center children vertically, on the trailing side.
+        BOTTOM_START: Pin children to the bottom edge and the leading side.
+        BOTTOM_CENTER: Pin children to the bottom edge, centered
+            horizontally.
+        BOTTOM_END: Pin children to the bottom edge and the trailing side.
     """
 
     TOP_START = "top-start"
@@ -362,7 +506,17 @@ class Edge(BaseModel):
 
 
 class Border(BaseModel):
-    """A uniform border (``border-width`` + ``border-color``)."""
+    """A uniform border (``border-width`` + ``border-color``).
+
+    Applies the same width and color to all four sides. Use it in
+    :attr:`Style.border`; reach for :class:`SideBorder` when sides differ.
+    Frozen so the reconciler can diff it by value.
+
+    Attributes:
+        width: Border thickness in logical pixels (``0.0`` draws no border).
+        color: The border color, or ``None`` to defer to the renderer's
+            default border color.
+    """
 
     model_config = ConfigDict(frozen=True)
 

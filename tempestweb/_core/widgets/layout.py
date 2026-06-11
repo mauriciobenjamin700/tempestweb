@@ -35,7 +35,18 @@ def _empty_children() -> list[Widget]:
 
 
 class SafeAreaEdge(StrEnum):
-    """A screen edge a :class:`SafeArea` can inset against system intrusions."""
+    """A screen edge a :class:`SafeArea` can inset against system intrusions.
+
+    Attributes:
+        TOP: The top edge. Insetting it pushes content below the status bar or a
+            top display cutout/notch so it is not drawn underneath them.
+        RIGHT: The right edge. Insetting it keeps content clear of right-side
+            intrusions such as a rounded corner or a landscape-orientation notch.
+        BOTTOM: The bottom edge. Insetting it lifts content above the system
+            navigation bar or the home-indicator gesture area.
+        LEFT: The left edge. Insetting it keeps content clear of left-side
+            intrusions such as a rounded corner or a landscape-orientation notch.
+    """
 
     TOP = "top"
     RIGHT = "right"

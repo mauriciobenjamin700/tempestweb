@@ -67,9 +67,7 @@ ICON_PATHS: dict[str, str] = {
         "M5 11 a2 2 0 0 1 2-2 h10 a2 2 0 0 1 2 2 v8 a2 2 0 0 1-2 2 H7 a2 2 0 0 "
         "1-2-2 Z M7 11 V7 a5 5 0 0 1 9.9-1"
     ),
-    "search": (
-        "M21 21 l-4.34-4.34 M11 19 a8 8 0 1 0 0-16 8 8 0 0 0 0 16 Z"
-    ),
+    "search": ("M21 21 l-4.34-4.34 M11 19 a8 8 0 1 0 0-16 8 8 0 0 0 0 16 Z"),
     "x": "M18 6 6 18 M6 6 l12 12",
     "check": "M20 6 9 17 l-5-5",
     "chevron-down": "M6 9 l6 6 6-6",
@@ -102,19 +100,14 @@ ICON_PATHS: dict[str, str] = {
         "M5 4 h14 a2 2 0 0 1 2 2 v14 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 V6 "
         "a2 2 0 0 1 2-2 Z"
     ),
-    "clock": (
-        "M12 6 v6 l4 2 M12 2 a10 10 0 1 0 0 20 10 10 0 0 0 0-20 Z"
-    ),
+    "clock": ("M12 6 v6 l4 2 M12 2 a10 10 0 1 0 0 20 10 10 0 0 0 0-20 Z"),
     "trash": (
         "M3 6 h18 M19 6 v14 c0 1-1 2-2 2 H7 c-1 0-2-1-2-2 V6 "
         "M8 6 V4 c0-1 1-2 2-2 h4 c1 0 2 1 2 2 v2 "
         "M10 11 v6 M14 11 v6"
     ),
     "menu": "M4 12 h16 M4 6 h16 M4 18 h16",
-    "home": (
-        "M3 9 l9-7 9 7 v11 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 z "
-        "M9 22 V12 h6 v10"
-    ),
+    "home": ("M3 9 l9-7 9 7 v11 a2 2 0 0 1-2 2 H5 a2 2 0 0 1-2-2 z M9 22 V12 h6 v10"),
     "settings": (
         "M12.22 2 h-.44 a2 2 0 0 0-2 2 v.18 a2 2 0 0 1-1 1.73 l-.43.25 "
         "a2 2 0 0 1-2 0 l-.15-.08 a2 2 0 0 0-2.73.73 l-.22.38 "
@@ -153,10 +146,7 @@ ICON_PATHS: dict[str, str] = {
         "C19.41 13.956 18 12.499 18 8 "
         "A6 6 0 0 0 6 8 c0 4.499-1.411 5.956-2.738 7.326 Z"
     ),
-    "info": (
-        "M12 16 v-4 M12 8 h.01 "
-        "M12 2 a10 10 0 1 0 0 20 10 10 0 0 0 0-20 Z"
-    ),
+    "info": ("M12 16 v-4 M12 8 h.01 M12 2 a10 10 0 1 0 0 20 10 10 0 0 0 0-20 Z"),
 }
 
 
@@ -167,6 +157,37 @@ class Icons(StrEnum):
     ``Icons.EYE == "eye"`` — giving editor autocomplete while still being a
     plain ``str`` anywhere a name is accepted (e.g. ``Icon(name=Icons.SEARCH)``
     or ``Input(leading_icon=Icons.MAIL)``).
+
+    Attributes:
+        EYE: An open eye; toggle to reveal hidden content (e.g. a password).
+        EYE_OFF: An eye with a slash; toggle to hide content (e.g. a password).
+        LOCK: A closed padlock, denoting secured or locked state.
+        UNLOCK: An open padlock, denoting unsecured or unlocked state.
+        SEARCH: A magnifying glass, for search inputs and actions.
+        X: A close cross, for dismissing dialogs, chips, or clearing input.
+        CHECK: A checkmark, indicating success, confirmation, or selection.
+        CHEVRON_DOWN: A downward chevron, for expanding or opening dropdowns.
+        CHEVRON_UP: An upward chevron, for collapsing or closing dropdowns.
+        CHEVRON_LEFT: A left-pointing chevron, for back or previous navigation.
+        CHEVRON_RIGHT: A right-pointing chevron, for forward or next navigation.
+        ARROW_LEFT: A left arrow, for back navigation or moving content left.
+        ARROW_RIGHT: A right arrow, for forward navigation or moving content
+            right.
+        PLUS: A plus sign, for add, create, or increment actions.
+        MINUS: A minus sign, for remove or decrement actions.
+        USER: A person silhouette, for accounts, profiles, or authors.
+        MAIL: An envelope, for email addresses, messages, or contact actions.
+        PHONE: A telephone handset, for phone numbers or call actions.
+        CALENDAR: A calendar grid, for dates, schedules, or date pickers.
+        CLOCK: A clock face, for times, durations, or recent activity.
+        TRASH: A trash can, for delete or discard actions.
+        MENU: A three-line "hamburger", for opening a navigation menu.
+        HOME: A house, for the home screen or landing page.
+        SETTINGS: A gear, for settings, preferences, or configuration.
+        STAR: A five-point star, for favorites, ratings, or bookmarks.
+        HEART: A heart, for likes, favorites, or wishlist actions.
+        BELL: A bell, for notifications or alerts.
+        INFO: An "i" in a circle, for informational hints or details.
     """
 
     EYE = "eye"
@@ -277,9 +298,7 @@ def _shape_to_path(tag: str, attrib: dict[str, str]) -> str:
             return ""
         # Two arcs trace the full ellipse, starting at the left-most point.
         return (
-            f"M{cx - rx},{cy} "
-            f"a{rx},{ry} 0 1,0 {rx * 2},0 "
-            f"a{rx},{ry} 0 1,0 {-rx * 2},0"
+            f"M{cx - rx},{cy} a{rx},{ry} 0 1,0 {rx * 2},0 a{rx},{ry} 0 1,0 {-rx * 2},0"
         )
     if tag == "line":
         x1, y1, x2, y2 = num("x1"), num("y1"), num("x2"), num("y2")

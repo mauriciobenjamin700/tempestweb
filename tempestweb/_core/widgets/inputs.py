@@ -63,6 +63,21 @@ class KeyboardType(StrEnum):
 
     Maps to Android ``inputType`` on the device renderer and to Qt input-method
     hints in the simulator.
+
+    Attributes:
+        TEXT: The default full alphanumeric keyboard for free-form text, with no
+            specialization.
+        NUMBER: A numeric keypad optimized for entering numbers (digits, and
+            typically a decimal/sign key).
+        EMAIL: A text keyboard tuned for email addresses, surfacing the ``@`` and
+            ``.`` keys for quicker entry.
+        PHONE: A telephone dial pad for phone numbers (digits plus ``+``, ``*``
+            and ``#``).
+        URL: A text keyboard tuned for web addresses, surfacing ``/`` and ``.``
+            and omitting the space bar in favor of URL-friendly keys.
+        PASSWORD: A keyboard for secret entry; the field masks its characters and
+            the platform disables suggestions/auto-correct so the value is not
+            cached or learned.
     """
 
     TEXT = "text"

@@ -152,7 +152,18 @@ class FileSelectEvent(Event):
 
 
 class SwipeDirection(StrEnum):
-    """The cardinal direction of a swipe gesture."""
+    """The cardinal direction of a swipe gesture.
+
+    Attributes:
+        LEFT: The pointer travelled predominantly toward the left edge of the
+            screen (decreasing x).
+        RIGHT: The pointer travelled predominantly toward the right edge of the
+            screen (increasing x).
+        UP: The pointer travelled predominantly toward the top of the screen
+            (decreasing y).
+        DOWN: The pointer travelled predominantly toward the bottom of the
+            screen (increasing y).
+    """
 
     LEFT = "left"
     RIGHT = "right"
@@ -521,7 +532,19 @@ def _empty_str_map() -> dict[str, str]:
 
 
 class AppState(StrEnum):
-    """The lifecycle state of the application process."""
+    """The lifecycle state of the application process.
+
+    Attributes:
+        FOREGROUND: The app is visible and receiving user input — it is the
+            active task in front of the user and may run UI work freely.
+        BACKGROUND: The app is no longer visible (the user switched away or the
+            screen is off); it should pause UI work and release scarce
+            resources, as the OS may suspend or reclaim it.
+        INACTIVE: The app is in a transitional, partially-obscured state where
+            it is visible but not receiving input — e.g. during an incoming
+            call, the app switcher, a system permission prompt, or a split-screen
+            transition.
+    """
 
     FOREGROUND = "foreground"
     BACKGROUND = "background"
@@ -544,7 +567,25 @@ class LifecycleEvent(Event):
 
 
 class SensorType(StrEnum):
-    """A device hardware sensor a continuous stream can be opened on."""
+    """A device hardware sensor a continuous stream can be opened on.
+
+    Attributes:
+        ACCELEROMETER: Reports linear acceleration along the device's x/y/z
+            axes (including gravity), in metres per second squared.
+        GYROSCOPE: Reports the device's angular velocity (rate of rotation)
+            about its x/y/z axes, in radians per second.
+        MAGNETOMETER: Reports the ambient geomagnetic field strength along the
+            device's x/y/z axes, in microtesla — the basis for a compass.
+        PRESSURE: Reports ambient atmospheric (barometric) pressure, in
+            hectopascals, used for altitude estimation and weather sensing.
+        LIGHT: Reports ambient illuminance at the screen, in lux — used to drive
+            automatic screen-brightness adjustment.
+        PROXIMITY: Reports nearness of an object to the front of the device
+            (e.g. an ear during a call); typically a near/far distance in
+            centimetres.
+        STEP_COUNTER: Reports the cumulative number of steps the user has taken
+            since the device last booted, as counted by the hardware pedometer.
+    """
 
     ACCELEROMETER = "accelerometer"
     GYROSCOPE = "gyroscope"
@@ -583,7 +624,20 @@ class SensorEvent(Event):
 
 
 class ConnectivityState(StrEnum):
-    """The device's current network connectivity state."""
+    """The device's current network connectivity state.
+
+    Attributes:
+        CONNECTED: The device has an active network link of an unspecified or
+            generic transport — reachability is available but the kind of link
+            is not distinguished.
+        DISCONNECTED: The device has no active network link; requests will fail
+            until connectivity is restored (airplane mode, no signal, Wi-Fi
+            off).
+        WIFI: The device is connected over a Wi-Fi network — typically
+            unmetered, so larger transfers are acceptable.
+        MOBILE: The device is connected over a cellular (mobile data) network —
+            typically metered, so handlers may choose to defer heavy transfers.
+    """
 
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"

@@ -53,7 +53,22 @@ __all__ = [
 
 
 class ImageFit(StrEnum):
-    """How an image scales to fill its box (CSS ``object-fit`` vocabulary)."""
+    """How an image scales to fill its box (CSS ``object-fit`` vocabulary).
+
+    Attributes:
+        CONTAIN: Scale the image up or down, preserving its aspect ratio, until
+            it fits entirely inside the box. The whole image is visible and may
+            leave empty space (letterboxing) on the unfilled axis.
+        COVER: Scale the image, preserving its aspect ratio, until it fully
+            covers the box. The image fills the box with no empty space, and
+            whatever overflows the box on the longer axis is cropped.
+        FILL: Stretch the image to the box's exact width and height, ignoring
+            its aspect ratio. Nothing is cropped, but the image may appear
+            distorted (squashed or stretched).
+        NONE: Do not scale the image at all; render it at its intrinsic pixel
+            size. If larger than the box it is clipped; if smaller it is centered
+            with surrounding empty space.
+    """
 
     CONTAIN = "contain"
     COVER = "cover"
@@ -547,7 +562,20 @@ class BackdropFilter(Widget):
 
 
 class ClipShape(StrEnum):
-    """The predefined shapes a :class:`ClipPath` can clip its child to."""
+    """The predefined shapes a :class:`ClipPath` can clip its child to.
+
+    Attributes:
+        CIRCLE: Clip the child to a circle inscribed in its box — anything
+            outside the largest centered circle that fits the box is hidden.
+            Useful for circular avatars; on a non-square box the circle uses the
+            shorter side as its diameter.
+        ROUNDED_RECT: Clip the child to a rectangle with rounded corners, using
+            :attr:`ClipPath.radius` as the corner radius. With a radius of ``0``
+            this is effectively a plain rectangle (no clipping effect).
+        OVAL: Clip the child to an ellipse that fills the box's full width and
+            height — it stretches to the box bounds rather than staying circular,
+            so a non-square box yields a non-circular oval.
+    """
 
     CIRCLE = "circle"
     ROUNDED_RECT = "rounded_rect"

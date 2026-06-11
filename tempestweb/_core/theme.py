@@ -33,6 +33,12 @@ class ThemeMode(StrEnum):
     ``SYSTEM`` defers to the platform's current setting (read from
     :attr:`MediaQueryData.platform_dark_mode`); ``LIGHT`` / ``DARK`` force the
     respective scheme regardless of the OS.
+
+    Attributes:
+        LIGHT: Force the light color scheme always, ignoring the OS setting.
+        DARK: Force the dark color scheme always, ignoring the OS setting.
+        SYSTEM: Follow the platform's current scheme, resolving against
+            :attr:`MediaQueryData.platform_dark_mode` at build time.
     """
 
     LIGHT = "light"

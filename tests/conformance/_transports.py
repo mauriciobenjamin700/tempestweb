@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Callable
 from typing import Any
 
 from tests.conformance._dom import DomNode, apply_batch
@@ -63,6 +64,27 @@ class MockTransportA:
             event: A JSON-able event dict.
         """
         self._events.put_nowait(event)
+
+    async def send_native_call(
+        self, call_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Proxy a native capability call — unused by the DOM-independence harness.
+
+        Present only to satisfy the :class:`PatchTransport` Protocol; this suite
+        exercises patch rendering, not native capabilities.
+
+        Args:
+            call_id: Correlation id for the awaited ``native_result``.
+            capability: Stable capability name.
+            args: JSON-able capability arguments.
+        """
+
+    def on_native_result(self, handler: Callable[[dict[str, Any]], None]) -> None:
+        """Register a ``native_result`` sink — unused by this harness.
+
+        Args:
+            handler: Callback for ``native_result`` envelopes.
+        """
 
     async def close(self) -> None:
         """Mark the transport closed."""
@@ -117,6 +139,27 @@ class MockTransportB:
             event: A JSON-able event dict.
         """
         self._inbox.append(json.loads(json.dumps(event)))
+
+    async def send_native_call(
+        self, call_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Proxy a native capability call — unused by the DOM-independence harness.
+
+        Present only to satisfy the :class:`PatchTransport` Protocol; this suite
+        exercises patch rendering, not native capabilities.
+
+        Args:
+            call_id: Correlation id for the awaited ``native_result``.
+            capability: Stable capability name.
+            args: JSON-able capability arguments.
+        """
+
+    def on_native_result(self, handler: Callable[[dict[str, Any]], None]) -> None:
+        """Register a ``native_result`` sink — unused by this harness.
+
+        Args:
+            handler: Callback for ``native_result`` envelopes.
+        """
 
     async def close(self) -> None:
         """Mark the transport closed."""

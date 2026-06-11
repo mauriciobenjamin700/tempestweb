@@ -195,7 +195,7 @@ def _default_sender() -> WebPushSender:
         RuntimeError: If ``pywebpush`` is not installed.
     """
     try:
-        from pywebpush import webpush as _webpush  # type: ignore[import-not-found]
+        from pywebpush import webpush as _webpush
     except ImportError as exc:  # pragma: no cover - exercised via mock in tests
         raise RuntimeError(
             "pywebpush is required to send WebPush; install "

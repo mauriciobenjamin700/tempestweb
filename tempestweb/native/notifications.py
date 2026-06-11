@@ -1,19 +1,21 @@
 """Native notifications capability over the browser's Notifications Web API.
 
-The web sibling of :mod:`tempestroid.native.notifications`. :func:`notify` is
-fire-and-forget (mirrors tempestroid's signature); the web adds an explicit
-permission gate, so :func:`request_permission` is exposed as a request/response
-call returning a typed :class:`NotificationPermission`.
+The web sibling of :mod:`tempestroid.native.notifications`. :func:`notify` posts a
+local notification; the web adds an explicit permission gate, so
+:func:`request_permission` returns a typed :class:`NotificationPermission`.
 
-``client/native.js`` drives ``Notification.requestPermission`` and the
-``new Notification(title, { body })`` constructor.
+``client/native/notifications.js`` drives ``Notification.requestPermission`` and
+the ``new Notification(title, { body })`` constructor.
+
+WebPush subscriptions (P3) are out of this module's scope — they share the
+``native_call`` envelope but live in ``tempestweb/pwa`` (Track T9).
 """
 
 from __future__ import annotations
 
 from enum import StrEnum
 
-from tempestweb.native.dispatch import send_native, send_native_request
+from tempestweb.native.dispatch import send_native_call
 
 __all__ = ["NotificationPermission", "notify", "request_permission"]
 
@@ -34,21 +36,21 @@ class NotificationPermission(StrEnum):
     DENIED = "denied"
 
 
-def notify(title: str, body: str = "") -> None:
-    """Post a system notification.
+async def notify(title: str, body: str = "") -> None:
+    """Post a local system notification.
 
-    Fire-and-forget, matching tempestroid. The notification only appears if
-    permission has been granted (see :func:`request_permission`); otherwise the
-    browser silently drops it.
+    The notification only appears if permission has been granted (see
+    :func:`request_permission`); otherwise the browser silently drops it.
 
     Args:
         title: The notification title.
         body: The notification body text.
 
     Raises:
+        NativeError: If the Notifications API is unavailable (``unavailable``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
-    send_native("notifications", "notify", {"title": title, "body": body})
+    await send_native_call("notifications.notify", {"title": title, "body": body})
 
 
 async def request_permission() -> NotificationPermission:
@@ -62,5 +64,5 @@ async def request_permission() -> NotificationPermission:
         NativeError: If the Notifications API is unavailable (``unavailable``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
-    data = await send_native_request("notifications", "request_permission", {})
-    return NotificationPermission(str(data.get("permission", "default")))
+    value = await send_native_call("notifications.request_permission", {})
+    return NotificationPermission(str(value.get("permission", "default")))

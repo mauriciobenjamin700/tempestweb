@@ -1,8 +1,9 @@
 """Native geolocation capability over the browser's Geolocation Web API.
 
 The web sibling of :mod:`tempestroid.native.geolocation`. :func:`get_position`
-sends a request/response ``native`` command; ``client/native.js`` calls
-``navigator.geolocation.getCurrentPosition`` and replies with the fix.
+(aliased :func:`get`) sends a ``geolocation.get`` ``native_call``;
+``client/native/geolocation.js`` calls ``navigator.geolocation.getCurrentPosition``
+and replies with the fix.
 
 Naming mirrors tempestroid (:class:`Position`, :func:`get_position`) so the same
 application code reads identically on Android and on the web.
@@ -12,9 +13,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from tempestweb.native.dispatch import send_native_request
+from tempestweb.native.dispatch import send_native_call
 
-__all__ = ["Position", "get_position"]
+__all__ = ["Position", "get", "get_position"]
 
 
 class Position(BaseModel):
@@ -53,7 +54,9 @@ async def get_position(high_accuracy: bool = True) -> Position:
             available (``unavailable``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
-    data = await send_native_request(
-        "geolocation", "get_position", {"high_accuracy": high_accuracy}
-    )
-    return Position.model_validate(data)
+    value = await send_native_call("geolocation.get", {"high_accuracy": high_accuracy})
+    return Position.model_validate(value)
+
+
+#: Alias matching the tempestroid/plan API ``await geolocation.get()``.
+get = get_position

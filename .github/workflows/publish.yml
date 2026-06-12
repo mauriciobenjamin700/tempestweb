@@ -1,0 +1,47 @@
+name: Publish
+
+# Build the sdist + wheel and upload to PyPI when a version tag is pushed.
+# Uses PyPI Trusted Publishing (OIDC) — no API token stored in the repo.
+# Configure the publisher once at https://pypi.org/manage/account/publishing/
+# (project: tempestweb, workflow: publish.yml, environment: pypi).
+#
+# The wheel vendors the pure-JS client under tempestweb/_client (see the
+# [tool.hatch.build.targets.wheel.force-include] block in pyproject.toml), so no
+# JS build step is needed here — uv build packs it from the client/ tree.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Build sdist + wheel
+        run: uv build
+      - name: Check metadata
+        run: uvx twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # required for Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

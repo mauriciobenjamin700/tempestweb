@@ -62,12 +62,6 @@ packages = ["tempestweb"]
 [tool.hatch.build.targets.sdist]
 include = ["tempestweb", "client", "README.md", "CHANGELOG.md", "pyproject.toml"]
 
-# tempest-core is not yet on PyPI; resolve it from the sibling checkout for local
-# dev. pip/PyPI ignore [tool.uv.sources]; the wheel only declares
-# `tempest-core>=0.1.0`, so publish tempest-core first. Remove once it is on PyPI.
-[tool.uv.sources]
-tempest-core = { path = "../tempest-core", editable = true }
-
 [tool.ruff]
 line-length = 88
 target-version = "py311"

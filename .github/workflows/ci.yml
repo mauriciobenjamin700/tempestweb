@@ -15,15 +15,15 @@ jobs:
       - name: Set up Python
         run: uv python install 3.11
       - name: Install
-        run: uv pip install --system -e ".[dev,server,cli]"
+        run: uv sync --extra dev --extra server --extra cli
       - name: Lint
         run: |
-          ruff check .
-          ruff format --check .
+          uv run ruff check .
+          uv run ruff format --check .
       - name: Type-check
-        run: mypy tempestweb
+        run: uv run mypy tempestweb
       - name: Test
-        run: pytest -q
+        run: uv run pytest -q
 
   client:
     runs-on: ubuntu-latest

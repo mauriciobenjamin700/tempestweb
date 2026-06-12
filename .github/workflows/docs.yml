@@ -40,7 +40,7 @@ jobs:
       - name: Set up Python
         run: uv python install 3.11
       - name: Install docs dependencies
-        run: uv pip install --system -e ".[docs]"
+        run: uv sync --extra docs
       - name: Build (strict — the gate)
         run: uv run mkdocs build --strict
       - name: Upload Pages artifact

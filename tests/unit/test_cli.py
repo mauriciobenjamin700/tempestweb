@@ -60,12 +60,30 @@ def test_build_dispatch_reports_failure(tmp_path: Path) -> None:
     assert rc == 1
 
 
-def test_run_dispatch_builds_and_plans(tmp_path: Path) -> None:
+def test_run_dispatch_builds_and_plans(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     assert main(["new", "r", "--into", str(tmp_path)]) == 0
     project = tmp_path / "r"
+
+    # Serving binds a blocking uvicorn server; stub it so the dispatch returns
+    # after building + planning (the bind plan is asserted via the captured plan).
+    served: dict[str, object] = {}
+
+    def fake_serve_run(plan: object) -> None:
+        served["plan"] = plan
+
+    # The cli package re-exports the `main` function, shadowing the `main`
+    # submodule attribute, so reach the module via sys.modules.
+    import sys
+
+    main_module = sys.modules["tempestweb.cli.main"]
+    monkeypatch.setattr(main_module, "serve_run", fake_serve_run)
     rc = main(["run", "--mode", "wasm", "--path", str(project), "--port", "5555"])
     assert rc == 0
     assert (project / "dist" / "wasm" / "index.html").is_file()
+    assert served.get("plan") is not None
+    assert getattr(served["plan"], "port", None) == 5555
 
 
 def test_dev_dispatch_runs_watch_loop(

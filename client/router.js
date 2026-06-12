@@ -8,9 +8,12 @@
 // Reported as a `navigate` wire event { type:"navigate", key:"", payload:{path} },
 // special-cased by the runtime before handler resolution.
 //
-// Note: the reverse direction (pushState when the app navigates imperatively)
-// needs a server→client nav envelope and is a follow-up; today the URL drives the
-// view (deep links + back/forward), not the other way around.
+// Reverse direction (view → URL): when the app navigates imperatively (app.push /
+// pop / reset inside a handler), the Python side emits a `navigate` envelope with
+// the new path; the bootstrap routes it to `navigateTo`, which `pushState`s the
+// URL so back/forward + bookmarks stay correct. pushState does NOT fire popstate,
+// so this never echoes back as a navigate event; and a no-op when the path
+// already matches the URL (which is the case right after a URL → view round-trip).
 
 /**
  * Install URL→navigation reporting on `window`.
@@ -20,12 +23,14 @@
  *
  * @param {import("./transport.js").Transport} transport  The event sink.
  * @param {Window} [win]  The window to bind (defaults to the global).
- * @returns {{dispose: () => void}}  `dispose` removes the popstate listener.
+ * @returns {{dispose: () => void, navigateTo: (path: string) => void}}
+ *          `dispose` removes the popstate listener; `navigateTo` pushes a new URL
+ *          when the app navigates (view → URL), guarded against echoing back.
  */
 export function installRouter(transport, win) {
   const target = win ?? (typeof window !== "undefined" ? window : null);
   if (target == null) {
-    return { dispose() {} };
+    return { dispose() {}, navigateTo() {} };
   }
 
   const report = () => {
@@ -39,6 +44,24 @@ export function installRouter(transport, win) {
   return {
     dispose() {
       target.removeEventListener("popstate", report);
+    },
+
+    /**
+     * Sync the browser URL to a path the app navigated to (view → URL).
+     *
+     * No-op when the URL already matches `path` — which is exactly the case
+     * right after a URL → view round-trip (deep link / back-forward), so the
+     * server's confirming `navigate` envelope never adds a duplicate history
+     * entry. `pushState` does not fire `popstate`, so this never re-reports.
+     *
+     * @param {string} path  The new top-route path (e.g. "/settings").
+     * @returns {void}
+     */
+    navigateTo(path) {
+      if (typeof path !== "string" || !path) return;
+      const current = target.location?.pathname || "/";
+      if (path === current) return;
+      target.history?.pushState({}, "", path);
     },
   };
 }

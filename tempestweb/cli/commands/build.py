@@ -32,7 +32,17 @@ from pathlib import Path
 from tempestweb.cli.config import VALID_MODES, ProjectConfig, load_config
 from tempestweb.cli.loader import load_app, render_initial_tree
 from tempestweb.core.constants import WASM_PACKAGE_ARCHIVE, WASM_PYODIDE_VERSION
-from tempestweb.pwa import ManifestOptions, emit_icons, write_manifest
+from tempestweb.pwa import (
+    ManifestOptions,
+    emit_icons,
+    pyodide_cdn_base,
+    vendor_pyodide,
+    write_manifest,
+)
+
+#: Pyodide packages the vendored core needs at runtime (its only hard dependency).
+#: An offline build vendors the closure of these from the Pyodide lock file.
+WASM_RUNTIME_PACKAGES: tuple[str, ...] = ("pydantic",)
 
 __all__ = [
     "WASM_ARTIFACT_FILES",
@@ -342,18 +352,21 @@ def _index_html(name: str) -> str:
 """
 
 
-def _bootstrap_js(name: str) -> str:
+def _bootstrap_js(name: str, pyodide_base: str) -> str:
     """Render the live wasm bootstrap entrypoint (Mode A, Pyodide).
 
-    The emitted module loads Pyodide + ``pydantic`` from the CDN, unpacks the
-    zipped ``tempestweb`` package and writes ``app.py`` into the Pyodide virtual
-    filesystem, builds the app in-process via
+    The emitted module loads Pyodide + ``pydantic`` from ``pyodide_base``, unpacks
+    the zipped ``tempestweb`` package and writes ``app.py`` into the Pyodide
+    virtual filesystem, builds the app in-process via
     :func:`tempestweb.runtime.wasm_main.bootstrap`, and mounts the shared client
     onto ``#app`` through ``transport-wasm.js`` — Python runs in the same tab, so
     the transport is an in-process bridge with no network.
 
     Args:
         name: The project name.
+        pyodide_base: The base URL Pyodide is loaded from — the jsdelivr CDN by
+            default, or the artifact-relative ``"./pyodide/"`` for an offline
+            build (vendored runtime + wheels, precached by the service worker).
 
     Returns:
         The bootstrap module source.
@@ -367,7 +380,7 @@ import {{ mount }} from "./client/tempestweb.js";
 import {{ createWasmTransport }} from "./client/transport-wasm.js";
 import {{ installNativeBridge }} from "./client/native/index.js";
 
-const PYODIDE_BASE = "https://cdn.jsdelivr.net/pyodide/{WASM_PYODIDE_VERSION}/full/";
+const PYODIDE_BASE = "{pyodide_base}";
 
 // Python entry: build the app and hand back a _start(on_patches, dispatch) hook.
 const PY_GLUE = `
@@ -571,6 +584,7 @@ def build_artifact(
     mode: str | None = None,
     out_dir: str | Path | None = None,
     clean: bool = True,
+    offline: bool = False,
 ) -> BuildResult:
     """Build a deployable artifact for ``mode`` from a project.
 
@@ -580,6 +594,10 @@ def build_artifact(
         out_dir: Where to write the artifact. Defaults to
             ``<project_root>/dist/<mode>``.
         clean: When ``True`` (default), remove an existing ``out_dir`` first.
+        offline: When ``True`` (wasm only), vendor the Pyodide runtime + package
+            wheels into the artifact so it boots fully offline (the service worker
+            precaches them). Requires network *at build time* to download them.
+            Ignored for server mode.
 
     Returns:
         A :class:`BuildResult` describing the artifact.
@@ -614,14 +632,21 @@ def build_artifact(
     app_source = config.entrypoint_path.read_text(encoding="utf-8")
 
     if resolved_mode == "wasm":
-        files = _build_wasm(out, client, config.name, app_source)
+        files = _build_wasm(out, client, config.name, app_source, offline=offline)
     else:
         files = _build_server(out, client, config.name, app_source)
 
     return BuildResult(mode=resolved_mode, out_dir=out, files=files)
 
 
-def _build_wasm(out: Path, client: Path, name: str, app_source: str) -> tuple[str, ...]:
+def _build_wasm(
+    out: Path,
+    client: Path,
+    name: str,
+    app_source: str,
+    *,
+    offline: bool = False,
+) -> tuple[str, ...]:
     """Write the wasm (static) artifact layout into ``out``.
 
     Args:
@@ -629,12 +654,30 @@ def _build_wasm(out: Path, client: Path, name: str, app_source: str) -> tuple[st
         client: The shared ``client/`` directory.
         name: The project name.
         app_source: The project's ``app.py`` source to embed.
+        offline: When ``True``, vendor the Pyodide runtime + package wheels under
+            ``out/pyodide/``, point the bootstrap at that local copy, and precache
+            it so the app boots offline after the first load.
 
     Returns:
         The artifact-relative paths written, sorted.
     """
+    # Offline: vendor Pyodide same-origin so the service worker can precache it;
+    # otherwise the bootstrap loads it from the (cross-origin) jsdelivr CDN.
+    vendored: list[str] = []
+    if offline:
+        vendored = vendor_pyodide(
+            out / "pyodide",
+            version=WASM_PYODIDE_VERSION,
+            packages=WASM_RUNTIME_PACKAGES,
+        )
+        pyodide_base = "./pyodide/"
+    else:
+        pyodide_base = pyodide_cdn_base(WASM_PYODIDE_VERSION)
+
     (out / "index.html").write_text(_index_html(name), encoding="utf-8")
-    (out / "bootstrap.js").write_text(_bootstrap_js(name), encoding="utf-8")
+    (out / "bootstrap.js").write_text(
+        _bootstrap_js(name, pyodide_base), encoding="utf-8"
+    )
     (out / "app.py").write_text(app_source, encoding="utf-8")
     _zip_package(out / WASM_PACKAGE_ARCHIVE)
     _copy_client(client, out / "client", "transport-wasm.js")
@@ -654,9 +697,10 @@ def _build_wasm(out: Path, client: Path, name: str, app_source: str) -> tuple[st
     push_dest = out / "client" / "push"
     push_dest.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(push_source, push_dest / "web-push-client.js")
-    # App-shell the service worker precaches for an offline second load. The
-    # Pyodide runtime itself loads from the CDN (cross-origin) and is out of scope
-    # for this precache; the local shell + package payload are cached.
+    # App-shell the service worker precaches for an offline second load. With an
+    # offline build the vendored Pyodide runtime + wheels are same-origin and join
+    # the precache, so the app boots with no network at all; a CDN build precaches
+    # only the local shell + package payload (Pyodide stays cross-origin).
     precache = (
         "/",
         "/index.html",
@@ -666,9 +710,10 @@ def _build_wasm(out: Path, client: Path, name: str, app_source: str) -> tuple[st
         "/app.py",
         f"/{WASM_PACKAGE_ARCHIVE}",
         *(f"/client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
+        *(f"/pyodide/{file_name}" for file_name in vendored),
     )
     _build_pwa(out, client, name, precache)
-    return tuple(sorted(WASM_ARTIFACT_FILES))
+    return tuple(sorted([*WASM_ARTIFACT_FILES, *(f"pyodide/{f}" for f in vendored)]))
 
 
 def _build_server(

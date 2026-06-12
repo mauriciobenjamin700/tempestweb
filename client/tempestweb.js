@@ -71,6 +71,13 @@ export function mount(root, transport, initialNode = null) {
   const unbind = bindEvents(root, transport);
   const virtualization = installVirtualization(root, transport);
   const router = installRouter(transport);
+  // View → URL (Mode B): when the Python app navigates imperatively the transport
+  // surfaces a `navigate` envelope here; mirror it onto the browser URL. Mode A
+  // transports don't implement onNavigate (the bridge wires pushState directly),
+  // so this is a no-op there.
+  if (typeof transport.onNavigate === "function") {
+    transport.onNavigate((path) => router.navigateTo(path));
+  }
   // Reserve off-window scroll space for any virtualized list in the initial tree,
   // once the browser has laid the window out (so item heights can be measured).
   scheduleFrame(virtualization.refresh);

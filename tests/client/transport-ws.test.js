@@ -100,6 +100,25 @@ test("ws transport sends events as event envelopes", async () => {
   });
 });
 
+test("ws transport routes a navigate envelope to onNavigate", async () => {
+  let socket;
+  const Impl = class extends FakeWebSocket {
+    constructor(url) {
+      super(url);
+      socket = this;
+    }
+  };
+  const transport = createWebSocketTransport("ws://x/ws", { WebSocketImpl: Impl });
+  await transport.ready;
+
+  const paths = [];
+  transport.onNavigate((p) => paths.push(p));
+
+  socket.serverSend({ kind: "navigate", path: "/settings" });
+
+  assert.deepEqual(paths, ["/settings"]);
+});
+
 test("ws transport answers native_call with native_result", async () => {
   let socket;
   const Impl = class extends FakeWebSocket {

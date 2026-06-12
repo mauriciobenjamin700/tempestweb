@@ -49,6 +49,14 @@ class MockTransportA:
         # Mode A path: objects cross the boundary as-is, no JSON round trip.
         self.root = apply_batch(self.root, patches)
 
+    async def send_navigate(self, path: str) -> None:
+        """Sync the client URL on navigation — unused by this harness.
+
+        Args:
+            path: The new top-route path (ignored).
+        """
+        return None
+
     async def recv_event(self) -> dict[str, Any]:
         """Await the next queued client event.
 
@@ -120,6 +128,14 @@ class MockTransportB:
         wire: str = json.dumps(patches)
         decoded: list[dict[str, Any]] = json.loads(wire)
         self.root = apply_batch(self.root, decoded)
+
+    async def send_navigate(self, path: str) -> None:
+        """Sync the client URL on navigation — unused by this harness.
+
+        Args:
+            path: The new top-route path (ignored).
+        """
+        return None
 
     async def recv_event(self) -> dict[str, Any]:
         """Pop the next buffered client event.

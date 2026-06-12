@@ -27,10 +27,17 @@ from tempestweb.pwa.manifest import (
     validate_installable,
     write_manifest,
 )
+from tempestweb.pwa.pyodide_vendor import (
+    PYODIDE_CORE_FILES,
+    pyodide_cdn_base,
+    resolve_package_files,
+    vendor_pyodide,
+)
 
 __all__: list[str] = [
     "DEFAULT_ICONS",
     "DEFAULT_ICON_SPECS",
+    "PYODIDE_CORE_FILES",
     "IconSpec",
     "ManifestOptions",
     "build_manifest",
@@ -38,7 +45,10 @@ __all__: list[str] = [
     "emit_icons",
     "emit_manifest",
     "placeholder_png",
+    "pyodide_cdn_base",
+    "resolve_package_files",
     "validate_extras",
     "validate_installable",
+    "vendor_pyodide",
     "write_manifest",
 ]

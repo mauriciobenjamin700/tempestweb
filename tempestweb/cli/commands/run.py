@@ -2,10 +2,11 @@
 
 ``run`` is ``build`` followed by serving the produced artifact. :func:`prepare_run`
 produces the artifact and the bind plan (:class:`RunPlan`); :func:`serve_run`
-serves it. **Mode B (server)** is live: it imports the built ``server.py`` (the
-real FastAPI WS/SSE host) and runs it under uvicorn — the same artifact a
-deployment would run. **Mode A (wasm)** serving still depends on the Pyodide
-bootstrap glue owned by Track T3, so :func:`serve_run` reports that and stops.
+serves it. Both modes are live: **Mode B (server)** imports the built
+``server.py`` (the real FastAPI WS/SSE host) and runs it under uvicorn — the same
+artifact a deployment would run; **Mode A (wasm)** serves the static bundle over
+the dev HTTP app (:func:`~tempestweb.devserver.http.create_dev_app`), the same
+host that backs the Pyodide bootstrap in the browser.
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ def prepare_run(
     mode: str | None = None,
     host: str | None = None,
     port: int | None = None,
+    offline: bool = False,
 ) -> RunPlan:
     """Build the artifact and compute the bind plan for serving it.
 
@@ -63,6 +65,8 @@ def prepare_run(
         mode: ``"wasm"`` or ``"server"``. Defaults to the project config's mode.
         host: Override the bind address. Defaults to the project config's host.
         port: Override the bind port. Defaults to the project config's port.
+        offline: When ``True`` (wasm), vendor an offline-capable Pyodide into the
+            built bundle. See :func:`~tempestweb.cli.commands.build.build_artifact`.
 
     Returns:
         A :class:`RunPlan` with the built artifact and bind address.
@@ -72,7 +76,7 @@ def prepare_run(
     """
     config: ProjectConfig = load_config(project_root)
     try:
-        build = build_artifact(project_root, mode=mode)
+        build = build_artifact(project_root, mode=mode, offline=offline)
     except Exception as exc:  # noqa: BLE001 - normalize to RunError
         raise RunError(str(exc)) from exc
 
@@ -113,20 +117,21 @@ def serve_run(plan: RunPlan) -> None:
     """Serve a built artifact according to its bind plan (blocking).
 
     For **server** mode this imports the artifact's ``server.py`` — the real
-    FastAPI WS/SSE host — and runs it under uvicorn at ``plan.host:plan.port``.
-    The call blocks until the server is stopped (Ctrl-C).
+    FastAPI WS/SSE host — and runs it under uvicorn. For **wasm** mode it serves
+    the static bundle over the dev HTTP app. Either way the call binds
+    ``plan.host:plan.port`` and blocks until stopped (Ctrl-C).
 
     Args:
         plan: The run plan produced by :func:`prepare_run`.
 
     Raises:
-        RunError: If the artifact is not a server artifact (wasm serving is owned
-            by Track T3) or the built server cannot be imported.
+        RunError: If the built server (server mode) cannot be imported.
     """
-    if plan.build.mode != "server":
-        raise RunError(
-            f"serving mode {plan.build.mode!r} is not available yet "
-            "(wasm Pyodide bootstrap is owned by Track T3)"
-        )
-    server = _load_artifact_server(plan.build.out_dir)
-    server.run(plan.host, plan.port)
+    if plan.build.mode == "server":
+        server = _load_artifact_server(plan.build.out_dir)
+        server.run(plan.host, plan.port)
+        return
+    # wasm: static-host the bundle (no livereload — that is `dev`'s job).
+    from tempestweb.devserver.http import create_dev_app, serve
+
+    serve(create_dev_app(plan.build.out_dir), plan.host, plan.port)

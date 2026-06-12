@@ -27,6 +27,7 @@ from tempestweb.transports.base import (
     encode_event,
     encode_native_call,
     encode_native_result,
+    encode_navigate,
     encode_patches,
 )
 from tempestweb.transports.wasm import WasmTransport
@@ -83,5 +84,6 @@ __all__ = [
     "encode_event",
     "encode_native_call",
     "encode_native_result",
+    "encode_navigate",
     "encode_patches",
 ]

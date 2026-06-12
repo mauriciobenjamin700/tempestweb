@@ -39,6 +39,8 @@ export function createWebSocketTransport(url, options = {}) {
 
   /** @type {((patches: Patch[]) => void) | null} */
   let patchHandler = null;
+  /** @type {((path: string) => void) | null} */
+  let navigateHandler = null;
   /** @type {Patch[][]} */
   const pendingBatches = [];
   let closed = false;
@@ -97,6 +99,8 @@ export function createWebSocketTransport(url, options = {}) {
       else pendingBatches.push(envelope.data);
     } else if (envelope.kind === "native_call") {
       void handleNativeCall(envelope);
+    } else if (envelope.kind === "navigate") {
+      if (navigateHandler) navigateHandler(envelope.path);
     }
   });
 
@@ -114,6 +118,15 @@ export function createWebSocketTransport(url, options = {}) {
     onPatches(handler) {
       patchHandler = handler;
       while (pendingBatches.length > 0) handler(pendingBatches.shift());
+    },
+
+    /**
+     * Register the callback invoked when the app navigates (view → URL).
+     * @param {(path: string) => void} handler
+     * @returns {void}
+     */
+    onNavigate(handler) {
+      navigateHandler = handler;
     },
 
     /**

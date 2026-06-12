@@ -1,6 +1,7 @@
 // Tests for client/tempestweb.js — mount() wiring against a mock transport.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { JSDOM } from "jsdom";
 import { fixture, freshDom } from "./setup.js";
 import { mount } from "../../client/tempestweb.js";
 
@@ -13,13 +14,22 @@ function mockTransport() {
   const events = [];
   /** @type {?(patches: import("../../client/transport.js").Patch[]) => void} */
   let handler = null;
+  /** @type {?(path: string) => void} */
+  let navHandler = null;
   return {
     events,
     push(patches) {
       if (handler) handler(patches);
     },
+    /** Test helper: simulate a server-pushed navigate envelope. */
+    navigate(path) {
+      if (navHandler) navHandler(path);
+    },
     onPatches(fn) {
       handler = fn;
+    },
+    onNavigate(fn) {
+      navHandler = fn;
     },
     sendEvent(event) {
       events.push(event);
@@ -130,6 +140,29 @@ test("deferred mount throws when the first patch is not a root replace", () => {
     () => transport.push([{ path: [], index: 0 }]),
     /expected a root Replace/,
   );
+});
+
+test("mount syncs the URL when the transport reports a navigate (view -> URL)", () => {
+  // A real http origin so jsdom's history.pushState accepts a path (about:blank
+  // rejects relative pushState).
+  const dom = new JSDOM(
+    "<!doctype html><html><body><div id='root'></div></body></html>",
+    { url: "http://localhost/" },
+  );
+  globalThis.document = dom.window.document;
+  globalThis.window = dom.window;
+  try {
+    const root = dom.window.document.getElementById("root");
+    const transport = mockTransport();
+    mount(root, transport, fixture("node_initial.json"));
+
+    // The server tells the client the app navigated; mount routes it to the
+    // router, which pushState-s the new URL.
+    transport.navigate("/settings");
+    assert.equal(dom.window.location.pathname, "/settings");
+  } finally {
+    delete globalThis.window;
+  }
 });
 
 test("unmount removes the tree and stops events", () => {

@@ -103,6 +103,10 @@ class AppSession(Generic[S]):
         # (await native.<capability>()), so there is no duplicated proxy logic.
         self._bridge: ProxyBridge = ProxyBridge(self._send_native_frame)
         self._bridge_installed: bool = False
+        # Last top-route path pushed to the client. The initial mount lands the
+        # client on "/" (its document URL), so we only emit a navigate envelope
+        # once the app navigates somewhere else (view → URL).
+        self._last_path: str = "/"
         transport.on_native_result(self._resolve_native_result)
 
     def _send_native_frame(self, envelope: dict[str, Any]) -> None:
@@ -140,6 +144,27 @@ class AppSession(Generic[S]):
             return
         wire = patches_to_wire(patches)
         self._spawn(self.transport.send_patches(wire))
+        self._emit_nav_if_changed()
+
+    def _emit_nav_if_changed(self) -> None:
+        """Push a ``navigate`` envelope when the app's top route changed.
+
+        Called after each coalesced rebuild: if the app navigated imperatively
+        (``app.push`` / ``app.pop`` / ``app.reset`` inside a handler), the top
+        route's path differs from the last one the client saw, so we tell the
+        client to ``pushState`` the new URL. No-op when the path is unchanged,
+        the session is closed, or the app has not mounted yet. This is the
+        view → URL leg; the reverse (URL → view) arrives as a ``navigate`` event.
+        """
+        if self._closed or self.app is None:
+            return
+        nav = getattr(self.app, "nav", None)
+        if nav is None:
+            return
+        path = nav.top.name
+        if path != self._last_path:
+            self._last_path = path
+            self._spawn(self.transport.send_navigate(path))
 
     def _spawn(self, coro: Coroutine[Any, Any, None]) -> None:
         """Schedule a coroutine as a tracked session task.
@@ -164,13 +189,12 @@ class AppSession(Generic[S]):
         screen.
 
         Note:
-            ``install_bridge`` is process-global (see
-            :mod:`tempestweb.native.dispatch`). For the single-session-per-process
-            path this is correct; with multiple concurrent server sessions the last
-            ``start()`` wins for the dispatch-module path, so a session always uses
-            its **own** bridge through :meth:`native_call`. Cross-session isolation
-            of ``await native.*`` is a known limitation tracked for the
-            session-local context-var bridge follow-up.
+            ``install_bridge`` stores the bridge in a context-local variable (see
+            :mod:`tempestweb.native.dispatch`). Because this ``start`` is awaited
+            from the session's own ``run`` task, the bridge is isolated to that
+            connection's asyncio context: concurrent server sessions each resolve
+            ``await native.*`` through their **own** bridge, never clobbering one
+            another. :meth:`native_call` also uses this session's bridge directly.
         """
         self.app = App(
             state=self._state_factory(),

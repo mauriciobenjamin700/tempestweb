@@ -125,6 +125,20 @@ class WasmTransport:
             raise TransportClosedError("wasm transport is closed")
         self._events.put_nowait(event)
 
+    async def send_navigate(self, path: str) -> None:
+        """Sync the client URL on app navigation — a no-op in Mode A.
+
+        In Mode A the Python runtime runs in the same browser tab, so view → URL
+        is wired directly by :class:`~tempestweb.runtime.wasm.WasmRuntime`'s
+        ``on_navigate`` callback (it calls ``history.pushState`` over
+        ``pyodide.ffi``), never through the transport. This method exists only to
+        satisfy the :class:`~tempestweb.transports.base.PatchTransport` Protocol.
+
+        Args:
+            path: The new top-route path (ignored here).
+        """
+        return None
+
     async def send_native_call(
         self, call_id: str, capability: str, args: dict[str, Any]
     ) -> None:

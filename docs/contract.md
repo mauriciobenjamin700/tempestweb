@@ -158,3 +158,29 @@ transporte (WS ou SSE+POST):
 > No Modo A o mesmo awaitable Python resolve em-processo (sem `native_call`/
 > `native_result`) — a **API Python é idêntica**, só o caminho muda. É a razão de a
 > assinatura tipada morar no contrato, não no transporte.
+
+## Navegação ↔ URL (deep links + back/forward)
+
+O browser dona a **URL**; o app Python dona a **pilha de navegação**. As duas
+pontas se sincronizam por mensagens nos dois sentidos:
+
+```json
+// cliente → servidor: a URL mudou (load, popstate). Reseta a pilha p/ a rota.
+{ "type": "navigate", "key": "", "payload": { "path": "/details" } }
+
+// servidor → cliente: o app navegou imperativamente (app.push/pop/reset).
+{ "kind": "navigate", "path": "/details" }
+```
+
+- **URL → view:** no load e em cada `popstate` (voltar/avançar), o cliente reporta
+  `location.pathname` como um **evento** `navigate` (`key` vazio). O runtime o
+  trata antes da resolução de handler (`apply_navigate` → `routes_from_path`),
+  resetando a pilha de navegação, então o `view` re-renderiza a tela linkada.
+- **view → URL:** quando um handler navega (`app.push`/`pop`/`reset`), o topo da
+  rota muda; o servidor emite o envelope `navigate` e o cliente faz
+  `history.pushState` (no-op se a URL já bate — evita entrada duplicada logo após
+  um round-trip URL→view). `pushState` não dispara `popstate`, então não há eco.
+
+> No Modo A não há envelope: o `WasmRuntime` chama `history.pushState` direto via
+> `pyodide.ffi` (callback `on_navigate`). A **semântica é idêntica** nos dois modos
+> — só o transporte do sentido view→URL difere (envelope no B, callback no A).

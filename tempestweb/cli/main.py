@@ -19,9 +19,9 @@ from tempestweb.cli.commands import (
     NewError,
     RunError,
     build_artifact,
-    create_dev_session,
     create_project,
     prepare_run,
+    serve_dev,
     serve_run,
 )
 
@@ -71,6 +71,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=".",
         help="Project directory to watch (default: cwd).",
     )
+    dev.add_argument("--host", default=None, help="Override the bind address.")
+    dev.add_argument("--port", type=int, default=None, help="Override the bind port.")
 
     build = sub.add_parser("build", help="Build a deployable artifact.")
     build.add_argument(
@@ -89,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Artifact output directory (default: <project>/dist/<mode>).",
     )
+    build.add_argument(
+        "--offline",
+        action="store_true",
+        help="Vendor the Pyodide runtime + wheels so wasm boots offline "
+        "(downloads them at build time).",
+    )
 
     run = sub.add_parser("run", help="Build and serve the app locally.")
     run.add_argument("--mode", choices=["wasm", "server"], default="wasm")
@@ -103,6 +111,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Override the bind port.",
+    )
+    run.add_argument(
+        "--offline",
+        action="store_true",
+        help="Build the wasm bundle with a vendored, offline-capable Pyodide.",
     )
 
     return parser
@@ -137,8 +150,9 @@ def _cmd_new(args: argparse.Namespace) -> int:
 def _cmd_dev(args: argparse.Namespace) -> int:
     """Handle ``tempestweb dev``.
 
-    Builds a wired dev session and runs the (blocking) file-watch loop. The
-    reload transport is the stub until Tracks T2/T3 land their real transports.
+    Builds the wasm bundle, serves it with browser livereload, watches the
+    project, and rebuilds + reloads on every change (Mode A). Mode B is served by
+    ``tempestweb run --mode server`` instead.
 
     Args:
         args: Parsed arguments for the ``dev`` subcommand.
@@ -147,16 +161,12 @@ def _cmd_dev(args: argparse.Namespace) -> int:
         Process exit code.
     """
     try:
-        session = create_dev_session(args.path, mode=args.mode)
+        asyncio.run(
+            serve_dev(args.path, mode=args.mode, host=args.host, port=args.port)
+        )
     except DevError as exc:
         print(f"tempestweb dev: {exc}", file=sys.stderr)
         return 1
-    print(
-        f"Watching {session.config.root} (mode={session.mode}); "
-        "edit a file to reload. Ctrl-C to stop."
-    )
-    try:
-        asyncio.run(session.watcher.run())
     except KeyboardInterrupt:  # pragma: no cover - interactive only
         print("\nStopped.")
     return 0
@@ -172,7 +182,9 @@ def _cmd_build(args: argparse.Namespace) -> int:
         Process exit code.
     """
     try:
-        result = build_artifact(args.path, mode=args.mode, out_dir=args.out)
+        result = build_artifact(
+            args.path, mode=args.mode, out_dir=args.out, offline=args.offline
+        )
     except BuildError as exc:
         print(f"tempestweb build: {exc}", file=sys.stderr)
         return 1
@@ -186,8 +198,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
     """Handle ``tempestweb run``.
 
     Builds the artifact, then serves it. Mode B (server) starts the real FastAPI
-    WS/SSE host under uvicorn (blocking until Ctrl-C). Mode A (wasm) serving is
-    owned by Track T3, so it stops at "ready to serve".
+    WS/SSE host under uvicorn; Mode A (wasm) static-hosts the bundle. Both block
+    until Ctrl-C.
 
     Args:
         args: Parsed arguments for the ``run`` subcommand.
@@ -201,19 +213,12 @@ def _cmd_run(args: argparse.Namespace) -> int:
             mode=args.mode,
             host=args.host,
             port=args.port,
+            offline=args.offline,
         )
     except RunError as exc:
         print(f"tempestweb run: {exc}", file=sys.stderr)
         return 1
     print(f"Built {plan.build.mode} artifact at {plan.build.out_dir}")
-
-    if plan.build.mode != "server":
-        print(f"Ready to serve at {plan.url}")
-        print(
-            "tempestweb run: wasm serving is provided by the Pyodide bootstrap "
-            "(Track T3); the artifact is built and the bind plan is ready."
-        )
-        return 0
 
     print(f"Serving at {plan.url} (Ctrl-C to stop)")
     try:

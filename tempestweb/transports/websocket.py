@@ -30,6 +30,7 @@ from tempestweb.transports.base import (
     Patch,
     TransportClosedError,
     encode_native_call,
+    encode_navigate,
     encode_patches,
 )
 
@@ -99,6 +100,17 @@ class WebSocketTransport:
         if not patches:
             return
         await self._send(encode_patches(patches))
+
+    async def send_navigate(self, path: str) -> None:
+        """Send a ``navigate`` envelope so the client syncs its URL (view → URL).
+
+        Args:
+            path: The new top-route path the app navigated to.
+
+        Raises:
+            TransportClosedError: If the socket is no longer connected.
+        """
+        await self._send(encode_navigate(path))
 
     async def send_native_call(
         self, call_id: str, capability: str, args: dict[str, Any]

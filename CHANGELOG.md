@@ -4,6 +4,18 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.5.2] — 2026-06-13
+
+### Changed
+
+- **Friendly error when the `[server]` extra is missing for Mode A serving.**
+  `tempestweb dev` and `tempestweb run --mode wasm` lazy-import the dev server
+  (Starlette + uvicorn, shipped under the `[server]` extra). On an install
+  without it the import surfaced a raw `ModuleNotFoundError`. Both commands now
+  raise a `DevError`/`RunError` with an actionable hint
+  (`uv add 'tempestweb[server]'`), printed cleanly by the CLI. The built wasm
+  artifact still never embeds a server — this only affects local serving.
+
 ## [0.5.1] — 2026-06-13
 
 ### Fixed

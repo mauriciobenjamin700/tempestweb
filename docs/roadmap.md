@@ -1,13 +1,18 @@
 # Roadmap e fases
 
-!!! info "Estado atual — atualizado em 2026-06-11"
-    Tracks **T1–T10 mesclados na `main`** com gate verde (ruff/format/mypy ✓ ·
-    pytest 266 pass/1 skip · jsdom 155 pass). Legenda de status: **✅** mesclado e
-    com gate verde · **🔶** implementado mas pendente de **verificação real**
-    (browser/device — ver `docs/agents/reports/NOTES-T*.md`) · **⬜** não iniciado.
-    Pendências de alto nível: **Trilho 0** (extração `tempest-core`) não iniciado —
-    core ainda vendorado em `_core/`; **Trilho E** (paridade) não iniciado;
-    verificação ao vivo (Pyodide, Lighthouse, push aba-fechada) não executada.
+!!! info "Estado atual — atualizado em 2026-06-13"
+    Tracks **T1–T10 + Trilhos 0/W/A/B/P/N/O/E mesclados na `main`** com gate verde
+    (ruff/format/mypy ✓ · pytest 459 pass/1 skip · jsdom 205 pass). Publicado no
+    PyPI: **tempestweb 0.5.1**. Legenda de status: **✅** mesclado e com gate verde ·
+    **🔶** implementado mas pendente de **verificação real** (browser/device — ver
+    `docs/agents/reports/NOTES-T*.md`) · **⬜** não iniciado. Os dois modos rodam um
+    app fim-a-fim ao vivo (counter por WS e Pyodide no browser), Trilho E está ✅ ao
+    vivo (7/7) e o core já é o pacote `tempest-core` (o `_core/` vendorado foi
+    removido). Pendências de alto nível: **Trilho 0 fase 2** (tempestroid passar a
+    depender do `tempest-core` + conformância Qt↔Compose) — bloqueada no repo
+    tempestroid; e a **verificação ao vivo device-dependente** dos itens 🔶
+    (Background Sync com aba fechada, WebPush aba-fechada, geo/clipboard/câmera
+    reais), que não dá para automatizar em unit/jsdom.
 
 !!! danger "Lacuna de integração descoberta na verificação (2026-06-11)"
     Os **engines** de ambos os modos existem e passam unit/jsdom, mas a **costura
@@ -35,8 +40,9 @@
     não só pesquisado**. Junto: refactor que torna o import do Modo A livre de
     Starlette (`transports/__init__` lazy nos transportes Modo B).
 
-    Ambos os modos agora rodam um app fim-a-fim. Resta `A2` (handler async com
-    `await` ao vivo), Trilho 0 (`tempest-core`) e Trilho E.
+    Ambos os modos agora rodam um app fim-a-fim. `A2` (handler async com `await`
+    ao vivo), Trilho 0 fase 1 (`tempest-core` adotado, `_core/` removido) e Trilho
+    E (7/7 ao vivo) já fecharam — resta só o Trilho 0 fase 2 no repo tempestroid.
 
 O desenvolvimento segue um pré-requisito, trilhos compartilhados e dois trilhos de
 execução. **Trilho 0** extrai o `tempest-core` do tempestroid. **Trilho W** é o
@@ -173,7 +179,7 @@ backend sem tocar a app) herdado do `tempest-react-sdk`. Servidor reusa o
 |---|---|---|
 | C | Polimento: `new`/`build --mode`/`run` + hot reload com estado (B primeiro) | ✅ (CLI completo; hot reload preserva-estado ainda é restart) |
 | D | Conformância A-vs-B: mesma `view()` → DOM idêntico nos dois modos, no CI | ✅ |
-| E | Paridade (reusa extras do `tempest-core`): rotas/URL, listas, overlays, animação CSS, gestos, formulários, mídia, tema/i18n/a11y | ✅ ao vivo (branch `feat/trilho-e-parity`, 7/7 verificados no browser: E.1 rotas URL→view · E.2 listas virtualizadas · E.3 overlays · E.4 animação CSS · E.5 gestos · E.6 forms+media · E.7 a11y/i18n/theme). Follow-ups: view→URL (pushState), scrollbar proporcional |
+| E | Paridade (reusa extras do `tempest-core`): rotas/URL, listas, overlays, animação CSS, gestos, formulários, mídia, tema/i18n/a11y | ✅ ao vivo (branch `feat/trilho-e-parity`, 7/7 verificados no browser: E.1 rotas URL→view · E.2 listas virtualizadas · E.3 overlays · E.4 animação CSS · E.5 gestos · E.6 forms+media · E.7 a11y/i18n/theme). Follow-ups ✅: view→URL (pushState) + scrollbar proporcional, ambos mesclados e testados (`test_server_navigate.py` · `router.test.js` · `virtualize.test.js`) |
 
 !!! note "Conformância (fase D)"
     Diferente do tempestroid (Qt vs Compose, dois tradutores de `Style`), aqui há

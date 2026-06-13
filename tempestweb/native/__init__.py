@@ -46,6 +46,7 @@ from tempestweb.native import (
     file,
     geolocation,
     http,
+    install,
     notifications,
     onnx,
     storage,
@@ -78,6 +79,9 @@ from tempestweb.native.http import (
     request,
     upload,
 )
+from tempestweb.native.install import InstallState
+from tempestweb.native.install import prompt as install_prompt
+from tempestweb.native.install import state as install_state
 from tempestweb.native.notifications import (
     NotificationPermission,
     notify,
@@ -109,6 +113,7 @@ __all__ = [
     "file",
     "geolocation",
     "http",
+    "install",
     "notifications",
     "onnx",
     "storage",
@@ -161,6 +166,10 @@ __all__ = [
     "SaveResult",
     "file_pick",
     "file_save",
+    # install (PWA install prompt)
+    "InstallState",
+    "install_prompt",
+    "install_state",
     # notifications
     "NotificationPermission",
     "notify",

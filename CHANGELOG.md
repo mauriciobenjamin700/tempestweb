@@ -4,6 +4,16 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.3.0] — 2026-06-13
+
+### Added
+
+- **`native.install` capability** — the PWA install flow in Python:
+  `install.state()` → `InstallState(can_install, installed)` and
+  `install.prompt()` → `"accepted" | "dismissed" | "unavailable"`. Wraps the soft
+  controller in `client/pwa/install-prompt.js` (now copied into the wasm
+  artifact) via `client/native/install.js`.
+
 ## [0.2.0] — 2026-06-13
 
 Real-app capabilities, driven by building a full on-device vision PWA (FAMACHApp)

@@ -163,6 +163,23 @@ test("file.pick: reads the chosen file back as base64", async () => {
   assert.equal(res.value.name, "ovino.png");
 });
 
+test("install.state/prompt: no captured event → not installable, unavailable", async () => {
+  const fakeWindow = {
+    addEventListener() {},
+    removeEventListener() {},
+    matchMedia: () => ({ matches: false }),
+    navigator: {},
+  };
+  const deps = { window: fakeWindow };
+  const s = await dispatch(call("install.state"), deps);
+  assert.equal(s.ok, true);
+  assert.equal(s.value.can_install, false);
+  assert.equal(s.value.installed, false);
+  const p = await dispatch(call("install.prompt"), deps);
+  assert.equal(p.ok, true);
+  assert.equal(p.value.outcome, "unavailable");
+});
+
 test("file.save: uses the Web Share API when it accepts files", async () => {
   const dom = new JSDOM("<!doctype html><html><body></body></html>");
   globalThis.Blob = dom.window.Blob;

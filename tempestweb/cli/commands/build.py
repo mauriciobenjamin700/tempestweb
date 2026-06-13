@@ -74,6 +74,7 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "file.js",
     "geolocation.js",
     "http.js",
+    "install.js",
     "notifications.js",
     "onnx.js",
     "share.js",
@@ -119,6 +120,7 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     *(f"client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
     *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
     "client/push/web-push-client.js",
+    "client/pwa/install-prompt.js",
 )
 
 # Files a server artifact must contain, relative to the artifact root.
@@ -773,6 +775,13 @@ def _build_wasm(
     push_dest = out / "client" / "push"
     push_dest.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(push_source, push_dest / "web-push-client.js")
+    # The install capability imports the soft install-prompt controller.
+    install_source = client / "pwa" / "install-prompt.js"
+    if not install_source.is_file():
+        raise BuildError(f"missing pwa asset: {install_source}")
+    pwa_dest = out / "client" / "pwa"
+    pwa_dest.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(install_source, pwa_dest / "install-prompt.js")
     # Project static assets (ONNX models, vendored JS libs) copied verbatim,
     # preserving their relative path, and precached for the offline second load.
     assets: list[str] = []

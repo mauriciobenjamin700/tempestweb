@@ -171,6 +171,30 @@ async def export_zip(zip_bytes: bytes) -> None:
     await file.save("historico.zip", zip_bytes, mime_type="application/zip")
 ```
 
+## Instalação do PWA (`native.install`)
+
+Exponha o fluxo de instalação do PWA ao Python: saber se o app é instalável
+(`beforeinstallprompt` capturado) ou já instalado, e disparar o prompt após um
+gesto real do usuário.
+
+```python
+from tempestweb.native import install
+
+
+async def on_install_tap() -> None:
+    """Fire the native install prompt from a button handler."""
+    outcome = await install.prompt()   # "accepted" | "dismissed" | "unavailable"
+
+
+async def maybe_show_install_button() -> bool:
+    """Whether to show an Install button."""
+    state = await install.state()      # InstallState(can_install, installed)
+    return state.can_install and not state.installed
+```
+
+`client/native/install.js` envolve o controlador soft de
+`client/pwa/install-prompt.js` (suprime o mini-infobar e guarda o evento).
+
 ## Extras de build do Modo A (`[wasm]`)
 
 Capacidades que dependem de pacotes Pyodide extras, módulos Python próprios,

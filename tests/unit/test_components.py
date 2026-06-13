@@ -11,6 +11,11 @@ from tempestweb.components import (
     PasswordField,
     SignupForm,
     TextField,
+    elevated_button,
+    filled_button,
+    outlined_button,
+    text_button,
+    tonal_button,
     validate_email,
     validate_phone,
 )
@@ -128,3 +133,71 @@ def test_text_field_generic_labelled_input() -> None:
     assert labels and labels[0].props.get("content") == "Name"
     inputs = [n for n in _walk(node) if n.type == "Input"]
     assert inputs[0].props.get("value") == "Ada"
+
+
+def _bg_alpha(style: Any | None) -> float | None:
+    """Read a Style's background alpha, or None when unset/not a solid color."""
+    if style is None:
+        return None
+    background = getattr(style, "background", None)
+    alpha = getattr(background, "a", None)
+    return float(alpha) if alpha is not None else None
+
+
+def test_light_fields_carry_no_dark_inline_background() -> None:
+    """EmailField/PasswordField inputs are unstyled so the MD3 base sheet applies.
+
+    Guards against regressing to the core's dark BR input: the inner Input must
+    not ship an inline background, leaving it to the light base stylesheet.
+    """
+    for field in (
+        EmailField(value="", on_change=lambda _v: None),
+        PasswordField(value="", on_change=lambda _v: None),
+    ):
+        inputs = [n for n in _walk(build(field)) if n.type == "Input"]
+        assert inputs
+        assert inputs[0].props.get("style") is None
+
+
+def test_filled_button_is_unstyled_for_the_base_sheet() -> None:
+    """filled_button carries no inline style, so the base sheet styles it."""
+    fired: list[str] = []
+    node = build(filled_button("Save", lambda: fired.append("x"), key="save"))
+    assert node.type == "Button"
+    assert node.props.get("style") is None
+    assert node.props.get("label") == "Save"
+    handler = node.props.get("on_click")
+    assert callable(handler)
+    handler()
+    assert fired == ["x"]
+
+
+def test_tonal_button_sets_an_opaque_fill() -> None:
+    """tonal_button paints a secondary-container fill (opaque background)."""
+    node = build(tonal_button("More", lambda: None))
+    assert _bg_alpha(node.props.get("style")) == 1.0
+
+
+def test_elevated_button_carries_a_resting_shadow() -> None:
+    """elevated_button ships an inline shadow for its resting elevation."""
+    node = build(elevated_button("Open", lambda: None))
+    style = node.props.get("style")
+    assert style is not None and getattr(style, "shadow", None) is not None
+
+
+def test_outlined_button_has_a_border_and_transparent_fill() -> None:
+    """outlined_button draws a border over a transparent background."""
+    node = build(outlined_button("Edit", lambda: None))
+    style = node.props.get("style")
+    assert style is not None
+    assert getattr(style, "border", None) is not None
+    assert _bg_alpha(style) == 0.0
+
+
+def test_text_button_is_transparent_with_no_border() -> None:
+    """text_button is a bare label: transparent fill, no border."""
+    node = build(text_button("Cancel", lambda: None))
+    style = node.props.get("style")
+    assert style is not None
+    assert _bg_alpha(style) == 0.0
+    assert getattr(style, "border", None) is None

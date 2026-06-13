@@ -22,12 +22,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets.events import TextChangeEvent
-
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import DataTable, SearchBar
+from tempestweb._core.style import AlignItems, Edge, FontWeight
 from tempestweb._core.widgets import Button, Column, Row, Text
+from tempestweb._core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Domain data

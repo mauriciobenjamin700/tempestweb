@@ -20,8 +20,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempestweb._core.style import AlignItems, Color, Edge, FontWeight, TextAlign
-
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import (
     Banner,
@@ -30,6 +28,7 @@ from tempestweb._core.components import (
     EmailInput,
     PasswordInput,
 )
+from tempestweb._core.style import AlignItems, Color, Edge, FontWeight, TextAlign
 from tempestweb._core.widgets import (
     Button,
     Column,

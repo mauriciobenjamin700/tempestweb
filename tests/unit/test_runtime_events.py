@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from tempest_core.widgets.events import SwipeEvent, TextChangeEvent
-
 from tempestweb.runtime import coerce_event
 
 

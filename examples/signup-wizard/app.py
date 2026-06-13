@@ -23,10 +23,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets.events import SelectEvent, TextChangeEvent
-
 from tempestweb._core import App, Style, Widget
+from tempestweb._core.style import Edge
 from tempestweb._core.widgets import (
     Button,
     Column,
@@ -40,6 +38,7 @@ from tempestweb._core.widgets import (
     TextArea,
     Validator,
 )
+from tempestweb._core.widgets.events import SelectEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # State

@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from tempest_core import Node, build
-
 from tempestweb.components import (
     EmailField,
     LoginForm,

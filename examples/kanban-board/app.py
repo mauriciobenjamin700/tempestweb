@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from tempestweb._core import App, Style, Widget
 from tempestweb._core.style import (
     AlignItems,
     Border,
@@ -24,9 +25,6 @@ from tempestweb._core.style import (
     FontWeight,
     JustifyContent,
 )
-from tempestweb._core.widgets.events import DragEvent, TextChangeEvent
-
-from tempestweb._core import App, Style, Widget
 from tempestweb._core.widgets import (
     Button,
     Column,
@@ -38,6 +36,7 @@ from tempestweb._core.widgets import (
     ScrollView,
     Text,
 )
+from tempestweb._core.widgets.events import DragEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Domain types

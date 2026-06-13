@@ -25,9 +25,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets.events import RouteChangeEvent, ToggleEvent
-
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import (
     AppBar,
@@ -37,6 +34,7 @@ from tempestweb._core.components import (
     ListTile,
     Scaffold,
 )
+from tempestweb._core.style import AlignItems, Edge, FontWeight
 from tempestweb._core.widgets import (
     Column,
     Row,
@@ -44,6 +42,7 @@ from tempestweb._core.widgets import (
     TabView,
     Text,
 )
+from tempestweb._core.widgets.events import RouteChangeEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # State

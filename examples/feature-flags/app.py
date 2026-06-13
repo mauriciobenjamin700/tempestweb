@@ -34,9 +34,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core.style import Border, Color, Edge, FontWeight
-
 from tempestweb._core import App, Style, Widget
+from tempestweb._core.style import Border, Color, Edge, FontWeight
 from tempestweb._core.widgets import Button, Column, Container, Row, Text
 from tempestweb.observability import (
     FeatureFlagsProvider,

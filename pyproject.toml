@@ -81,6 +81,13 @@ ignore = ["D203", "D213"]
 "tests/*" = ["D", "ANN"]
 "examples/*" = ["D"]
 
+[tool.ruff.lint.isort]
+# Pin first-party so import ordering is deterministic regardless of what is
+# installed: ruff's auto-detection classifies tempestweb/tempest_core differently
+# in a fresh CI venv vs a local editable checkout, which made `ruff check .` pass
+# locally but fail in CI. Both are our own packages (split across repos).
+known-first-party = ["tempestweb", "tempest_core"]
+
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "double"
 

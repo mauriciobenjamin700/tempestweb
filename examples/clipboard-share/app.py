@@ -38,9 +38,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempestweb._core.style import Edge
-
 from tempestweb._core import App, Style, Widget
+from tempestweb._core.style import Edge
 from tempestweb._core.widgets import Button, Column, Row, Spinner, Text
 from tempestweb.native import clipboard
 from tempestweb.native.share import ShareOutcome, ShareResult

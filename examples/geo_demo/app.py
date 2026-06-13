@@ -14,7 +14,6 @@ from dataclasses import dataclass
 
 from tempest_core import App, Button, Column, Style, Text, Widget
 from tempest_core.style import Edge
-
 from tempestweb.native import get_position
 
 

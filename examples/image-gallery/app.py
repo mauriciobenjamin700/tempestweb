@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from tempestweb._core import App, Style, Widget
 from tempestweb._core.style import (
     AlignItems,
     Color,
@@ -26,8 +27,6 @@ from tempestweb._core.style import (
     Shadow,
     TextAlign,
 )
-
-from tempestweb._core import App, Style, Widget
 from tempestweb._core.widgets import (
     Button,
     Column,

@@ -22,12 +22,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core.style import Edge, FontWeight, TextAlign
-from tempestweb._core.widgets.events import TextChangeEvent
-
 from tempestweb._core import App, Locale, Style, Widget, t
 from tempestweb._core.components import Card, Divider, SegmentedControl
+from tempestweb._core.style import Edge, FontWeight, TextAlign
 from tempestweb._core.widgets import Column, Input, Text
+from tempestweb._core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Translation catalogue

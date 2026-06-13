@@ -18,6 +18,7 @@ from types import ModuleType
 from typing import Any
 
 import pytest
+
 from tempest_core import App, Node, build, diff
 from tempest_core.widgets.events import TextChangeEvent, ToggleEvent
 

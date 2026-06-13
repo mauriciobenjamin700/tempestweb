@@ -13,7 +13,6 @@ from dataclasses import dataclass
 
 from tempest_core import App, Column, Style, Text, Widget
 from tempest_core.style import Edge
-
 from tempestweb.components import LoginForm, validate_email
 
 

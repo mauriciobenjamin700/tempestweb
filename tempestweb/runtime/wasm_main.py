@@ -28,7 +28,6 @@ from collections.abc import Awaitable, Callable
 from typing import Any, Generic, TypeVar
 
 from tempest_core import App, Widget
-
 from tempestweb.native.bridges import FFIBridge
 from tempestweb.native.dispatch import install_bridge, uninstall_bridge
 from tempestweb.runtime.wasm import WasmRuntime

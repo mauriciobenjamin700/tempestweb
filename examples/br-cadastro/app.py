@@ -23,14 +23,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core.style import Color, Edge, FontWeight
-from tempestweb._core.validators import (
-    validate_cnpj,
-    validate_cpf,
-    validate_email,
-    validate_phone,
-)
-
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import (
     AddressInput,
@@ -42,6 +34,13 @@ from tempestweb._core.components import (
     EmailInput,
     PhoneInput,
     SegmentedControl,
+)
+from tempestweb._core.style import Color, Edge, FontWeight
+from tempestweb._core.validators import (
+    validate_cnpj,
+    validate_cpf,
+    validate_email,
+    validate_phone,
 )
 from tempestweb._core.widgets import Button, Column, Input, Text
 

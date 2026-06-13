@@ -15,9 +15,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets.events import SlideEvent, ToggleEvent
-
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import (
     AppBar,
@@ -27,6 +24,7 @@ from tempestweb._core.components import (
     Scaffold,
     SegmentedControl,
 )
+from tempestweb._core.style import AlignItems, Edge, FontWeight
 from tempestweb._core.widgets import (
     Checkbox,
     Column,
@@ -35,6 +33,7 @@ from tempestweb._core.widgets import (
     Switch,
     Text,
 )
+from tempestweb._core.widgets.events import SlideEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Constants

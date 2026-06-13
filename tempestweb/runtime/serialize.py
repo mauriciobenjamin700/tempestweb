@@ -27,6 +27,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 from pydantic import BaseModel
+
 from tempest_core import Insert, Node, Patch, Remove, Replace, Scene, Update
 
 __all__ = [

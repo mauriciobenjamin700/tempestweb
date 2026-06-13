@@ -4,6 +4,28 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.5.3] — 2026-06-13
+
+### Fixed
+
+- **`Checkbox` now renders its label as visible text on the web.** The DOM
+  renderer mapped `Checkbox` to a bare `<input type=checkbox>` and put its
+  `label` on `aria-label` only, so labelled checkboxes (todo items, settings
+  toggles) showed as empty boxes. A `Checkbox` now renders as a `<label>`
+  wrapping the real `<input>` plus a caption text node: the box and its caption
+  lay out as one tidy row (the wrapper also gives the input its accessible name
+  natively). The `<label>` is the keyed, path-addressed element; the nested
+  input carries `checked` and fires `change`, which bubbles to the label for
+  event delegation. An explicit widget `Style` still wins.
+
+### Examples
+
+- **Fixed three examples that passed `children=` to `Container`.** `Container`
+  holds a single `child`, not a `children` list (that is `Column`/`Row`/`Stack`).
+  Pydantic silently dropped the unknown kwarg, so the container rendered empty:
+  `list_demo` lost its row text (1000-item list showed blank rows), `gesture_demo`
+  lost its "swipe or tap me" hint, and `anim_demo` carried a no-op `children=[]`.
+
 ## [0.5.2] — 2026-06-13
 
 ### Changed

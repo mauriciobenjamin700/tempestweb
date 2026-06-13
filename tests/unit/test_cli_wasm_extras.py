@@ -6,13 +6,14 @@ packages, bundled Python modules, copied static assets, and injected scripts.
 
 from __future__ import annotations
 
+import importlib
 import zipfile
 from pathlib import Path
 
 import pytest
 
 from tempestweb.cli import build_artifact, scaffold_project
-from tempestweb.cli.commands.build import WASM_PACKAGE_ARCHIVE
+from tempestweb.cli.commands.build import WASM_PACKAGE_ARCHIVE, BuildError
 from tempestweb.cli.config import ConfigError, WasmConfig, load_config
 
 
@@ -139,3 +140,116 @@ def test_build_errors_on_empty_asset_glob(tmp_path: Path) -> None:
     )
     with pytest.raises(Exception, match="matched no files"):
         build_artifact(root, mode="wasm")
+
+
+def _install_external_package(site: Path, name: str) -> None:
+    """Create an importable package under ``site`` (not under the project root)."""
+    pkg = site / name
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text(f'"""{name}."""\n', encoding="utf-8")
+    (pkg / "tool.py").write_text("VALUE = 42\n", encoding="utf-8")
+
+
+def test_build_bundles_module_from_site_packages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A module declared in ``[wasm].modules`` but absent from the project root
+    is pulled from the installed environment (importlib), so a ``.venv`` dependency
+    need not be vendored into the repo."""
+    site = tmp_path / "site-packages"
+    _install_external_package(site, "extpkg")
+    monkeypatch.syspath_prepend(str(site))
+    importlib.invalidate_caches()
+
+    root = scaffold_project("withdep", parent=tmp_path).root
+    (root / "tempestweb.toml").write_text(
+        '[project]\nname = "withdep"\nentrypoint = "app.py"\n'
+        '[dev]\nmode = "wasm"\n'
+        '[wasm]\nmodules = ["extpkg"]\n',
+        encoding="utf-8",
+    )
+    # No `extpkg` directory beside app.py — resolution must come from sys.path.
+    assert not (root / "extpkg").exists()
+
+    result = build_artifact(root, mode="wasm")
+    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+        names = set(archive.namelist())
+    assert "extpkg/__init__.py" in names
+    assert "extpkg/tool.py" in names
+
+
+def test_build_prefers_vendored_copy_over_site_packages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A vendored copy beside ``app.py`` wins over an installed package of the
+    same name."""
+    site = tmp_path / "site-packages"
+    _install_external_package(site, "dual")
+    monkeypatch.syspath_prepend(str(site))
+    importlib.invalidate_caches()
+
+    root = scaffold_project("vendored", parent=tmp_path).root
+    (root / "tempestweb.toml").write_text(
+        '[project]\nname = "vendored"\nentrypoint = "app.py"\n'
+        '[dev]\nmode = "wasm"\n'
+        '[wasm]\nmodules = ["dual"]\n',
+        encoding="utf-8",
+    )
+    vendored = root / "dual"
+    vendored.mkdir()
+    (vendored / "__init__.py").write_text('"""vendored dual."""\n', encoding="utf-8")
+    (vendored / "local_only.py").write_text("LOCAL = True\n", encoding="utf-8")
+
+    result = build_artifact(root, mode="wasm")
+    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+        names = set(archive.namelist())
+    # The vendored copy is bundled (its unique file is present)…
+    assert "dual/local_only.py" in names
+    # …and the site-packages copy's unique file is not.
+    assert "dual/tool.py" not in names
+
+
+def test_build_errors_on_unresolvable_module(tmp_path: Path) -> None:
+    """A module that is neither vendored nor importable fails the build."""
+    root = scaffold_project("missingmod", parent=tmp_path).root
+    (root / "tempestweb.toml").write_text(
+        '[project]\nname = "missingmod"\nentrypoint = "app.py"\n'
+        '[dev]\nmode = "wasm"\n'
+        '[wasm]\nmodules = ["nope_not_a_real_module"]\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(BuildError, match="not found"):
+        build_artifact(root, mode="wasm")
+
+
+def test_build_ignores_stale_pycache_only_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A directory left holding only ``__pycache__`` (source deleted, bytecode
+    lingering) must not shadow the installed package and bundle nothing — the
+    installed copy is used instead."""
+    site = tmp_path / "site-packages"
+    _install_external_package(site, "stale")
+    monkeypatch.syspath_prepend(str(site))
+    importlib.invalidate_caches()
+
+    root = scaffold_project("stalepkg", parent=tmp_path).root
+    (root / "tempestweb.toml").write_text(
+        '[project]\nname = "stalepkg"\nentrypoint = "app.py"\n'
+        '[dev]\nmode = "wasm"\n'
+        '[wasm]\nmodules = ["stale"]\n',
+        encoding="utf-8",
+    )
+    # Stale dir at the project root: only __pycache__, no real source files.
+    cache = root / "stale" / "__pycache__"
+    cache.mkdir(parents=True)
+    (cache / "__init__.cpython-313.pyc").write_bytes(b"\x00stale-bytecode")
+
+    result = build_artifact(root, mode="wasm")
+    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+        names = set(archive.namelist())
+    # Bundled from site-packages, not the empty vendored shell.
+    assert "stale/__init__.py" in names
+    assert "stale/tool.py" in names
+    # The stale bytecode is never bundled.
+    assert not any("__pycache__" in n for n in names if n.startswith("stale/"))

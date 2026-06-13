@@ -203,10 +203,23 @@ assets estáticos ou libs JS declaram-se no `tempestweb.toml`:
 ```toml
 [wasm]
 packages = ["numpy", "pillow"]                 # loadPackage além do pydantic do core
-modules  = ["famacha"]                          # pacotes Python bundlados junto do app.py
+modules  = ["famacha", "ort_vision_sdk"]        # pacotes Python bundlados junto do app.py
 assets   = ["models/*.onnx", "vendor/ort/*"]    # copiados (path preservado) + precache
 scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injetado antes do bootstrap
 ```
+
+!!! tip "De onde vem cada `module`"
+    Cada nome em `modules` é resolvido em duas etapas, nesta ordem:
+
+    1. **Cópia vendida** ao lado do `app.py` (`<projeto>/<module>/`), se existir — o
+       comportamento histórico, em que uma cópia versionada no repo vence.
+    2. **Pacote instalado** no ambiente (`importlib`) — se não houver cópia vendida,
+       o módulo é puxado direto do `site-packages` do seu `.venv`.
+
+    Ou seja: uma dependência que você instala (`uv add ...`) **não precisa ser
+    clonada e jogada na raiz do repositório** para ir pro bundle — basta listá-la
+    em `modules`. Um nome que não é cópia vendida nem importável falha o build com
+    uma mensagem clara.
 
 ## Recap
 

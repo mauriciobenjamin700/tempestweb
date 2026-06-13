@@ -204,10 +204,24 @@ assets, or a JS library are declared in `tempestweb.toml`:
 ```toml
 [wasm]
 packages = ["numpy", "pillow"]                 # loadPackage beyond the core's pydantic
-modules  = ["famacha"]                          # Python packages bundled next to app.py
+modules  = ["famacha", "ort_vision_sdk"]        # Python packages bundled next to app.py
 assets   = ["models/*.onnx", "vendor/ort/*"]    # copied (path preserved) + precached
 scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injected before the bootstrap
 ```
+
+!!! tip "Where each `module` comes from"
+    Each name in `modules` is resolved in two steps, in order:
+
+    1. A **vendored copy** next to `app.py` (`<project>/<module>/`), if present —
+       the historical behavior, where a copy committed to the repo wins.
+    2. An **installed package** in the environment (`importlib`) — when no vendored
+       copy exists, the module is pulled straight from your `.venv`'s
+       `site-packages`.
+
+    So a dependency you install (`uv add ...`) **need not be cloned and dropped at
+    the repo root** to make it into the bundle — just list it in `modules`. A name
+    that is neither a vendored copy nor importable fails the build with a clear
+    message.
 
 ## Recap
 

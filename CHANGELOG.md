@@ -4,6 +4,22 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.4.0] — 2026-06-13
+
+### Added
+
+- **`[wasm].modules` resolves from the installed environment** — each entry is now
+  resolved in two steps: a vendored copy beside `app.py`
+  (`<project>/<module>/`) still wins, but when none exists the module is pulled
+  straight from the project's `.venv` `site-packages` via `importlib`. A
+  dependency you `uv add` no longer has to be cloned and committed at the repo
+  root to make it into the wasm bundle — just list it in `modules`. A name that is
+  neither vendored nor importable fails the build with a clear message.
+  Backward compatible: existing vendored layouts build unchanged. A stale project
+  directory holding only `__pycache__` (real source deleted, bytecode lingering)
+  no longer shadows the installed package and silently bundles nothing — it falls
+  through to the installed copy.
+
 ## [0.3.0] — 2026-06-13
 
 ### Added

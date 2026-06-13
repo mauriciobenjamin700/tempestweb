@@ -23,6 +23,7 @@ WebSocket transport — ``python server.py`` (or ``uvicorn server:app``) serves 
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import shutil
 import zipfile
@@ -236,6 +237,80 @@ def _zip_tree(
             archive.write(path, str(path.relative_to(root)))
 
 
+def _is_vendored(candidate: Path) -> bool:
+    """Tell whether ``candidate`` is a usable vendored module/package.
+
+    A single file counts. A directory counts only if it holds at least one
+    bundlable file (anything outside ``__pycache__``) — so a stale directory
+    left holding only ``__pycache__`` after the real source was deleted does
+    **not** shadow the installed package and silently bundle nothing.
+
+    Args:
+        candidate: The ``project_root/module`` path to test.
+
+    Returns:
+        ``True`` if the path is a file or a directory with real content.
+    """
+    if candidate.is_file():
+        return True
+    if not candidate.is_dir():
+        return False
+    return any(
+        path.is_file() and "__pycache__" not in path.parts
+        for path in candidate.rglob("*")
+    )
+
+
+def _resolve_module(module: str, project_root: Path | None) -> tuple[Path, str]:
+    """Resolve a ``[wasm].modules`` entry to its ``(root, top)`` for bundling.
+
+    Resolution order:
+
+    1. A **vendored copy** under ``project_root`` (``project_root/module``) that
+       carries real content — preserves the historical behavior where a copy
+       sitting beside ``app.py`` wins. A stale directory holding only
+       ``__pycache__`` is skipped (see :func:`_is_vendored`).
+    2. An **installed** package or module on ``sys.path`` (resolved via
+       ``importlib``) — so a dependency declared in the project's environment
+       (e.g. an ``uv``-managed ``.venv``) is pulled straight from site-packages
+       with no vendored copy committed to the repository.
+
+    Args:
+        module: The top-level module or package name from ``[wasm].modules``.
+        project_root: The project directory, when available.
+
+    Returns:
+        A ``(root, top)`` pair where ``root`` is the parent directory archive
+        entries are made relative to and ``top`` is the file or directory name
+        under it — fed straight into :func:`_zip_tree`.
+
+    Raises:
+        BuildError: If the module is neither vendored under ``project_root`` nor
+            importable from the current environment.
+    """
+    if project_root is not None and _is_vendored(project_root / module):
+        return project_root, module
+
+    try:
+        spec = importlib.util.find_spec(module)
+    except (ImportError, ValueError):
+        spec = None
+    if spec is not None:
+        locations = list(spec.submodule_search_locations or ())
+        if locations:
+            package_dir = Path(locations[0]).resolve()
+            return package_dir.parent, module
+        if spec.origin and spec.origin not in ("built-in", "frozen"):
+            origin = Path(spec.origin).resolve()
+            return origin.parent, origin.name
+
+    vendored = f"{project_root / module}" if project_root is not None else "<none>"
+    raise BuildError(
+        f"wasm module {module!r} not found: no vendored copy at {vendored} "
+        f"and not importable from the current environment"
+    )
+
+
 def _zip_package(
     dest: Path,
     *,
@@ -256,11 +331,16 @@ def _zip_package(
         dest: The ``.zip`` path to write.
         project_root: The project directory the ``modules`` are relative to.
             Required when ``modules`` is non-empty.
-        modules: Project-relative names (files or package dirs) to bundle next to
-            ``app.py`` (e.g. ``("famacha",)``).
+        modules: Names (files or package dirs) to bundle next to ``app.py``
+            (e.g. ``("famacha",)``). Each is resolved by :func:`_resolve_module`:
+            a vendored copy under ``project_root`` wins, otherwise the module is
+            pulled from the installed environment (site-packages) via importlib —
+            so a dependency declared in the project's ``.venv`` need not be
+            vendored into the repository.
 
     Raises:
-        BuildError: If an expected package part or a declared module is missing.
+        BuildError: If an expected package part is missing, or a declared module
+            is neither vendored nor importable.
     """
     tempestweb_root = _package_dir().parent
     tempest_core_root = _tempest_core_dir().parent
@@ -268,9 +348,8 @@ def _zip_package(
         _zip_tree(archive, tempestweb_root, "tempestweb", _WASM_PACKAGE_PARTS)
         _zip_tree(archive, tempest_core_root, "tempest_core", None)
         for module in modules:
-            if project_root is None:
-                raise BuildError("project_root is required to bundle wasm modules")
-            _zip_tree(archive, project_root, module, None)
+            root, top = _resolve_module(module, project_root)
+            _zip_tree(archive, root, top, None)
 
 
 def _build_pwa(out: Path, client: Path, name: str, precache: tuple[str, ...]) -> None:

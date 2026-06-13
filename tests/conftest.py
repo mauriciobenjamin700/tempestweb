@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -31,12 +32,27 @@ def _ensure_event_loop() -> Any:
     the core's rebuild (which calls ``asyncio.get_event_loop()``) would then hit
     a closed loop. This installs a fresh loop whenever the current one is missing
     or closed, without overriding the loop pytest-asyncio sets for async tests.
+    A loop created here is closed on teardown so it is not garbage-collected
+    open (which would raise a ``ResourceWarning`` from ``BaseEventLoop.__del__``).
     """
     try:
-        loop = asyncio.get_event_loop_policy().get_event_loop()
+        loop = asyncio.get_running_loop()
         closed = loop.is_closed()
     except RuntimeError:
-        closed = True
+        # No loop is running in this thread. Probe the policy's current loop;
+        # ``get_event_loop`` emits a DeprecationWarning when none is set, which
+        # is exactly the case we are handling, so silence that single probe.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            try:
+                loop = asyncio.get_event_loop_policy().get_event_loop()
+                closed = loop.is_closed()
+            except RuntimeError:
+                closed = True
+    created: asyncio.AbstractEventLoop | None = None
     if closed:
-        asyncio.set_event_loop(asyncio.new_event_loop())
+        created = asyncio.new_event_loop()
+        asyncio.set_event_loop(created)
     yield
+    if created is not None and not created.is_closed():
+        created.close()

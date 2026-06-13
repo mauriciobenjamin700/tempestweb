@@ -4,6 +4,28 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.6.0] — 2026-06-13
+
+### Added
+
+- **Always-on Material 3 base stylesheet.** The web client now ships a small
+  always-on MD3 base theme (`client/theme.js`), keyed off `data-tw-type`, so
+  apps get sensible typography, spacing and accented controls out of the box —
+  no per-widget styling required. Inline widget `Style` still overrides it.
+- **`Style.shadow` renders as `box-shadow` on the web.** Elevation set on a
+  widget's `Style` now emits a real CSS `box-shadow`, matching the native
+  renderers.
+- **MD3 field and button variants.** The pre-built components (`fields`,
+  `buttons`) gained light Material 3 variants (filled/outlined/text buttons,
+  themed text fields) so forms look finished without hand-styling.
+
+### Fixed
+
+- **Checkbox MD3 theming targets the nested input.** Following the Checkbox
+  `<label><input>` structure (0.5.3), the base theme sizes/accents the nested
+  `[data-tw-type="Checkbox"] > input` rather than the keyed `<label>` wrapper,
+  so the box is styled without shrinking the whole caption row.
+
 ## [0.5.3] — 2026-06-13
 
 ### Fixed

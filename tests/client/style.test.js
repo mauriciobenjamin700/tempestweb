@@ -224,3 +224,15 @@ test("dimension fields map to CSS px (and unitless aspect-ratio)", () => {
 test("opacity maps verbatim", () => {
   assert.equal(declarations(styleToCss({ opacity: 0.25 }))["opacity"], "0.25");
 });
+
+test("shadow maps to box-shadow (offset_x offset_y blur color)", () => {
+  const css = styleToCss({
+    shadow: { color: { r: 0, g: 0, b: 0, a: 0.3 }, blur: 6, offset_x: 0, offset_y: 2 },
+  });
+  assert.equal(declarations(css)["box-shadow"], "0px 2px 6px rgba(0, 0, 0, 0.3)");
+});
+
+test("shadow with a null color falls back to a neutral tint", () => {
+  const css = styleToCss({ shadow: { color: null, blur: 4, offset_x: 1, offset_y: 1 } });
+  assert.equal(declarations(css)["box-shadow"], "1px 1px 4px rgba(0, 0, 0, 0.3)");
+});

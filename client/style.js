@@ -49,6 +49,14 @@
  */
 
 /**
+ * @typedef {Object} ShadowDump
+ * @property {?ColorDump} color  The shadow color, or null for a default tint.
+ * @property {number} blur       The blur radius, px.
+ * @property {number} offset_x   The horizontal offset, px.
+ * @property {number} offset_y   The vertical offset, px.
+ */
+
+/**
  * @typedef {Object} GradientStopDump
  * @property {ColorDump} color  The stop color.
  * @property {number} position  The stop position, 0.0-1.0.
@@ -231,6 +239,20 @@ const CURVE_CSS = Object.freeze({
 });
 
 /**
+ * Render a serialized Shadow as a CSS `box-shadow` value.
+ *
+ * `offset_x offset_y blur color`. A null shadow color falls back to a neutral
+ * translucent black so an elevation set without an explicit tint still reads.
+ *
+ * @param {ShadowDump} shadow  The shadow dump.
+ * @returns {string}           The CSS `box-shadow` value.
+ */
+function shadowToCss(shadow) {
+  const color = shadow.color ? colorToRgba(shadow.color) : "rgba(0, 0, 0, 0.3)";
+  return `${shadow.offset_x}px ${shadow.offset_y}px ${shadow.blur}px ${color}`;
+}
+
+/**
  * Translate a serialized Transition into a CSS `transition` shorthand.
  * @param {{duration_ms:number, curve:string, delay_ms:number}} transition
  * @returns {string} e.g. "all 200ms ease-in-out 50ms"
@@ -316,6 +338,9 @@ export function styleToCss(style, type) {
   }
   if (style.opacity != null) {
     rules.push(`opacity: ${style.opacity}`);
+  }
+  if (style.shadow != null) {
+    rules.push(`box-shadow: ${shadowToCss(style.shadow)}`);
   }
 
   // Typography.

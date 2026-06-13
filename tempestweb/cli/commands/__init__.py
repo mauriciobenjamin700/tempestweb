@@ -22,6 +22,7 @@ from tempestweb.cli.commands.dev import (
 )
 from tempestweb.cli.commands.new import NewError, create_project
 from tempestweb.cli.commands.run import RunError, RunPlan, prepare_run, serve_run
+from tempestweb.cli.commands.sync import SyncError, SyncResult, sync_modules
 
 __all__ = [
     "SERVER_ARTIFACT_FILES",
@@ -34,10 +35,13 @@ __all__ = [
     "RunError",
     "RunPlan",
     "StubTransport",
+    "SyncError",
+    "SyncResult",
     "build_artifact",
     "create_dev_session",
     "create_project",
     "prepare_run",
     "serve_dev",
     "serve_run",
+    "sync_modules",
 ]

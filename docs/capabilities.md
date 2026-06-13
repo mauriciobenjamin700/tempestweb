@@ -221,6 +221,21 @@ scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injetado antes do boo
     em `modules`. Um nome que não é cópia vendida nem importável falha o build com
     uma mensagem clara.
 
+!!! tip "Nem precisa listar à mão: `tempestweb sync`"
+    Para não ter o trabalho de manter `modules` em dia, rode:
+
+    ```bash
+    tempestweb sync            # preenche [wasm].modules; --dry-run só mostra
+    ```
+
+    Ele lê as `[project.dependencies]` do seu `pyproject.toml`, mantém as que
+    estão **instaladas e são puro-Python**, e escreve os nomes de import em
+    `[wasm].modules` — preservando o que já estava lá (o pacote do seu app, cópias
+    vendidas). Pacotes com código nativo (numpy, pillow) são **pulados** — eles vêm
+    do Pyodide via `[wasm].packages` — assim como o próprio framework
+    (`tempestweb`, `pydantic`). É idempotente: rodar de novo sem mudar o ambiente
+    não escreve nada. Basta ter as dependências no `.venv` e rodar o comando. 🚀
+
 ## Recap
 
 - Capacidades são Web APIs expostas como **awaitables tipados em Python**.

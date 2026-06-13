@@ -72,7 +72,7 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | `tempestweb/native/` | Web API capability adapters — http, audio, share, geo, clipboard, storage, camera (Track N). |
 | `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
 | `tempestweb/pwa/` | Web App Manifest + icon emitter (Track P). |
-| `tempestweb/cli/` | `tempestweb new/dev/build/run`. |
+| `tempestweb/cli/` | `tempestweb new/dev/build/run/sync`. |
 | `client/` | Pure-JS DOM renderer, Style→CSS, event capture; `pwa/` `sw/` `offline/` `push/` `native/` subdirs. |
 | `tests/fixtures/` | Golden wire-format fixtures derived from the core. |
 

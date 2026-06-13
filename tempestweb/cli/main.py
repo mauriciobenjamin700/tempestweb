@@ -18,11 +18,13 @@ from tempestweb.cli.commands import (
     DevError,
     NewError,
     RunError,
+    SyncError,
     build_artifact,
     create_project,
     prepare_run,
     serve_dev,
     serve_run,
+    sync_modules,
 )
 
 __all__ = ["main", "build_parser"]
@@ -116,6 +118,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--offline",
         action="store_true",
         help="Build the wasm bundle with a vendored, offline-capable Pyodide.",
+    )
+
+    sync = sub.add_parser(
+        "sync",
+        help="Fill [wasm].modules from the installed pure-Python dependencies.",
+    )
+    sync.add_argument(
+        "--path",
+        default=".",
+        help="Project directory to sync (default: cwd).",
+    )
+    sync.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be added without writing tempestweb.toml.",
     )
 
     return parser
@@ -231,6 +248,36 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_sync(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb sync``.
+
+    Fills ``[wasm].modules`` with the project's installed pure-Python
+    dependencies (excluding the framework and ``[wasm].packages``), preserving
+    existing entries. With ``--dry-run`` it reports without writing.
+
+    Args:
+        args: Parsed arguments for the ``sync`` subcommand.
+
+    Returns:
+        Process exit code.
+    """
+    try:
+        result = sync_modules(args.path, dry_run=args.dry_run)
+    except SyncError as exc:
+        print(f"tempestweb sync: {exc}", file=sys.stderr)
+        return 1
+    if not result.added:
+        print("[wasm].modules already up to date.")
+        return 0
+    verb = "Would add" if args.dry_run else "Added"
+    print(f"{verb} {len(result.added)} module(s) to [wasm].modules:")
+    for module in result.added:
+        print(f"  + {module}")
+    if not args.dry_run:
+        print(f"\nWrote {result.config_path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entrypoint for the ``tempestweb`` console script.
 
@@ -252,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
         "dev": _cmd_dev,
         "build": _cmd_build,
         "run": _cmd_run,
+        "sync": _cmd_sync,
     }
     handler = handlers[args.command]
     return handler(args)

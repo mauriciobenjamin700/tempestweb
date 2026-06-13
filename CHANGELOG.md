@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.5.0] — 2026-06-13
+
+### Added
+
+- **`tempestweb sync` command** — auto-fills `[wasm].modules` from the project's
+  installed pure-Python dependencies. Reads `[project.dependencies]` from
+  `pyproject.toml`, keeps the names that are installed **and** pure-Python
+  (no `.so`/`.pyd`/`.dylib`), and writes their import names into `[wasm].modules`,
+  preserving existing entries. Native packages (numpy, pillow) and the framework
+  (`tempestweb`, `pydantic`, …) are skipped, as is anything already under
+  `[wasm].packages`. Idempotent; `--dry-run` previews without writing. Pairs with
+  the 0.4.0 site-packages resolution so a dependency you `uv add` reaches the wasm
+  bundle with **zero manual bookkeeping**. Uses `tomlkit` (added to the `[cli]`
+  extra) for a comment-preserving round-trip edit of `tempestweb.toml`.
+
 ## [0.4.0] — 2026-06-13
 
 ### Added

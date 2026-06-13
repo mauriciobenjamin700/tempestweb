@@ -37,7 +37,7 @@ The **extras** decide which capabilities you install:
 |---|---|
 | `dev` | ruff, mypy, pytest — the quality gate. |
 | `server` | FastAPI, uvicorn, websockets — **Mode B**. |
-| `cli` | watchfiles — the dev loop (`tempestweb dev`). |
+| `cli` | watchfiles + tomlkit — the dev loop (`tempestweb dev`) and `tempestweb sync`. |
 | `docs` | mkdocs-material + i18n — **this documentation**. |
 
 !!! note "Mode A (WASM) has no Python extra"

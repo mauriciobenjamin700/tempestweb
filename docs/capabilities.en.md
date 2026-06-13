@@ -223,6 +223,21 @@ scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injected before the b
     that is neither a vendored copy nor importable fails the build with a clear
     message.
 
+!!! tip "You don't even have to list them: `tempestweb sync`"
+    To avoid keeping `modules` up to date by hand, run:
+
+    ```bash
+    tempestweb sync            # fills [wasm].modules; --dry-run only previews
+    ```
+
+    It reads `[project.dependencies]` from your `pyproject.toml`, keeps the ones
+    that are **installed and pure-Python**, and writes their import names into
+    `[wasm].modules` — preserving whatever was already there (your app package,
+    vendored copies). Packages with native code (numpy, pillow) are **skipped** —
+    Pyodide provides them via `[wasm].packages` — as is the framework itself
+    (`tempestweb`, `pydantic`). It is idempotent: a second run with no environment
+    change writes nothing. Just have the dependencies in your `.venv` and run it. 🚀
+
 ## Recap
 
 - Capabilities are Web APIs exposed as **typed Python awaitables**.

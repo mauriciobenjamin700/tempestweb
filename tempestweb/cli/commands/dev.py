@@ -156,7 +156,16 @@ async def serve_dev(
         DevError: If the mode is invalid/unsupported or the initial build fails.
     """
     from tempestweb.cli.commands.build import BuildError, build_artifact
-    from tempestweb.devserver import create_dev_app, make_server
+
+    try:
+        from tempestweb.devserver import create_dev_app, make_server
+    except ImportError as exc:  # noqa: TRY003 - actionable install hint
+        raise DevError(
+            "serving Mode A needs the 'server' extra (Starlette + uvicorn). "
+            "Install it with: uv add 'tempestweb[server]' "
+            "(or pip install 'tempestweb[server]'). The built wasm artifact "
+            "itself never embeds a server — this is only for local serving."
+        ) from exc
 
     config = load_config(project_root)
     resolved_mode = mode or config.mode

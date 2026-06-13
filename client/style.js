@@ -64,6 +64,17 @@
 // "flex-start"/"flex-end". Everything else (center, space-*, stretch) is identity.
 const FLEX_EDGE = Object.freeze({ start: "flex-start", end: "flex-end" });
 
+// Widget types that are flex containers by nature: they render `display: flex`
+// with this axis unless the style sets an explicit `direction`. Matches the
+// native (Qt/Compose) behaviour where a Column/Row is always a flex container,
+// so `gap`/`justify`/`align` are not silently inert on the web.
+const FLEX_DIRECTION_BY_TYPE = Object.freeze({
+  Column: "column",
+  Row: "row",
+  LazyColumn: "column",
+  LazyRow: "row",
+});
+
 /**
  * Map a flex justify-content value (core spelling) to its CSS spelling.
  * @param {string} value  A JustifyContent value ("start", "center", ...).
@@ -241,19 +252,27 @@ function transitionToCss(transition) {
  * inline; unsupported v1 fields are simply not emitted.
  *
  * @param {?Object} style  Style dump, or null.
+ * @param {?string} type   The widget type ("Row"/"Column"/...), so flex
+ *                         containers default to the right `flex-direction` even
+ *                         when the style does not set one. Optional.
  * @returns {string}       A "; "-joined CSS declaration body ("" when empty/null).
  */
-export function styleToCss(style) {
-  if (style == null) {
+export function styleToCss(style, type) {
+  const direction = (style && style.direction) ?? FLEX_DIRECTION_BY_TYPE[type];
+  if (style == null && direction == null) {
     return "";
   }
   /** @type {string[]} */
   const rules = [];
 
-  // Flexbox layout. A direction present implies a flex container.
-  if (style.direction != null) {
+  // Flexbox layout. Row/Column are flex containers by type; an explicit
+  // `direction` in the style overrides the type's natural axis.
+  if (direction != null) {
     rules.push("display: flex");
-    rules.push(`flex-direction: ${style.direction}`);
+    rules.push(`flex-direction: ${direction}`);
+  }
+  if (style == null) {
+    return rules.join("; ");
   }
   if (style.justify != null) {
     rules.push(`justify-content: ${justifyToCss(style.justify)}`);

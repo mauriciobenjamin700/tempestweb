@@ -4,6 +4,20 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.5.1] — 2026-06-13
+
+### Fixed
+
+- **`Row`/`Column` are now flex containers on the web by default.** The web
+  renderer only emitted `display: flex` when a style set an explicit `direction`,
+  so a `Row`/`Column` with just `gap`/`justify`/`align` rendered as a plain block
+  and those properties were silently inert (children only flowed horizontally by
+  accident when they were inline-block, e.g. buttons). `styleToCss` now takes the
+  widget type and defaults `display: flex` + `flex-direction` (`row`/`column`,
+  also `LazyRow`/`LazyColumn`) from it; an explicit `style.direction` still
+  overrides the natural axis. This matches the widget docstrings and the native
+  (Qt/Compose) behaviour. Non-flex types (`Container`, `Stack`) are unchanged.
+
 ## [0.5.0] — 2026-06-13
 
 ### Added

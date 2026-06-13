@@ -41,8 +41,11 @@ test("buildElement applies the Column's style (flex column + gap + padding)", ()
   withDocument();
   const node = fixture("node_initial.json");
   const el = buildElement(node);
-  // node_initial Column has gap:8 + padding 16 (direction null -> no display:flex).
+  // A Column is a flex container by type, so it renders display:flex +
+  // flex-direction:column even with no explicit `direction` in the style.
   const css = el.getAttribute("style");
+  assert.match(css, /display: flex/);
+  assert.match(css, /flex-direction: column/);
   assert.match(css, /gap: 8px/);
   assert.match(css, /padding: 16px 16px 16px 16px/);
 });

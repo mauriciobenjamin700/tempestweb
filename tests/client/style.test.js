@@ -43,6 +43,29 @@ test("empty style object yields an empty string", () => {
   assert.equal(styleToCss({}), "");
 });
 
+test("Row/Column are flex containers by type (no explicit direction)", () => {
+  // A null/empty style still becomes a flex container when the widget type is
+  // Row or Column — so gap/justify/align are never silently inert on the web.
+  assert.equal(styleToCss(null, "Column"), "display: flex; flex-direction: column");
+  assert.equal(styleToCss(null, "Row"), "display: flex; flex-direction: row");
+  const col = declarations(styleToCss({ gap: 8 }, "Column"));
+  assert.equal(col["display"], "flex");
+  assert.equal(col["flex-direction"], "column");
+  assert.equal(col["gap"], "8px");
+});
+
+test("an explicit style.direction overrides the type's natural axis", () => {
+  const d = declarations(styleToCss({ direction: "row" }, "Column"));
+  assert.equal(d["display"], "flex");
+  assert.equal(d["flex-direction"], "row");
+});
+
+test("non-flex types (Container) stay block without a direction", () => {
+  assert.equal(styleToCss(null, "Container"), "");
+  const d = declarations(styleToCss({ padding: { top: 4, right: 4, bottom: 4, left: 4 } }, "Container"));
+  assert.equal("display" in d, false);
+});
+
 test("transition maps to the CSS transition shorthand (E.4)", () => {
   const css = styleToCss({
     transition: { duration_ms: 200, curve: "ease-in-out", delay_ms: 50 },

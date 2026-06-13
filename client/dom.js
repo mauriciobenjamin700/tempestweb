@@ -80,15 +80,15 @@ function applyNodeShape(el, type, key, props) {
  * @returns {void}
  */
 function applyProps(el, props) {
+  const type = el.getAttribute(TYPE_ATTR);
   if ("style" in props) {
-    const css = styleToCss(props.style);
+    const css = styleToCss(props.style, type);
     if (css) {
       el.style.cssText = css;
     } else {
       el.removeAttribute("style");
     }
   }
-  const type = el.getAttribute(TYPE_ATTR);
   // Text-bearing props. A Checkbox is an <input> and cannot hold text, so its
   // label rides as an accessible name instead of textContent.
   if ("content" in props) {

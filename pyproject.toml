@@ -1,6 +1,6 @@
 [project]
 name = "tempestweb"
-version = "0.5.0"
+version = "0.5.1"
 description = "Build web apps in typed Python — one tree, a DOM renderer, two execution modes (WASM + server)."
 readme = "README.md"
 requires-python = ">=3.11"

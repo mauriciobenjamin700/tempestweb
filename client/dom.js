@@ -32,7 +32,12 @@ const TAG_BY_TYPE = Object.freeze({
   Text: "span",
   Button: "button",
   Input: "input",
-  Checkbox: "input",
+  // A Checkbox renders as a <label> wrapping a real <input type=checkbox> plus
+  // its caption text, so the box and its label show side by side and the input
+  // gets its accessible name natively. The <label> is the keyed, path-addressed
+  // element; the input it wraps is renderer-internal (Checkbox is an IR leaf, so
+  // no patch path ever descends into it).
+  Checkbox: "label",
   Image: "img",
 });
 
@@ -89,14 +94,15 @@ function applyProps(el, props) {
       el.removeAttribute("style");
     }
   }
-  // Text-bearing props. A Checkbox is an <input> and cannot hold text, so its
-  // label rides as an accessible name instead of textContent.
+  // Text-bearing props. A Checkbox is a <label> wrapping an <input>, so its
+  // caption is set as a trailing text node (see setCheckboxLabel) rather than
+  // overwriting textContent, which would drop the nested input.
   if ("content" in props) {
     el.textContent = props.content == null ? "" : String(props.content);
   }
   if ("label" in props) {
     if (type === "Checkbox") {
-      el.setAttribute("aria-label", props.label == null ? "" : String(props.label));
+      setCheckboxLabel(el, props.label == null ? "" : String(props.label));
     } else {
       el.textContent = props.label == null ? "" : String(props.label);
     }
@@ -188,6 +194,46 @@ function applyLazyProps(el, type, props) {
   el.setAttribute("data-tw-window-start", String(start ?? 0));
 }
 
+/**
+ * Get (or lazily create) the real ``<input type=checkbox>`` nested inside a
+ * Checkbox's ``<label>`` wrapper. The label is the keyed, path-addressed
+ * element; this nested input carries the actual ``checked`` state and fires the
+ * native ``change`` event (which bubbles up to the keyed label for delegation).
+ *
+ * @param {HTMLElement} el  The Checkbox ``<label>`` element.
+ * @returns {HTMLInputElement}  The nested checkbox input.
+ */
+function ensureCheckboxInput(el) {
+  let input = /** @type {HTMLInputElement|null} */ (el.querySelector("input"));
+  if (input == null) {
+    input = /** @type {HTMLInputElement} */ (document.createElement("input"));
+    input.setAttribute("type", "checkbox");
+    el.insertBefore(input, el.firstChild);
+  }
+  return input;
+}
+
+/**
+ * Set a Checkbox's visible caption, kept as a single text node after the nested
+ * input so the box and its label render side by side. Wrapping the input in the
+ * ``<label>`` also gives it its accessible name natively (no ``aria-label``).
+ *
+ * @param {HTMLElement} el    The Checkbox ``<label>`` element.
+ * @param {string} text       The caption text (``""`` clears it).
+ * @returns {void}
+ */
+function setCheckboxLabel(el, text) {
+  const input = ensureCheckboxInput(el);
+  for (const node of Array.from(el.childNodes)) {
+    if (node !== input) {
+      el.removeChild(node);
+    }
+  }
+  if (text) {
+    el.appendChild(document.createTextNode(text));
+  }
+}
+
 function applyControlProps(el, type, props) {
   if (type === "Input") {
     el.setAttribute("type", props.secure ? "password" : "text");
@@ -201,9 +247,29 @@ function applyControlProps(el, type, props) {
       el.setAttribute("maxlength", String(props.max_length));
     }
   } else if (type === "Checkbox") {
-    el.setAttribute("type", "checkbox");
+    const input = ensureCheckboxInput(el);
     if ("checked" in props) {
-      el.checked = Boolean(props.checked);
+      input.checked = Boolean(props.checked);
+    }
+    // Lay the box and caption out on one line, as a block-level row so stacked
+    // checkboxes each get their own line (an inline default would let adjacent
+    // labels flow together in a non-flex parent). Defaults only — an explicit
+    // Style on the widget (applied just before this) wins. Re-applied here on
+    // every update because a `style` patch resets the element's inline cssText.
+    if (!el.style.display) {
+      el.style.display = "flex";
+    }
+    if (!el.style.alignItems) {
+      el.style.alignItems = "center";
+    }
+    if (!el.style.gap) {
+      el.style.gap = "0.4em";
+    }
+    // Size to the box + caption. Without this the <label>, as a flex item of a
+    // column, collapses to the input's width and the caption overflows onto the
+    // next row; fit-content keeps it a tidy one-line row instead of stretching.
+    if (!el.style.width) {
+      el.style.width = "fit-content";
     }
   } else if (type === "Image") {
     if ("src" in props && props.src != null) {
@@ -263,6 +329,8 @@ function applyUpdate(root, patch) {
   for (const key of patch.unset_props ?? []) {
     if (key === "style") {
       el.removeAttribute("style");
+    } else if (key === "label" && el.getAttribute(TYPE_ATTR) === "Checkbox") {
+      setCheckboxLabel(el, "");
     } else if (key === "content" || key === "label") {
       el.textContent = "";
     }

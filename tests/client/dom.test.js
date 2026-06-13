@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixture, freshDom } from "./setup.js";
-import { applyPatches, buildElement, KEY_ATTR } from "../../client/dom.js";
+import { applyPatches, buildElement, KEY_ATTR, TYPE_ATTR } from "../../client/dom.js";
 
 /** Install jsdom's `document` globally so dom.js's `document.createElement` works. */
 function withDocument() {
@@ -160,7 +160,7 @@ test("a secure Input renders type=password", () => {
   assert.equal(el.getAttribute("type"), "password");
 });
 
-test("Checkbox builds an <input type=checkbox> reflecting checked", () => {
+test("Checkbox builds a <label> wrapping a checkbox input plus visible caption", () => {
   withDocument();
   const el = buildElement({
     type: "Checkbox",
@@ -168,10 +168,29 @@ test("Checkbox builds an <input type=checkbox> reflecting checked", () => {
     props: { checked: true, label: "Agree" },
     children: [],
   });
-  assert.equal(el.tagName, "INPUT");
-  assert.equal(el.getAttribute("type"), "checkbox");
-  assert.equal(el.checked, true);
-  assert.equal(el.getAttribute("aria-label"), "Agree");
+  // The keyed, path-addressed element is the <label>; the real input is nested.
+  assert.equal(el.tagName, "LABEL");
+  assert.equal(el.getAttribute(TYPE_ATTR), "Checkbox");
+  const input = el.querySelector("input");
+  assert.equal(input.getAttribute("type"), "checkbox");
+  assert.equal(input.checked, true);
+  // The caption is visible text (the <label> gives the input its name natively).
+  assert.equal(el.textContent.trim(), "Agree");
+});
+
+test("Checkbox Update toggles checked and relabels without dropping the input", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Checkbox",
+    key: "c",
+    props: { checked: false, label: "Old" },
+    children: [],
+  });
+  applyPatches(el, [{ path: [], set_props: { checked: true, label: "New" } }]);
+  const input = el.querySelector("input");
+  assert.equal(el.querySelectorAll("input").length, 1, "exactly one nested input");
+  assert.equal(input.checked, true);
+  assert.equal(el.textContent.trim(), "New");
 });
 
 test("Image builds an <img> with src/alt", () => {

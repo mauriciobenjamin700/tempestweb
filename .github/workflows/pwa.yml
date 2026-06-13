@@ -46,9 +46,9 @@ jobs:
       - name: Set up Python
         run: uv python install 3.11
       - name: Install (with webpush extra)
-        run: uv pip install --system -e ".[dev,server,webpush]"
+        run: uv sync --extra dev --extra server --extra webpush
       - name: PWA Python tests (manifest emitter + webpush)
-        run: pytest tests/unit/test_pwa*.py -q
+        run: uv run pytest tests/unit/test_pwa*.py -q
 
   lighthouse:
     name: Lighthouse PWA (installable)

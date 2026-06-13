@@ -14,6 +14,7 @@
 // read the originating widget key via event delegation. Verify against
 // ../tests/fixtures/ in tests/client/ (jsdom). No framework.
 
+import { createIconSvg, renderIcon } from "./icons/index.js";
 import { styleToCss } from "./style.js";
 
 /** Attribute holding a widget's stable reconciliation key. */
@@ -106,6 +107,11 @@ function applyProps(el, props) {
     } else {
       el.textContent = props.label == null ? "" : String(props.label);
     }
+  }
+  // An Icon is an inline <svg>; (re)draw its glyph when its name or size changes
+  // (a style-only update leaves the existing glyph untouched).
+  if (type === "Icon" && ("name" in props || "size" in props)) {
+    renderIcon(/** @type {any} */ (el), props);
   }
   applyControlProps(el, type, props);
   applyA11yProps(el, props);
@@ -287,7 +293,12 @@ function applyControlProps(el, type, props) {
  * @returns {HTMLElement}                        The constructed element subtree.
  */
 export function buildElement(node) {
-  const el = document.createElement(tagForType(node.type));
+  // An Icon is an inline <svg>, which must be created in the SVG namespace (not
+  // via createElement). It is an IR leaf, so no children are recursed into it.
+  const el =
+    node.type === "Icon"
+      ? createIconSvg()
+      : document.createElement(tagForType(node.type));
   applyNodeShape(el, node.type, node.key ?? null, node.props ?? {});
   for (const child of node.children ?? []) {
     el.appendChild(buildElement(child));

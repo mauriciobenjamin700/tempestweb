@@ -77,6 +77,7 @@ plugins:
             "3. Patches on the wire": "3. Patches na rede"
             "4. Running both modes": "4. Rodando os dois modos"
             "Ready-made components": "Componentes prontos"
+            "Best practices": "Boas práticas"
             Examples: Exemplos
             "Example gallery": "Galeria de exemplos"
             Stopwatch: Cronômetro
@@ -132,13 +133,17 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.details
-  - pymdownx.superfences
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.emoji:
@@ -161,6 +166,7 @@ nav:
       - "3. Patches on the wire": tutorial/patches.md
       - "4. Running both modes": tutorial/modes.md
   - Ready-made components: components.md
+  - Best practices: best-practices.md
   - Examples:
       - "Example gallery": examples/index.md
       - Stopwatch: examples/stopwatch.md

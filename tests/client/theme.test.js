@@ -25,7 +25,14 @@ test("the base CSS styles the Button, Input and Checkbox by data-tw-type", () =>
   assert.ok(BASE_THEME_CSS.includes('[data-tw-type="Button"]:focus-visible'), "focus");
   assert.ok(BASE_THEME_CSS.includes('[data-tw-type="Button"]:active'), "press state");
   assert.ok(BASE_THEME_CSS.includes('[data-tw-type="Input"]'), "inputs");
-  assert.ok(BASE_THEME_CSS.includes('[data-tw-type="Checkbox"]'), "checkbox");
+  assert.ok(BASE_THEME_CSS.includes('[data-tw-type="Checkbox"]'), "checkbox label");
+  // The box itself is the nested <input>, not the keyed <label> wrapper, so the
+  // size/accent rule must target the child input (sizing the label would shrink
+  // the whole caption row).
+  assert.ok(
+    BASE_THEME_CSS.includes('[data-tw-type="Checkbox"] > input'),
+    "checkbox nested input",
+  );
   assert.ok(BASE_THEME_CSS.includes("--tw-primary"), "overridable token");
   // No !important anywhere: an app's inline Style must still win the cascade.
   assert.ok(!BASE_THEME_CSS.includes("!important"), "no !important");

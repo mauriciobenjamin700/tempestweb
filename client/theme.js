@@ -141,10 +141,20 @@ export const BASE_THEME_CSS = `
   color: rgba(29,27,32,0.38);
 }
 
-/* ── Checkbox: themed to the primary tone ──────────────────────────────────── */
+/* ── Checkbox: a <label> wrapping the real <input type=checkbox> ─────────────
+   dom.js renders a Checkbox as a keyed <label> with the caption text and lays
+   the row out inline (display/gap/align/width), so the base only sets the
+   caption type ramp + cursor on the label and themes the nested box itself. */
 [data-tw-type="Checkbox"] {
+  cursor: pointer;
+  font-family: var(--tw-font);
+  font-size: 14px;
+  color: var(--tw-on-surface);
+}
+[data-tw-type="Checkbox"] > input {
   width: 18px;
   height: 18px;
+  margin: 0;
   accent-color: var(--tw-primary);
   cursor: pointer;
 }

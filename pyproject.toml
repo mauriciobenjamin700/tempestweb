@@ -111,3 +111,12 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+    # Treat our own API-rot signals as failures so deprecations can't accrete.
+    # ResourceWarning / unraisable GC-timing warnings stay non-fatal: they are
+    # nondeterministic and partly upstream (Starlette TestClient sockets).
+    "error::DeprecationWarning",
+    "error::PendingDeprecationWarning",
+    # Upstream: Starlette's TestClient warns until httpx2 ships; not ours to fix.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated:starlette.exceptions.StarletteDeprecationWarning",
+]

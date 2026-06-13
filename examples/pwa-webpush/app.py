@@ -43,8 +43,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-from tempestweb._core import App, Style, Widget
 from tempestweb._core.style import Edge
+
+from tempestweb._core import App, Style, Widget
 from tempestweb._core.widgets import Button, Column, Row, Spinner, Text
 from tempestweb.native import notifications
 from tempestweb.native.notifications import NotificationPermission

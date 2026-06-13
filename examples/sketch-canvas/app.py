@@ -28,7 +28,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
 from tempestweb._core.style import (
     AlignItems,
     Color,
@@ -36,6 +35,8 @@ from tempestweb._core.style import (
     FontWeight,
     JustifyContent,
 )
+
+from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
 from tempestweb._core.widgets import (
     Canvas,
     DrawCommand,

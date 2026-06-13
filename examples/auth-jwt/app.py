@@ -27,8 +27,10 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempestweb._core import App, Widget
 from tempestweb._core.style import AlignItems, Color, Edge, FontWeight, Style, TextAlign
+from tempestweb._core.widgets.events import TextChangeEvent
+
+from tempestweb._core import App, Widget
 from tempestweb._core.widgets import (
     Button,
     Column,
@@ -37,7 +39,6 @@ from tempestweb._core.widgets import (
     Row,
     Text,
 )
-from tempestweb._core.widgets.events import TextChangeEvent
 from tempestweb.observability import (
     AuthStore,
     Logger,

@@ -15,6 +15,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from tempestweb._core.components.base import (
+    ACCENT,
+    BACKGROUND,
+    MUTED,
+    ON_MUTED,
+    ON_SURFACE,
+    SURFACE,
+)
+from tempestweb._core.style import AlignItems, Color, Edge, FontWeight
+
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import (
     AppBar,
@@ -28,15 +38,6 @@ from tempestweb._core.components import (
     Scaffold,
     Sidebar,
 )
-from tempestweb._core.components.base import (
-    ACCENT,
-    BACKGROUND,
-    MUTED,
-    ON_MUTED,
-    ON_SURFACE,
-    SURFACE,
-)
-from tempestweb._core.style import AlignItems, Color, Edge, FontWeight
 from tempestweb._core.widgets import Button, Column, Container, Row, Text
 
 # ---------------------------------------------------------------------------

@@ -26,15 +26,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, NavStack, Route, Style, Widget, build
-from tempestweb._core.components import (
-    AppBar,
-    Breadcrumb,
-    Card,
-    Divider,
-    ListTile,
-    Scaffold,
-)
 from tempestweb._core.components.base import (
     ACCENT,
     BACKGROUND,
@@ -44,6 +35,16 @@ from tempestweb._core.components.base import (
     SURFACE,
 )
 from tempestweb._core.style import AlignItems, Color, Edge, FontWeight
+
+from tempestweb._core import App, NavStack, Route, Style, Widget, build
+from tempestweb._core.components import (
+    AppBar,
+    Breadcrumb,
+    Card,
+    Divider,
+    ListTile,
+    Scaffold,
+)
 from tempestweb._core.widgets import (
     Button,
     Column,

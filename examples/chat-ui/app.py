@@ -21,7 +21,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from tempestweb._core import App, Style, Widget
 from tempestweb._core.components.base import (
     ACCENT,
     BACKGROUND,
@@ -38,6 +37,9 @@ from tempestweb._core.style import (
     FontWeight,
     JustifyContent,
 )
+from tempestweb._core.widgets.events import TextChangeEvent
+
+from tempestweb._core import App, Style, Widget
 from tempestweb._core.widgets import (
     Button,
     Column,
@@ -47,7 +49,6 @@ from tempestweb._core.widgets import (
     Row,
     Text,
 )
-from tempestweb._core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Color palette additions specific to this example

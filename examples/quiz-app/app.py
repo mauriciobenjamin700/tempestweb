@@ -19,9 +19,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from tempestweb._core.style import Color, Edge, FontWeight
+
 from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
 from tempestweb._core.components import AppBar, Card, Divider, RadioGroup
-from tempestweb._core.style import Color, Edge, FontWeight
 from tempestweb._core.widgets import ProgressBar
 
 # ---------------------------------------------------------------------------

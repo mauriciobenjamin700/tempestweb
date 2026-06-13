@@ -28,8 +28,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core import App, Button, Column, Row, Style, Widget
-from tempestweb._core.components import ACCENT, BACKGROUND, ON_MUTED, ON_SURFACE, Card
 from tempestweb._core.style import (
     AlignItems,
     Color,
@@ -38,8 +36,11 @@ from tempestweb._core.style import (
     JustifyContent,
     TextAlign,
 )
-from tempestweb._core.widgets import Container, PageView, Text
 from tempestweb._core.widgets.events import PageChangeEvent
+
+from tempestweb._core import App, Button, Column, Row, Style, Widget
+from tempestweb._core.components import ACCENT, BACKGROUND, ON_MUTED, ON_SURFACE, Card
+from tempestweb._core.widgets import Container, PageView, Text
 
 # ---------------------------------------------------------------------------
 # Slide data

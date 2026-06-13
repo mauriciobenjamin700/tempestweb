@@ -21,9 +21,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from tempestweb._core.style import Edge
+from tempestweb._core.widgets.events import SelectEvent, TextChangeEvent
+
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import Chip
-from tempestweb._core.style import Edge
 from tempestweb._core.widgets import (
     Autocomplete,
     Button,
@@ -32,7 +34,6 @@ from tempestweb._core.widgets import (
     Text,
     Wrap,
 )
-from tempestweb._core.widgets.events import SelectEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Data catalog

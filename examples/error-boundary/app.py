@@ -25,8 +25,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
 from tempestweb._core.style import Edge
+
+from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
 from tempestweb.observability import (
     ConsoleTelemetryAdapter,
     ErrorBoundary,

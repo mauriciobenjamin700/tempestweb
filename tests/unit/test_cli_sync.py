@@ -16,9 +16,7 @@ from tempestweb.cli import load_config, scaffold_project, sync_modules
 from tempestweb.cli.commands.sync import SyncError
 
 
-def _make_dist(
-    site: Path, dist_name: str, top: str, *, binary: bool = False
-) -> None:
+def _make_dist(site: Path, dist_name: str, top: str, *, binary: bool = False) -> None:
     """Create a fake installed distribution discoverable by importlib.metadata.
 
     Args:
@@ -52,8 +50,7 @@ def _project(tmp_path: Path, deps: list[str], *, modules: str, packages: str) ->
     root = scaffold_project("app", parent=tmp_path).root
     dep_list = ", ".join(f'"{d}"' for d in deps)
     (root / "pyproject.toml").write_text(
-        f'[project]\nname = "app"\nversion = "0.1.0"\n'
-        f"dependencies = [{dep_list}]\n",
+        f'[project]\nname = "app"\nversion = "0.1.0"\ndependencies = [{dep_list}]\n',
         encoding="utf-8",
     )
     (root / "tempestweb.toml").write_text(
@@ -77,9 +74,7 @@ def site(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_sync_adds_pure_python_dep(site: Path, tmp_path: Path) -> None:
     _make_dist(site, "ort-vision-sdk", "ort_vision_sdk")
-    root = _project(
-        tmp_path, ["ort-vision-sdk"], modules='["app"]', packages="[]"
-    )
+    root = _project(tmp_path, ["ort-vision-sdk"], modules='["app"]', packages="[]")
     result = sync_modules(root)
     assert result.added == ["ort_vision_sdk"]
     assert result.modules == ["app", "ort_vision_sdk"]
@@ -116,13 +111,9 @@ def test_sync_skips_framework(site: Path, tmp_path: Path) -> None:
     assert result.added == []
 
 
-def test_sync_preserves_existing_and_is_idempotent(
-    site: Path, tmp_path: Path
-) -> None:
+def test_sync_preserves_existing_and_is_idempotent(site: Path, tmp_path: Path) -> None:
     _make_dist(site, "ort-vision-sdk", "ort_vision_sdk")
-    root = _project(
-        tmp_path, ["ort-vision-sdk"], modules='["app"]', packages="[]"
-    )
+    root = _project(tmp_path, ["ort-vision-sdk"], modules='["app"]', packages="[]")
     first = sync_modules(root)
     assert first.added == ["ort_vision_sdk"]
     # Second run sees no change.
@@ -135,9 +126,7 @@ def test_sync_preserves_existing_and_is_idempotent(
 
 def test_sync_dry_run_does_not_write(site: Path, tmp_path: Path) -> None:
     _make_dist(site, "ort-vision-sdk", "ort_vision_sdk")
-    root = _project(
-        tmp_path, ["ort-vision-sdk"], modules='["app"]', packages="[]"
-    )
+    root = _project(tmp_path, ["ort-vision-sdk"], modules='["app"]', packages="[]")
     result = sync_modules(root, dry_run=True)
     assert result.added == ["ort_vision_sdk"]
     assert result.written is False

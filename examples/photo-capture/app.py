@@ -34,9 +34,10 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from tempestweb._core.style import AlignItems, Edge, FontWeight, JustifyContent
+
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import Card, Divider
-from tempestweb._core.style import AlignItems, Edge, FontWeight, JustifyContent
 from tempestweb._core.widgets import Button, Column, Image, ImageFit, Row, Spinner, Text
 from tempestweb.native import NativeError
 from tempestweb.native import camera as _camera

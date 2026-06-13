@@ -25,11 +25,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from tempestweb._core.style import Edge, FontWeight
+from tempestweb._core.widgets.events import TextChangeEvent
+
 from tempestweb._core import App, Style, Widget
 from tempestweb._core.components import Card, Chip, Divider, Rating
-from tempestweb._core.style import Edge, FontWeight
 from tempestweb._core.widgets import Button, Column, Row, Text, TextArea, Wrap
-from tempestweb._core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Chip tag catalogue — aspect keywords the reviewer can toggle.

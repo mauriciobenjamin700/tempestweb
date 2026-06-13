@@ -24,10 +24,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core import App, Column, Row, Style, Text, Widget
 from tempestweb._core.style import Edge
-from tempestweb._core.widgets import Input
 from tempestweb._core.widgets.events import TextChangeEvent
+
+from tempestweb._core import App, Column, Row, Style, Text, Widget
+from tempestweb._core.widgets import Input
 
 __all__ = ["ConverterState", "make_state", "view"]
 

@@ -130,6 +130,60 @@ async def take_photo() -> bytes:
     No Modo B a foto atravessa a rede no round-trip. Comprima no cliente antes de
     devolver para manter o payload pequeno.
 
+## Inferência ONNX no browser (`native.onnx`)
+
+`onnxruntime` (a extensão C do CPython) **não tem wheel Pyodide** — Python no
+browser não roda um grafo ONNX em-processo. A capacidade `onnx` cobre o vão:
+o grafo roda em JavaScript via **onnxruntime-web** (build WASM), dirigido pela
+mesma costura `native_call`. Você faz o pré/pós-processamento em Python (numpy +
+pillow, ambos no Pyodide) e atravessa só a execução do tensor.
+
+```python
+from tempestweb.native import onnx
+from tempestweb.native.onnx import Tensor
+
+
+async def detect(input_b64: str) -> dict[str, Tensor]:
+    """Run a YOLO ONNX model loaded same-origin from the artifact."""
+    model = await onnx.load("./models/detect.onnx")       # compila a sessão (cache no JS)
+    feeds = {model.input_name: Tensor(data_base64=input_b64, dims=[1, 3, 640, 640])}
+    return await onnx.run(model.session_id, feeds)         # → {nome: Tensor}
+```
+
+Carregue o `onnxruntime-web` por `[wasm].scripts` e vendore-o (e os `.onnx`) por
+`[wasm].assets`, para o service worker precachear tudo e a inferência rodar
+**offline**. O provedor `wasm` é forçado (o build web não tem alguns kernels sob
+WebGPU). Tensores cruzam como bytes base64 + shape + dtype — a capacidade é
+numpy-free; o lado Python (que tem numpy) serializa.
+
+## Salvar arquivo gerado (`native.file`)
+
+O browser não tem escrita síncrona de arquivo. `file.save` entrega um blob gerado
+em Python por `navigator.share({files})` (quando a plataforma aceita) ou por
+download via `<a download>` (desktop), reportando qual caminho rodou.
+
+```python
+from tempestweb.native import file
+
+
+async def export_zip(zip_bytes: bytes) -> None:
+    """Share or download a generated ZIP."""
+    await file.save("historico.zip", zip_bytes, mime_type="application/zip")
+```
+
+## Extras de build do Modo A (`[wasm]`)
+
+Capacidades que dependem de pacotes Pyodide extras, módulos Python próprios,
+assets estáticos ou libs JS declaram-se no `tempestweb.toml`:
+
+```toml
+[wasm]
+packages = ["numpy", "pillow"]                 # loadPackage além do pydantic do core
+modules  = ["famacha"]                          # pacotes Python bundlados junto do app.py
+assets   = ["models/*.onnx", "vendor/ort/*"]    # copiados (path preservado) + precache
+scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injetado antes do bootstrap
+```
+
 ## Recap
 
 - Capacidades são Web APIs expostas como **awaitables tipados em Python**.

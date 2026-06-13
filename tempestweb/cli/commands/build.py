@@ -66,6 +66,15 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "constants.js",
 )
 
+# Icon set modules (client/icons/*.js): the resolver plus the vendored Lucide and
+# Material Symbols path data. Imported by dom.js (`./icons/index.js`), so they are
+# copied alongside the other client assets in both modes.
+_ICON_ASSETS: tuple[str, ...] = (
+    "index.js",
+    "lucide.js",
+    "material.js",
+)
+
 # Native capability bridge modules (client/native/*.js), copied into the wasm
 # artifact so the in-process FFI dispatch (geolocation/clipboard/http/…) resolves.
 _NATIVE_ASSETS: tuple[str, ...] = (
@@ -120,6 +129,7 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     WASM_PACKAGE_ARCHIVE,
     *_PWA_FILES,
     *(f"client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
+    *(f"client/icons/{asset}" for asset in _ICON_ASSETS),
     *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
     "client/push/web-push-client.js",
     "client/pwa/install-prompt.js",
@@ -131,6 +141,7 @@ SERVER_ARTIFACT_FILES: tuple[str, ...] = (
     "app.py",
     "index.html",
     *(f"static/{asset}" for asset in (*_CLIENT_ASSETS, "transport-ws.js")),
+    *(f"static/icons/{asset}" for asset in _ICON_ASSETS),
 )
 
 
@@ -414,6 +425,16 @@ def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
             raise BuildError(f"missing client asset: {source}")
         shutil.copyfile(source, dest / asset)
         written.append(asset)
+    # The icon resolver + vendored sets live in an icons/ subdir, imported by
+    # dom.js as `./icons/index.js`; preserve that layout next to the flat assets.
+    icons_dest = dest / "icons"
+    icons_dest.mkdir(parents=True, exist_ok=True)
+    for asset in _ICON_ASSETS:
+        source = client / "icons" / asset
+        if not source.is_file():
+            raise BuildError(f"missing icon asset: {source}")
+        shutil.copyfile(source, icons_dest / asset)
+        written.append(f"icons/{asset}")
     return written
 
 

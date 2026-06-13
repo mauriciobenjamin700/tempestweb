@@ -110,6 +110,28 @@ def test_build_precaches_assets_and_local_scripts(tmp_path: Path) -> None:
     assert "https://cdn.example/ort.js" not in sw
 
 
+def test_build_loads_app_importing_a_bundled_module(tmp_path: Path) -> None:
+    """app.py can import a sibling package the project ships (project root on path)."""
+    root = _project_with_wasm(tmp_path)
+    # Rewrite app.py to depend on the bundled `mypkg` so the render check exercises
+    # the sibling import (regression: build failed with "No module named mypkg").
+    (root / "app.py").write_text(
+        "from dataclasses import dataclass\n"
+        "from tempest_core import App, Text, Widget\n"
+        "from mypkg.tool import VALUE\n\n"
+        "@dataclass\n"
+        "class State:\n"
+        "    value: int = VALUE\n\n"
+        "def make_state() -> State:\n"
+        "    return State()\n\n"
+        "def view(app: App[State]) -> Widget:\n"
+        '    return Text(content=f"v{app.state.value}")\n',
+        encoding="utf-8",
+    )
+    result = build_artifact(root, mode="wasm")
+    assert (result.out_dir / "app.py").is_file()
+
+
 def test_build_errors_on_empty_asset_glob(tmp_path: Path) -> None:
     root = scaffold_project("noassets", parent=tmp_path).root
     (root / "tempestweb.toml").write_text(

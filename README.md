@@ -32,6 +32,12 @@ demos (stopwatch, forms, data table, kanban, chat, theming, i18n, canvas, native
 capabilities, observability, PWA/WebPush, and a server-mode walkthrough), each
 running unchanged in both modes.
 
+Building something real? Read the **[App architecture & best practices](https://mauriciobenjamin700.github.io/tempestweb/best-practices/)**
+guide ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/best-practices/)) —
+the ideal layered structure (routes · pages · components · styles · controllers ·
+services · storages · schemas · utils · core), mirroring `tempest-fastapi-sdk`, so
+your app doesn't rot into garbage code.
+
 ## How it works
 
 ```text

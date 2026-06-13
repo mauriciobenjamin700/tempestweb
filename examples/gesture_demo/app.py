@@ -62,7 +62,7 @@ def view(app: App[GestureState]) -> Widget:
                 background=Color.from_hex("#dde3ff"),
                 padding=Edge.all(16),
             ),
-            children=[Text(content="swipe or tap me", key="hint")],
+            child=Text(content="swipe or tap me", key="hint"),
         ),
     )
 

@@ -18,7 +18,7 @@ import { clipboardRead, clipboardWrite } from "./clipboard.js";
 import { storageGet, storageList, storagePut, storageRemove } from "./storage.js";
 import { cameraCapture } from "./camera.js";
 import { onnxLoad, onnxRun } from "./onnx.js";
-import { fileSave } from "./file.js";
+import { fileSave, filePick } from "./file.js";
 import {
   notificationsNotify,
   notificationsRequestPermission,
@@ -79,6 +79,7 @@ export const HANDLERS = {
   "onnx.load": onnxLoad,
   "onnx.run": onnxRun,
   "file.save": fileSave,
+  "file.pick": filePick,
   "notifications.notify": notificationsNotify,
   "notifications.request_permission": notificationsRequestPermission,
   "notifications.subscribe": notificationsSubscribe,

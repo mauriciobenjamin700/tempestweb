@@ -1,12 +1,57 @@
-// native/file.js — deliver a generated file via Web Share or anchor download.
+// native/file.js — file output (share/download) and input (pick).
 //
-// The browser has no synchronous "save file" call. A blob built in Python (a ZIP,
-// a spreadsheet, an image) crosses the bridge as base64 and is delivered one of
-// two ways: navigator.share({files:[...]}) when the Web Share API accepts files
-// (typical on mobile), otherwise a programmatic <a download> click (desktop).
-// The chosen path is reported back so the caller knows what happened.
+// The browser has no synchronous file I/O. `file.save` delivers a blob built in
+// Python via navigator.share({files:[...]}) (when the platform accepts files) or
+// an <a download> click (desktop). `file.pick` opens a file input and reads the
+// chosen file back as base64 — the gallery path the FilePicker widget can't carry
+// (its event exposes only a uri/name, not bytes).
 
 import { CapabilityError } from "./index.js";
+
+/**
+ * Open a native file picker and return the chosen file as base64.
+ * @param {{accept?:string,capture?:string}} args
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {Promise<{data_base64:string,mime:string,name:string}>}
+ * @throws {CapabilityError} unavailable / read_failed.
+ */
+export async function filePick(args, deps) {
+  const doc = deps.document || /** @type {any} */ (globalThis).document;
+  const FileReaderCtor = /** @type {any} */ (globalThis).FileReader;
+  if (!doc || typeof doc.createElement !== "function" || !FileReaderCtor) {
+    throw new CapabilityError("unavailable", "no document/FileReader to pick a file");
+  }
+  return await new Promise((resolve, reject) => {
+    const input = doc.createElement("input");
+    input.type = "file";
+    input.accept = args.accept || "image/*";
+    if (args.capture) input.capture = args.capture;
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.onchange = () => {
+      const file = input.files && input.files[0];
+      if (input.remove) input.remove();
+      if (!file) {
+        reject(new CapabilityError("cancelled", "no file selected"));
+        return;
+      }
+      const reader = new FileReaderCtor();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const comma = result.indexOf(",");
+        resolve({
+          data_base64: comma >= 0 ? result.slice(comma + 1) : result,
+          mime: file.type || "application/octet-stream",
+          name: file.name || "",
+        });
+      };
+      reader.onerror = () => reject(new CapabilityError("read_failed", "failed to read file"));
+      reader.readAsDataURL(file);
+    };
+    if (doc.body && doc.body.appendChild) doc.body.appendChild(input);
+    input.click();
+  });
+}
 
 /**
  * Decode a base64 string into a Uint8Array of its raw bytes.

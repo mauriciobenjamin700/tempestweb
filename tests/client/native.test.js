@@ -57,6 +57,7 @@ test("HANDLERS covers every documented capability name", () => {
     "onnx.load",
     "onnx.run",
     "file.save",
+    "file.pick",
     "notifications.notify",
     "notifications.request_permission",
     "notifications.subscribe",

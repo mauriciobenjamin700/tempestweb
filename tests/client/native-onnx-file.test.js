@@ -132,6 +132,37 @@ test("file.save: falls back to an anchor download when share is unavailable", as
   assert.equal(clicked, true);
 });
 
+test("file.pick: reads the chosen file back as base64", async () => {
+  const dom = new JSDOM("<!doctype html><html><body></body></html>");
+  const doc = dom.window.document;
+  // Fake FileReader that yields a data URL synchronously on readAsDataURL.
+  globalThis.FileReader = class {
+    readAsDataURL(_file) {
+      this.result = "data:image/png;base64,aGVsbG8=";
+      if (this.onload) this.onload();
+    }
+  };
+  const realCreate = doc.createElement.bind(doc);
+  doc.createElement = (tag) => {
+    const el = realCreate(tag);
+    if (tag === "input") {
+      Object.defineProperty(el, "files", {
+        value: [{ name: "ovino.png", type: "image/png" }],
+        configurable: true,
+      });
+      el.click = () => {
+        if (el.onchange) el.onchange();
+      };
+    }
+    return el;
+  };
+  const res = await dispatch(call("file.pick", { accept: "image/*" }), { document: doc });
+  assert.equal(res.ok, true);
+  assert.equal(res.value.data_base64, "aGVsbG8=");
+  assert.equal(res.value.mime, "image/png");
+  assert.equal(res.value.name, "ovino.png");
+});
+
 test("file.save: uses the Web Share API when it accepts files", async () => {
   const dom = new JSDOM("<!doctype html><html><body></body></html>");
   globalThis.Blob = dom.window.Blob;

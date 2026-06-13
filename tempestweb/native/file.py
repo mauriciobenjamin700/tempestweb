@@ -14,11 +14,59 @@ from __future__ import annotations
 
 import base64
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from tempestweb.native.dispatch import send_native_call
 
-__all__ = ["SaveResult", "save"]
+__all__ = ["PickedFile", "SaveResult", "pick", "save"]
+
+
+class PickedFile(BaseModel):
+    """A file chosen by the user via the native file picker.
+
+    Attributes:
+        data_base64: The file bytes, base64-encoded (no data-URI prefix).
+        mime: The file's MIME type as reported by the browser.
+        name: The original file name.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    data_base64: str = Field(default="", repr=False)
+    mime: str = "application/octet-stream"
+    name: str = ""
+
+    def to_bytes(self) -> bytes:
+        """Decode the picked file to raw bytes.
+
+        Returns:
+            The decoded file bytes.
+        """
+        return base64.b64decode(self.data_base64)
+
+
+async def pick(*, accept: str = "image/*", capture: str | None = None) -> PickedFile:
+    """Open a native file picker and return the chosen file's bytes.
+
+    The FilePicker widget's event carries only a uri/name, not bytes; this
+    capability opens an ``<input type="file">`` and reads the selection back as
+    base64 — the gallery/upload path for an on-device pipeline.
+
+    Args:
+        accept: The accept filter (e.g. ``"image/*"``).
+        capture: Optional capture hint (``"environment"`` / ``"user"``) to prefer
+            the camera on mobile.
+
+    Returns:
+        The chosen :class:`PickedFile`.
+
+    Raises:
+        NativeError: If the user cancels (``cancelled``) or the read fails
+            (``read_failed``).
+        BrowserUnavailableError: If called with no native bridge installed.
+    """
+    value = await send_native_call("file.pick", {"accept": accept, "capture": capture})
+    return PickedFile.model_validate(value)
 
 
 class SaveResult(BaseModel):

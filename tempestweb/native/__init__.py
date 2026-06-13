@@ -66,7 +66,8 @@ from tempestweb.native.dispatch import (
     send_native_call,
     uninstall_bridge,
 )
-from tempestweb.native.file import SaveResult
+from tempestweb.native.file import PickedFile, SaveResult
+from tempestweb.native.file import pick as file_pick
 from tempestweb.native.file import save as file_save
 from tempestweb.native.geolocation import Position, get_position
 from tempestweb.native.http import (
@@ -155,8 +156,10 @@ __all__ = [
     # onnx (onnxruntime-web bridge)
     "OnnxModel",
     "Tensor",
-    # file (share/download output)
+    # file (share/download output + pick input)
+    "PickedFile",
     "SaveResult",
+    "file_pick",
     "file_save",
     # notifications
     "NotificationPermission",

@@ -4,6 +4,76 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.5.0] — 2026-06-13
+
+### Added
+
+- **`tempestweb sync` command** — auto-fills `[wasm].modules` from the project's
+  installed pure-Python dependencies. Reads `[project.dependencies]` from
+  `pyproject.toml`, keeps the names that are installed **and** pure-Python
+  (no `.so`/`.pyd`/`.dylib`), and writes their import names into `[wasm].modules`,
+  preserving existing entries. Native packages (numpy, pillow) and the framework
+  (`tempestweb`, `pydantic`, …) are skipped, as is anything already under
+  `[wasm].packages`. Idempotent; `--dry-run` previews without writing. Pairs with
+  the 0.4.0 site-packages resolution so a dependency you `uv add` reaches the wasm
+  bundle with **zero manual bookkeeping**. Uses `tomlkit` (added to the `[cli]`
+  extra) for a comment-preserving round-trip edit of `tempestweb.toml`.
+
+## [0.4.0] — 2026-06-13
+
+### Added
+
+- **`[wasm].modules` resolves from the installed environment** — each entry is now
+  resolved in two steps: a vendored copy beside `app.py`
+  (`<project>/<module>/`) still wins, but when none exists the module is pulled
+  straight from the project's `.venv` `site-packages` via `importlib`. A
+  dependency you `uv add` no longer has to be cloned and committed at the repo
+  root to make it into the wasm bundle — just list it in `modules`. A name that is
+  neither vendored nor importable fails the build with a clear message.
+  Backward compatible: existing vendored layouts build unchanged. A stale project
+  directory holding only `__pycache__` (real source deleted, bytecode lingering)
+  no longer shadows the installed package and silently bundles nothing — it falls
+  through to the installed copy.
+
+## [0.3.0] — 2026-06-13
+
+### Added
+
+- **`native.install` capability** — the PWA install flow in Python:
+  `install.state()` → `InstallState(can_install, installed)` and
+  `install.prompt()` → `"accepted" | "dismissed" | "unavailable"`. Wraps the soft
+  controller in `client/pwa/install-prompt.js` (now copied into the wasm
+  artifact) via `client/native/install.js`.
+
+## [0.2.0] — 2026-06-13
+
+Real-app capabilities, driven by building a full on-device vision PWA (FAMACHApp)
+entirely on tempestweb. Backward compatible — existing apps build unchanged.
+
+### Added
+
+- **`native.onnx` capability** — run ONNX models in the browser via
+  **onnxruntime-web**. `onnx.load(model_url) → OnnxModel` and
+  `onnx.run(session_id, feeds) → {name: Tensor}`, bridged over the same
+  `native_call` seam (`client/native/onnx.js`, wasm execution provider forced).
+  numpy-free: tensors cross as base64 + shape + dtype. Unlocks in-browser
+  inference even though `onnxruntime` has no Pyodide wheel.
+- **`native.file` capability** — `file.save(name, bytes, mime)` shares
+  (Web Share API) or downloads a generated blob; `file.pick(accept)` opens a file
+  input and returns the chosen file as `PickedFile` (bytes the FilePicker widget's
+  uri-only event can't carry). `client/native/file.js`.
+- **`[wasm]` project config** (`tempestweb.toml`): `packages` (extra Pyodide
+  packages to `loadPackage`, e.g. numpy/pillow), `modules` (project Python
+  packages bundled next to `app.py`), `assets` (static files copied verbatim +
+  precached, e.g. `.onnx` models), `scripts` (`<script>` tags injected before the
+  bootstrap, e.g. onnxruntime-web). Threaded through `tempestweb build`.
+
+### Fixed
+
+- `load_app` now puts the project root on `sys.path`, so a multi-module project's
+  `app.py` can import the sibling packages it ships (previously failed the build's
+  render check with `ModuleNotFoundError`).
+
 ## [0.1.0] — 2026-06-11
 
 First public release. Build web apps in typed Python — one declarative tree, a

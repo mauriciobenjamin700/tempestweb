@@ -20,11 +20,14 @@ from tempestweb.cli.commands import (
     RunError,
     RunPlan,
     StubTransport,
+    SyncError,
+    SyncResult,
     build_artifact,
     create_dev_session,
     create_project,
     prepare_run,
     serve_run,
+    sync_modules,
 )
 from tempestweb.cli.config import (
     VALID_MODES,
@@ -68,6 +71,8 @@ __all__ = [
     "RunPlan",
     "ScaffoldResult",
     "StubTransport",
+    "SyncError",
+    "SyncResult",
     "build_artifact",
     "build_parser",
     "create_dev_session",
@@ -80,4 +85,5 @@ __all__ = [
     "render_initial_tree",
     "serve_run",
     "scaffold_project",
+    "sync_modules",
 ]

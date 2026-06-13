@@ -13,8 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fastapi.testclient import TestClient
-from tempest_core import App, Button, Column, Text, Widget
 
+from tempest_core import App, Button, Column, Text, Widget
 from tempestweb.server import create_app
 
 

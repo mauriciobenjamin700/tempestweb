@@ -23,13 +23,14 @@ WebSocket transport — ``python server.py`` (or ``uvicorn server:app``) serves 
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import shutil
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from tempestweb.cli.config import VALID_MODES, ProjectConfig, load_config
+from tempestweb.cli.config import VALID_MODES, ProjectConfig, WasmConfig, load_config
 from tempestweb.cli.loader import load_app, render_initial_tree
 from tempestweb.core.constants import WASM_PACKAGE_ARCHIVE, WASM_PYODIDE_VERSION
 from tempestweb.pwa import (
@@ -71,9 +72,12 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "audio.js",
     "camera.js",
     "clipboard.js",
+    "file.js",
     "geolocation.js",
     "http.js",
+    "install.js",
     "notifications.js",
+    "onnx.js",
     "share.js",
     "storage.js",
 )
@@ -117,6 +121,7 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     *(f"client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
     *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
     "client/push/web-push-client.js",
+    "client/pwa/install-prompt.js",
 )
 
 # Files a server artifact must contain, relative to the artifact root.
@@ -232,26 +237,119 @@ def _zip_tree(
             archive.write(path, str(path.relative_to(root)))
 
 
-def _zip_package(dest: Path) -> None:
+def _is_vendored(candidate: Path) -> bool:
+    """Tell whether ``candidate`` is a usable vendored module/package.
+
+    A single file counts. A directory counts only if it holds at least one
+    bundlable file (anything outside ``__pycache__``) — so a stale directory
+    left holding only ``__pycache__`` after the real source was deleted does
+    **not** shadow the installed package and silently bundle nothing.
+
+    Args:
+        candidate: The ``project_root/module`` path to test.
+
+    Returns:
+        ``True`` if the path is a file or a directory with real content.
+    """
+    if candidate.is_file():
+        return True
+    if not candidate.is_dir():
+        return False
+    return any(
+        path.is_file() and "__pycache__" not in path.parts
+        for path in candidate.rglob("*")
+    )
+
+
+def _resolve_module(module: str, project_root: Path | None) -> tuple[Path, str]:
+    """Resolve a ``[wasm].modules`` entry to its ``(root, top)`` for bundling.
+
+    Resolution order:
+
+    1. A **vendored copy** under ``project_root`` (``project_root/module``) that
+       carries real content — preserves the historical behavior where a copy
+       sitting beside ``app.py`` wins. A stale directory holding only
+       ``__pycache__`` is skipped (see :func:`_is_vendored`).
+    2. An **installed** package or module on ``sys.path`` (resolved via
+       ``importlib``) — so a dependency declared in the project's environment
+       (e.g. an ``uv``-managed ``.venv``) is pulled straight from site-packages
+       with no vendored copy committed to the repository.
+
+    Args:
+        module: The top-level module or package name from ``[wasm].modules``.
+        project_root: The project directory, when available.
+
+    Returns:
+        A ``(root, top)`` pair where ``root`` is the parent directory archive
+        entries are made relative to and ``top`` is the file or directory name
+        under it — fed straight into :func:`_zip_tree`.
+
+    Raises:
+        BuildError: If the module is neither vendored under ``project_root`` nor
+            importable from the current environment.
+    """
+    if project_root is not None and _is_vendored(project_root / module):
+        return project_root, module
+
+    try:
+        spec = importlib.util.find_spec(module)
+    except (ImportError, ValueError):
+        spec = None
+    if spec is not None:
+        locations = list(spec.submodule_search_locations or ())
+        if locations:
+            package_dir = Path(locations[0]).resolve()
+            return package_dir.parent, module
+        if spec.origin and spec.origin not in ("built-in", "frozen"):
+            origin = Path(spec.origin).resolve()
+            return origin.parent, origin.name
+
+    vendored = f"{project_root / module}" if project_root is not None else "<none>"
+    raise BuildError(
+        f"wasm module {module!r} not found: no vendored copy at {vendored} "
+        f"and not importable from the current environment"
+    )
+
+
+def _zip_package(
+    dest: Path,
+    *,
+    project_root: Path | None = None,
+    modules: tuple[str, ...] = (),
+) -> None:
     """Zip the Mode A Python payload (tempestweb subset + tempest_core) into ``dest``.
 
     The archive carries the Mode A subset of ``tempestweb``
     (:data:`_WASM_PACKAGE_PARTS`) and the whole ``tempest_core`` package, excluding
     ``__pycache__``. The Pyodide bootstrap unpacks it into the virtual filesystem's
     working directory (on ``sys.path``), so ``import tempestweb`` and
-    ``import tempest_core`` both resolve in the browser.
+    ``import tempest_core`` both resolve in the browser. Any project ``modules``
+    (files or package directories declared under ``[wasm]``) are bundled too, so
+    ``app.py`` can ``import`` them in the browser.
 
     Args:
         dest: The ``.zip`` path to write.
+        project_root: The project directory the ``modules`` are relative to.
+            Required when ``modules`` is non-empty.
+        modules: Names (files or package dirs) to bundle next to ``app.py``
+            (e.g. ``("famacha",)``). Each is resolved by :func:`_resolve_module`:
+            a vendored copy under ``project_root`` wins, otherwise the module is
+            pulled from the installed environment (site-packages) via importlib —
+            so a dependency declared in the project's ``.venv`` need not be
+            vendored into the repository.
 
     Raises:
-        BuildError: If an expected package part is missing.
+        BuildError: If an expected package part is missing, or a declared module
+            is neither vendored nor importable.
     """
     tempestweb_root = _package_dir().parent
     tempest_core_root = _tempest_core_dir().parent
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
         _zip_tree(archive, tempestweb_root, "tempestweb", _WASM_PACKAGE_PARTS)
         _zip_tree(archive, tempest_core_root, "tempest_core", None)
+        for module in modules:
+            root, top = _resolve_module(module, project_root)
+            _zip_tree(archive, root, top, None)
 
 
 def _build_pwa(out: Path, client: Path, name: str, precache: tuple[str, ...]) -> None:
@@ -318,15 +416,19 @@ def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
     return written
 
 
-def _index_html(name: str) -> str:
+def _index_html(name: str, scripts: tuple[str, ...] = ()) -> str:
     """Render the static ``index.html`` shell for a wasm artifact.
 
     Args:
         name: The project name (page title).
+        scripts: URLs/paths injected as classic ``<script>`` tags in ``<head>``
+            before the bootstrap module, so a global library (e.g. ``window.ort``
+            from onnxruntime-web) is loaded and ready when Python boots.
 
     Returns:
         The HTML document that boots the app in the browser.
     """
+    script_tags = "".join(f'\n    <script src="{src}"></script>' for src in scripts)
     return f"""\
 <!doctype html>
 <html lang="en">
@@ -336,7 +438,7 @@ def _index_html(name: str) -> str:
     <title>{name}</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#111111" />
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />{script_tags}
   </head>
   <body>
     <div id="app"></div>
@@ -352,7 +454,7 @@ def _index_html(name: str) -> str:
 """
 
 
-def _bootstrap_js(name: str, pyodide_base: str) -> str:
+def _bootstrap_js(name: str, pyodide_base: str, packages: tuple[str, ...] = ()) -> str:
     """Render the live wasm bootstrap entrypoint (Mode A, Pyodide).
 
     The emitted module loads Pyodide + ``pydantic`` from ``pyodide_base``, unpacks
@@ -367,10 +469,14 @@ def _bootstrap_js(name: str, pyodide_base: str) -> str:
         pyodide_base: The base URL Pyodide is loaded from — the jsdelivr CDN by
             default, or the artifact-relative ``"./pyodide/"`` for an offline
             build (vendored runtime + wheels, precached by the service worker).
+        packages: Extra Pyodide packages to ``loadPackage`` alongside the core's
+            own ``pydantic`` (e.g. ``("numpy", "pillow")``), declared under
+            ``[wasm]``.
 
     Returns:
         The bootstrap module source.
     """
+    package_list_js = json.dumps(["pydantic", *packages])
     return f"""\
 // bootstrap.js — live wasm artifact entrypoint for "{name}" (Mode A, Pyodide).
 //
@@ -398,10 +504,11 @@ _start
 export async function boot() {{
   const root = document.getElementById("app");
 
-  // 1. Load Pyodide and pydantic (the vendored core's only hard dependency).
+  // 1. Load Pyodide + the configured packages (pydantic is the core's only hard
+  //    dependency; a project's [wasm] packages — e.g. numpy/pillow — join here).
   const {{ loadPyodide }} = await import(PYODIDE_BASE + "pyodide.mjs");
   const pyodide = await loadPyodide({{ indexURL: PYODIDE_BASE }});
-  await pyodide.loadPackage(["pydantic"]);
+  await pyodide.loadPackage({package_list_js});
 
   // 2. Install the tempestweb package + the app module into the virtual FS.
   const pkgZip = await (await fetch("./{WASM_PACKAGE_ARCHIVE}")).arrayBuffer();
@@ -632,11 +739,51 @@ def build_artifact(
     app_source = config.entrypoint_path.read_text(encoding="utf-8")
 
     if resolved_mode == "wasm":
-        files = _build_wasm(out, client, config.name, app_source, offline=offline)
+        files = _build_wasm(
+            out,
+            client,
+            config.name,
+            app_source,
+            offline=offline,
+            project_root=config.root,
+            wasm=config.wasm,
+        )
     else:
         files = _build_server(out, client, config.name, app_source)
 
     return BuildResult(mode=resolved_mode, out_dir=out, files=files)
+
+
+def _copy_assets(project_root: Path, out: Path, patterns: tuple[str, ...]) -> list[str]:
+    """Copy declared static assets into the artifact, preserving relative paths.
+
+    Each pattern is a project-relative glob (e.g. ``"models/*.onnx"``); every
+    matching file is copied to the same relative path under ``out``. Used to
+    bundle ONNX models and a vendored JS library into a Mode A artifact.
+
+    Args:
+        project_root: The project directory the patterns are relative to.
+        out: The artifact root.
+        patterns: Project-relative glob patterns.
+
+    Returns:
+        The artifact-relative POSIX paths written, sorted, deduplicated.
+
+    Raises:
+        BuildError: If a pattern matches no files (a likely typo).
+    """
+    written: set[str] = set()
+    for pattern in patterns:
+        matches = [p for p in sorted(project_root.glob(pattern)) if p.is_file()]
+        if not matches:
+            raise BuildError(f"wasm asset pattern matched no files: {pattern!r}")
+        for source in matches:
+            rel = source.relative_to(project_root).as_posix()
+            dest = out / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, dest)
+            written.add(rel)
+    return sorted(written)
 
 
 def _build_wasm(
@@ -646,6 +793,8 @@ def _build_wasm(
     app_source: str,
     *,
     offline: bool = False,
+    project_root: Path | None = None,
+    wasm: WasmConfig | None = None,
 ) -> tuple[str, ...]:
     """Write the wasm (static) artifact layout into ``out``.
 
@@ -657,29 +806,37 @@ def _build_wasm(
         offline: When ``True``, vendor the Pyodide runtime + package wheels under
             ``out/pyodide/``, point the bootstrap at that local copy, and precache
             it so the app boots offline after the first load.
+        project_root: The project directory (source of ``[wasm]`` modules/assets).
+        wasm: The project's ``[wasm]`` extras (packages, modules, assets, scripts).
 
     Returns:
         The artifact-relative paths written, sorted.
     """
+    wasm = wasm or WasmConfig()
+    extra_packages = tuple(wasm.packages)
+    modules = tuple(wasm.modules)
+    scripts = tuple(wasm.scripts)
+
     # Offline: vendor Pyodide same-origin so the service worker can precache it;
-    # otherwise the bootstrap loads it from the (cross-origin) jsdelivr CDN.
+    # otherwise the bootstrap loads it from the (cross-origin) jsdelivr CDN. The
+    # project's extra packages (numpy/pillow) join the vendored closure.
     vendored: list[str] = []
     if offline:
         vendored = vendor_pyodide(
             out / "pyodide",
             version=WASM_PYODIDE_VERSION,
-            packages=WASM_RUNTIME_PACKAGES,
+            packages=(*WASM_RUNTIME_PACKAGES, *extra_packages),
         )
         pyodide_base = "./pyodide/"
     else:
         pyodide_base = pyodide_cdn_base(WASM_PYODIDE_VERSION)
 
-    (out / "index.html").write_text(_index_html(name), encoding="utf-8")
+    (out / "index.html").write_text(_index_html(name, scripts), encoding="utf-8")
     (out / "bootstrap.js").write_text(
-        _bootstrap_js(name, pyodide_base), encoding="utf-8"
+        _bootstrap_js(name, pyodide_base, extra_packages), encoding="utf-8"
     )
     (out / "app.py").write_text(app_source, encoding="utf-8")
-    _zip_package(out / WASM_PACKAGE_ARCHIVE)
+    _zip_package(out / WASM_PACKAGE_ARCHIVE, project_root=project_root, modules=modules)
     _copy_client(client, out / "client", "transport-wasm.js")
     # Native capability bridge (geolocation/clipboard/http/…) for the in-process
     # FFI dispatch the bootstrap installs.
@@ -697,6 +854,24 @@ def _build_wasm(
     push_dest = out / "client" / "push"
     push_dest.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(push_source, push_dest / "web-push-client.js")
+    # The install capability imports the soft install-prompt controller.
+    install_source = client / "pwa" / "install-prompt.js"
+    if not install_source.is_file():
+        raise BuildError(f"missing pwa asset: {install_source}")
+    pwa_dest = out / "client" / "pwa"
+    pwa_dest.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(install_source, pwa_dest / "install-prompt.js")
+    # Project static assets (ONNX models, vendored JS libs) copied verbatim,
+    # preserving their relative path, and precached for the offline second load.
+    assets: list[str] = []
+    if project_root is not None and wasm.assets:
+        assets = _copy_assets(project_root, out, tuple(wasm.assets))
+    # Artifact-relative scripts (not external URLs) are part of the shell too.
+    local_scripts = [
+        s.lstrip(".") if s.startswith("./") else s
+        for s in scripts
+        if not s.startswith(("http://", "https://"))
+    ]
     # App-shell the service worker precaches for an offline second load. With an
     # offline build the vendored Pyodide runtime + wheels are same-origin and join
     # the precache, so the app boots with no network at all; a CDN build precaches
@@ -710,10 +885,20 @@ def _build_wasm(
         "/app.py",
         f"/{WASM_PACKAGE_ARCHIVE}",
         *(f"/client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
+        *(f"/{asset}" for asset in assets),
+        *(s if s.startswith("/") else f"/{s}" for s in local_scripts),
         *(f"/pyodide/{file_name}" for file_name in vendored),
     )
     _build_pwa(out, client, name, precache)
-    return tuple(sorted([*WASM_ARTIFACT_FILES, *(f"pyodide/{f}" for f in vendored)]))
+    return tuple(
+        sorted(
+            [
+                *WASM_ARTIFACT_FILES,
+                *assets,
+                *(f"pyodide/{f}" for f in vendored),
+            ]
+        )
+    )
 
 
 def _build_server(

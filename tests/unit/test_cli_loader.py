@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from tempest_core import Node
 
+from tempest_core import Node
 from tempestweb.cli import (
     LoadedApp,
     ProjectLoadError,

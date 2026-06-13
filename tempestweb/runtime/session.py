@@ -30,7 +30,6 @@ from typing import Any, Generic, TypeVar
 from tempest_core import App, Widget
 from tempest_core import Patch as CorePatch
 from tempest_core.widgets import handler_accepts_event
-
 from tempestweb.native.bridges import ProxyBridge
 from tempestweb.native.dispatch import (
     install_bridge,

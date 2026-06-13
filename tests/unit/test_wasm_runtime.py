@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+
 from tempest_core import App, Button, Column, Row, Style, Text, Widget, build
 from tempest_core.style import Edge
-
 from tempestweb.runtime import WasmRuntime, serialize_node, serialize_patches
 from tempestweb.transports import WasmTransport
 

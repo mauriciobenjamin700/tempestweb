@@ -29,8 +29,8 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from tempest_core import App, Text, Widget
 
+from tempest_core import App, Text, Widget
 from tempestweb import native
 from tempestweb.native import (
     BrowserUnavailableError,

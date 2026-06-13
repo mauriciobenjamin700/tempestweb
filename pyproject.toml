@@ -1,6 +1,6 @@
 [project]
 name = "tempestweb"
-version = "0.1.0"
+version = "0.5.0"
 description = "Build web apps in typed Python — one tree, a DOM renderer, two execution modes (WASM + server)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,6 +22,8 @@ server = [
 # CLI + dev loop.
 cli = [
     "watchfiles>=0.21",
+    # Round-trip TOML editing for `tempestweb sync` (preserves comments/format).
+    "tomlkit>=0.13",
 ]
 # Server-side WebPush (P3). Mirrors tempest-fastapi-sdk[webpush]; lazily imported
 # so tempestweb.server.webpush imports without it (the dep is touched only on send).
@@ -78,6 +80,13 @@ ignore = ["D203", "D213"]
 # Tests and examples are exempt from docstring/annotation ceremony.
 "tests/*" = ["D", "ANN"]
 "examples/*" = ["D"]
+
+[tool.ruff.lint.isort]
+# Pin first-party so import ordering is deterministic regardless of what is
+# installed: ruff's auto-detection classifies tempestweb/tempest_core differently
+# in a fresh CI venv vs a local editable checkout, which made `ruff check .` pass
+# locally but fail in CI. Both are our own packages (split across repos).
+known-first-party = ["tempestweb", "tempest_core"]
 
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "double"

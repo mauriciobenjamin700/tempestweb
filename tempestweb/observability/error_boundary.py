@@ -38,8 +38,8 @@ from dataclasses import dataclass
 from functools import wraps
 
 from pydantic import Field
-from tempest_core import Column, Component, Text, Widget
 
+from tempest_core import Column, Component, Text, Widget
 from tempestweb.observability.telemetry import TelemetryProvider
 
 __all__ = [

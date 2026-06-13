@@ -43,9 +43,12 @@ from tempestweb.native import (
     audio,
     camera,
     clipboard,
+    file,
     geolocation,
     http,
+    install,
     notifications,
+    onnx,
     storage,
 )
 from tempestweb.native.audio import PlayResult
@@ -64,6 +67,9 @@ from tempestweb.native.dispatch import (
     send_native_call,
     uninstall_bridge,
 )
+from tempestweb.native.file import PickedFile, SaveResult
+from tempestweb.native.file import pick as file_pick
+from tempestweb.native.file import save as file_save
 from tempestweb.native.geolocation import Position, get_position
 from tempestweb.native.http import (
     HttpResponse,
@@ -73,6 +79,9 @@ from tempestweb.native.http import (
     request,
     upload,
 )
+from tempestweb.native.install import InstallState
+from tempestweb.native.install import prompt as install_prompt
+from tempestweb.native.install import state as install_state
 from tempestweb.native.notifications import (
     NotificationPermission,
     notify,
@@ -80,6 +89,7 @@ from tempestweb.native.notifications import (
     subscribe,
     unsubscribe,
 )
+from tempestweb.native.onnx import OnnxModel, Tensor
 from tempestweb.native.share import (
     ShareOutcome,
     ShareResult,
@@ -100,9 +110,12 @@ __all__ = [
     "audio",
     "camera",
     "clipboard",
+    "file",
     "geolocation",
     "http",
+    "install",
     "notifications",
+    "onnx",
     "storage",
     # dispatch core + bridges (the Mode-A vs Mode-B seam)
     "NATIVE_RESULT_PREFIX",
@@ -145,6 +158,18 @@ __all__ = [
     # camera (N4)
     "Photo",
     "capture",
+    # onnx (onnxruntime-web bridge)
+    "OnnxModel",
+    "Tensor",
+    # file (share/download output + pick input)
+    "PickedFile",
+    "SaveResult",
+    "file_pick",
+    "file_save",
+    # install (PWA install prompt)
+    "InstallState",
+    "install_prompt",
+    "install_state",
     # notifications
     "NotificationPermission",
     "notify",

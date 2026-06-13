@@ -34,7 +34,6 @@ from typing import Any, Generic, TypeVar
 
 from tempest_core import App, Node, Scene, Widget
 from tempest_core.core.ir import Patch
-
 from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
 from tempestweb.transports.base import (
     Event,

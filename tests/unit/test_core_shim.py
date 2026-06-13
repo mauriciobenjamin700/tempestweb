@@ -37,7 +37,6 @@ def test_submodule_from_import_resolves() -> None:
 def test_submodule_attribute_access_resolves() -> None:
     """`tempestweb._core.<sub>` attribute access points at the same module."""
     import tempestweb._core.style
-
     import tempestweb._core.widgets
 
     assert tempestweb._core.style is tempest_core.style

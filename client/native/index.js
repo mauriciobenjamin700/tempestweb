@@ -17,6 +17,9 @@ import { geolocationGet } from "./geolocation.js";
 import { clipboardRead, clipboardWrite } from "./clipboard.js";
 import { storageGet, storageList, storagePut, storageRemove } from "./storage.js";
 import { cameraCapture } from "./camera.js";
+import { onnxLoad, onnxRun } from "./onnx.js";
+import { fileSave, filePick } from "./file.js";
+import { installState, installPrompt } from "./install.js";
 import {
   notificationsNotify,
   notificationsRequestPermission,
@@ -74,6 +77,12 @@ export const HANDLERS = {
   "storage.list": storageList,
   "storage.remove": storageRemove,
   "camera.capture": cameraCapture,
+  "onnx.load": onnxLoad,
+  "onnx.run": onnxRun,
+  "file.save": fileSave,
+  "file.pick": filePick,
+  "install.state": installState,
+  "install.prompt": installPrompt,
   "notifications.notify": notificationsNotify,
   "notifications.request_permission": notificationsRequestPermission,
   "notifications.subscribe": notificationsSubscribe,

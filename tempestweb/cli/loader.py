@@ -70,6 +70,13 @@ def load_app(entrypoint: str | Path) -> LoadedApp:
     if not path.is_file():
         raise ProjectLoadError(f"entrypoint not found: {path}")
 
+    # Put the project root on sys.path so the entrypoint can import sibling
+    # modules/packages it ships (declared under ``[wasm].modules`` and bundled
+    # alongside ``app.py``). Without this a multi-module project fails to import.
+    project_root = str(path.parent)
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
     # Make the synthetic module name unique per resolved path so loading several
     # projects (each with its own ``app.py``) in one process never reuses a stale
     # module object from ``sys.modules``.

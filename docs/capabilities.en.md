@@ -131,6 +131,113 @@ async def take_photo() -> bytes:
     In Mode B the photo crosses the network on the round-trip. Compress it on the
     client before returning to keep the payload small.
 
+## ONNX inference in the browser (`native.onnx`)
+
+`onnxruntime` (the CPython C-extension) **has no Pyodide wheel** — Python in the
+browser can't run an ONNX graph in-process. The `onnx` capability bridges the gap:
+the graph runs in JavaScript via **onnxruntime-web** (the WASM build), driven over
+the same `native_call` seam. You do the pre/post-processing in Python (numpy +
+pillow, both available in Pyodide) and ship only the raw tensor execution across.
+
+```python
+from tempestweb.native import onnx
+from tempestweb.native.onnx import Tensor
+
+
+async def detect(input_b64: str) -> dict[str, Tensor]:
+    """Run a YOLO ONNX model loaded same-origin from the artifact."""
+    model = await onnx.load("./models/detect.onnx")       # compiles the session (cached in JS)
+    feeds = {model.input_name: Tensor(data_base64=input_b64, dims=[1, 3, 640, 640])}
+    return await onnx.run(model.session_id, feeds)         # → {name: Tensor}
+```
+
+Load `onnxruntime-web` via `[wasm].scripts` and vendor it (and the `.onnx` files)
+via `[wasm].assets`, so the service worker precaches everything and inference runs
+**offline**. The `wasm` provider is forced (the web build lacks some kernels under
+WebGPU). Tensors cross as base64 bytes + shape + dtype — the capability is
+numpy-free; the Python side (which has numpy) serializes.
+
+## Save a generated file (`native.file`)
+
+The browser has no synchronous file write. `file.save` delivers a blob built in
+Python via `navigator.share({files})` (when the platform accepts it) or an
+`<a download>` click (desktop), reporting which path ran.
+
+```python
+from tempestweb.native import file
+
+
+async def export_zip(zip_bytes: bytes) -> None:
+    """Share or download a generated ZIP."""
+    await file.save("history.zip", zip_bytes, mime_type="application/zip")
+```
+
+## PWA install (`native.install`)
+
+Expose the PWA install flow to Python: whether the app is installable (a
+`beforeinstallprompt` was captured) or already installed, and fire the prompt
+after a real user gesture.
+
+```python
+from tempestweb.native import install
+
+
+async def on_install_tap() -> None:
+    """Fire the native install prompt from a button handler."""
+    outcome = await install.prompt()   # "accepted" | "dismissed" | "unavailable"
+
+
+async def maybe_show_install_button() -> bool:
+    """Whether to show an Install button."""
+    state = await install.state()      # InstallState(can_install, installed)
+    return state.can_install and not state.installed
+```
+
+`client/native/install.js` wraps the soft controller from
+`client/pwa/install-prompt.js` (suppresses the mini-infobar and stashes the event).
+
+## Mode A build extras (`[wasm]`)
+
+Capabilities that need extra Pyodide packages, your own Python modules, static
+assets, or a JS library are declared in `tempestweb.toml`:
+
+```toml
+[wasm]
+packages = ["numpy", "pillow"]                 # loadPackage beyond the core's pydantic
+modules  = ["famacha", "ort_vision_sdk"]        # Python packages bundled next to app.py
+assets   = ["models/*.onnx", "vendor/ort/*"]    # copied (path preserved) + precached
+scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injected before the bootstrap
+```
+
+!!! tip "Where each `module` comes from"
+    Each name in `modules` is resolved in two steps, in order:
+
+    1. A **vendored copy** next to `app.py` (`<project>/<module>/`), if present —
+       the historical behavior, where a copy committed to the repo wins.
+    2. An **installed package** in the environment (`importlib`) — when no vendored
+       copy exists, the module is pulled straight from your `.venv`'s
+       `site-packages`.
+
+    So a dependency you install (`uv add ...`) **need not be cloned and dropped at
+    the repo root** to make it into the bundle — just list it in `modules`. A name
+    that is neither a vendored copy nor importable fails the build with a clear
+    message.
+
+!!! tip "You don't even have to list them: `tempestweb sync`"
+    To avoid keeping `modules` up to date by hand, run:
+
+    ```bash
+    tempestweb sync            # fills [wasm].modules; --dry-run only previews
+    ```
+
+    It reads `[project.dependencies]` from your `pyproject.toml`, keeps the ones
+    that are **installed and pure-Python**, and writes their import names into
+    `[wasm].modules` — preserving whatever was already there (your app package,
+    vendored copies). Packages with native code (numpy, pillow) are **skipped** —
+    Pyodide provides them via `[wasm].packages` — as is the framework itself
+    (`tempestweb`, `pydantic`). It is idempotent: a second run with no environment
+    change writes nothing. Just have the dependencies in your `.venv` and run it. 🚀
+
 ## Recap
 
 - Capabilities are Web APIs exposed as **typed Python awaitables**.

@@ -17,8 +17,8 @@ from dataclasses import dataclass
 
 import pytest
 from fastapi.testclient import TestClient
-from tempest_core import App, Button, Column, Text, Widget
 
+from tempest_core import App, Button, Column, Text, Widget
 from tempestweb.runtime.session import AppSession
 from tempestweb.server import create_app
 from tempestweb.transports.sse import SSETransport

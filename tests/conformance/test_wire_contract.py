@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from tempest_core import Button, Column, Text, build, diff
 
+from tempest_core import Button, Column, Text, build, diff
 from tests.conformance._dom import patch_kind
 from tests.conformance._generate import CONFORMANCE_FIXTURE, render_fixture_text
 from tests.conformance._scenarios import SCENARIOS, scenario_to_fixture

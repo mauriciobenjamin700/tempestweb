@@ -77,6 +77,7 @@ plugins:
             "3. Patches on the wire": "3. Patches na rede"
             "4. Running both modes": "4. Rodando os dois modos"
             "Ready-made components": "Componentes prontos"
+            "Theming (Material 3)": "Tema (Material 3)"
             "Best practices": "Boas práticas"
             Examples: Exemplos
             "Example gallery": "Galeria de exemplos"
@@ -166,6 +167,7 @@ nav:
       - "3. Patches on the wire": tutorial/patches.md
       - "4. Running both modes": tutorial/modes.md
   - Ready-made components: components.md
+  - Theming (Material 3): theming.md
   - Best practices: best-practices.md
   - Examples:
       - "Example gallery": examples/index.md

@@ -132,6 +132,14 @@ def serve_run(plan: RunPlan) -> None:
         server.run(plan.host, plan.port)
         return
     # wasm: static-host the bundle (no livereload — that is `dev`'s job).
-    from tempestweb.devserver.http import create_dev_app, serve
+    try:
+        from tempestweb.devserver.http import create_dev_app, serve
+    except ImportError as exc:  # noqa: TRY003 - actionable install hint
+        raise RunError(
+            "serving Mode A needs the 'server' extra (Starlette + uvicorn). "
+            "Install it with: uv add 'tempestweb[server]' "
+            "(or pip install 'tempestweb[server]'). The built wasm artifact "
+            "itself never embeds a server — this is only for local serving."
+        ) from exc
 
     serve(create_dev_app(plan.build.out_dir), plan.host, plan.port)

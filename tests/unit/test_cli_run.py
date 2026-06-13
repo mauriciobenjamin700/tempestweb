@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 
 from tempestweb.cli import RunError, RunPlan, prepare_run, scaffold_project
+from tempestweb.cli.commands.run import serve_run
 
 
 def _project(tmp_path: Path) -> Path:
@@ -48,3 +50,15 @@ def test_prepare_run_propagates_build_failure(tmp_path: Path) -> None:
     (root / "app.py").write_text("def broken( =", encoding="utf-8")
     with pytest.raises(RunError):
         prepare_run(root, mode="wasm")
+
+
+def test_serve_run_wasm_missing_server_extra_raises_friendly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Setting the module to None makes its import raise ImportError, simulating
+    # an install without the [server] extra (no Starlette/uvicorn).
+    root = _project(tmp_path)
+    plan = prepare_run(root, mode="wasm")
+    monkeypatch.setitem(sys.modules, "tempestweb.devserver.http", None)
+    with pytest.raises(RunError, match=r"'server' extra"):
+        serve_run(plan)

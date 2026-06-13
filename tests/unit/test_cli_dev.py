@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from tempestweb.cli import (
     create_dev_session,
     scaffold_project,
 )
+from tempestweb.cli.commands.dev import serve_dev
 
 
 def _project(tmp_path: Path) -> Path:
@@ -72,3 +74,14 @@ def test_create_dev_session_skip_verify(tmp_path: Path) -> None:
     # With verify=False the session builds even without a loadable entrypoint.
     session = create_dev_session(tmp_path, mode="wasm", verify=False)
     assert isinstance(session, DevSession)
+
+
+async def test_serve_dev_missing_server_extra_raises_friendly(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Setting the module to None makes its import raise ImportError, simulating
+    # an install without the [server] extra (no Starlette/uvicorn).
+    root = _project(tmp_path)
+    monkeypatch.setitem(sys.modules, "tempestweb.devserver", None)
+    with pytest.raises(DevError, match=r"'server' extra"):
+        await serve_dev(root, mode="wasm")

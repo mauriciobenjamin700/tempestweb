@@ -54,7 +54,6 @@ def view(app: App[AnimState]) -> Widget:
             background=Color.from_hex("#3366ff" if wide else "#cccccc"),
             transition=Transition(duration_ms=300, curve=Curve.EASE_IN_OUT),
         ),
-        children=[],
     )
 
     return Column(

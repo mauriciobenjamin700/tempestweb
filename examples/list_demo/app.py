@@ -48,7 +48,7 @@ def view(app: App[ListState]) -> Widget:
         return Container(
             key=str(index),
             style=Style(padding=Edge.all(8)),
-            children=[Text(content=f"Item {index}", key=f"t{index}")],
+            child=Text(content=f"Item {index}", key=f"t{index}"),
         )
 
     return Column(

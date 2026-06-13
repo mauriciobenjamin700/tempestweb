@@ -75,8 +75,10 @@ def _label_update(patches: list[dict]) -> dict:
 
 def test_ws_initial_patches_and_click_update() -> None:
     """Connect → receive initial mount → click → receive the Update patch."""
-    client = TestClient(create_app(make_state, view))
-    with client.websocket_connect("/ws") as ws:
+    with (
+        TestClient(create_app(make_state, view)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
         initial = ws.receive_json()
         assert initial["kind"] == "patches"
         root_patch = initial["data"][0]
@@ -94,8 +96,8 @@ def test_ws_initial_patches_and_click_update() -> None:
 
 def test_ws_two_connections_keep_independent_state() -> None:
     """Two connections each own their counter; one click never leaks across."""
-    client = TestClient(create_app(make_state, view))
     with (
+        TestClient(create_app(make_state, view)) as client,
         client.websocket_connect("/ws") as ws_a,
         client.websocket_connect("/ws") as ws_b,
     ):
@@ -117,8 +119,10 @@ def test_ws_two_connections_keep_independent_state() -> None:
 
 def test_ws_unknown_key_is_ignored() -> None:
     """A click on a non-existent key produces no patch and does not crash."""
-    client = TestClient(create_app(make_state, view))
-    with client.websocket_connect("/ws") as ws:
+    with (
+        TestClient(create_app(make_state, view)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
         ws.receive_json()
         ws.send_json({"kind": "event", "data": {"type": "click", "key": "ghost"}})
         # A real click after the ignored one still yields exactly Count: 1.

@@ -100,7 +100,7 @@ def _client() -> TestClient:
 
 def test_initial_mount_receives_counter_zero() -> None:
     """Connecting receives one ``patches`` envelope with the initial counter label."""
-    with _client().websocket_connect("/ws") as ws:
+    with _client() as client, client.websocket_connect("/ws") as ws:
         initial = ws.receive_json()
 
     assert initial["kind"] == "patches", f"unexpected kind: {initial['kind']}"
@@ -111,7 +111,7 @@ def test_initial_mount_receives_counter_zero() -> None:
 
 def test_click_increments_counter() -> None:
     """A single ``click`` on ``"inc"`` drives the counter from 0 → 1."""
-    with _client().websocket_connect("/ws") as ws:
+    with _client() as client, client.websocket_connect("/ws") as ws:
         ws.receive_json()  # discard initial mount
 
         ws.send_json({"kind": "event", "data": {"type": "click", "key": "inc"}})
@@ -127,7 +127,7 @@ def test_click_increments_counter() -> None:
 
 def test_multiple_clicks_accumulate() -> None:
     """Two successive increments accumulate: 0 → 1 → 2."""
-    with _client().websocket_connect("/ws") as ws:
+    with _client() as client, client.websocket_connect("/ws") as ws:
         ws.receive_json()  # discard initial mount
 
         ws.send_json({"kind": "event", "data": {"type": "click", "key": "inc"}})
@@ -142,7 +142,7 @@ def test_multiple_clicks_accumulate() -> None:
 
 def test_decrement_via_dec_button() -> None:
     """Clicking ``"dec"`` after three increments rolls the counter back to 2."""
-    with _client().websocket_connect("/ws") as ws:
+    with _client() as client, client.websocket_connect("/ws") as ws:
         ws.receive_json()  # discard initial mount
 
         for _ in range(3):
@@ -161,8 +161,8 @@ def test_two_connections_independent_state() -> None:
     Connection A is clicked twice; connection B is never clicked and then
     clicked once.  B must yield ``Count: 1``, not ``Count: 3``.
     """
-    client = _client()
     with (
+        _client() as client,
         client.websocket_connect("/ws") as ws_a,
         client.websocket_connect("/ws") as ws_b,
     ):

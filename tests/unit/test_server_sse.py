@@ -170,12 +170,12 @@ async def test_sse_two_transports_keep_independent_state() -> None:
 
 def test_sse_post_to_unknown_session_returns_404() -> None:
     """POSTing an event to a session id that was never opened returns 404."""
-    client = TestClient(create_app(make_state, view))
-    response = client.post(
-        "/sse/never-opened",
-        json={"kind": "event", "data": {"type": "click", "key": "inc"}},
-    )
-    assert response.status_code == 404
+    with TestClient(create_app(make_state, view)) as client:
+        response = client.post(
+            "/sse/never-opened",
+            json={"kind": "event", "data": {"type": "click", "key": "inc"}},
+        )
+        assert response.status_code == 404
 
 
 def _read_sse_frame(lines: Iterator[str]) -> tuple[int | None, dict]:
@@ -224,8 +224,10 @@ def test_sse_endpoint_mount_then_post_click_yields_update() -> None:
     POSTed click into the session via ``feed_inbound`` and returns 204, and the
     resulting ``Update`` patch comes back down the same event stream.
     """
-    client = TestClient(create_app(make_state, view))
-    with client.stream("GET", "/sse?session=s1") as stream:
+    with (
+        TestClient(create_app(make_state, view)) as client,
+        client.stream("GET", "/sse?session=s1") as stream,
+    ):
         assert stream.status_code == 200
         assert stream.headers["content-type"].startswith("text/event-stream")
         lines = stream.iter_lines()

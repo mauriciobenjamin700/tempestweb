@@ -51,34 +51,32 @@ def test_inject_livereload_appends_when_no_body() -> None:
 def test_static_only_app_serves_index_untouched(tmp_path: Path) -> None:
     """Without a signal the app is a plain static host — no injection."""
     out = _bundle(tmp_path)
-    client = TestClient(create_dev_app(out))
+    with TestClient(create_dev_app(out)) as client:
+        index = client.get("/")
+        assert index.status_code == 200
+        assert "/__livereload.js" not in index.text
 
-    index = client.get("/")
-    assert index.status_code == 200
-    assert "/__livereload.js" not in index.text
+        asset = client.get("/app.js")
+        assert asset.status_code == 200
+        assert "export const x" in asset.text
 
-    asset = client.get("/app.js")
-    assert asset.status_code == 200
-    assert "export const x" in asset.text
-
-    # The livereload endpoints are not registered in static-only mode.
-    assert client.get("/__livereload.js").status_code == 404
+        # The livereload endpoints are not registered in static-only mode.
+        assert client.get("/__livereload.js").status_code == 404
 
 
 def test_dev_app_injects_and_serves_livereload(tmp_path: Path) -> None:
     """With a signal the index is injected and the snippet is served."""
     out = _bundle(tmp_path)
     signal = ReloadSignal()
-    client = TestClient(create_dev_app(out, signal))
+    with TestClient(create_dev_app(out, signal)) as client:
+        index = client.get("/")
+        assert index.status_code == 200
+        assert "/__livereload.js" in index.text
 
-    index = client.get("/")
-    assert index.status_code == 200
-    assert "/__livereload.js" in index.text
-
-    snippet = client.get("/__livereload.js")
-    assert snippet.status_code == 200
-    assert "EventSource" in snippet.text
-    assert "application/javascript" in snippet.headers["content-type"]
+        snippet = client.get("/__livereload.js")
+        assert snippet.status_code == 200
+        assert "EventSource" in snippet.text
+        assert "application/javascript" in snippet.headers["content-type"]
 
 
 def test_livereload_route_registered_only_in_dev(tmp_path: Path) -> None:

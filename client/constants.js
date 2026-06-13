@@ -15,3 +15,6 @@ export const GESTURE_TYPE = "GestureDetector";
 
 /** Id of the injected stylesheet that carries virtualized-list spacer heights. */
 export const VIRT_STYLE_ID = "tw-virt-styles";
+
+/** Id of the injected stylesheet that carries the always-on MD3 base theme. */
+export const BASE_THEME_STYLE_ID = "tw-base-theme";

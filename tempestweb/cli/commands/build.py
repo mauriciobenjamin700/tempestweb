@@ -58,6 +58,7 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "tempestweb.js",
     "dom.js",
     "style.js",
+    "theme.js",
     "events.js",
     "transport.js",
     "virtualize.js",

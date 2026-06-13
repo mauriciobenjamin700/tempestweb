@@ -9,6 +9,7 @@
 import { applyPatches, buildElement } from "./dom.js";
 import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
+import { installBaseTheme } from "./theme.js";
 import { installVirtualization } from "./virtualize.js";
 
 /**
@@ -48,6 +49,11 @@ import { installVirtualization } from "./virtualize.js";
  * @returns {MountHandle}     A handle to unmount the app.
  */
 export function mount(root, transport, initialNode = null) {
+  // Modern look for every app: inject the MD3 base stylesheet once. It styles
+  // bare widgets (Button/Input/Checkbox) and their interaction states; an app's
+  // inline Style still overrides it (see theme.js).
+  installBaseTheme();
+
   /** @type {HTMLElement | null} */
   let tree = null;
   if (initialNode != null) {

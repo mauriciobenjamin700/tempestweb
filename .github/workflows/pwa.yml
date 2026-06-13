@@ -24,8 +24,8 @@ jobs:
     name: PWA unit gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
       - run: npm install
@@ -42,7 +42,7 @@ jobs:
           tests/client/offline-sync.test.js
           tests/client/web-push-client.test.js
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v8.2.0
       - name: Set up Python
         run: uv python install 3.11
       - name: Install (with webpush extra)
@@ -57,8 +57,8 @@ jobs:
     # wired this job validates the manifest and is allowed to be a soft signal.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
       - run: npm install
@@ -76,8 +76,8 @@ jobs:
     # soft until the static build and a test VAPID pair are provisioned in CI.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "22"
       - run: npm install

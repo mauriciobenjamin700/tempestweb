@@ -78,6 +78,7 @@ plugins:
             "4. Running both modes": "4. Rodando os dois modos"
             "Ready-made components": "Componentes prontos"
             "Theming (Material 3)": "Tema (Material 3)"
+            "Icons (Material + Lucide)": "Ícones (Material + Lucide)"
             "Best practices": "Boas práticas"
             Examples: Exemplos
             "Example gallery": "Galeria de exemplos"
@@ -174,6 +175,7 @@ nav:
       - "4. Running both modes": tutorial/modes.md
   - Ready-made components: components.md
   - Theming (Material 3): theming.md
+  - Icons (Material + Lucide): icons.md
   - Best practices: best-practices.md
   - Examples:
       - "Example gallery": examples/index.md

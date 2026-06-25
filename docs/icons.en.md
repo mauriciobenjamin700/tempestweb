@@ -83,7 +83,8 @@ the surrounding font**. Color comes from `Style.color` — the glyph is drawn in
 `currentColor`:
 
 ```python
-from tempest_core import Color, Style
+from tempest_core import Style
+from tempest_core.style import Color
 
 from tempestweb.icons import MaterialIcons, material_icon
 

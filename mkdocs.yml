@@ -84,6 +84,12 @@ plugins:
             Stopwatch: Cronômetro
             "Temperature converter": "Conversor de temperatura"
             "Data table": "Tabela de dados"
+            "Data grid": "Grade de dados"
+            "Charts dashboard": "Dashboard de gráficos"
+            "Core app shell": "App shell do core"
+            "Tabbed settings": "Configurações com abas"
+            "Feedback & status": "Feedback e status"
+            "Profile cards": "Cards de perfil"
             "Login form": "Formulário de login"
             "Signup wizard": "Wizard de cadastro"
             "Brazilian registration": "Cadastro brasileiro"
@@ -174,6 +180,12 @@ nav:
       - Stopwatch: examples/stopwatch.md
       - "Temperature converter": examples/temperature-converter.md
       - "Data table": examples/data-table.md
+      - "Data grid": examples/data-grid.md
+      - "Charts dashboard": examples/charts-dashboard.md
+      - "Core app shell": examples/core-app-shell.md
+      - "Tabbed settings": examples/core-tabbed-settings.md
+      - "Feedback & status": examples/core-feedback.md
+      - "Profile cards": examples/core-profile-cards.md
       - "Login form": examples/login-form.md
       - "Signup wizard": examples/signup-wizard.md
       - "Brazilian registration": examples/br-cadastro.md

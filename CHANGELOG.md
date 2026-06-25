@@ -6,6 +6,23 @@ versioning.
 
 ## [Unreleased]
 
+### Added
+
+- **Canvas rendering on the web.** The DOM renderer now maps a `Canvas` widget to
+  a real `<canvas>` and executes its draw-command list
+  (`move_to`/`line_to`/`draw_rect`/`stroke`/`fill`/`draw_text`) onto the 2D
+  context. Previously any unknown node type fell back to a `<div>`, so the core's
+  Canvas-based components (charts, detection overlays, the sketch pad) rendered
+  blank — they now draw in both modes.
+- **The tempest-core component library, re-exported through
+  `tempestweb.components`.** 54 Material 3 components (layout scaffolds, app bars,
+  navigation, cards, lists, inputs, feedback, tables and `BarChart`/`LineChart`
+  charts) plus the value models/helpers that drive them (`ChartSeries`,
+  `TableRow`/`TableCell`, `DetectionBox`, `confidence_scheme`) are now importable
+  from `tempestweb.components` — one import home for the native helpers and the
+  core set. Each lowers to renderable primitives or a Canvas draw-command list,
+  so the whole library works in Mode A and Mode B.
+
 ### Changed
 
 - **Bumped tempest-core to `>=0.8.1`** and **delegated Material 3 styling to the

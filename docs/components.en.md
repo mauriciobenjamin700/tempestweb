@@ -145,10 +145,33 @@ SignupForm(
 )
 ```
 
+## The full tempest-core library
+
+Beyond the native helpers above, **the entire tempest-core Material 3 component
+library** is re-exported from `tempestweb.components` — the same obvious place.
+That's 54 components: layout scaffolds, app bars, navigation, `Card`, `ListTile`,
+inputs, feedback (`Alert`/`Banner`/`Badge`), tables (`Table`/`DataTable`) and
+**charts** (`BarChart`/`LineChart`).
+
+```python
+from tempestweb.components import Card, DataTable, BarChart, ChartSeries
+
+BarChart(series=[ChartSeries(points=[3.0, 7.0, 2.0, 9.0, 5.0], label="sales")])
+```
+
+!!! info "Charts draw via Canvas — in both modes"
+    `BarChart`/`LineChart` (and detection overlays) lower to a `Canvas` widget with
+    a draw-command list. The web client executes those commands onto a real
+    `<canvas>` — axes, gridlines, bars and lines actually draw, no charting library,
+    **identical in Mode A and Mode B**. The value models that drive the components
+    (`ChartSeries`, `TableRow`/`TableCell`, `DetectionBox`) come along.
+
 ## Recap
 
-- Import from `tempestweb.components` — fields and forms in one place.
+- Import from `tempestweb.components` — fields, forms **and** the full core library
+  in one place.
 - Fields are **controlled**: `value` + `on_change` (+ optional `error`).
 - `LoginForm` is a whole form in one call; you just wire it to your state.
 - Validators (`validate_email`, `validate_phone`, …) return `None` when OK.
-- Everything renders the same in Mode A (WASM) and Mode B (server).
+- The core components (incl. `BarChart`/`LineChart` via `Canvas`) render the same
+  in Mode A (WASM) and Mode B (server).

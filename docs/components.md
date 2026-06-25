@@ -144,10 +144,34 @@ SignupForm(
 )
 ```
 
+## A biblioteca completa do tempest-core
+
+Além dos ajudantes nativos acima, **toda a biblioteca de componentes Material 3 do
+tempest-core** está re-exportada de `tempestweb.components` — o mesmo lugar óbvio.
+São 54 componentes: scaffolds de layout, app bars, navegação, `Card`, `ListTile`,
+inputs, feedback (`Alert`/`Banner`/`Badge`), tabelas (`Table`/`DataTable`) e
+**gráficos** (`BarChart`/`LineChart`).
+
+```python
+from tempestweb.components import Card, DataTable, BarChart, ChartSeries
+
+BarChart(series=[ChartSeries(points=[3.0, 7.0, 2.0, 9.0, 5.0], label="vendas")])
+```
+
+!!! info "Gráficos desenham via Canvas — nos dois modos"
+    `BarChart`/`LineChart` (e overlays de detecção) baixam para um widget `Canvas`
+    com uma lista de comandos de desenho. O cliente web executa esses comandos num
+    `<canvas>` real — eixos, gridlines, barras e linhas desenham de verdade, sem
+    biblioteca de gráficos, **igual no Modo A e no Modo B**. Os modelos de dados que
+    alimentam os componentes (`ChartSeries`, `TableRow`/`TableCell`, `DetectionBox`)
+    vêm junto.
+
 ## Recapitulando
 
-- Importe de `tempestweb.components` — campos e formulários prontos num lugar só.
+- Importe de `tempestweb.components` — campos, formulários **e** a biblioteca
+  completa do core num lugar só.
 - Campos são **controlados**: `value` + `on_change` (+ `error` opcional).
 - `LoginForm` é um formulário inteiro numa chamada; você só liga ao seu estado.
 - Validadores (`validate_email`, `validate_phone`, …) devolvem `None` quando OK.
-- Tudo renderiza igual no Modo A (WASM) e no Modo B (servidor).
+- Os componentes do core (incl. `BarChart`/`LineChart` via `Canvas`) renderizam
+  igual no Modo A (WASM) e no Modo B (servidor).

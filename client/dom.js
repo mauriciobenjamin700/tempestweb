@@ -39,7 +39,14 @@ const TAG_BY_TYPE = Object.freeze({
   // no patch path ever descends into it).
   Checkbox: "label",
   Image: "img",
+  // A Canvas renders to a real <canvas>; its draw-command list is executed onto
+  // the 2D context by paintCanvas (charts, overlays, the sketch pad).
+  Canvas: "canvas",
 });
+
+// Font stack for Canvas draw_text commands (a literal, since a 2D context cannot
+// read the --tw-font CSS variable). Mirrors the base theme's family.
+const CANVAS_FONT = "Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif";
 
 /**
  * Resolve the HTML tag name for an IR widget type.
@@ -147,11 +154,12 @@ function applyA11yProps(el, props) {
 }
 
 /**
- * Apply form-control / media props (Input, Checkbox, Image) onto an element.
+ * Apply form-control / media / canvas props (Canvas, Input, Checkbox, Image).
  *
  * Maps the widget's typed props onto the right DOM property/attribute so the
  * control is actually interactive (a real <input> holding `value`, a checkbox
- * reflecting `checked`, an <img> pointing at `src`). No-ops for other types.
+ * reflecting `checked`, an <img> pointing at `src`) or, for a Canvas, paints its
+ * draw-command list onto the 2D context. No-ops for other types.
  *
  * @param {HTMLElement} el     The target element.
  * @param {?string} type       The widget type (from the data-tw-type attribute).
@@ -234,8 +242,97 @@ function setCheckboxLabel(el, text) {
   }
 }
 
+/**
+ * Convert a core color (RGBA channels as floats in [0, 1]) to a CSS `rgba()`.
+ *
+ * @param {?number[]} c  ``[r, g, b, a]`` with each channel in ``[0, 1]``; alpha
+ *                       defaults to ``1`` when absent.
+ * @returns {string}     A CSS ``rgba(...)`` string (transparent when malformed).
+ */
+function canvasColor(c) {
+  if (!Array.isArray(c) || c.length < 3) {
+    return "rgba(0,0,0,0)";
+  }
+  const r = Math.round(c[0] * 255);
+  const g = Math.round(c[1] * 255);
+  const b = Math.round(c[2] * 255);
+  const a = c.length > 3 && c[3] != null ? c[3] : 1;
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/**
+ * Paint a Canvas widget's draw-command list onto its ``<canvas>`` 2D context.
+ *
+ * The command list is an immediate-mode path program mirroring the core's Canvas
+ * API: ``move_to``/``line_to`` build the current path, ``draw_rect`` adds a
+ * rectangle, ``stroke``/``fill`` paint it, and ``draw_text`` writes a label.
+ * Width, height and commands are remembered on the element so an Update patch
+ * that changes only one of them still repaints the whole canvas. A no-op when
+ * the 2D context is unavailable (e.g. a jsdom harness without canvas support).
+ *
+ * @param {HTMLCanvasElement} el  The Canvas element.
+ * @param {Object} props          Props that may include width/height/commands.
+ * @returns {void}
+ */
+function paintCanvas(el, props) {
+  if ("width" in props && props.width != null) {
+    el._twCanvasW = Number(props.width);
+  }
+  if ("height" in props && props.height != null) {
+    el._twCanvasH = Number(props.height);
+  }
+  if ("commands" in props && Array.isArray(props.commands)) {
+    el._twCanvasCmds = props.commands;
+  }
+  // Setting width/height resets the drawing buffer, so we always repaint fully.
+  if (el._twCanvasW != null) {
+    el.width = el._twCanvasW;
+  }
+  if (el._twCanvasH != null) {
+    el.height = el._twCanvasH;
+  }
+  const ctx = typeof el.getContext === "function" ? el.getContext("2d") : null;
+  if (ctx == null) {
+    return;
+  }
+  ctx.clearRect(0, 0, el.width, el.height);
+  for (const cmd of el._twCanvasCmds ?? []) {
+    switch (cmd.kind) {
+      case "move_to":
+        ctx.beginPath();
+        ctx.moveTo(cmd.x, cmd.y);
+        break;
+      case "line_to":
+        ctx.lineTo(cmd.x, cmd.y);
+        break;
+      case "draw_rect":
+        ctx.beginPath();
+        ctx.rect(cmd.x, cmd.y, cmd.width, cmd.height);
+        break;
+      case "stroke":
+        ctx.strokeStyle = canvasColor(cmd.color);
+        ctx.lineWidth = cmd.width != null ? cmd.width : 1;
+        ctx.stroke();
+        break;
+      case "fill":
+        ctx.fillStyle = canvasColor(cmd.color);
+        ctx.fill();
+        break;
+      case "draw_text":
+        ctx.fillStyle = canvasColor(cmd.color);
+        ctx.font = `${cmd.size != null ? cmd.size : 12}px ${CANVAS_FONT}`;
+        ctx.fillText(String(cmd.text), cmd.x, cmd.y);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
 function applyControlProps(el, type, props) {
-  if (type === "Input") {
+  if (type === "Canvas") {
+    paintCanvas(el, props);
+  } else if (type === "Input") {
     el.setAttribute("type", props.secure ? "password" : "text");
     if ("value" in props) {
       el.value = props.value == null ? "" : String(props.value);

@@ -1,43 +1,27 @@
-"""tempestweb.components — ready-to-use fields, forms and Material 3 buttons.
+"""The tempest-core component library, re-exported for tempestweb apps.
 
-Pre-built, validated building blocks so an app declares a field, a button or a
-whole form in one line instead of wiring inputs, labels, errors and validators
-by hand:
+tempest-core ships a broad Material 3 component set — layout scaffolds, app bars,
+navigation, cards, lists, inputs, feedback, tables and charts. Every component
+lowers to the renderer-agnostic primitives (``Column``/``Row``/``Text``/…) or to a
+``Canvas`` draw-command list, both of which the web client renders, so the whole
+set works unchanged in Mode A (WASM) and Mode B (server).
 
-    from tempestweb.components import EmailField, PasswordField, LoginForm
-    from tempestweb.components import filled_button, text_button
+This module re-exports that library under :mod:`tempestweb.components` so an app
+has a single import home for both the tempestweb-native helpers (the ``*_button``
+variants, ``EmailField``/``PasswordField``, ``LoginForm``) and the core
+components:
 
-``EmailField``/``PasswordField`` and ``TextField`` are tempestweb-native, styled
-for the Material 3 light surface the base stylesheet renders; the BR fields
-(:class:`PhoneField`/:class:`CPFField`/:class:`CNPJField`/:class:`AddressField`)
-wrap the core's masked inputs. The ``*_button`` helpers build the MD3 button
-variants. Everything renders identically in Mode A (WASM) and Mode B (server).
+    from tempestweb.components import Card, DataTable, BarChart, ChartSeries
+
+The names are re-bound, not re-implemented — each is the very class from
+:mod:`tempest_core.components`, so behavior and typing match the core exactly.
+The value models and helpers needed to drive the components (``ChartSeries``,
+``TableRow``/``TableCell``, ``DetectionBox``, ``confidence_scheme``) come along.
 """
 
 from __future__ import annotations
 
-from tempestweb.components.buttons import (
-    elevated_button,
-    filled_button,
-    outlined_button,
-    text_button,
-    tonal_button,
-)
-from tempestweb.components.fields import (
-    AddressField,
-    CNPJField,
-    CPFField,
-    EmailField,
-    PasswordField,
-    PhoneField,
-    TextField,
-    validate_cnpj,
-    validate_cpf,
-    validate_email,
-    validate_phone,
-)
-from tempestweb.components.forms import LoginForm, SignupForm
-from tempestweb.components.library import (
+from tempest_core.components import (
     Accordion,
     AddressInput,
     Alert,
@@ -100,7 +84,6 @@ from tempestweb.components.library import (
 
 __all__ = [
     "Accordion",
-    "AddressField",
     "AddressInput",
     "Alert",
     "AppBar",
@@ -110,9 +93,7 @@ __all__ = [
     "BarChart",
     "Breadcrumb",
     "Burger",
-    "CNPJField",
     "CNPJInput",
-    "CPFField",
     "CPFInput",
     "Calendar",
     "Card",
@@ -126,7 +107,6 @@ __all__ = [
     "DetectionOverlay",
     "Divider",
     "DocumentPicker",
-    "EmailField",
     "EmailInput",
     "EmptyState",
     "Footer",
@@ -137,12 +117,9 @@ __all__ = [
     "ImagePicture",
     "LineChart",
     "ListTile",
-    "LoginForm",
     "MetricCard",
     "NavBar",
-    "PasswordField",
     "PasswordInput",
-    "PhoneField",
     "PhoneInput",
     "ProgressStepper",
     "RadioGroup",
@@ -152,7 +129,6 @@ __all__ = [
     "SearchBar",
     "SegmentedControl",
     "Sidebar",
-    "SignupForm",
     "Stat",
     "StatCard",
     "Stepper",
@@ -163,16 +139,6 @@ __all__ = [
     "TableRow",
     "Tabs",
     "Tag",
-    "TextField",
     "VStack",
     "confidence_scheme",
-    "elevated_button",
-    "filled_button",
-    "outlined_button",
-    "text_button",
-    "tonal_button",
-    "validate_cnpj",
-    "validate_cpf",
-    "validate_email",
-    "validate_phone",
 ]

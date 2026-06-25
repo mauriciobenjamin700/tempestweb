@@ -4,7 +4,7 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
-## [Unreleased]
+## [0.7.0] — 2026-06-25
 
 ### Added
 

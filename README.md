@@ -27,10 +27,10 @@ JavaScript, no framework, no build step, no TypeScript) and two patch transports
 - [`docs/agents/MANIFEST.md`](docs/agents/MANIFEST.md) — parallel agent task plan.
 
 Want runnable apps? Browse the **[Example Gallery](https://mauriciobenjamin700.github.io/tempestweb/en/examples/)**
-([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 35 single-concept
-demos (stopwatch, forms, data table, kanban, chat, theming, i18n, canvas, native
-capabilities, observability, PWA/WebPush, and a server-mode walkthrough), each
-running unchanged in both modes.
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 41 single-concept
+demos (stopwatch, forms, data table/grid, kanban, chat, theming, i18n, canvas
+charts, app shells, native capabilities, observability, PWA/WebPush, and a
+server-mode walkthrough), each running unchanged in both modes.
 
 Building something real? Read the **[App architecture & best practices](https://mauriciobenjamin700.github.io/tempestweb/best-practices/)**
 guide ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/best-practices/)) —
@@ -72,14 +72,14 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | Path | What |
 |---|---|
 | `tempest-core` (dependency) | Renderer-agnostic engine — IR/reconciler/state/style/widgets (`import tempest_core`), extracted from tempestroid. |
-| `tempestweb/components/` | Ready-to-use fields + forms (EmailField, PasswordField, PhoneField, LoginForm, …). |
+| `tempestweb/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — 54 Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
 | `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`, `sse.py`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
 | `tempestweb/native/` | Web API capability adapters — http, audio, share, geo, clipboard, storage, camera (Track N). |
 | `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
 | `tempestweb/pwa/` | Web App Manifest + icon emitter (Track P). |
 | `tempestweb/cli/` | `tempestweb new/dev/build/run/sync`. |
-| `client/` | Pure-JS DOM renderer, Style→CSS, event capture; `pwa/` `sw/` `offline/` `push/` `native/` subdirs. |
+| `client/` | Pure-JS DOM renderer (incl. Canvas draw-command execution for charts), Style→CSS, event capture; `pwa/` `sw/` `offline/` `push/` `native/` subdirs. |
 | `tests/fixtures/` | Golden wire-format fixtures derived from the core. |
 
 ## Conventions

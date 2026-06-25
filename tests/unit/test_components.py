@@ -145,10 +145,12 @@ def _bg_alpha(style: Any | None) -> float | None:
 
 
 def test_light_fields_carry_no_dark_inline_background() -> None:
-    """EmailField/PasswordField inputs are unstyled so the MD3 base sheet applies.
+    """EmailField/PasswordField inputs render light, with no dark inline fill.
 
-    Guards against regressing to the core's dark BR input: the inner Input must
-    not ship an inline background, leaving it to the light base stylesheet.
+    The fields hand the core a plain :class:`~tempest_core.Input`; tempest-core
+    resolves its light, outlined Material 3 style inline (a border, no opaque
+    background). Guards against regressing to the core's old dark BR input by
+    asserting the inner Input ships no solid background of its own.
     """
     for field in (
         EmailField(value="", on_change=lambda _v: None),
@@ -156,15 +158,15 @@ def test_light_fields_carry_no_dark_inline_background() -> None:
     ):
         inputs = [n for n in _walk(build(field)) if n.type == "Input"]
         assert inputs
-        assert inputs[0].props.get("style") is None
+        assert _bg_alpha(inputs[0].props.get("style")) is None
 
 
-def test_filled_button_is_unstyled_for_the_base_sheet() -> None:
-    """filled_button carries no inline style, so the base sheet styles it."""
+def test_filled_button_delegates_to_the_core_solid_fill() -> None:
+    """filled_button delegates to the core SOLID variant, which paints the fill."""
     fired: list[str] = []
     node = build(filled_button("Save", lambda: fired.append("x"), key="save"))
     assert node.type == "Button"
-    assert node.props.get("style") is None
+    assert _bg_alpha(node.props.get("style")) == 1.0
     assert node.props.get("label") == "Save"
     handler = node.props.get("on_click")
     assert callable(handler)
@@ -173,31 +175,30 @@ def test_filled_button_is_unstyled_for_the_base_sheet() -> None:
 
 
 def test_tonal_button_sets_an_opaque_fill() -> None:
-    """tonal_button paints a secondary-container fill (opaque background)."""
+    """tonal_button paints a secondary-toned fill (opaque background)."""
     node = build(tonal_button("More", lambda: None))
     assert _bg_alpha(node.props.get("style")) == 1.0
 
 
 def test_elevated_button_carries_a_resting_shadow() -> None:
-    """elevated_button ships an inline shadow for its resting elevation."""
+    """elevated_button merges an inline shadow onto the filled style."""
     node = build(elevated_button("Open", lambda: None))
     style = node.props.get("style")
     assert style is not None and getattr(style, "shadow", None) is not None
+    assert _bg_alpha(style) == 1.0
 
 
-def test_outlined_button_has_a_border_and_transparent_fill() -> None:
-    """outlined_button draws a border over a transparent background."""
+def test_outlined_button_has_a_border() -> None:
+    """outlined_button delegates to the core OUTLINE variant, drawing a border."""
     node = build(outlined_button("Edit", lambda: None))
     style = node.props.get("style")
     assert style is not None
     assert getattr(style, "border", None) is not None
-    assert _bg_alpha(style) == 0.0
 
 
-def test_text_button_is_transparent_with_no_border() -> None:
-    """text_button is a bare label: transparent fill, no border."""
+def test_text_button_has_no_border() -> None:
+    """text_button delegates to the core GHOST variant: a bare label, no border."""
     node = build(text_button("Cancel", lambda: None))
     style = node.props.get("style")
     assert style is not None
-    assert _bg_alpha(style) == 0.0
     assert getattr(style, "border", None) is None

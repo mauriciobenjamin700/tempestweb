@@ -1,9 +1,9 @@
 """Ready-to-use, Material 3-styled form fields.
 
 ``TextField``/``EmailField``/``PasswordField`` are tempestweb-native: a labelled
-column wrapping a plain :class:`~tempest_core.widgets.inputs.Input` with *no*
-inline style, so the always-on MD3 base stylesheet (``client/theme.js``) renders
-them as light, outlined fields consistent with the rest of a tempestweb UI. The
+column wrapping a plain :class:`~tempest_core.widgets.inputs.Input`. tempest-core
+resolves the Input's light, outlined Material 3 style inline, so the fields look
+consistent with the rest of a tempestweb UI without any per-field styling. The
 BR-specific fields (``PhoneField``/``CPFField``/``CNPJField``/``AddressField``)
 are aliases over the core's masked inputs (:mod:`tempest_core.components.brforms`),
 which keep their own masking logic.
@@ -170,9 +170,8 @@ class EmailField(Component):
 
     The tempestweb-native e-mail field: a muted label, a controlled
     :class:`~tempest_core.widgets.inputs.Input` on the e-mail keyboard, and an
-    optional error line. The input carries no inline style, so the always-on MD3
-    base stylesheet (``client/theme.js``) renders it as a light, outlined field
-    that matches the rest of a tempestweb UI — unlike the core's dark BR input.
+    optional error line. tempest-core resolves the Input's light, outlined
+    Material 3 style inline, so it matches the rest of a tempestweb UI.
 
     Validate with :func:`validate_email`.
 

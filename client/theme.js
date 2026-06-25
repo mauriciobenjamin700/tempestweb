@@ -55,10 +55,13 @@ export const BASE_THEME_CSS = `
 /* Sensible page baseline so apps don't sit on Times New Roman. */
 [data-tw-type] { box-sizing: border-box; }
 
-/* ── Button: MD3 filled button ─────────────────────────────────────────────
-   A pill-shaped filled button with an interaction state layer (::before) and
-   elevation on hover. The state layer is the MD3 way to show hover/focus/press:
-   a translucent overlay of the on-color tinting the surface. */
+/* ── Button: interaction layer over the core's resolved variant ────────────
+   tempest-core resolves each Button variant's resting look inline — fill, text
+   color, pill radius, padding and min-height all come from the core. This sheet
+   adds only what inline Style cannot express: the structural bits a <button>
+   needs for the overlay (position/overflow), the modern font family, and the
+   MD3 interaction state layer (::before) — a translucent overlay of the
+   on-color tinting the surface on hover/focus/press. */
 [data-tw-type="Button"] {
   position: relative;
   overflow: hidden;
@@ -66,15 +69,8 @@ export const BASE_THEME_CSS = `
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
-  padding: 10px 24px;
   border: none;
-  border-radius: var(--tw-radius-full);
-  background: var(--tw-primary);
-  color: var(--tw-on-primary);
   font-family: var(--tw-font);
-  font-size: 14px;
-  font-weight: 500;
   letter-spacing: 0.1px;
   line-height: 20px;
   cursor: pointer;
@@ -98,12 +94,6 @@ export const BASE_THEME_CSS = `
 [data-tw-type="Button"]:focus-visible { outline: none; }
 [data-tw-type="Button"]:focus-visible::before { opacity: 0.12; }
 [data-tw-type="Button"]:active::before { opacity: 0.12; }
-/* Elevation — only the default filled button (no app-set inline background).
-   A variant that sets its own \`background\` (tonal/outlined/text/elevated) opts
-   out of this and controls its own shadow via inline Style. */
-[data-tw-type="Button"]:not([style*="background"]):hover { box-shadow: var(--tw-elevation-1); }
-[data-tw-type="Button"]:not([style*="background"]):active { box-shadow: var(--tw-elevation-2); }
-[data-tw-type="Button"]:not([style*="background"]):focus-visible { box-shadow: var(--tw-elevation-1); }
 [data-tw-type="Button"]:disabled,
 [data-tw-type="Button"][aria-disabled="true"] {
   background: rgba(29,27,32,0.12);
@@ -113,14 +103,14 @@ export const BASE_THEME_CSS = `
 }
 [data-tw-type="Button"]:disabled::before { opacity: 0; }
 
-/* ── Input: MD3 outlined text field ────────────────────────────────────────
-   A rounded, outlined field whose border thickens and recolors to the primary
-   tone on focus. */
+/* ── Input: interaction layer over the core's resolved outlined field ──────
+   tempest-core resolves the Input's outline and radius inline; this sheet adds
+   the surface fill, type ramp and the focus ring. The focus indicator is an
+   inset box-shadow (not a border-color change) because the core's inline border
+   would otherwise win over a stylesheet :focus rule. */
 [data-tw-type="Input"] {
   min-height: 40px;
   padding: 9px 16px;
-  border: 1px solid var(--tw-outline);
-  border-radius: 8px;
   background: var(--tw-surface);
   color: var(--tw-on-surface);
   font-family: var(--tw-font);

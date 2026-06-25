@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from tempest_core.widgets.events import SwipeEvent, TextChangeEvent
+from tempest_core.widgets.events import SwipeEvent, TextChangeEvent, ToggleEvent
 from tempestweb.runtime import coerce_event
 
 
@@ -21,6 +21,35 @@ def test_coerce_input_change_payload() -> None:
     event = coerce_event("Input", "change", {"value": "hello"})
     assert isinstance(event, TextChangeEvent)
     assert event.value == "hello"
+
+
+def test_coerce_input_live_typing_input_event() -> None:
+    """The DOM ``input`` wire type (live typing) coerces like ``change``.
+
+    Regression: the live ``input`` event aliases to ``on_change`` for routing, so
+    it must also coerce to TextChangeEvent — otherwise a live-filtering handler
+    receives the raw payload dict and ``event.value`` fails.
+    """
+    event = coerce_event("Input", "input", {"value": "admin"})
+    assert isinstance(event, TextChangeEvent)
+    assert event.value == "admin"
+
+
+def test_coerce_checkbox_toggle_payload() -> None:
+    """A Checkbox toggle payload becomes a typed ToggleEvent."""
+    event = coerce_event("Checkbox", "toggle", {"checked": True})
+    assert isinstance(event, ToggleEvent)
+    assert event.checked is True
+
+
+def test_coerce_checkbox_input_with_value_payload_falls_back() -> None:
+    """A wire type aliased to on_change whose payload does not match falls back.
+
+    A checkbox's DOM ``input`` carries a value, not ``checked``; it cannot validate
+    as a ToggleEvent, so it degrades to the raw payload rather than crashing.
+    """
+    payload = {"value": "on"}
+    assert coerce_event("Checkbox", "input", payload) is payload
 
 
 def test_coerce_unknown_widget_returns_raw_payload() -> None:

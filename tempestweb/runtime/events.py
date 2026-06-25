@@ -20,6 +20,7 @@ from typing import Any
 from tempest_core import App, Widget
 from tempest_core.navigation import routes_from_path
 from tempest_core.widgets.events import Event, EventValidationError, parse_event
+from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS
 
 __all__ = ["coerce_event", "apply_scroll", "apply_navigate"]
 
@@ -68,22 +69,36 @@ def _build_event_types() -> dict[str, dict[str, type[Event]]]:
     """Map each widget type tag to its ``{wire_event_type: Event class}``.
 
     Walks every :class:`~tempest_core.widgets.base.Widget` subclass and reads its
-    ``event_schemas`` ClassVar (``{"on_<type>": EventClass}``), keying the result
-    by the widget's type tag and the wire event type (the prop without ``on_``).
+    ``event_schemas`` ClassVar (``{"on_<type>": EventClass}``). The result is keyed
+    by the widget's type tag and by **every** wire event type that routes to a
+    declared handler prop — derived from :data:`EVENT_TYPE_TO_HANDLER_PROPS`, the
+    same table :func:`~tempestweb.runtime.serialize.resolve_handler` uses to
+    resolve the handler. This keeps coercion and routing in lock-step: a text
+    field's live ``input`` event (and a checkbox's ``toggle``) both alias to
+    ``on_change``, so they coerce to the handler's typed event instead of falling
+    through to the raw payload dict. The literal ``prop`` without ``on_`` is always
+    included as a fallback.
 
     Returns:
-        ``{widget_type: {event_type: Event subclass}}``.
+        ``{widget_type: {wire_event_type: Event subclass}}``.
     """
+    prop_to_wire_types: dict[str, list[str]] = {}
+    for wire_type, props in EVENT_TYPE_TO_HANDLER_PROPS.items():
+        for prop in props:
+            prop_to_wire_types.setdefault(prop, []).append(wire_type)
+
     mapping: dict[str, dict[str, type[Event]]] = {}
 
     def walk(cls: type[Widget]) -> None:
         for subclass in cls.__subclasses__():
             schemas = getattr(subclass, "event_schemas", {})
             if schemas:
-                mapping[subclass.__name__] = {
-                    prop.removeprefix("on_"): event_type
-                    for prop, event_type in schemas.items()
-                }
+                wire_map: dict[str, type[Event]] = {}
+                for prop, event_type in schemas.items():
+                    wire_map[prop.removeprefix("on_")] = event_type
+                    for wire_type in prop_to_wire_types.get(prop, ()):
+                        wire_map[wire_type] = event_type
+                mapping[subclass.__name__] = wire_map
             walk(subclass)
 
     walk(Widget)

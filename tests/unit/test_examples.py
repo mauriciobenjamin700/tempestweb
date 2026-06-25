@@ -137,6 +137,12 @@ EXAMPLE_NAMES = [
     "router_demo",
     "login_demo",
     "geo_demo",
+    "charts-dashboard",
+    "data-grid",
+    "core-app-shell",
+    "core-tabbed-settings",
+    "core-feedback",
+    "core-profile-cards",
 ]
 
 

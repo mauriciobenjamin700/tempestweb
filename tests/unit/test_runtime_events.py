@@ -2,8 +2,40 @@
 
 from __future__ import annotations
 
+import importlib
+import inspect
+import pkgutil
+
+import tempest_core
+from tempest_core.widgets.base import Widget
 from tempest_core.widgets.events import SwipeEvent, TextChangeEvent, ToggleEvent
 from tempestweb.runtime import coerce_event
+from tempestweb.runtime.events import _WIDGET_EVENT_TYPES
+from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS
+
+
+def _widgets_with_schemas() -> dict[str, dict[str, type]]:
+    """Collect every core widget class that declares event schemas.
+
+    Returns:
+        ``{widget_type: {handler_prop: EventClass}}`` over all importable core
+        widget subclasses.
+    """
+    found: dict[str, dict[str, type]] = {}
+    for module in pkgutil.walk_packages(tempest_core.__path__, "tempest_core."):
+        try:
+            imported = importlib.import_module(module.name)
+        except Exception:  # noqa: BLE001 — optional submodules may not import bare
+            continue
+        for name in dir(imported):
+            obj = getattr(imported, name)
+            if (
+                inspect.isclass(obj)
+                and issubclass(obj, Widget)
+                and getattr(obj, "event_schemas", None)
+            ):
+                found[obj.__name__] = dict(obj.event_schemas)
+    return found
 
 
 def test_coerce_gesture_swipe_payload() -> None:
@@ -50,6 +82,28 @@ def test_coerce_checkbox_input_with_value_payload_falls_back() -> None:
     """
     payload = {"value": "on"}
     assert coerce_event("Checkbox", "input", payload) is payload
+
+
+def test_routing_and_coercion_maps_agree() -> None:
+    """Every wire type that routes to a schema'd handler prop also coerces.
+
+    Guards the two maps against drift: ``resolve_handler`` routes a wire event
+    type to a handler prop via ``EVENT_TYPE_TO_HANDLER_PROPS``, and
+    ``_WIDGET_EVENT_TYPES`` must carry the matching coercion entry for the same
+    ``(widget, wire_type)`` — otherwise a routed handler silently receives the raw
+    payload dict (the live-typing ``input`` bug).
+    """
+    schemas_by_widget = _widgets_with_schemas()
+    gaps: list[tuple[str, str, str]] = []
+    for wire_type, props in EVENT_TYPE_TO_HANDLER_PROPS.items():
+        for prop in props:
+            for widget_name, schema in schemas_by_widget.items():
+                if prop not in schema:
+                    continue
+                coerced = _WIDGET_EVENT_TYPES.get(widget_name, {}).get(wire_type)
+                if coerced is not schema[prop]:
+                    gaps.append((widget_name, wire_type, prop))
+    assert not gaps, f"routing/coercion drift for {gaps}"
 
 
 def test_coerce_unknown_widget_returns_raw_payload() -> None:

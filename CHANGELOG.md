@@ -4,6 +4,23 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [Unreleased]
+
+### Changed
+
+- **Bumped tempest-core to `>=0.8.1`** and **delegated Material 3 styling to the
+  core's native variant system.** The core now resolves each `Button`/`Input`
+  variant's resting MD3 style inline (fill, border, shape, color), so tempestweb
+  no longer reimplements it. The button helpers (`filled_button`, `tonal_button`,
+  `outlined_button`, `text_button`, `elevated_button`) are now a thin MD3-named
+  façade over the core variants; `client/theme.js` keeps only what inline Style
+  cannot express (the `::before` state layer, focus ring, disabled state, surface
+  fill and type ramp) and dropped the duplicated resting rules.
+- **Behavior:** outlined/text buttons now paint the core's opaque surface fill
+  (was transparent), and the `Input` focus indicator is the inset box-shadow ring
+  (the core's inline border outranks a stylesheet `:focus` rule). Apps still get
+  the MD3 look with zero CSS.
+
 ## [0.6.0] — 2026-06-13
 
 ### Added

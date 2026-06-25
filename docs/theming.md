@@ -11,6 +11,15 @@ espaçamento e controles acentuados sensatos a todo app — mesmo o que você nu
 estilizou. E quando você quer fugir do padrão, o `Style` inline do widget **sempre
 ganha**.
 
+!!! note "De onde vem o estilo (tempest-core ≥ 0.8.1)"
+    O **visual em repouso** de cada `Button`/`Input` — preenchimento, borda, forma
+    e cor — agora vem do **sistema de variantes do tempest-core**, resolvido inline
+    pelo próprio widget. O `client/theme.js` cuida só do que o inline **não**
+    consegue expressar: a *state layer* (`::before`) de hover/foco/clique, o anel
+    de foco e o tipo de fonte. Os ajudantes `filled_button`/`tonal_button`/… são
+    uma fachada com nomes MD3 sobre as variantes do core. Você continua ganhando o
+    visual Material 3 sem escrever **nenhum** CSS.
+
 ## O mínimo: confie no tema base
 
 Não há nada a configurar. Escreva o app normalmente; o tema base entra sozinho.

@@ -11,6 +11,14 @@ sensible typography, spacing and accented controls — even one you never styled
 when you want to break out of the defaults, the widget's inline `Style` **always
 wins**.
 
+!!! note "Where the style comes from (tempest-core ≥ 0.8.1)"
+    Each `Button`/`Input`'s **resting look** — fill, border, shape and color — now
+    comes from **tempest-core's variant system**, resolved inline by the widget
+    itself. `client/theme.js` handles only what inline style **cannot** express:
+    the hover/focus/press state layer (`::before`), the focus ring and the font
+    family. The `filled_button`/`tonal_button`/… helpers are an MD3-named façade
+    over the core variants. You still get the Material 3 look with **zero** CSS.
+
 ## The minimum: rely on the base theme
 
 There is nothing to configure. Write the app normally; the base theme installs

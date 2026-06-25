@@ -4,6 +4,24 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [Unreleased]
+
+### Added
+
+- **Two vendored icon sets — Material Symbols (Outlined) + Lucide.** A new
+  `tempestweb.icons` façade (`material_icon`, `lucide_icon`, `custom_icon`,
+  `register_icon`, `MaterialIcons`/`Icons` enums) builds the core `Icon` widget
+  from either set. Both render client-side as **inline SVG** from path data
+  vendored in `client/icons/{lucide,material}.js` — no icon font, no network,
+  offline/PWA safe. The set is encoded as a `"set:"` prefix on the icon name
+  (`"material:home"` / `"lucide:mail"`); a bare name stays Lucide for
+  compatibility with the core `Icon` and the field icon slots. `custom_icon`
+  ships a one-off SVG path over the wire (no registration); `register_icon` +
+  the client `registerIcon` add a reused glyph to both sides.
+- **`tempestweb build` bundles the icon assets** into the artifact, so installed
+  PWAs draw every icon offline.
+- **Docs:** bilingual "Icons (Material + Lucide)" guide (PT-BR + EN-US).
+
 ## [0.7.0] — 2026-06-25
 
 ### Added

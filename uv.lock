@@ -1684,14 +1684,14 @@ wheels = [
 
 [[package]]
 name = "tempest-core"
-version = "0.1.0"
+version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8a/9a/1b5be903256f285d47a712a8928eb0dd2d73361375905969868a74bb8adc/tempest_core-0.1.0.tar.gz", hash = "sha256:d04cfbce515f75478d0eefa233693efb3cc22bc3862296fb1279f80c03f106a1", size = 104532, upload-time = "2026-06-12T13:00:41.635Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/ef/81cf51fc89de0900d483f940c7b44611347036d4f9eb4deee95ace7fcbfe/tempest_core-0.8.1.tar.gz", hash = "sha256:af7e916dab731b9e08d515162793cd422a46ba247dbc6d27becbd53cbb349003", size = 275532, upload-time = "2026-06-21T00:49:25.638Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/50/fb/7ef61bd963f0f1a0a540c05143df33ea8b338eac7239bf3127c157bd28b1/tempest_core-0.1.0-py3-none-any.whl", hash = "sha256:e3c547881e33ce8abee100e84c88f070c80253320b0d0146aaf596d48b8bc963", size = 124176, upload-time = "2026-06-12T13:00:40.094Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/62/c509683bcd65d2628d5df24c920adf0e80f3568d0b101b867f0622dffd54/tempest_core-0.8.1-py3-none-any.whl", hash = "sha256:a155ddd1a6d330c5f1cf61d433c694e777f79063ce874843033e358274acab73", size = 193831, upload-time = "2026-06-21T00:49:24.108Z" },
 ]
 
 [[package]]
@@ -1738,7 +1738,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
     { name = "pywebpush", marker = "extra == 'webpush'", specifier = ">=1.14" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
-    { name = "tempest-core", specifier = ">=0.1.0" },
+    { name = "tempest-core", specifier = ">=0.8.1" },
     { name = "tomlkit", marker = "extra == 'cli'", specifier = ">=0.13" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.29" },
     { name = "watchfiles", marker = "extra == 'cli'", specifier = ">=0.21" },

@@ -9,7 +9,7 @@ authors = [{ name = "Mauricio Benjamin", email = "mauricio.benjamin@reloverelati
 dependencies = [
     # Renderer-agnostic UI core (IR/reconciler/state/style/widgets), extracted from
     # the former vendored tempestweb/_core/. pydantic comes transitively via it.
-    "tempest-core>=0.1.0",
+    "tempest-core>=0.8.1",
 ]
 
 [project.optional-dependencies]

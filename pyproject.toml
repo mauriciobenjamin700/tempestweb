@@ -1,6 +1,6 @@
 [project]
 name = "tempestweb"
-version = "0.7.0"
+version = "0.8.0"
 description = "Build web apps in typed Python — one tree, a DOM renderer, two execution modes (WASM + server)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -9,7 +9,7 @@ authors = [{ name = "Mauricio Benjamin", email = "mauricio.benjamin@reloverelati
 dependencies = [
     # Renderer-agnostic UI core (IR/reconciler/state/style/widgets), extracted from
     # the former vendored tempestweb/_core/. pydantic comes transitively via it.
-    "tempest-core>=0.8.1",
+    "tempest-core>=0.8.2",
 ]
 
 [project.optional-dependencies]

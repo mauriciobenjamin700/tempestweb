@@ -4,7 +4,7 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
-## [Unreleased]
+## [0.8.0] — 2026-06-25
 
 ### Added
 
@@ -21,6 +21,17 @@ versioning.
 - **`tempestweb build` bundles the icon assets** into the artifact, so installed
   PWAs draw every icon offline.
 - **Docs:** bilingual "Icons (Material + Lucide)" guide (PT-BR + EN-US).
+
+### Changed
+
+- **Bumped tempest-core to `>=0.8.2`.** Picks up the clickable-`Rating` fix
+  (stars render as bare glyphs, not filled pills).
+
+### Fixed
+
+- **The `core-profile-cards` example uses an interactive `Rating` again.** The
+  0.7.0 display-only workaround is reverted now that tempest-core 0.8.2 renders
+  clickable stars as bare glyphs.
 
 ## [0.7.0] — 2026-06-25
 

@@ -1684,19 +1684,19 @@ wheels = [
 
 [[package]]
 name = "tempest-core"
-version = "0.8.1"
+version = "0.8.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b6/ef/81cf51fc89de0900d483f940c7b44611347036d4f9eb4deee95ace7fcbfe/tempest_core-0.8.1.tar.gz", hash = "sha256:af7e916dab731b9e08d515162793cd422a46ba247dbc6d27becbd53cbb349003", size = 275532, upload-time = "2026-06-21T00:49:25.638Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/05/c4d69d7e463f50a7fe22596a68fd9940e34ffc340d645c60d96823bee6fb/tempest_core-0.8.2.tar.gz", hash = "sha256:aaa3e771cfe4c8bbe6acfc3455837924f9da2240861adbcbe9f79a463da2c904", size = 276075, upload-time = "2026-06-25T23:44:56.792Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c1/62/c509683bcd65d2628d5df24c920adf0e80f3568d0b101b867f0622dffd54/tempest_core-0.8.1-py3-none-any.whl", hash = "sha256:a155ddd1a6d330c5f1cf61d433c694e777f79063ce874843033e358274acab73", size = 193831, upload-time = "2026-06-21T00:49:24.108Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/48/b9f145bd1607e4252eecd5af0a8098b626e6b52c804f8298d8b3c9c26814/tempest_core-0.8.2-py3-none-any.whl", hash = "sha256:61d033a9924a01ed92b73afa965705d6281d33b0ed68fc9cdc7f6d89d0ba0d93", size = 193966, upload-time = "2026-06-25T23:44:55.18Z" },
 ]
 
 [[package]]
 name = "tempestweb"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "tempest-core" },
@@ -1738,7 +1738,7 @@ requires-dist = [
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
     { name = "pywebpush", marker = "extra == 'webpush'", specifier = ">=1.14" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
-    { name = "tempest-core", specifier = ">=0.8.1" },
+    { name = "tempest-core", specifier = ">=0.8.2" },
     { name = "tomlkit", marker = "extra == 'cli'", specifier = ">=0.13" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'server'", specifier = ">=0.29" },
     { name = "watchfiles", marker = "extra == 'cli'", specifier = ">=0.21" },

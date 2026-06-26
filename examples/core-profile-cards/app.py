@@ -10,10 +10,9 @@ The same ``view`` runs unchanged in both modes::
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
     tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
-Interaction is wired through state: toggling a section header calls
-``Accordion.on_toggle`` to open or close it. The ``Rating`` is display-only (a
-clickable Rating lowers to filled star Buttons that the web base theme paints as
-solid pills — see the note at its call site).
+Interaction is wired through state: tapping a star calls ``Rating.on_rate``
+to record a new score, and toggling a section header calls
+``Accordion.on_toggle`` to open or close it.
 """
 
 from __future__ import annotations
@@ -41,7 +40,7 @@ class Profile:
         name: Display name shown as the card heading.
         role: Job title shown beneath the name.
         initials: Two-letter monogram rendered inside the avatar.
-        rating: Star score (0..5) shown by the display-only ``Rating``.
+        rating: Current star score (0..5), mutated by ``Rating.on_rate``.
     """
 
     slug: str
@@ -98,15 +97,31 @@ def make_state() -> ProfileCardsState:
     )
 
 
-def _profile_card(profile: Profile) -> Widget:
-    """Render one profile card with an avatar and a display rating.
+def _profile_card(app: App[ProfileCardsState], profile: Profile) -> Widget:
+    """Render one profile card with an avatar and an interactive rating.
 
     Args:
+        app: The application handle exposing ``state`` and ``set_state``.
         profile: The team member to render.
 
     Returns:
         A :class:`Card` widget for the given profile.
     """
+
+    def rate(stars: int) -> None:
+        """Record a new star score for this profile.
+
+        Args:
+            stars: The number of stars selected by the user (1..5).
+        """
+
+        def apply(state: ProfileCardsState) -> None:
+            for candidate in state.profiles:
+                if candidate.slug == profile.slug:
+                    candidate.rating = stars
+                    break
+
+        app.set_state(apply)
 
     return Card(
         key=f"card-{profile.slug}",
@@ -135,14 +150,11 @@ def _profile_card(profile: Profile) -> Widget:
                     ),
                 ],
             ),
-            # Display-only Rating: the core lowers a *clickable* Rating to filled
-            # Buttons (one per star), which the web's Material 3 base paints as
-            # solid pills over the star glyph. A display Rating renders the
-            # ★/☆ glyphs cleanly; click-to-rate awaits a borderless star variant.
             Rating(
                 key=f"rating-{profile.slug}",
                 value=profile.rating,
                 max_stars=5,
+                on_rate=rate,
             ),
         ],
     )
@@ -204,7 +216,7 @@ def view(app: App[ProfileCardsState]) -> Widget:
         style=Style(gap=12.0, padding=Edge.all(16)),
         children=[
             Text(content="Team Directory", key="heading"),
-            *[_profile_card(profile) for profile in app.state.profiles],
+            *[_profile_card(app, profile) for profile in app.state.profiles],
             Accordion(
                 key="acc-skills",
                 title="Shared skills",

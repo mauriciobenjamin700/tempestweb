@@ -61,7 +61,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core.theme import ThemeMode
+from tempest_core.theme import ThemeMode
 
 
 @dataclass
@@ -104,7 +104,7 @@ Define two colour palettes (light and dark) as module-level constants. This
 keeps all colour values centralised and easy to maintain.
 
 ```python
-from tempestweb._core.style import Color, Curve, Transition
+from tempest_core.style import Color, Curve, Transition
 
 # Light palette
 _LIGHT_BG: Color = Color.from_hex("#f8fafc")
@@ -163,9 +163,9 @@ _ACCENT_NAMES: list[str] = ["Blue", "Violet", "Teal"]
 Two small helpers isolate the theme resolution logic from the rest of the UI:
 
 ```python
-from tempestweb._core import App
-from tempestweb._core.style import Color
-from tempestweb._core.theme import Theme, ThemeMode
+from tempest_core import App
+from tempest_core.style import Color
+from tempest_core.theme import Theme, ThemeMode
 
 
 def _is_dark(app: App[ThemeSwitcherState]) -> bool:
@@ -242,9 +242,9 @@ def _make_theme(
 The first card displays the active mode and current accent name:
 
 ```python
-from tempestweb._core import Style, Widget
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets import Button, Column, Container, Row, Switch, Text
+from tempest_core import Style, Widget
+from tempest_core.style import AlignItems, Edge, FontWeight
+from tempest_core.widgets import Button, Column, Container, Row, Switch, Text
 
 
 def _header_card(app: App[ThemeSwitcherState]) -> Widget:
@@ -335,9 +335,9 @@ The second card provides the three mode buttons and a `Switch` that simulates
 an OS signal:
 
 ```python
-from tempestweb._core.style import Border, JustifyContent
-from tempestweb._core.theme import MediaQueryData
-from tempestweb._core.widgets.events import ToggleEvent
+from tempest_core.style import Border, JustifyContent
+from tempest_core.theme import MediaQueryData
+from tempest_core.widgets.events import ToggleEvent
 
 
 def _mode_card(app: App[ThemeSwitcherState]) -> Widget:
@@ -724,7 +724,7 @@ def _palette_preview_card(app: App[ThemeSwitcherState]) -> Widget:
 The **ThemeChangeEvent** card simulates OS notifications:
 
 ```python
-from tempestweb._core.widgets.events import ThemeChangeEvent
+from tempest_core.widgets.events import ThemeChangeEvent
 
 
 def _os_event_card(app: App[ThemeSwitcherState]) -> Widget:
@@ -840,8 +840,8 @@ def _os_event_card(app: App[ThemeSwitcherState]) -> Widget:
 The root `view` function composes the five cards inside a `Column`:
 
 ```python
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Edge
+from tempest_core import App, Style, Widget
+from tempest_core.style import Edge
 
 
 def view(app: App[ThemeSwitcherState]) -> Widget:
@@ -898,14 +898,14 @@ navigation, no overlays, just pure theming.
 
 Key concepts shown
 ------------------
-* :class:`~tempestweb._core.theme.Theme` — carries the active
-  :class:`~tempestweb._core.theme.ThemeMode` plus an optional colour palette.
-* :meth:`~tempestweb._core.core.state.App.set_theme` — swaps the active theme
+* :class:`~tempest_core.theme.Theme` — carries the active
+  :class:`~tempest_core.theme.ThemeMode` plus an optional colour palette.
+* :meth:`~tempest_core.core.state.App.set_theme` — swaps the active theme
   and schedules a coalesced rebuild like any state mutation.
-* :meth:`~tempestweb._core.theme.Theme.is_dark` — resolves ``SYSTEM`` against
+* :meth:`~tempest_core.theme.Theme.is_dark` — resolves ``SYSTEM`` against
   the platform flag; used by the ``view`` to pick the right palette at
   build time.
-* :class:`~tempestweb._core.widgets.events.ThemeChangeEvent` — the typed event
+* :class:`~tempest_core.widgets.events.ThemeChangeEvent` — the typed event
   the host fires when the OS colour scheme changes; shown here as an inline
   handler the user can fire manually.
 
@@ -922,8 +922,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import (
+from tempest_core import App, Style, Widget
+from tempest_core.style import (
     AlignItems,
     Border,
     Color,
@@ -933,9 +933,9 @@ from tempestweb._core.style import (
     JustifyContent,
     Transition,
 )
-from tempestweb._core.theme import MediaQueryData, Theme, ThemeMode
-from tempestweb._core.widgets import Button, Column, Container, Row, Switch, Text
-from tempestweb._core.widgets.events import ThemeChangeEvent, ToggleEvent
+from tempest_core.theme import MediaQueryData, Theme, ThemeMode
+from tempest_core.widgets import Button, Column, Container, Row, Switch, Text
+from tempest_core.widgets.events import ThemeChangeEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Palette definitions
@@ -980,7 +980,7 @@ class ThemeSwitcherState:
     """Application state for the theme-switcher demo.
 
     Attributes:
-        forced_mode: The :class:`~tempestweb._core.theme.ThemeMode` the user
+        forced_mode: The :class:`~tempest_core.theme.ThemeMode` the user
             has explicitly chosen; ``SYSTEM`` means follow the OS.
         last_os_event: A human-readable description of the last
             ``ThemeChangeEvent`` received from the OS (purely for display).
@@ -1029,7 +1029,7 @@ _ACCENT_NAMES: list[str] = ["Blue", "Violet", "Teal"]
 def _is_dark(app: App[ThemeSwitcherState]) -> bool:
     """Resolve whether the current theme renders dark.
 
-    Delegates to :meth:`~tempestweb._core.theme.Theme.is_dark` so ``SYSTEM``
+    Delegates to :meth:`~tempest_core.theme.Theme.is_dark` so ``SYSTEM``
     is resolved correctly against the platform flag.
 
     Args:
@@ -1049,7 +1049,7 @@ def _accent(app: App[ThemeSwitcherState], dark: bool) -> Color:
         dark: Whether the dark palette should be used.
 
     Returns:
-        The :class:`~tempestweb._core.style.Color` for the active accent.
+        The :class:`~tempest_core.style.Color` for the active accent.
     """
     palette: list[Color] = _ACCENT_DARK if dark else _ACCENT_LIGHT
     return palette[app.state.swatch_index]
@@ -1060,15 +1060,15 @@ def _make_theme(
     dark: bool,
     swatch_index: int,
 ) -> Theme:
-    """Construct a fully-populated :class:`~tempestweb._core.theme.Theme`.
+    """Construct a fully-populated :class:`~tempest_core.theme.Theme`.
 
     Args:
-        mode: The :class:`~tempestweb._core.theme.ThemeMode` to set.
+        mode: The :class:`~tempest_core.theme.ThemeMode` to set.
         dark: Whether the dark palette should be used.
         swatch_index: The 0-based index into the accent colour lists.
 
     Returns:
-        The fully-populated :class:`~tempestweb._core.theme.Theme`.
+        The fully-populated :class:`~tempest_core.theme.Theme`.
     """
     palette: list[Color] = _ACCENT_DARK if dark else _ACCENT_LIGHT
     accent_color: Color = palette[swatch_index]

@@ -1,18 +1,31 @@
 # Roadmap e fases
 
-!!! info "Estado atual — atualizado em 2026-06-13"
+!!! info "Estado atual — atualizado em 2026-06-27"
     Tracks **T1–T10 + Trilhos 0/W/A/B/P/N/O/E mesclados na `main`** com gate verde
-    (ruff/format/mypy ✓ · pytest 459 pass/1 skip · jsdom 205 pass). Publicado no
-    PyPI: **tempestweb 0.5.1**. Legenda de status: **✅** mesclado e com gate verde ·
-    **🔶** implementado mas pendente de **verificação real** (browser/device — ver
-    `docs/agents/reports/NOTES-T*.md`) · **⬜** não iniciado. Os dois modos rodam um
-    app fim-a-fim ao vivo (counter por WS e Pyodide no browser), Trilho E está ✅ ao
-    vivo (7/7) e o core já é o pacote `tempest-core` (o `_core/` vendorado foi
-    removido). Pendências de alto nível: **Trilho 0 fase 2** (tempestroid passar a
+    (ruff/format/mypy ✓ · pytest **484 pass/1 skip** · jsdom **229 pass**). Publicado
+    no PyPI: **tempestweb 0.8.1**, pinando **tempest-core 0.8.2**. Legenda de status:
+    **✅** mesclado e com gate verde · **🔶** implementado mas pendente de
+    **verificação real** (browser/device — ver `docs/agents/reports/NOTES-T*.md`) ·
+    **⬜** não iniciado.
+
+    O **`tempest_core` é o centro da verdade** (a engine renderer-agnostic:
+    IR/reconciliador/estado/estilo/widgets/componentes). Na **0.8.1** o pacote
+    vendorado `tempestweb/_core/` **e o shim de back-compat** foram **removidos** —
+    todo o código, exemplos e docs importam `from tempest_core import ...` direto.
+    Os dois modos foram **re-verificados ao vivo no browser (Playwright) na 0.8.1**:
+    **Modo A** (Pyodide/WASM, in-process, zero-network) e **Modo B** (FastAPI +
+    WebSocket round-trip), ambos sem o shim. Trilho E está ✅ ao vivo (7/7).
+
+    As releases **0.6 / 0.7 / 0.8** entregaram features além do roadmap original:
+    **Material 3** (depois delegado ao core), **Canvas charts** (`BarChart`/
+    `LineChart`), **dois conjuntos de ícones** (Lucide + Material) e a **biblioteca
+    de componentes do core** re-exportada de `tempestweb.components`.
+
+    Pendências de alto nível (inalteradas): **Trilho 0 fase 2** (tempestroid passar a
     depender do `tempest-core` + conformância Qt↔Compose) — bloqueada no repo
     tempestroid; e a **verificação ao vivo device-dependente** dos itens 🔶
     (Background Sync com aba fechada, WebPush aba-fechada, geo/clipboard/câmera
-    reais), que não dá para automatizar em unit/jsdom.
+    reais, Lighthouse ao vivo), que não dá para automatizar em unit/jsdom.
 
 !!! danger "Lacuna de integração descoberta na verificação (2026-06-11)"
     Os **engines** de ambos os modos existem e passam unit/jsdom, mas a **costura

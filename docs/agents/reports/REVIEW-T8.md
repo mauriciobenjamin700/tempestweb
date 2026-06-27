@@ -60,7 +60,7 @@ T1/CI owner.
 - **No asserts-nothing / skip / xfail / NotImplementedError** in the suite.
 - **All widgets are genuine core widgets** (verified import of `Input`, `LazyColumn`,
   `Checkbox`, `Form`, `FormField`, `FormState`, `Validator`, `Spinner` from
-  `tempestweb._core.widgets` and the events from `tempestweb._core.widgets.events`).
+  `tempest_core.widgets` and the events from `tempest_core.widgets.events`).
 - **Scope clean:** `git diff main...HEAD` = `examples/{todo,form,fetch}/app.py`,
   `tests/unit/test_examples.py`, `REVIEW-T8.md`, `SUMMARY-T8.md`. No `_core` edits, no
   `examples/counter` edits, nothing outside track.

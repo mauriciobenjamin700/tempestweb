@@ -85,8 +85,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.style import Edge
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.style import Edge
 
 
 @dataclass
@@ -297,8 +297,8 @@ def _json_safe(value: Any) -> Any:
     The IR carries live handler callables in ``props``; this strips them to
     ``None`` so the result is JSON-serializable.  Pydantic
     :class:`~pydantic.BaseModel` instances (e.g.
-    :class:`~tempestweb._core.style.Style`,
-    :class:`~tempestweb._core.style.Edge`) are lowered via
+    :class:`~tempest_core.style.Style`,
+    :class:`~tempest_core.style.Edge`) are lowered via
     ``model_dump(mode="json")`` which resolves colors, edges, enums and other
     structured style values to plain JSON-safe scalars before the recursive walk.
 

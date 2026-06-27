@@ -435,7 +435,7 @@ def _meta_badge(label: str, value: str, key: str) -> Widget:
         key: The widget key for reconciliation.
 
     Returns:
-        A :class:`~tempestweb._core.components.Card` containing a label/value
+        A :class:`~tempest_core.components.Card` containing a label/value
         column.
     """
     return Card(
@@ -475,12 +475,12 @@ It demonstrates an async native-capability handler: pressing *Capture* runs an
 ``async`` handler that:
 
 1. Flips the view into a ``CAPTURING`` loading state (showing a
-   :class:`~tempestweb._core.widgets.Spinner`).
+   :class:`~tempest_core.widgets.Spinner`).
 2. Awaits the injected ``capture`` callable (defaults to
    ``native.camera.capture``), which resolves to a :class:`~tempestweb.native.Photo`
    carrying the MIME type, pixel dimensions, and base64-encoded bytes.
-3. Renders the result in a :class:`~tempestweb._core.components.Card` with a
-   data-URI :class:`~tempestweb._core.widgets.Image` preview and metadata row.
+3. Renders the result in a :class:`~tempest_core.components.Card` with a
+   data-URI :class:`~tempest_core.widgets.Image` preview and metadata row.
 
 If the user denies camera permission, the bridge raises a
 :class:`~tempestweb.native.NativeError` — the handler catches it and surfaces a
@@ -499,10 +499,10 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import Card, Divider
-from tempestweb._core.style import AlignItems, Edge, FontWeight, JustifyContent
-from tempestweb._core.widgets import Button, Column, Image, ImageFit, Row, Spinner, Text
+from tempest_core import App, Style, Widget
+from tempest_core.components import Card, Divider
+from tempest_core.style import AlignItems, Edge, FontWeight, JustifyContent
+from tempest_core.widgets import Button, Column, Image, ImageFit, Row, Spinner, Text
 from tempestweb.native import NativeError
 from tempestweb.native import camera as _camera
 from tempestweb.native.camera import Photo
@@ -817,7 +817,7 @@ def _meta_badge(label: str, value: str, key: str) -> Widget:
         key: The widget key for reconciliation.
 
     Returns:
-        A :class:`~tempestweb._core.components.Card` containing a label/value
+        A :class:`~tempest_core.components.Card` containing a label/value
         column.
     """
     return Card(
@@ -891,7 +891,7 @@ import asyncio
 import base64
 import pytest
 from examples_photo_capture import make_state, view, Phase
-from tempestweb._core import App, build
+from tempest_core import App, build
 from tempestweb.native.camera import Photo
 
 _FAKE_B64 = base64.b64encode(b"fake-image-bytes").decode()

@@ -5,7 +5,34 @@ Let's get tempestweb running locally. The project uses
 the JS client's test tooling (jsdom). No frontend build step — the client is
 plain JavaScript. ✅
 
-## Prerequisites
+## Install from PyPI
+
+To **use** tempestweb in your own project, install the published package:
+
+```bash
+pip install tempestweb        # or:  uv add tempestweb
+```
+
+The base install already pulls in `tempest-core` (the renderer-agnostic engine).
+Add the **extras** for the pieces you actually use:
+
+```bash
+uv add "tempestweb[server,cli]"     # Mode B (FastAPI/WebSocket) + the CLI
+uv add "tempestweb[webpush]"        # server-side WebPush (P3)
+```
+
+| Extra | For |
+|---|---|
+| `server` | FastAPI, uvicorn, websockets — **Mode B**. |
+| `cli` | watchfiles + tomlkit — the dev loop (`tempestweb dev`) and `tempestweb sync`. |
+| `webpush` | pywebpush — server-side WebPush sends (P3). |
+| `docs` | mkdocs-material + i18n — **this documentation**. |
+
+!!! note "Mode A (WASM) has no Python extra"
+    Mode A runs Python in the browser via Pyodide; the static bundling is done
+    by the CLI. You do not need a Python extra for it. ✅
+
+## Prerequisites (for contributing)
 
 - **Python 3.11+** (the repository runs on 3.13).
 - **[uv](https://docs.astral.sh/uv/)** — installer and venv manager.
@@ -15,7 +42,7 @@ plain JavaScript. ✅
     `uv` creates the venv and installs dependencies in seconds, with a
     reproducible lockfile (`uv.lock`). It is the project's default manager.
 
-## Clone and install
+## Clone and install (editable install)
 
 ```bash
 git clone https://github.com/mauriciobenjamin700/tempestweb.git
@@ -31,18 +58,8 @@ uv pip install -e ".[dev,server,cli]"    # (2) install the package + extras
 npm install                              # (3) JS test tooling
 ```
 
-The **extras** decide which capabilities you install:
-
-| Extra | For |
-|---|---|
-| `dev` | ruff, mypy, pytest — the quality gate. |
-| `server` | FastAPI, uvicorn, websockets — **Mode B**. |
-| `cli` | watchfiles + tomlkit — the dev loop (`tempestweb dev`) and `tempestweb sync`. |
-| `docs` | mkdocs-material + i18n — **this documentation**. |
-
-!!! note "Mode A (WASM) has no Python extra"
-    Mode A runs Python in the browser via Pyodide; the static bundling is done
-    by the CLI. You do not need a Python extra for it.
+For contributing you want the **`dev`** extra (ruff, mypy, pytest — the quality
+gate) on top of `server`/`cli` from the table above.
 
 ## Run the gate
 

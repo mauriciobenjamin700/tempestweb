@@ -36,7 +36,7 @@ linha. 🚀
 ## Como funciona
 
 ```text
-   view(app) ──build──▶ árvore de Node (IR)        ← core compartilhado
+   view(app) ──build──▶ árvore de Node (IR)        ← core compartilhado (`import tempest_core`)
                             │
                           diff
                             ▼

@@ -22,7 +22,7 @@ not block the gate.
 
 | Clause | Proof (passing test) | Status |
 |---|---|---|
-| Generates patches from the real core | `_scenarios.py` runs `build`/`diff` over real `tempestweb._core` widgets; `_generate.py` writes the golden; `test_conformance_fixture_matches_core` byte-matches on-disk vs fresh render | MET |
+| Generates patches from the real core | `_scenarios.py` runs `build`/`diff` over real `tempest_core` widgets; `_generate.py` writes the golden; `test_conformance_fixture_matches_core` byte-matches on-disk vs fresh render | MET |
 | Pins the node IR shape | `test_node_ir_shape` (exactly 4 keys), `test_text_props_carry_content`, `test_button_props_carry_label_and_handler_ref` | MET |
 | Pins all five patch kinds | `test_all_five_patch_kinds_are_emitted_and_classified` (update/insert/remove/reorder/replace), `test_patch_paths_are_index_lists` | MET |
 | Regenerable golden lock | `test_conformance_fixture_matches_core` + `test_scenario_ticks_match_golden[*]`; regeneration is idempotent (re-ran `_generate`, tree stayed clean) | MET |

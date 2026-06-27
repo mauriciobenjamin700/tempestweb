@@ -69,11 +69,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import Card, Chip, Divider, Rating
-from tempestweb._core.style import Edge, FontWeight
-from tempestweb._core.widgets import Button, Column, Row, Text, TextArea, Wrap
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core import App, Style, Widget
+from tempest_core.components import Card, Chip, Divider, Rating
+from tempest_core.style import Edge, FontWeight
+from tempest_core.widgets import Button, Column, Row, Text, TextArea, Wrap
+from tempest_core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Chip tag catalogue — aspect keywords the reviewer can toggle.
@@ -95,8 +95,8 @@ _ALL_TAGS: list[str] = [
 
 **What just happened:**
 
-- The `Rating` and `Chip` components come from `tempestweb._core.components`.
-- `Wrap` (from `tempestweb._core.widgets`) distributes children across multiple
+- The `Rating` and `Chip` components come from `tempest_core.components`.
+- `Wrap` (from `tempest_core.widgets`) distributes children across multiple
   lines automatically when space runs out — ideal for variable-width chip sets.
 - `TextChangeEvent` is the event fired by `TextArea` on every keystroke.
 
@@ -511,12 +511,12 @@ This exact ``view`` runs unchanged in both modes::
 
 The demo builds a complete product-review form:
 
-* A :class:`~tempestweb._core.components.Rating` row lets the user pick 1–5 stars.
-* A :class:`~tempestweb._core.widgets.Wrap` of togglable
-  :class:`~tempestweb._core.components.Chip` widgets lets the user tag the review
+* A :class:`~tempest_core.components.Rating` row lets the user pick 1–5 stars.
+* A :class:`~tempest_core.widgets.Wrap` of togglable
+  :class:`~tempest_core.components.Chip` widgets lets the user tag the review
   with relevant aspect keywords (e.g. "Quality", "Value for money").
-* A :class:`~tempestweb._core.widgets.TextArea` collects the free-text body.
-* A submit :class:`~tempestweb._core.widgets.Button` assembles and stores the
+* A :class:`~tempest_core.widgets.TextArea` collects the free-text body.
+* A submit :class:`~tempest_core.widgets.Button` assembles and stores the
   finished review in the state, while a guard ensures at least one star and a
   non-empty body before accepting.
 
@@ -529,11 +529,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import Card, Chip, Divider, Rating
-from tempestweb._core.style import Edge, FontWeight
-from tempestweb._core.widgets import Button, Column, Row, Text, TextArea, Wrap
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core import App, Style, Widget
+from tempest_core.components import Card, Chip, Divider, Rating
+from tempest_core.style import Edge, FontWeight
+from tempest_core.widgets import Button, Column, Row, Text, TextArea, Wrap
+from tempest_core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Chip tag catalogue — aspect keywords the reviewer can toggle.

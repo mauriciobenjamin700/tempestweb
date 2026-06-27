@@ -218,10 +218,10 @@ def reset() -> None:
 The header combines a `Text` with `grow=1.0` (takes the remaining space), a `Badge` with the unread count, and a conditional button that switches between "Dismiss all" and "Reset" depending on the phase:
 
 ```python
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components.feedback import Badge, Banner, EmptyState
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import Button, Column, LazyColumn, Row, Text
+from tempest_core import App, Style, Widget
+from tempest_core.components.feedback import Badge, Banner, EmptyState
+from tempest_core.style import Edge
+from tempest_core.widgets import Button, Column, LazyColumn, Row, Text
 
 
 def view(app: App[NotificationState]) -> Widget:
@@ -405,10 +405,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import uuid4
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components.feedback import Badge, Banner, EmptyState
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import Button, Column, LazyColumn, Row, Text
+from tempest_core import App, Style, Widget
+from tempest_core.components.feedback import Badge, Banner, EmptyState
+from tempest_core.style import Edge
+from tempest_core.widgets import Button, Column, LazyColumn, Row, Text
 
 # ---------------------------------------------------------------------------
 # Domain model

@@ -18,7 +18,14 @@ JavaScript, no framework, no build step, no TypeScript) and two patch transports
 
 ## Status
 
-🚧 Early construction. See the design docs:
+✅ **Stable & published.** `tempestweb` is on PyPI (latest **0.8.1**). Every track
+(W/A/B/P/N/O/E + the `tempest-core` adoption) is merged to `main` with a green gate
+(`ruff` ✓ · `mypy --strict` ✓ · `pytest` 484 passed/1 skipped · jsdom 229 pass), and
+**both execution modes run an app end-to-end live in the browser** (Mode A via
+Pyodide/WASM, in-process and zero-network; Mode B via FastAPI + WebSocket
+round-trip), re-verified with Playwright on 0.8.1.
+
+The design docs:
 
 - [`docs/plan.md`](docs/plan.md) — full design and phase plan.
 - [`docs/roadmap.md`](docs/roadmap.md) — phase checklist.
@@ -41,7 +48,7 @@ your app doesn't rot into garbage code.
 ## How it works
 
 ```text
-   view(app) ──build──▶ Node tree (IR)        ← shared core (vendored from tempestroid)
+   view(app) ──build──▶ Node tree (IR)        ← shared core (the `tempest-core` dependency)
                             │
                           diff
                             ▼
@@ -60,6 +67,29 @@ http, audio, share, geolocation, clipboard, storage, camera) are typed awaitable
 with the same Python API in both modes — Mode A calls the Web API in-process, Mode
 B proxies it over a round-trip (see [`docs/contract.md`](docs/contract.md)).
 
+## Install
+
+```bash
+pip install tempestweb        # or:  uv add tempestweb
+```
+
+The base install pulls in `tempest-core` (the renderer-agnostic engine). Add the
+extras for the pieces you actually use:
+
+```bash
+uv add "tempestweb[server,cli]"     # Mode B host (FastAPI/WebSocket) + the CLI
+uv add "tempestweb[webpush]"        # server-side WebPush (P3)
+```
+
+| Extra | Pulls in | When you need it |
+|---|---|---|
+| `server` | `fastapi`, `uvicorn[standard]`, `websockets` | Mode B — Python on the server, thin JS client over WebSocket/SSE. |
+| `cli` | `watchfiles`, `tomlkit` | The `tempestweb new/dev/build/run/sync` workflow. |
+| `webpush` | `pywebpush` | Server-side WebPush sends (P3). |
+| `docs` | `mkdocs-material`, `mkdocs-static-i18n` | Build the bilingual docs site locally. |
+
+Mode A (WASM) needs no extras — the browser + Pyodide are the runtime.
+
 ## Develop
 
 ```bash
@@ -72,7 +102,7 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | Path | What |
 |---|---|
 | `tempest-core` (dependency) | Renderer-agnostic engine — IR/reconciler/state/style/widgets (`import tempest_core`), extracted from tempestroid. |
-| `tempestweb/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — 54 Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
+| `tempestweb/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — **67 Material 3 components** + 10 helpers (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …) from `import tempestweb.components`. |
 | `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`, `sse.py`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
 | `tempestweb/native/` | Web API capability adapters — http, audio, share, geo, clipboard, storage, camera (Track N). |

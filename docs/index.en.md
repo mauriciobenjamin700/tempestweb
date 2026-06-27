@@ -36,7 +36,7 @@ changing a line. 🚀
 ## How it works
 
 ```text
-   view(app) ──build──▶ Node tree (IR)        ← shared core
+   view(app) ──build──▶ Node tree (IR)        ← shared core (`import tempest_core`)
                             │
                           diff
                             ▼

@@ -64,15 +64,15 @@ touch examples/br-cadastro/app.py
 
 ## Passo 1 — Imports e constantes
 
-Abra `app.py` e escreva os imports. Note a separação clara: widgets genéricos vêm de `tempestweb._core.widgets`, componentes compostos (incluindo todos os inputs BR) vêm de `tempestweb._core.components`, e os validadores vêm de `tempestweb._core.validators`.
+Abra `app.py` e escreva os imports. Note a separação clara: widgets genéricos vêm de `tempest_core.widgets`, componentes compostos (incluindo todos os inputs BR) vêm de `tempest_core.components`, e os validadores vêm de `tempest_core.validators`.
 
 ```python
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     AddressInput,
     Banner,
     Card,
@@ -83,14 +83,14 @@ from tempestweb._core.components import (
     PhoneInput,
     SegmentedControl,
 )
-from tempestweb._core.style import Color, Edge, FontWeight
-from tempestweb._core.validators import (
+from tempest_core.style import Color, Edge, FontWeight
+from tempest_core.validators import (
     validate_cnpj,
     validate_cpf,
     validate_email,
     validate_phone,
 )
-from tempestweb._core.widgets import Button, Column, Input, Text
+from tempest_core.widgets import Button, Column, Input, Text
 ```
 
 Logo abaixo dos imports, defina as três constantes do módulo:
@@ -552,8 +552,8 @@ Aqui está o `app.py` completo, pronto para copiar:
 """Brazilian registration form — CPF/CNPJ, phone, address with masked inputs.
 
 Demonstrates the full complement of BR-specific form components from
-:mod:`tempestweb._core.components.brforms` paired with the real-time
-validators from :mod:`tempestweb._core.validators`.
+:mod:`tempest_core.components.brforms` paired with the real-time
+validators from :mod:`tempest_core.validators`.
 
 Two registration modes are offered via a segmented control:
 
@@ -574,8 +574,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     AddressInput,
     Banner,
     Card,
@@ -586,14 +586,14 @@ from tempestweb._core.components import (
     PhoneInput,
     SegmentedControl,
 )
-from tempestweb._core.style import Color, Edge, FontWeight
-from tempestweb._core.validators import (
+from tempest_core.style import Color, Edge, FontWeight
+from tempest_core.validators import (
     validate_cnpj,
     validate_cpf,
     validate_email,
     validate_phone,
 )
-from tempestweb._core.widgets import Button, Column, Input, Text
+from tempest_core.widgets import Button, Column, Input, Text
 
 # ---------------------------------------------------------------------------
 # Module constants
@@ -609,7 +609,7 @@ _ERROR_COLOR: Color = Color.from_hex("#ef4444")
 #: Registered modes exposed by the segmented control.
 _MODES: list[str] = ["Pessoa Física", "Pessoa Jurídica"]
 
-#: Address field names reported by :class:`~tempestweb._core.components.AddressInput`.
+#: Address field names reported by :class:`~tempest_core.components.AddressInput`.
 _ADDRESS_FIELDS: tuple[str, ...] = (
     "cep",
     "street",

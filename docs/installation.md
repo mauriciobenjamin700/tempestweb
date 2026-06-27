@@ -5,7 +5,34 @@ Vamos preparar tudo para rodar o tempestweb localmente. O projeto usa
 tooling de teste do cliente JS (jsdom). Nenhum passo de build de frontend — o
 cliente é JavaScript puro. ✅
 
-## Pré-requisitos
+## Instalar do PyPI
+
+Para **usar** o tempestweb no seu próprio projeto, instale o pacote publicado:
+
+```bash
+pip install tempestweb        # ou:  uv add tempestweb
+```
+
+O install base já traz o `tempest-core` (a engine renderer-agnostic). Adicione os
+**extras** conforme as peças que você usa:
+
+```bash
+uv add "tempestweb[server,cli]"     # Modo B (FastAPI/WebSocket) + a CLI
+uv add "tempestweb[webpush]"        # WebPush no servidor (P3)
+```
+
+| Extra | Para quê |
+|---|---|
+| `server` | FastAPI, uvicorn, websockets — o **Modo B**. |
+| `cli` | watchfiles + tomlkit — o dev-loop (`tempestweb dev`) e o `tempestweb sync`. |
+| `webpush` | pywebpush — envios de WebPush no servidor (P3). |
+| `docs` | mkdocs-material + i18n — **esta documentação**. |
+
+!!! note "Modo A (WASM) não tem extra Python"
+    O Modo A roda Python no browser via Pyodide; o empacotamento estático é
+    feito pela CLI. Você não precisa de um extra Python para ele. ✅
+
+## Pré-requisitos (para contribuir)
 
 - **Python 3.11+** (o repositório roda em 3.13).
 - **[uv](https://docs.astral.sh/uv/)** — instalador e gerenciador de venv.
@@ -15,7 +42,7 @@ cliente é JavaScript puro. ✅
     `uv` cria o venv e instala dependências em segundos, com lockfile
     reprodutível (`uv.lock`). É o gerenciador padrão do projeto.
 
-## Clonar e instalar
+## Clonar e instalar (instalação editável)
 
 ```bash
 git clone https://github.com/mauriciobenjamin700/tempestweb.git
@@ -31,18 +58,8 @@ uv pip install -e ".[dev,server,cli]"    # (2) instala o pacote + extras
 npm install                              # (3) tooling de teste JS
 ```
 
-Os **extras** dizem quais capacidades você instala:
-
-| Extra | Para quê |
-|---|---|
-| `dev` | ruff, mypy, pytest — o gate de qualidade. |
-| `server` | FastAPI, uvicorn, websockets — o **Modo B**. |
-| `cli` | watchfiles + tomlkit — o dev-loop (`tempestweb dev`) e o `tempestweb sync`. |
-| `docs` | mkdocs-material + i18n — **esta documentação**. |
-
-!!! note "Modo A (WASM) não tem extra Python"
-    O Modo A roda Python no browser via Pyodide; o empacotamento estático é
-    feito pela CLI. Você não precisa de um extra Python para ele.
+Para contribuir você quer o extra **`dev`** (ruff, mypy, pytest — o gate de
+qualidade) além de `server`/`cli` da tabela acima.
 
 ## Rodar o gate
 

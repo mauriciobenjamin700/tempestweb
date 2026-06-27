@@ -82,8 +82,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     AppBar,
     Avatar,
     Badge,
@@ -95,7 +95,7 @@ from tempestweb._core.components import (
     Scaffold,
     Sidebar,
 )
-from tempestweb._core.components.base import (
+from tempest_core.components.base import (
     ACCENT,
     BACKGROUND,
     MUTED,
@@ -103,8 +103,8 @@ from tempestweb._core.components.base import (
     ON_SURFACE,
     SURFACE,
 )
-from tempestweb._core.style import AlignItems, Color, Edge, FontWeight
-from tempestweb._core.widgets import Button, Column, Container, Row, Text
+from tempest_core.style import AlignItems, Color, Edge, FontWeight
+from tempest_core.widgets import Button, Column, Container, Row, Text
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -164,7 +164,7 @@ def make_state() -> DashState:
 
 !!! tip "Tip — semantic colour tokens"
     `ACCENT`, `BACKGROUND`, `SURFACE`, `MUTED`, `ON_SURFACE` and `ON_MUTED` are
-    semantic colour constants defined in `tempestweb._core.components.base`. They
+    semantic colour constants defined in `tempest_core.components.base`. They
     follow the default theme colour scheme and let you build consistent UIs without
     hardcoding hex values.
 

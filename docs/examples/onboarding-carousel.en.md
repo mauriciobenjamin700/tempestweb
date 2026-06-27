@@ -141,9 +141,9 @@ Before assembling `view`, write two pure helper functions that build parts of th
 Receives the active index and the total number of pages; returns a `Row` of circular `Container` widgets. The active dot is larger and coloured with `ACCENT`; the others are muted grey.
 
 ```python
-from tempestweb._core import Button, Column, Row, Style, Widget
-from tempestweb._core.components import ACCENT, BACKGROUND, ON_MUTED, ON_SURFACE, Card
-from tempestweb._core.style import (
+from tempest_core import Button, Column, Row, Style, Widget
+from tempest_core.components import ACCENT, BACKGROUND, ON_MUTED, ON_SURFACE, Card
+from tempest_core.style import (
     AlignItems,
     Color,
     Edge,
@@ -151,8 +151,8 @@ from tempestweb._core.style import (
     JustifyContent,
     TextAlign,
 )
-from tempestweb._core.widgets import Container, PageView, Text
-from tempestweb._core.widgets.events import PageChangeEvent
+from tempest_core.widgets import Container, PageView, Text
+from tempest_core.widgets.events import PageChangeEvent
 
 
 def _dot_indicator(active: int, total: int) -> Widget:
@@ -328,7 +328,7 @@ def _done_card() -> Widget:
 Inside `view()`, define five functions that react to user interactions. Each one calls `app.set_state(mutator)`:
 
 ```python
-from tempestweb._core import App
+from tempest_core import App
 
 
 def view(app: App[OnboardingState]) -> Widget:
@@ -480,7 +480,7 @@ Here is the complete file, ready to copy:
 ```python
 """Onboarding carousel — paged navigation demo.
 
-A multi-step onboarding flow built with :class:`~tempestweb._core.widgets.PageView`.
+A multi-step onboarding flow built with :class:`~tempest_core.widgets.PageView`.
 Three full-width slides walk the user through a product introduction; a dot
 indicator below the pager tracks the active page, and ``Skip`` / ``Next``
 buttons (replaced by a ``Get started`` button on the last slide) let the user
@@ -488,8 +488,8 @@ navigate without swiping.
 
 Demonstrates:
 
-* :class:`~tempestweb._core.widgets.PageView` driven by ``page`` state.
-* :class:`~tempestweb._core.widgets.events.PageChangeEvent` — fired when the
+* :class:`~tempest_core.widgets.PageView` driven by ``page`` state.
+* :class:`~tempest_core.widgets.events.PageChangeEvent` — fired when the
   user swipes; the handler ignores events that would land on the current page to
   break feedback loops.
 * Dot-indicator pattern: three ``Container`` widgets styled conditionally on the
@@ -508,9 +508,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core import App, Button, Column, Row, Style, Widget
-from tempestweb._core.components import ACCENT, BACKGROUND, ON_MUTED, ON_SURFACE, Card
-from tempestweb._core.style import (
+from tempest_core import App, Button, Column, Row, Style, Widget
+from tempest_core.components import ACCENT, BACKGROUND, ON_MUTED, ON_SURFACE, Card
+from tempest_core.style import (
     AlignItems,
     Color,
     Edge,
@@ -518,8 +518,8 @@ from tempestweb._core.style import (
     JustifyContent,
     TextAlign,
 )
-from tempestweb._core.widgets import Container, PageView, Text
-from tempestweb._core.widgets.events import PageChangeEvent
+from tempest_core.widgets import Container, PageView, Text
+from tempest_core.widgets.events import PageChangeEvent
 
 # ---------------------------------------------------------------------------
 # Slide data

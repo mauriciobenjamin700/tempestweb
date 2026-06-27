@@ -149,9 +149,10 @@ SignupForm(
 
 Beyond the native helpers above, **the entire tempest-core Material 3 component
 library** is re-exported from `tempestweb.components` — the same obvious place.
-That's 54 components: layout scaffolds, app bars, navigation, `Card`, `ListTile`,
-inputs, feedback (`Alert`/`Banner`/`Badge`), tables (`Table`/`DataTable`) and
-**charts** (`BarChart`/`LineChart`).
+In total, `tempestweb.components` exposes **67 components** (+ 10 helpers): layout
+scaffolds, app bars, navigation, `Card`, `ListTile`, inputs, feedback
+(`Alert`/`Banner`/`Badge`), tables (`Table`/`DataTable`) and **charts**
+(`BarChart`/`LineChart`).
 
 ```python
 from tempestweb.components import Card, DataTable, BarChart, ChartSeries

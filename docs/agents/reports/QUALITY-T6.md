@@ -47,7 +47,7 @@ land, or a human with repo access). Recording them per the workflow rule.
    marked "under construction". Those modules are being built on Tracks N/O/P.
    When they land, add import/doctest coverage so the snippets cannot drift from
    the real modules (the same way the tutorial examples were validated against the
-   real `tempestweb._core` in this pass). Requires the other tracks to be merged
+   real `tempest_core` in this pass). Requires the other tracks to be merged
    first — a dependency, not a quality fix.
 2. **MkDocs 2.0 upstream deprecation banner.** `mkdocs-material` prints a stderr
    banner warning that MkDocs 2.0 will break the plugin/theme system. It does not

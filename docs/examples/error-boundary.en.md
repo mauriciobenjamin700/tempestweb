@@ -331,8 +331,8 @@ def toggle_boom() -> None:
 The layout has four sections outside the boundary (never affected by it) and the boundary itself:
 
 ```python
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.style import Edge
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.style import Edge
 
 
 def view(app: App[BoundaryState]) -> Widget:
@@ -437,8 +437,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.style import Edge
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.style import Edge
 from tempestweb.observability import (
     ConsoleTelemetryAdapter,
     ErrorBoundary,

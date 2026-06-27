@@ -2,12 +2,12 @@
 
 This example shows how tempestweb's navigation primitives compose together:
 
-* :class:`~tempestweb._core.widgets.RouteDrawer` — a slide-over side panel whose
+* :class:`~tempest_core.widgets.RouteDrawer` — a slide-over side panel whose
   ``open`` flag lives in state and is toggled without naming a transport.
-* :class:`~tempestweb._core.widgets.Navigator` — wraps the active screen; pushing /
+* :class:`~tempest_core.widgets.Navigator` — wraps the active screen; pushing /
   popping via ``app.push`` / ``app.pop`` replaces its ``child`` and the reconciler
   diffs the swap.
-* :class:`~tempestweb._core.components.Breadcrumb` — renders the current route path
+* :class:`~tempest_core.components.Breadcrumb` — renders the current route path
   as a tappable trail so users can jump back to any ancestor.
 
 The app models a small documentation-style site with four top-level sections and a
@@ -26,8 +26,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, NavStack, Route, Style, Widget, build
-from tempestweb._core.components import (
+from tempest_core import App, NavStack, Route, Style, Widget, build
+from tempest_core.components import (
     AppBar,
     Breadcrumb,
     Card,
@@ -35,7 +35,7 @@ from tempestweb._core.components import (
     ListTile,
     Scaffold,
 )
-from tempestweb._core.components.base import (
+from tempest_core.components.base import (
     ACCENT,
     BACKGROUND,
     MUTED,
@@ -43,8 +43,8 @@ from tempestweb._core.components.base import (
     ON_SURFACE,
     SURFACE,
 )
-from tempestweb._core.style import AlignItems, Color, Edge, FontWeight
-from tempestweb._core.widgets import (
+from tempest_core.style import AlignItems, Color, Edge, FontWeight
+from tempest_core.widgets import (
     Button,
     Column,
     Container,

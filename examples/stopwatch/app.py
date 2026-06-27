@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.style import (
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.style import (
     AlignItems,
     Color,
     Edge,
@@ -87,7 +87,7 @@ def _format_time(tenths: int) -> str:
 def view(app: App[StopwatchState]) -> Widget:
     """Render the stopwatch UI from the current state.
 
-    The tree is a :class:`~tempestweb._core.widgets.Column` with three
+    The tree is a :class:`~tempest_core.widgets.Column` with three
     sections:
 
     1. **Display** — a large monospaced readout showing ``MM:SS.T``.

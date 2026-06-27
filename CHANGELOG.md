@@ -4,6 +4,27 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.8.1] — 2026-06-27
+
+### Changed
+
+- **`tempest-core` is now the single source of truth.** The whole example
+  gallery and the test suite import the renderer-agnostic engine directly as
+  `tempest_core` (`from tempest_core import App, Column, Style, …`) instead of
+  going through the historical `tempestweb._core` path. Both execution modes were
+  re-verified live in the browser (Playwright): the counter renders and updates in
+  **Mode B** (FastAPI + WebSocket round-trip) and in **Mode A** (Pyodide,
+  in-process, zero-network) with the shim gone.
+
+### Removed
+
+- **The `tempestweb._core` back-compat shim.** The vendored `tempestweb/_core/`
+  copy was already extracted into the standalone `tempest-core` package; the shim
+  that re-exported it under the old import path (and its `test_core_shim.py`) is
+  deleted. The Mode A WASM bundler no longer packs a `_core` part — it ships the
+  `tempest_core` package directly. Internal-only change: `_core` was always
+  private, so no public API is affected.
+
 ## [0.8.0] — 2026-06-25
 
 ### Added

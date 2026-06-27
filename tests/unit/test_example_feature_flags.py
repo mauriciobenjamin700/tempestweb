@@ -13,8 +13,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from tempestweb._core import App, Node, build, diff
-from tempestweb._core.widgets import Button
+from tempest_core import App, Node, build, diff
+from tempest_core.widgets import Button
 
 # ---------------------------------------------------------------------------
 # Helpers (no import from examples module at module level — tests load it lazily)

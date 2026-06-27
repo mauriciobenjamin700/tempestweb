@@ -26,9 +26,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import Card
-from tempestweb._core.style import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import Card
+from tempest_core.style import (
     AlignItems,
     Color,
     Edge,
@@ -36,7 +36,7 @@ from tempestweb._core.style import (
     JustifyContent,
     TextAlign,
 )
-from tempestweb._core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core.widgets import Button, Column, Row, Spinner, Text
 from tempestweb.native import geolocation
 from tempestweb.native.geolocation import Position
 from tempestweb.native.http import HttpResponse, request

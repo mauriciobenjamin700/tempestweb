@@ -7,7 +7,7 @@ Demonstrates a real-world registration flow split across three steps:
 - **Step 3 — Review**: read-only summary; a final Submit gated on all prior steps
   being valid.
 
-A ``step`` index in state drives which :class:`~tempestweb._core.widgets.Form` is
+A ``step`` index in state drives which :class:`~tempest_core.widgets.Form` is
 shown.  ``Next`` and ``Back`` buttons advance or retreat the stepper; ``Next`` only
 advances when the current step's form validates cleanly. This pattern is transport-
 agnostic — the same ``view`` runs unchanged under Mode A (Pyodide in the browser)
@@ -23,9 +23,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import (
+from tempest_core import App, Style, Widget
+from tempest_core.style import Edge
+from tempest_core.widgets import (
     Button,
     Column,
     Dropdown,
@@ -38,7 +38,7 @@ from tempestweb._core.widgets import (
     TextArea,
     Validator,
 )
-from tempestweb._core.widgets.events import SelectEvent, TextChangeEvent
+from tempest_core.widgets.events import SelectEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # State
@@ -259,7 +259,7 @@ def _step_indicator(current: int, total: int) -> Widget:
         total: Total number of steps in the wizard.
 
     Returns:
-        A :class:`~tempestweb._core.widgets.Text` widget showing ``Step N of M``.
+        A :class:`~tempest_core.widgets.Text` widget showing ``Step N of M``.
     """
     return Text(
         content=f"Step {current + 1} of {total}",

@@ -15,7 +15,7 @@ This example demonstrates the PWA/WebPush flow:
    injected VAPID public key and stores the raw subscription dict returned by the
    browser.
 3. The current status (idle / requesting / subscribing / subscribed / denied) is
-   rendered in a :class:`~tempestweb._core.widgets.Text` feedback label so the user
+   rendered in a :class:`~tempest_core.widgets.Text` feedback label so the user
    always sees what happened.
 
 State machine
@@ -43,9 +43,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import App, Style, Widget
+from tempest_core.style import Edge
+from tempest_core.widgets import Button, Column, Row, Spinner, Text
 from tempestweb.native import notifications
 from tempestweb.native.notifications import NotificationPermission
 
@@ -142,7 +142,7 @@ def make_state() -> State:
 def view(app: App[State]) -> Widget:
     """Render the PWA/WebPush consent UI from the current state.
 
-    The view is a single :class:`~tempestweb._core.widgets.Column` containing:
+    The view is a single :class:`~tempest_core.widgets.Column` containing:
 
     * A title.
     * A status feedback text that reflects the current phase.

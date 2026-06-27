@@ -28,15 +28,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.style import (
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.style import (
     AlignItems,
     Color,
     Edge,
     FontWeight,
     JustifyContent,
 )
-from tempestweb._core.widgets import (
+from tempest_core.widgets import (
     Canvas,
     DrawCommand,
     Dropdown,
@@ -252,12 +252,12 @@ def _make_diagonal_stroke(color: list[float], width: float) -> Stroke:
 def view(app: App[SketchState]) -> Widget:
     """Render the sketch-pad UI from the current state.
 
-    The tree is a :class:`~tempestweb._core.widgets.Column` with three
+    The tree is a :class:`~tempest_core.widgets.Column` with three
     sections:
 
     1. **Title bar** — heading and stroke count.
     2. **Toolbar** — ink color selector, width selector, shape presets.
-    3. **Canvas** — a :class:`~tempestweb._core.widgets.Canvas` showing all
+    3. **Canvas** — a :class:`~tempest_core.widgets.Canvas` showing all
        compiled draw commands.
     4. **Footer** — Undo and Clear buttons.
 

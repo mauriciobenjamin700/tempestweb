@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from tempestweb._core import App, Node, build
+from tempest_core import App, Node, build
 from tempestweb.native import install_bridge, uninstall_bridge
 from tempestweb.native.share import ShareOutcome
 
@@ -315,7 +315,7 @@ async def test_copy_error_transitions_to_error_phase(
 
 async def test_tree_changes_between_idle_and_copied(module: Any, app: App[Any]) -> None:
     """The rebuilt tree differs after a successful copy (diff-friendly)."""
-    from tempestweb._core import diff
+    from tempest_core import diff
 
     install_bridge(FakeBridge())
 

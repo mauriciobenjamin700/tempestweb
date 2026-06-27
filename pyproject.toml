@@ -1,14 +1,15 @@
 [project]
 name = "tempestweb"
-version = "0.8.0"
+version = "0.8.1"
 description = "Build web apps in typed Python — one tree, a DOM renderer, two execution modes (WASM + server)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Mauricio Benjamin", email = "mauricio.benjamin@reloverelations.com" }]
 dependencies = [
-    # Renderer-agnostic UI core (IR/reconciler/state/style/widgets), extracted from
-    # the former vendored tempestweb/_core/. pydantic comes transitively via it.
+    # Renderer-agnostic UI core (IR/reconciler/state/style/widgets) — the single
+    # source of truth, imported directly as ``tempest_core``. pydantic comes
+    # transitively via it.
     "tempest-core>=0.8.2",
 ]
 
@@ -67,8 +68,6 @@ include = ["tempestweb", "client", "README.md", "CHANGELOG.md", "pyproject.toml"
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-# Vendored core is a mechanical copy — exclude from lint AND format.
-extend-exclude = ["tempestweb/_core"]
 
 [tool.ruff.lint]
 # Mirrors tempestroid / tempest-fastapi-sdk: annotations (ANN) and docstrings (D)
@@ -100,8 +99,6 @@ quote-style = "double"
 [tool.mypy]
 python_version = "3.11"
 strict = true
-# Vendored core ships its own typing posture; check it separately if needed.
-exclude = ["tempestweb/_core/"]
 
 [[tool.mypy.overrides]]
 # pywebpush ships no type stubs / py.typed marker.

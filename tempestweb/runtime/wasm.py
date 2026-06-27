@@ -1,7 +1,7 @@
 """Mode A (WASM/Pyodide) runtime glue — the Python half of the in-browser bridge.
 
 In Mode A the whole application runs **inside the browser** on Pyodide: the
-vendored reconciler builds and diffs the widget tree, and the resulting patches
+``tempest_core`` reconciler builds and diffs the widget tree, and the resulting patches
 cross to the JS DOM renderer in-process via ``pyodide.ffi`` (no network). This
 module is the Python-side glue that:
 
@@ -202,7 +202,7 @@ def _collect_handlers(
 class WasmRuntime(Generic[S]):
     """Drives a tempestweb app in Mode A, bridging the core to a transport.
 
-    The runtime wires the vendored :class:`~tempest_core.App` to a
+    The runtime wires the :class:`~tempest_core.App` to a
     :class:`~tempestweb.transports.base.PatchTransport`: the app's coalesced
     rebuild loop produces patches, which the runtime serializes and pushes to the
     client via :meth:`PatchTransport.send_patches`; the client's events flow back

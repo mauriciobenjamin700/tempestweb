@@ -1,8 +1,8 @@
 """Brazilian registration form — CPF/CNPJ, phone, address with masked inputs.
 
 Demonstrates the full complement of BR-specific form components from
-:mod:`tempestweb._core.components.brforms` paired with the real-time
-validators from :mod:`tempestweb._core.validators`.
+:mod:`tempest_core.components.brforms` paired with the real-time
+validators from :mod:`tempest_core.validators`.
 
 Two registration modes are offered via a segmented control:
 
@@ -23,8 +23,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     AddressInput,
     Banner,
     Card,
@@ -35,14 +35,14 @@ from tempestweb._core.components import (
     PhoneInput,
     SegmentedControl,
 )
-from tempestweb._core.style import Color, Edge, FontWeight
-from tempestweb._core.validators import (
+from tempest_core.style import Color, Edge, FontWeight
+from tempest_core.validators import (
     validate_cnpj,
     validate_cpf,
     validate_email,
     validate_phone,
 )
-from tempestweb._core.widgets import Button, Column, Input, Text
+from tempest_core.widgets import Button, Column, Input, Text
 
 # ---------------------------------------------------------------------------
 # Module constants
@@ -58,7 +58,7 @@ _ERROR_COLOR: Color = Color.from_hex("#ef4444")
 #: Registered modes exposed by the segmented control.
 _MODES: list[str] = ["Pessoa Física", "Pessoa Jurídica"]
 
-#: Address field names reported by :class:`~tempestweb._core.components.AddressInput`.
+#: Address field names reported by :class:`~tempest_core.components.AddressInput`.
 _ADDRESS_FIELDS: tuple[str, ...] = (
     "cep",
     "street",
@@ -206,15 +206,15 @@ def _validate_pj(s: CadastroState) -> dict[str, str]:
 def view(app: App[CadastroState]) -> Widget:
     """Render the Brazilian registration form from the current state.
 
-    Builds a :class:`~tempestweb._core.components.SegmentedControl` for PF/PJ
+    Builds a :class:`~tempest_core.components.SegmentedControl` for PF/PJ
     mode switching, then the appropriate set of BR-document inputs
-    (:class:`~tempestweb._core.components.CPFInput` or
-    :class:`~tempestweb._core.components.CNPJInput`), followed by shared
-    :class:`~tempestweb._core.components.PhoneInput`,
-    :class:`~tempestweb._core.components.EmailInput` and
-    :class:`~tempestweb._core.components.AddressInput` fields. A submit button
+    (:class:`~tempest_core.components.CPFInput` or
+    :class:`~tempest_core.components.CNPJInput`), followed by shared
+    :class:`~tempest_core.components.PhoneInput`,
+    :class:`~tempest_core.components.EmailInput` and
+    :class:`~tempest_core.components.AddressInput` fields. A submit button
     triggers full validation and shows a status
-    :class:`~tempestweb._core.components.Banner`.
+    :class:`~tempest_core.components.Banner`.
 
     Args:
         app: The application handle exposing ``state`` and ``set_state``.

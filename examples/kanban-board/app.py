@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import (
+from tempest_core import App, Style, Widget
+from tempest_core.style import (
     AlignItems,
     Border,
     Color,
@@ -25,7 +25,7 @@ from tempestweb._core.style import (
     FontWeight,
     JustifyContent,
 )
-from tempestweb._core.widgets import (
+from tempest_core.widgets import (
     Button,
     Column,
     Container,
@@ -36,7 +36,7 @@ from tempestweb._core.widgets import (
     ScrollView,
     Text,
 )
-from tempestweb._core.widgets.events import DragEvent, TextChangeEvent
+from tempest_core.widgets.events import DragEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Domain types
@@ -121,9 +121,9 @@ def view(app: App[KanbanState]) -> Widget:
     """Render the kanban board from the current state.
 
     The board shows three columns side-by-side.  Each card is wrapped in a
-    :class:`~tempestweb._core.widgets.Draggable` whose ``drag_data`` encodes its
+    :class:`~tempest_core.widgets.Draggable` whose ``drag_data`` encodes its
     id and source column (``"<id>:<column>"``).  Each column body and header is
-    wrapped in a :class:`~tempestweb._core.widgets.DragTarget` whose ``on_drop``
+    wrapped in a :class:`~tempest_core.widgets.DragTarget` whose ``on_drop``
     handler decodes that payload and moves the card in state.  A bottom trash-bin
     :class:`DragTarget` deletes the dropped card.
 

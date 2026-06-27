@@ -7,7 +7,7 @@ This exact ``view`` runs unchanged in both modes::
 
 It demonstrates the ``DataTable`` component driven entirely from Python state:
 
-* A :class:`~tempestweb._core.components.SearchBar` filters the visible rows as
+* A :class:`~tempest_core.components.SearchBar` filters the visible rows as
   the user types — no network call, no debounce, pure in-memory predicate.
 * Clicking a column-header button sorts the rows ascending on the first click and
   descending on the second click of the same column (the classic toggle cycle).
@@ -22,11 +22,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import DataTable, SearchBar
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets import Button, Column, Row, Text
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core import App, Style, Widget
+from tempest_core.components import DataTable, SearchBar
+from tempest_core.style import AlignItems, Edge, FontWeight
+from tempest_core.widgets import Button, Column, Row, Text
+from tempest_core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Domain data

@@ -1,8 +1,8 @@
 """Temperature Converter — demonstrates two-way binding via on_change.
 
-Two :class:`~tempestweb._core.widgets.Input` fields (Celsius and Fahrenheit)
+Two :class:`~tempest_core.widgets.Input` fields (Celsius and Fahrenheit)
 stay in sync: editing either one recomputes and writes the other into state,
-driven entirely by :class:`~tempestweb._core.widgets.events.TextChangeEvent`.
+driven entirely by :class:`~tempest_core.widgets.events.TextChangeEvent`.
 No transport is named — the same ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
@@ -24,10 +24,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core import App, Column, Row, Style, Text, Widget
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import Input
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core import App, Column, Row, Style, Text, Widget
+from tempest_core.style import Edge
+from tempest_core.widgets import Input
+from tempest_core.widgets.events import TextChangeEvent
 
 __all__ = ["ConverterState", "make_state", "view"]
 
@@ -104,7 +104,7 @@ def make_state() -> ConverterState:
 def view(app: App[ConverterState]) -> Widget:
     """Render the temperature converter UI from the current state.
 
-    Both :class:`~tempestweb._core.widgets.Input` fields are controlled
+    Both :class:`~tempest_core.widgets.Input` fields are controlled
     components: their ``value`` comes from state, and their ``on_change``
     handlers write back to state — including recomputing the *other* field.
 

@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 
-from tempestweb._core import App, Node, build
+from tempest_core import App, Node, build
 from tempestweb.native import install_bridge, uninstall_bridge
 
 # ---------------------------------------------------------------------------

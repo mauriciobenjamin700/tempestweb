@@ -64,8 +64,8 @@ def _json_safe(value: Any) -> Any:  # noqa: ANN401 — walks arbitrary IR prop v
     The IR carries live handler callables in ``props``; this strips them to
     ``None`` so the result is JSON-serializable.  Pydantic
     :class:`~pydantic.BaseModel` instances (e.g.
-    :class:`~tempestweb._core.style.Style`,
-    :class:`~tempestweb._core.style.Edge`) are lowered via
+    :class:`~tempest_core.style.Style`,
+    :class:`~tempest_core.style.Edge`) are lowered via
     ``model_dump(mode="json")`` which resolves colors, edges, enums and other
     structured style values to plain JSON-safe scalars before the recursive walk.
 

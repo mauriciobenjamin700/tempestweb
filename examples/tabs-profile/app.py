@@ -1,19 +1,19 @@
 """Tabbed profile — demonstrates Layout & navigation with TabView.
 
 Three profile sections — Overview, Activity, Settings — are surfaced via a
-:class:`~tempestweb._core.widgets.TabView`.  Switching tabs fires a
-:class:`~tempestweb._core.widgets.events.RouteChangeEvent`; the index stored
+:class:`~tempest_core.widgets.TabView`.  Switching tabs fires a
+:class:`~tempest_core.widgets.events.RouteChangeEvent`; the index stored
 in ``params["index"]`` is written back to state so the reconciler can diff
 the active ``child`` to the correct section.
 
-Each section is composed from :class:`~tempestweb._core.components.cards.Card`,
-:class:`~tempestweb._core.components.cards.Avatar`,
-:class:`~tempestweb._core.components.cards.ListTile`, and
-:class:`~tempestweb._core.components.cards.Divider` to produce a rich,
+Each section is composed from :class:`~tempest_core.components.cards.Card`,
+:class:`~tempest_core.components.cards.Avatar`,
+:class:`~tempest_core.components.cards.ListTile`, and
+:class:`~tempest_core.components.cards.Divider` to produce a rich,
 non-trivial layout.  The Settings section lets the user toggle notifications
 and toggle dark-mode preference, exercising
-:class:`~tempestweb._core.widgets.inputs.Switch` and
-:class:`~tempestweb._core.widgets.events.ToggleEvent`.
+:class:`~tempest_core.widgets.inputs.Switch` and
+:class:`~tempest_core.widgets.events.ToggleEvent`.
 
 Run unchanged in both modes::
 
@@ -25,8 +25,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     AppBar,
     Avatar,
     Card,
@@ -34,15 +34,15 @@ from tempestweb._core.components import (
     ListTile,
     Scaffold,
 )
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets import (
+from tempest_core.style import AlignItems, Edge, FontWeight
+from tempest_core.widgets import (
     Column,
     Row,
     Switch,
     TabView,
     Text,
 )
-from tempestweb._core.widgets.events import RouteChangeEvent, ToggleEvent
+from tempest_core.widgets.events import RouteChangeEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # State
@@ -387,9 +387,9 @@ def view(app: App[ProfileState]) -> Widget:
     """Render the tabbed-profile UI from the current state.
 
     The active section is determined by ``app.state.active_tab``.  Tapping a
-    tab fires a :class:`~tempestweb._core.widgets.events.RouteChangeEvent`;
+    tab fires a :class:`~tempest_core.widgets.events.RouteChangeEvent`;
     the handler reads ``event.params["index"]`` and writes it back via
-    :meth:`~tempestweb._core.core.state.App.set_state`.
+    :meth:`~tempest_core.core.state.App.set_state`.
 
     Args:
         app: The application handle exposing ``state`` and ``set_state``.

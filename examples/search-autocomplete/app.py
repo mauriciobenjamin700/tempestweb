@@ -1,13 +1,13 @@
 """Search with autocomplete — exercises Autocomplete, Chip, and dynamic filtering.
 
 A realistic country-search widget: as the user types, the
-:class:`~tempestweb._core.widgets.Autocomplete` widget narrows the suggestion
+:class:`~tempest_core.widgets.Autocomplete` widget narrows the suggestion
 list in real time. Selecting a suggestion commits it as the active choice and
-shows it as a :class:`~tempestweb._core.components.Chip` below the field. The
+shows it as a :class:`~tempest_core.components.Chip` below the field. The
 user can clear the committed choice with a button and start over.
 
 The demo also showcases *category filtering*: three
-:class:`~tempestweb._core.components.Chip` pills let the user restrict suggestions
+:class:`~tempest_core.components.Chip` pills let the user restrict suggestions
 to a continent (All / Americas / Europe), so the autocomplete's ``options``
 list changes whenever the query *or* the category filter changes.
 
@@ -21,10 +21,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import Chip
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import Chip
+from tempest_core.style import Edge
+from tempest_core.widgets import (
     Autocomplete,
     Button,
     Column,
@@ -32,7 +32,7 @@ from tempestweb._core.widgets import (
     Text,
     Wrap,
 )
-from tempestweb._core.widgets.events import SelectEvent, TextChangeEvent
+from tempest_core.widgets.events import SelectEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Data catalog

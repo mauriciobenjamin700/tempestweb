@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     AppBar,
     Card,
     Divider,
@@ -24,8 +24,8 @@ from tempestweb._core.components import (
     Scaffold,
     SegmentedControl,
 )
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets import (
+from tempest_core.style import AlignItems, Edge, FontWeight
+from tempest_core.widgets import (
     Checkbox,
     Column,
     Row,
@@ -33,7 +33,7 @@ from tempestweb._core.widgets import (
     Switch,
     Text,
 )
-from tempestweb._core.widgets.events import SlideEvent, ToggleEvent
+from tempest_core.widgets.events import SlideEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -421,14 +421,14 @@ def view(app: App[SettingsState]) -> Widget:
 
     Sections are laid out vertically:
 
-    1. **Notifications** — :class:`~tempestweb._core.widgets.inputs.Switch` +
-       :class:`~tempestweb._core.widgets.inputs.Checkbox` controls.
-    2. **Appearance** — :class:`~tempestweb._core.components.SegmentedControl` for
-       theme and quality, :class:`~tempestweb._core.widgets.inputs.Slider` for
+    1. **Notifications** — :class:`~tempest_core.widgets.inputs.Switch` +
+       :class:`~tempest_core.widgets.inputs.Checkbox` controls.
+    2. **Appearance** — :class:`~tempest_core.components.SegmentedControl` for
+       theme and quality, :class:`~tempest_core.widgets.inputs.Slider` for
        font size.
-    3. **Audio & Storage** — :class:`~tempestweb._core.widgets.inputs.Slider` for
-       volume, :class:`~tempestweb._core.widgets.inputs.Switch` for auto-save.
-    4. **Language** — :class:`~tempestweb._core.components.RadioGroup` single-choice.
+    3. **Audio & Storage** — :class:`~tempest_core.widgets.inputs.Slider` for
+       volume, :class:`~tempest_core.widgets.inputs.Switch` for auto-save.
+    4. **Language** — :class:`~tempest_core.components.RadioGroup` single-choice.
     5. **Live summary** — re-renders every time any control changes state.
 
     Args:

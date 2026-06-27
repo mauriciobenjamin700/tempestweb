@@ -13,11 +13,14 @@ por WebSocket.
 
 ## Regras estruturais
 
-- **Core vendorado.** `tempestweb/_core/` é uma **cópia mecânica** do core
-  renderer-agnostic do tempestroid (IR, reconciliador, estado, estilo, widgets,
-  componentes, animation/i18n/navigation/theme/validators). **Não edite à mão** —
-  será trocado por uma dependência `tempest-core` depois. Importe dele:
-  `from tempestweb._core import App, Column, Text, Button, Style, build, diff`.
+- **Core = `tempest-core` (centro da verdade).** O core renderer-agnostic (IR,
+  reconciliador, estado, estilo, widgets, componentes,
+  animation/i18n/navigation/theme/validators) é a dependência publicada
+  [`tempest-core`](https://pypi.org/project/tempest-core/) (pinada em
+  `pyproject.toml`). **Não vive no repo** — o antigo `tempestweb/_core/` vendorado
+  e seu shim de back-compat foram removidos. Importe direto do pacote:
+  `from tempest_core import App, Column, Text, Button, Style, build, diff`.
+  Mudou o core? Mexa no repo `tempest-core` e suba a versão pinada aqui.
 - **Uma seam só separa os modos:** `tempestweb/transports/`. Tudo acima (o
   `view()` do app) e abaixo (o cliente JS) é compartilhado. `transports/base.py`
   define o `PatchTransport` Protocol — a fronteira A vs B.

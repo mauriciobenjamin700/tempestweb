@@ -6,11 +6,13 @@
           "children": [],
           "key": "label",
           "props": {
+            "attrs": {},
             "content": "Count: 2",
             "focus_order": null,
             "focusable": null,
             "semantics": null,
-            "style": null
+            "style": null,
+            "tag": null
           },
           "type": "Text"
         },
@@ -20,6 +22,7 @@
               "children": [],
               "key": "dec",
               "props": {
+                "attrs": {},
                 "color_scheme": "primary",
                 "focus_order": null,
                 "focusable": null,
@@ -85,6 +88,7 @@
                   "transition": null,
                   "width": null
                 },
+                "tag": null,
                 "variant": "solid"
               },
               "type": "Button"
@@ -93,6 +97,7 @@
               "children": [],
               "key": "inc",
               "props": {
+                "attrs": {},
                 "color_scheme": "primary",
                 "focus_order": null,
                 "focusable": null,
@@ -158,6 +163,7 @@
                   "transition": null,
                   "width": null
                 },
+                "tag": null,
                 "variant": "solid"
               },
               "type": "Button"
@@ -165,20 +171,24 @@
           ],
           "key": null,
           "props": {
+            "attrs": {},
             "focus_order": null,
             "focusable": null,
             "semantics": null,
-            "style": null
+            "style": null,
+            "tag": null
           },
           "type": "Row"
         }
       ],
       "key": "root",
       "props": {
+        "attrs": {},
         "focus_order": null,
         "focusable": null,
         "semantics": null,
-        "style": null
+        "style": null,
+        "tag": null
       },
       "type": "Column"
     },
@@ -188,11 +198,13 @@
           "children": [],
           "key": "label",
           "props": {
+            "attrs": {},
             "content": "Count: 0",
             "focus_order": null,
             "focusable": null,
             "semantics": null,
-            "style": null
+            "style": null,
+            "tag": null
           },
           "type": "Text"
         },
@@ -202,6 +214,7 @@
               "children": [],
               "key": "dec",
               "props": {
+                "attrs": {},
                 "color_scheme": "primary",
                 "focus_order": null,
                 "focusable": null,
@@ -267,6 +280,7 @@
                   "transition": null,
                   "width": null
                 },
+                "tag": null,
                 "variant": "solid"
               },
               "type": "Button"
@@ -275,6 +289,7 @@
               "children": [],
               "key": "inc",
               "props": {
+                "attrs": {},
                 "color_scheme": "primary",
                 "focus_order": null,
                 "focusable": null,
@@ -340,6 +355,7 @@
                   "transition": null,
                   "width": null
                 },
+                "tag": null,
                 "variant": "solid"
               },
               "type": "Button"
@@ -347,20 +363,24 @@
           ],
           "key": null,
           "props": {
+            "attrs": {},
             "focus_order": null,
             "focusable": null,
             "semantics": null,
-            "style": null
+            "style": null,
+            "tag": null
           },
           "type": "Row"
         }
       ],
       "key": "root",
       "props": {
+        "attrs": {},
         "focus_order": null,
         "focusable": null,
         "semantics": null,
-        "style": null
+        "style": null,
+        "tag": null
       },
       "type": "Column"
     },
@@ -397,21 +417,25 @@
           "children": [],
           "key": "b",
           "props": {
+            "attrs": {},
             "content": "b",
             "focus_order": null,
             "focusable": null,
             "semantics": null,
-            "style": null
+            "style": null,
+            "tag": null
           },
           "type": "Text"
         }
       ],
       "key": "root",
       "props": {
+        "attrs": {},
         "focus_order": null,
         "focusable": null,
         "semantics": null,
-        "style": null
+        "style": null,
+        "tag": null
       },
       "type": "Column"
     },
@@ -421,21 +445,25 @@
           "children": [],
           "key": "a",
           "props": {
+            "attrs": {},
             "content": "a",
             "focus_order": null,
             "focusable": null,
             "semantics": null,
-            "style": null
+            "style": null,
+            "tag": null
           },
           "type": "Text"
         }
       ],
       "key": "root",
       "props": {
+        "attrs": {},
         "focus_order": null,
         "focusable": null,
         "semantics": null,
-        "style": null
+        "style": null,
+        "tag": null
       },
       "type": "Column"
     },
@@ -448,11 +476,13 @@
             "children": [],
             "key": "b",
             "props": {
+              "attrs": {},
               "content": "b",
               "focus_order": null,
               "focusable": null,
               "semantics": null,
-              "style": null
+              "style": null,
+              "tag": null
             },
             "type": "Text"
           },
@@ -483,6 +513,7 @@
           "children": [],
           "key": "x",
           "props": {
+            "attrs": {},
             "color_scheme": "primary",
             "focus_order": null,
             "focusable": null,
@@ -548,6 +579,7 @@
               "transition": null,
               "width": null
             },
+            "tag": null,
             "variant": "solid"
           },
           "type": "Button"
@@ -555,10 +587,12 @@
       ],
       "key": "root",
       "props": {
+        "attrs": {},
         "focus_order": null,
         "focusable": null,
         "semantics": null,
-        "style": null
+        "style": null,
+        "tag": null
       },
       "type": "Column"
     },
@@ -568,21 +602,25 @@
           "children": [],
           "key": "x",
           "props": {
+            "attrs": {},
             "content": "a",
             "focus_order": null,
             "focusable": null,
             "semantics": null,
-            "style": null
+            "style": null,
+            "tag": null
           },
           "type": "Text"
         }
       ],
       "key": "root",
       "props": {
+        "attrs": {},
         "focus_order": null,
         "focusable": null,
         "semantics": null,
-        "style": null
+        "style": null,
+        "tag": null
       },
       "type": "Column"
     },
@@ -594,6 +632,7 @@
             "children": [],
             "key": "x",
             "props": {
+              "attrs": {},
               "color_scheme": "primary",
               "focus_order": null,
               "focusable": null,
@@ -659,6 +698,7 @@
                 "transition": null,
                 "width": null
               },
+              "tag": null,
               "variant": "solid"
             },
             "type": "Button"

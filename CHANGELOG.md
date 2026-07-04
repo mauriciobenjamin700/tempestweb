@@ -4,6 +4,44 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.9.0] — 2026-07-04
+
+### Added
+
+- **Static SSR — a new leaf renderer (`tempestweb.html`).** The same typed widget
+  tree that drives the interactive DOM client now renders to a **static HTML
+  string** on the server, reusing `tempest_core.build()` — the "one tree, N
+  renderers" thesis, with HTML as a render target alongside the DOM-JS client.
+  - `render_to_html(widget) -> str` renders a widget tree to an HTML fragment.
+  - `render_document(widget, *, title, lang="pt-BR", head="", htmx=False,
+    css_reset=True) -> str` wraps a tree in a full `<!doctype html>` document
+    (charset + viewport meta, escaped `<title>`, optional CSS reset, optional htmx
+    script tag).
+  - `style_to_css(style, widget_type=None) -> str` is a faithful Python port of
+    the client's `client/style.js` (`styleToCss`) — **byte-identical** CSS output
+    (same field order, enum maps, and JavaScript-style number formatting) so a
+    server-rendered page and the DOM client agree with no hydration drift.
+  - `escape_text` / `escape_attr` are the HTML-escaping choke points; every text
+    node and attribute value passes through them, and the `attrs` escape hatch
+    rejects invalid attribute names (`^[a-zA-Z][a-zA-Z0-9:_-]*$`) as an
+    attribute-injection guard.
+- **`tag` / `attrs` honoring.** The renderer reads the new (`tempest-core` 0.9.0)
+  base `Widget.tag` (semantic HTML tag override) and `Widget.attrs` (arbitrary
+  HTML attributes — `hx-*`, `id`, `class`, `data-*`, `aria-*`) so a typed tree can
+  emit semantic, htmx-ready markup (`Container(tag="nav", attrs={...})`).
+
+### Changed
+
+- **Pinned `tempest-core>=0.9.0`** (was `>=0.8.2`) for the base `Widget.tag` /
+  `Widget.attrs` fields the HTML renderer consumes.
+- **The Mode B wire omits empty `tag` / `attrs`.** Since `tempest-core` 0.9.0 puts
+  `tag=None` / `attrs={}` on every node's props, `runtime.serialize.node_to_wire`
+  now drops them when falsy. This keeps the WebSocket/SSE payload byte-identical to
+  the pre-0.9.0 wire for widgets that do not use them (no per-node bloat) — a
+  widget that *does* set them still ships them. The conformance golden
+  (`tests/fixtures/conformance_scenarios.json`, derived from `model_dump`) was
+  regenerated to reflect the new base fields (purely additive).
+
 ## [0.8.1] — 2026-06-27
 
 ### Changed

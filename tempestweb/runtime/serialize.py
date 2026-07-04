@@ -95,16 +95,29 @@ def node_to_wire(node: Node) -> dict[str, Any]:
     then its ``props`` are walked to replace any live handler callable with
     ``None`` — handlers never cross the boundary (see ``docs/contract.md``).
 
+    Since ``tempest-core`` 0.9.0 every widget carries the SSR-only ``tag`` and
+    ``attrs`` props (see :mod:`tempestweb.html`). They are meaningful to the
+    static HTML renderer but inert on the DOM-JS wire, so a falsy ``tag`` (``None``)
+    and a falsy ``attrs`` (``{}``) are **omitted** here. This keeps the wire
+    byte-identical to the pre-0.9.0 payload for widgets that do not use them —
+    avoiding per-node bloat and keeping the existing golden fixtures valid — while
+    a widget that *does* set them still ships them.
+
     Args:
         node: The IR node to serialize.
 
     Returns:
         A JSON-able ``{"type", "key", "props", "children"}`` dict.
     """
+    props = {name: _json_safe(value) for name, value in node.props.items()}
+    if not props.get("tag"):
+        props.pop("tag", None)
+    if not props.get("attrs"):
+        props.pop("attrs", None)
     return {
         "type": node.type,
         "key": node.key,
-        "props": {name: _json_safe(value) for name, value in node.props.items()},
+        "props": props,
         "children": [node_to_wire(child) for child in node.children],
     }
 

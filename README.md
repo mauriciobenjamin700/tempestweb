@@ -60,6 +60,33 @@ http, audio, share, geolocation, clipboard, storage, camera) are typed awaitable
 with the same Python API in both modes — Mode A calls the Web API in-process, Mode
 B proxies it over a round-trip (see [`docs/contract.md`](docs/contract.md)).
 
+## Static SSR — `render_to_html`
+
+A third render target, alongside the two interactive modes: the **same** typed
+tree renders to a **static HTML string** on the server — no JavaScript, no DOM, no
+runtime. HTML is just another leaf renderer.
+
+```python
+from tempest_core import Column, Text, Button, Style
+from tempest_core.style import Edge
+from tempestweb.html import render_to_html, render_document
+
+tree: Column = Column(
+    style=Style(gap=8.0, padding=Edge.all(16)),
+    children=[Text(content="Hello"), Button(label="Click")],
+)
+
+fragment: str = render_to_html(tree)                 # an HTML fragment
+page: str = render_document(tree, title="Home", htmx=True)  # a full document
+```
+
+The CSS is **byte-identical** to what the DOM client emits (the `style_to_css`
+port mirrors `client/style.js`), and the new `tempest-core` 0.9.0 `Widget.tag` /
+`Widget.attrs` fields let you emit semantic, htmx-ready markup
+(`Container(tag="nav", attrs={"hx-get": "/x"})`). All text/attributes are escaped.
+See the [Static SSR guide](https://mauriciobenjamin700.github.io/tempestweb/ssr/)
+([EN](https://mauriciobenjamin700.github.io/tempestweb/en/ssr/)).
+
 ## Develop
 
 ```bash
@@ -74,6 +101,7 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | `tempest-core` (dependency) | Renderer-agnostic engine — IR/reconciler/state/style/widgets (`import tempest_core`), extracted from tempestroid. |
 | `tempestweb/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — 54 Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
 | `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`, `sse.py`). |
+| `tempestweb/html/` | Static SSR leaf renderer — `render_to_html` / `render_document` / `style_to_css` (Python port of `client/style.js`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
 | `tempestweb/native/` | Web API capability adapters — http, audio, share, geo, clipboard, storage, camera (Track N). |
 | `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |

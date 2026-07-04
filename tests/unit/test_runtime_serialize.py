@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from tempest_core import Column, Style, Text, Widget, build
+from tempest_core import Column, Container, Style, Text, Widget, build
 from tempest_core.style import Edge
 from tempestweb.runtime import node_to_wire
 
@@ -47,3 +47,24 @@ def test_node_to_wire_style_has_contract_shape() -> None:
         "bottom": 16.0,
         "left": 16.0,
     }
+
+
+def test_node_to_wire_omits_empty_tag_and_attrs() -> None:
+    """A widget that does not use ``tag``/``attrs`` keeps the pre-0.9.0 wire shape.
+
+    ``tempest-core`` 0.9.0 puts ``tag=None`` / ``attrs={}`` on every node's props;
+    the wire serializer drops them when falsy so the payload stays byte-identical
+    to the pre-0.9.0 wire (no per-node bloat) and the golden fixtures stay valid.
+    """
+    wire = node_to_wire(build(Text(content="x")))
+    assert "tag" not in wire["props"]
+    assert "attrs" not in wire["props"]
+
+
+def test_node_to_wire_keeps_set_tag_and_attrs() -> None:
+    """A widget that *does* set ``tag``/``attrs`` still ships them on the wire."""
+    wire = node_to_wire(
+        build(Container(tag="section", attrs={"id": "x"}, child=Text(content="y")))
+    )
+    assert wire["props"]["tag"] == "section"
+    assert wire["props"]["attrs"] == {"id": "x"}

@@ -401,8 +401,10 @@ no espírito do `mypy --strict`.
 !!! info "Dentro do subset hoje"
     - **Expressões:** aritmética (`+ - * / %`), comparação (`== != < <= > >=`),
       booleanos (`and`/`or`), unários (`not`/`-`), ternário (`a if c else b`),
-      list comprehensions (`[e for x in it if c]`), `in`/`not in`, indexação,
-      f-strings, lambdas de expressão.
+      comprehensions de lista e de dict (`[e for x in it if c]`,
+      `{k: v for x in it}`), literais `list`/`tuple`/`set`/`dict`, `in`/`not in`,
+      indexação, f-strings (incl. `{x:.2f}`, `{x!s}`, `{x!r}`), lambdas de
+      expressão.
     - **Statements:** `if`/`elif`/`else`, `for … in`, atribuição, `+=` e afins,
       `return`.
     - **Estruturas:** `@dataclass` de estado (campos + métodos), `make_state()`,
@@ -432,7 +434,9 @@ no espírito do `mypy --strict`.
     Python** que expande em primitivos no `build()` — muitos a partir de dados/
     loops — então não são auto-portáveis para um runtime sem Python. Os aliases de
     layout `HStack`/`VStack` são a exceção (expandem em `Row`/`Column`). Também
-    fora: dict/set/tuple, f-strings com format-spec.
+    fora: comprehensions multi-loop ou com alvo desestruturado (`for k, v in …`),
+    e format-specs de f-string além de `.Nf` (ex.: alinhamento `{x:>5}`,
+    dinâmico `{x:.{n}f}`, conversão `!a`).
 
 ## Recapitulando
 

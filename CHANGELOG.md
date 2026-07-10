@@ -4,6 +4,24 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.25.0] — 2026-07-10
+
+### Added
+
+- **Wider transpiler expression subset.** Mode C now transcribes more everyday
+  Python:
+  - `set` literals → `new Set([...])`; `tuple` literals → JS arrays (JS has no
+    tuple type — immutability is not enforced).
+  - dict comprehensions (`{k: v for x in it if c}`) →
+    `Object.fromEntries(it.filter(...).map((x) => [k, v]))`.
+  - f-string formatting: `{x:.2f}` → `(x).toFixed(2)`, `{x!s}` → `String(x)`,
+    `{x!r}` → `JSON.stringify(x)`.
+
+  Out-of-subset format specs (alignment `{x:>5}`, dynamic `{x:.{n}f}`, the `!a`
+  conversion) and multi-loop/destructured comprehensions still fail loud with a
+  located `TranspileError`. Verified live (Playwright): a built app renders
+  `pi=3.14` and a dict-comp-derived `squares=9` with zero Python in the browser.
+
 ## [0.24.0] — 2026-07-10
 
 ### Added

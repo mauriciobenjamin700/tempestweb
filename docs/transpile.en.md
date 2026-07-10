@@ -198,6 +198,37 @@ def view(app: App[FormState]) -> Widget:
 
 Type in the field and the greeting updates live — no server, no Python. ✨
 
+## Native capabilities (requests, storage, cookies…)
+
+The same typed `native` API from Modes A/B works in Mode C — `async` calls are
+transcribed to in-process JS calls into the shared browser glue (`fetch`,
+IndexedDB/localStorage, `document.cookie`). No Python, no network.
+
+```python
+from tempestweb import native
+
+
+@dataclass
+class DataState:
+    body: str = ""
+
+
+def view(app: App[DataState]) -> Widget:
+    async def fetch_it() -> None:
+        res = await native.http.request("GET", "/api/items")
+        await native.storage.put("last", res.body)
+        await native.cookies.set("seen", "1")
+        app.set_state(lambda s: setattr(s, "body", res.body))
+
+    return Button(label="fetch", on_click=fetch_it, key="go")
+```
+
+!!! tip "`async` handlers"
+    A handler may be `async def` and use `await`. The re-render happens when
+    `set_state` runs (after the `await`), so the UI reflects the result as soon as
+    the capability resolves. Capabilities available in Mode C: `http`, `storage`
+    (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`.
+
 ## The supported subset
 
 Mode C accepts a **typed subset** of Python — enough for the app layer. A

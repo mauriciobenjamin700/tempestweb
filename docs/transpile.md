@@ -198,6 +198,37 @@ def view(app: App[FormState]) -> Widget:
 
 Digite no campo e a saudação atualiza ao vivo — sem servidor, sem Python. ✨
 
+## Capacidades nativas (requests, storage, cookies…)
+
+O mesmo `native` tipado dos Modos A/B funciona no Modo C — chamadas `async`
+transcritas para chamadas JS em processo à glue de browser compartilhada
+(`fetch`, IndexedDB/localStorage, `document.cookie`). Zero Python, zero rede.
+
+```python
+from tempestweb import native
+
+
+@dataclass
+class DataState:
+    body: str = ""
+
+
+def view(app: App[DataState]) -> Widget:
+    async def fetch_it() -> None:
+        res = await native.http.request("GET", "/api/items")
+        await native.storage.put("last", res.body)
+        await native.cookies.set("seen", "1")
+        app.set_state(lambda s: setattr(s, "body", res.body))
+
+    return Button(label="fetch", on_click=fetch_it, key="go")
+```
+
+!!! tip "Handlers `async`"
+    Um handler pode ser `async def` e usar `await`. O re-render acontece quando o
+    `set_state` roda (depois do `await`), então a UI reflete o resultado assim que
+    a capacidade resolve. Capacidades disponíveis no Modo C: `http`, `storage`
+    (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`.
+
 ## O subset suportado
 
 O Modo C aceita um **subset tipado** de Python — o suficiente para a camada de

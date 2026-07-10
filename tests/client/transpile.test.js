@@ -79,8 +79,9 @@ test("every generated builder returns a well-formed IR node", () => {
   };
   const builders = Object.entries(widgets).filter(([, v]) => typeof v === "function");
   assert.ok(builders.length >= 40, `expected many builders, got ${builders.length}`);
+  const helpers = new Set(["Style", "Color", "Edge"]); // Style-value helpers, not widgets
   for (const [name, build] of builders) {
-    if (name === "Style") continue; // helper, not a widget
+    if (helpers.has(name)) continue;
     let node;
     try {
       node = build(required[name] ?? {});

@@ -173,7 +173,7 @@ def render_module_text() -> str:
         "// Regenerate: python -m tests.conformance._transpile_widgets. Do not "
         "edit.\n\n"
         'import { resolveWidgetStyle, Style } from "./widget-support.js";\n'
-        'export { Edge, Style } from "./widget-support.js";\n\n'
+        'export { Color, Edge, Style } from "./widget-support.js";\n\n'
         "// `Style` is re-exported for apps; reference it so linters see the "
         "import as used.\n"
         "void Style;\n"

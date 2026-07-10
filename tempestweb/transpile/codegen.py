@@ -34,6 +34,8 @@ _I18N_NAMES: frozenset[str] = frozenset({"translate", "t", "Locale"})
 _THEME_NAMES: frozenset[str] = frozenset(
     {"Theme", "ThemeMode", "MediaQueryData", "Breakpoints"}
 )
+# Declarative animation values, imported from `./motion.js` in Mode C.
+_MOTION_NAMES: frozenset[str] = frozenset({"Transition", "Curve"})
 # Imported JS classes that must be constructed with `new` (Route(...) -> new Route).
 _JS_CLASSES: frozenset[str] = frozenset(
     {"Route", "NavStack", "Locale", "Theme", "MediaQueryData", "Breakpoints"}
@@ -712,6 +714,7 @@ class _Generator:
         nav = sorted(used & _NAV_NAMES)
         i18n = sorted(used & _I18N_NAMES)
         theme = sorted(used & _THEME_NAMES)
+        motion = sorted(used & _MOTION_NAMES)
         validators = sorted(used & _VALIDATOR_NAMES)
         widgets = sorted(
             used
@@ -720,6 +723,7 @@ class _Generator:
             - _NAV_NAMES
             - _I18N_NAMES
             - _THEME_NAMES
+            - _MOTION_NAMES
             - _VALIDATOR_NAMES
         )
         lines: list[str] = []
@@ -735,6 +739,8 @@ class _Generator:
             lines.append(f'import {{ {", ".join(i18n)} }} from "./i18n.js";')
         if theme:
             lines.append(f'import {{ {", ".join(theme)} }} from "./theme.js";')
+        if motion:
+            lines.append(f'import {{ {", ".join(motion)} }} from "./motion.js";')
         if validators:
             module = "./validators.js"
             lines.append(f'import {{ {", ".join(validators)} }} from "{module}";')

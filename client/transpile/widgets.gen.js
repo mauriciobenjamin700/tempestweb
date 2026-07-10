@@ -4,7 +4,7 @@
 // Regenerate: python -m tests.conformance._transpile_widgets. Do not edit.
 
 import { resolveWidgetStyle, Style } from "./widget-support.js";
-export { Edge, Style } from "./widget-support.js";
+export { Color, Edge, Style } from "./widget-support.js";
 
 // `Style` is re-exported for apps; reference it so linters see the import as used.
 void Style;

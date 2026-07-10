@@ -105,6 +105,7 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "file.js",
     "geolocation.js",
     "http.js",
+    "idb-kv.js",
     "install.js",
     "notifications.js",
     "onnx.js",

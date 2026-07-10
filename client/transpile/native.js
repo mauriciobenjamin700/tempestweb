@@ -13,7 +13,19 @@
 //
 // See docs/native-modo-c.md and docs/contract.md.
 
-import { dispatch } from "../native/index.js";
+import { browserDeps, dispatch } from "../native/index.js";
+import { createIdbKv } from "../native/idb-kv.js";
+
+// The `storage` capability persists over IndexedDB when available (injected as
+// `deps.store`), falling back to localStorage otherwise. Built once, lazily.
+let _store;
+/** @returns {?import("../native/idb-kv.js").KeyValueStore} */
+function idbStore() {
+  if (_store === undefined) {
+    _store = createIdbKv();
+  }
+  return _store;
+}
 
 /**
  * An error thrown when a native capability fails (mirrors Python's NativeError).
@@ -39,7 +51,14 @@ export class NativeError extends Error {
  * @throws {NativeError}        When the capability reports `ok: false`.
  */
 async function call(capability, args) {
-  const result = await dispatch({ capability, args });
+  // Inject the IndexedDB KV store so `storage.*` persists over IndexedDB; the
+  // other capabilities ignore it. Falls back to localStorage when IDB is absent.
+  const deps = browserDeps();
+  const store = idbStore();
+  if (store !== null) {
+    deps.store = store;
+  }
+  const result = await dispatch({ capability, args }, deps);
   if (!result.ok) {
     throw new NativeError(result.error, result.message);
   }

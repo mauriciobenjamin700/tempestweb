@@ -7,6 +7,7 @@
 //      click drives state -> diff -> patch -> DOM update.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { JSDOM } from "jsdom";
 import { fixture, freshDom } from "./setup.js";
 import { diff } from "../../client/transpile/diff.js";
 import {
@@ -22,6 +23,7 @@ import {
 import { mountApp, State } from "../../client/transpile/runtime.js";
 import * as widgets from "../../client/transpile/widgets.gen.js";
 import { HStack, VStack } from "../../client/transpile/components.js";
+import { native, NativeError } from "../../client/transpile/native.js";
 import { makeState, view } from "../../client/transpile/counter.gen.js";
 
 // ---- 1. diff conformance against the core-derived golden -------------------
@@ -266,4 +268,54 @@ test("decrement works too and the tree element stays stable across ticks", () =>
   // Granular patches mutate in place — the mounted tree element is never swapped.
   assert.equal(dom.root.children[0], treeBefore);
   assert.equal(handle.patchLog.length, 2);
+});
+
+// ---- Mode C native facade -------------------------------------------------
+
+test("native.cookies round-trips via the in-process facade (document)", async () => {
+  const dom = new JSDOM("<!doctype html>", { url: "https://example.com/" });
+  globalThis.document = dom.window.document;
+  try {
+    await native.cookies.set("token", "xyz");
+    assert.equal(await native.cookies.get("token"), "xyz");
+    assert.equal(await native.cookies.get("absent"), null);
+    const all = await native.cookies.all();
+    assert.equal(all.token, "xyz");
+    await native.cookies.remove("token");
+    assert.equal(await native.cookies.get("token"), null);
+  } finally {
+    delete globalThis.document;
+  }
+});
+
+test("native.http.request routes to fetch and parses the response", async () => {
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    return {
+      status: 200,
+      ok: true,
+      headers: { get: () => "application/json", forEach: () => {} },
+      json: async () => ({ hello: "world" }),
+      text: async () => '{"hello":"world"}',
+    };
+  };
+  try {
+    const res = await native.http.request("GET", "/api/x");
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "/api/x");
+    assert.equal(res.status, 200);
+  } finally {
+    delete globalThis.fetch;
+  }
+});
+
+test("a native failure surfaces as a NativeError", async () => {
+  // No document -> the cookies capability reports "unsupported".
+  delete globalThis.document;
+  await assert.rejects(() => native.cookies.get("x"), (err) => {
+    assert.ok(err instanceof NativeError);
+    assert.equal(err.code, "unsupported");
+    return true;
+  });
 });

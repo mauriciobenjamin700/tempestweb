@@ -165,8 +165,19 @@ export function mountApp(root, { makeState, view }) {
         return;
       }
       const handler = handlers.get(`${event.type}:${event.key}`);
-      if (typeof handler === "function") {
-        handler(event);
+      if (typeof handler !== "function") {
+        return;
+      }
+      // A handler may be async (e.g. `await native.http.request(...)` then
+      // set_state); the re-render fires when set_state runs, after the await.
+      // Swallow a rejection so an unhandled promise never crashes the tab.
+      const result = handler(event);
+      if (result != null && typeof result.then === "function") {
+        result.then(undefined, (err) => {
+          if (typeof console !== "undefined") {
+            console.error("tempestweb: async handler failed", err);
+          }
+        });
       }
     },
     async close() {},

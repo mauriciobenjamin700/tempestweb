@@ -144,6 +144,50 @@ def test_expression_lambda_calls_state_method() -> None:
     assert "app.setState((s) => s.increment());" in js
 
 
+def test_async_def_and_await() -> None:
+    """`async def` → `async` arrow; `await` → `await`."""
+    js = gen(
+        "def view(app):\n    async def go() -> None:\n        x = await fetch_it()\n"
+    )
+    assert "const go = async () => {" in js
+    assert "const x = await fetch_it();" in js
+
+
+def test_native_import_maps_to_facade() -> None:
+    """`from tempestweb import native` imports the Mode C native facade."""
+    js = gen(
+        "from tempestweb import native\n\n"
+        "def view(app):\n"
+        "    async def go() -> None:\n"
+        '        await native.storage.put("k", "v")\n'
+    )
+    assert 'import { native } from "./native.js";' in js
+    assert 'await native.storage.put("k", "v");' in js
+
+
+def test_mixed_positional_and_keyword_call() -> None:
+    """Positional + keyword args → positional args then a trailing options object."""
+    js = gen(
+        "from tempestweb import native\n\n"
+        "def view(app):\n"
+        "    async def go() -> None:\n"
+        '        await native.http.request("GET", "/x", json=None, headers={})\n'
+    )
+    assert 'native.http.request("GET", "/x", { json: null, headers: {} })' in js
+
+
+def test_dict_literal_becomes_object() -> None:
+    """A dict literal with string keys becomes a JS object."""
+    js = gen('def view(app):\n    return f({"a": 1, "b": app.state.x})\n')
+    assert 'f({ "a": 1, "b": app.state.x })' in js
+
+
+def test_native_import_rejects_non_native_symbol() -> None:
+    """`from tempestweb import` only allows `native`."""
+    with pytest.raises(TranspileError, match="only `native`"):
+        transpile_source("from tempestweb import server\n", filename="app.py")
+
+
 def test_unsupported_construct_raises() -> None:
     """A construct still outside the subset is a compile error."""
     with pytest.raises(TranspileError):

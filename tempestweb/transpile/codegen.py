@@ -24,6 +24,8 @@ __all__: list[str] = ["generate"]
 
 # Imported names that resolve to the native runtime rather than a widget builder.
 _RUNTIME_NAMES: frozenset[str] = frozenset({"App", "State"})
+# The native-capability namespace, imported from `./native.js` in Mode C.
+_NATIVE_NAMES: frozenset[str] = frozenset({"native"})
 # Type-only imports that carry no runtime value and are dropped from the output.
 _TYPE_ONLY_NAMES: frozenset[str] = frozenset({"Widget"})
 # API identifiers renamed from Python's snake_case to the JS client's camelCase.
@@ -95,10 +97,14 @@ class _Generator:
             return self._binop(node, indent)
         if isinstance(node, ast.List):
             return self._list(node, indent)
+        if isinstance(node, ast.Dict):
+            return self._dict(node, indent)
         if isinstance(node, ast.Call):
             return self._call(node, indent)
         if isinstance(node, ast.Lambda):
             return self._lambda(node, indent)
+        if isinstance(node, ast.Await):
+            return f"await {self.expr(node.value, indent)}"
         if isinstance(node, ast.Compare):
             return self._compare(node, indent)
         if isinstance(node, ast.BoolOp):
@@ -268,12 +274,50 @@ class _Generator:
         items = ",\n".join(f"{pad}{self.expr(el, inner)}" for el in node.elts)
         return "[\n" + items + ",\n" + _INDENT * indent + "]"
 
+    def _dict(self, node: ast.Dict, indent: int) -> str:
+        """Emit a dict literal as a JS object.
+
+        String-constant keys become plain object keys (``"k": v``); any other key
+        expression becomes a computed key (``[expr]: v``). ``**spread`` keys
+        (a ``None`` key) are unsupported.
+        """
+        if not node.keys:
+            return "{}"
+        pairs: list[str] = []
+        for key, value in zip(node.keys, node.values, strict=True):
+            if key is None:
+                raise TranspileError(
+                    "dict unpacking (**) is not supported", node, self.filename
+                )
+            val = self.expr(value, indent)
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                pairs.append(f"{json.dumps(key.value)}: {val}")
+            else:
+                pairs.append(f"[{self.expr(key, indent)}]: {val}")
+        return "{ " + ", ".join(pairs) + " }"
+
     def _call(self, node: ast.Call, indent: int) -> str:
-        """Emit a call: keyword-only → object arg; positional → plain args."""
+        """Emit a call.
+
+        Keyword-only → a single object arg (the widget-builder convention).
+        Positional-only → plain args. Mixed (positional + keyword, e.g.
+        ``native.http.request("GET", url, json=body)``) → the positional args
+        followed by a trailing options object holding the keywords.
+        """
         func = self.expr(node.func, indent)
         if node.keywords and not node.args:
             return self._object_call(func, node, indent)
-        args = ", ".join(self.expr(a, indent) for a in node.args)
+        parts = [self.expr(a, indent) for a in node.args]
+        if node.keywords:
+            pairs = []
+            for kw in node.keywords:
+                if kw.arg is None:
+                    raise TranspileError(
+                        "**kwargs is not supported", node, self.filename
+                    )
+                pairs.append(f"{_js_name(kw.arg)}: {self.expr(kw.value, indent)}")
+            parts.append("{ " + ", ".join(pairs) + " }")
+        args = ", ".join(parts)
         is_class = isinstance(node.func, ast.Name) and node.func.id in self.class_names
         prefix = "new " if is_class else ""
         return f"{prefix}{func}({args})"
@@ -341,7 +385,7 @@ class _Generator:
         """
         if isinstance(node, ast.Return):
             return self._return(node, indent)
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             return self._nested_def(node, indent)
         if isinstance(node, ast.Expr):
             return [f"{_INDENT * indent}{self.expr(node.value, indent)};"]
@@ -443,11 +487,17 @@ class _Generator:
             return [f"{_INDENT * indent}return;"]
         return [f"{_INDENT * indent}return {self.expr(node.value, indent)};"]
 
-    def _nested_def(self, node: ast.FunctionDef, indent: int) -> list[str]:
-        """Emit a nested `def` as a `const name = (params) => {...}` arrow."""
+    def _nested_def(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef, indent: int
+    ) -> list[str]:
+        """Emit a nested `def` as a `const name = (params) => {...}` arrow.
+
+        An `async def` becomes an `async` arrow, so `await` inside it is valid.
+        """
         params = ", ".join(a.arg for a in node.args.args)
         pad = _INDENT * indent
-        lines = [f"{pad}const {_js_name(node.name)} = ({params}) => {{"]
+        prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
+        lines = [f"{pad}const {_js_name(node.name)} = {prefix}({params}) => {{"]
         lines.extend(self._body(node.body, indent + 1))
         lines.append(f"{pad}}};")
         return lines
@@ -493,7 +543,7 @@ class _Generator:
             elif isinstance(node, ast.ClassDef):
                 self.class_names.add(node.name)
                 top_level.append(node)
-            elif isinstance(node, ast.FunctionDef):
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 top_level.append(node)
             elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
                 continue  # module docstring
@@ -512,7 +562,7 @@ class _Generator:
                 bodies.append(self._class(node))
                 self.referenced.add("State")
             else:
-                assert isinstance(node, ast.FunctionDef)
+                assert isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                 bodies.append(self._function(node))
 
         imports = self._imports(self.referenced & importable)
@@ -538,9 +588,25 @@ class _Generator:
         module = node.module or ""
         if module in {"__future__", "dataclasses"}:
             return
+        # `from tempestweb import native` — the native-capability namespace, which
+        # Mode C serves from its in-process JS facade (./native.js).
+        if module == "tempestweb":
+            for alias in node.names:
+                name = alias.asname or alias.name
+                if name in _NATIVE_NAMES:
+                    importable.add(name)
+                else:
+                    raise TranspileError(
+                        f"`from tempestweb import {name}` is not supported "
+                        "(only `native`)",
+                        node,
+                        self.filename,
+                    )
+            return
         if not module.startswith("tempest_core"):
             raise TranspileError(
-                f"import from {module!r} is not supported (only tempest_core)",
+                f"import from {module!r} is not supported "
+                "(only tempest_core and `tempestweb.native`)",
                 node,
                 self.filename,
             )
@@ -551,14 +617,17 @@ class _Generator:
         importable.add("State")
 
     def _imports(self, used: set[str]) -> str:
-        """Emit the fixed runtime + widgets import lines for the used names."""
-        runtime = sorted(used & _RUNTIME_NAMES)
-        widgets = sorted(used - _RUNTIME_NAMES)
+        """Emit the fixed runtime + widgets + native import lines for used names."""
+        runtime = sorted((used & _RUNTIME_NAMES) - _NATIVE_NAMES)
+        native = sorted(used & _NATIVE_NAMES)
+        widgets = sorted(used - _RUNTIME_NAMES - _NATIVE_NAMES)
         lines: list[str] = []
         if runtime:
             lines.append(f'import {{ {", ".join(runtime)} }} from "./runtime.js";')
         if widgets:
             lines.append(f'import {{ {", ".join(widgets)} }} from "./widgets.js";')
+        if native:
+            lines.append(f'import {{ {", ".join(native)} }} from "./native.js";')
         return "\n".join(lines)
 
     def _class(self, node: ast.ClassDef) -> str:
@@ -569,7 +638,7 @@ class _Generator:
         parameter list).
         """
         fields: list[tuple[str, str]] = []
-        methods: list[ast.FunctionDef] = []
+        methods: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
         for stmt in node.body:
             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
                 if stmt.value is None:
@@ -579,7 +648,7 @@ class _Generator:
                         self.filename,
                     )
                 fields.append((stmt.target.id, self.expr(stmt.value, 2)))
-            elif isinstance(stmt, ast.FunctionDef):
+            elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 methods.append(stmt)
             elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
                 continue  # class docstring
@@ -601,21 +670,23 @@ class _Generator:
         lines.append("}")
         return "\n".join(lines)
 
-    def _method(self, node: ast.FunctionDef) -> list[str]:
+    def _method(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
         """Emit a dataclass method as a JS class method (drops the `self` param)."""
         params = [a.arg for a in node.args.args]
         if params and params[0] == "self":
             params = params[1:]
         pad = _INDENT
-        lines = [f"{pad}{_js_name(node.name)}({', '.join(params)}) {{"]
+        prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
+        lines = [f"{pad}{prefix}{_js_name(node.name)}({', '.join(params)}) {{"]
         lines.extend(self._body(node.body, 2))
         lines.append(f"{pad}}}")
         return lines
 
-    def _function(self, node: ast.FunctionDef) -> str:
+    def _function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
         """Emit a top-level `def` as `export function name(params) {...}`."""
         params = ", ".join(a.arg for a in node.args.args)
-        lines = [f"export function {_js_name(node.name)}({params}) {{"]
+        prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
+        lines = [f"export {prefix}function {_js_name(node.name)}({params}) {{"]
         lines.extend(self._body(node.body, 1))
         lines.append("}")
         return "\n".join(lines)

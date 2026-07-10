@@ -50,6 +50,7 @@ exclude_docs: |
   contract.md
   arquitetura.md
   modo-c-transpile.md
+  native-modo-c.md
   agents/
 
 plugins:

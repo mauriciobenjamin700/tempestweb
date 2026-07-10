@@ -435,3 +435,51 @@ test("camera.capture: permission denied maps to permission_denied", async () => 
   assert.equal(res.ok, false);
   assert.equal(res.error, "permission_denied");
 });
+
+// ---- cookies capability ---------------------------------------------------
+
+/** A fresh jsdom document to back document.cookie. */
+function cookieDoc() {
+  const dom = new JSDOM("<!doctype html>", { url: "https://example.com/" });
+  return dom.window.document;
+}
+
+test("cookies.set then cookies.get round-trips a value", async () => {
+  const document = cookieDoc();
+  const set = await dispatch(call("cookies.set", { name: "sid", value: "abc 123" }), { document });
+  assert.equal(set.ok, true);
+  const got = await dispatch(call("cookies.get", { name: "sid" }), { document });
+  assert.equal(got.ok, true);
+  assert.equal(got.value.value, "abc 123"); // percent-decoded
+});
+
+test("cookies.get returns null for an absent cookie", async () => {
+  const document = cookieDoc();
+  const got = await dispatch(call("cookies.get", { name: "nope" }), { document });
+  assert.equal(got.ok, true);
+  assert.equal(got.value.value, null);
+});
+
+test("cookies.all returns a name->value map", async () => {
+  const document = cookieDoc();
+  await dispatch(call("cookies.set", { name: "a", value: "1" }), { document });
+  await dispatch(call("cookies.set", { name: "b", value: "2" }), { document });
+  const all = await dispatch(call("cookies.all"), { document });
+  assert.equal(all.ok, true);
+  assert.equal(all.value.a, "1");
+  assert.equal(all.value.b, "2");
+});
+
+test("cookies.remove clears a cookie", async () => {
+  const document = cookieDoc();
+  await dispatch(call("cookies.set", { name: "x", value: "y" }), { document });
+  await dispatch(call("cookies.remove", { name: "x" }), { document });
+  const got = await dispatch(call("cookies.get", { name: "x" }), { document });
+  assert.equal(got.value.value, null);
+});
+
+test("cookies.get without a document reports unsupported", async () => {
+  const res = await dispatch(call("cookies.get", { name: "x" }), {});
+  assert.equal(res.ok, false);
+  assert.equal(res.error, "unsupported");
+});

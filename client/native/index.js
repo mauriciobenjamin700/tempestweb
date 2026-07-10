@@ -16,6 +16,7 @@ import { shareIsSupported, shareShare } from "./share.js";
 import { geolocationGet } from "./geolocation.js";
 import { clipboardRead, clipboardWrite } from "./clipboard.js";
 import { storageGet, storageList, storagePut, storageRemove } from "./storage.js";
+import { cookiesAll, cookiesGet, cookiesRemove, cookiesSet } from "./cookies.js";
 import { cameraCapture } from "./camera.js";
 import { onnxLoad, onnxRun } from "./onnx.js";
 import { fileSave, filePick } from "./file.js";
@@ -76,6 +77,10 @@ export const HANDLERS = {
   "storage.get": storageGet,
   "storage.list": storageList,
   "storage.remove": storageRemove,
+  "cookies.get": cookiesGet,
+  "cookies.set": cookiesSet,
+  "cookies.remove": cookiesRemove,
+  "cookies.all": cookiesAll,
   "camera.capture": cameraCapture,
   "onnx.load": onnxLoad,
   "onnx.run": onnxRun,

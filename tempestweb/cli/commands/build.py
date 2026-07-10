@@ -79,6 +79,7 @@ _TRANSPILE_ASSETS: tuple[str, ...] = (
     "spacing.gen.js",
     "diff.js",
     "widget-styles.gen.js",
+    "native.js",
 )
 
 #: The generated app module's filename inside the transpile artifact.
@@ -100,6 +101,7 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "audio.js",
     "camera.js",
     "clipboard.js",
+    "cookies.js",
     "file.js",
     "geolocation.js",
     "http.js",
@@ -170,6 +172,10 @@ TRANSPILE_ARTIFACT_FILES: tuple[str, ...] = (
     *(f"client/icons/{asset}" for asset in _ICON_ASSETS),
     *(f"client/transpile/{asset}" for asset in _TRANSPILE_ASSETS),
     f"client/transpile/{_TRANSPILE_APP_MODULE}",
+    # Native capability tree — the facade (transpile/native.js) routes to it.
+    *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
+    "client/push/web-push-client.js",
+    "client/pwa/install-prompt.js",
 )
 
 
@@ -1097,6 +1103,23 @@ def _build_transpile(
         written.append(f"transpile/{asset}")
     (transpile_dest / _TRANSPILE_APP_MODULE).write_text(generated, encoding="utf-8")
     written.append(f"transpile/{_TRANSPILE_APP_MODULE}")
+
+    # Native capability tree — the transpile/native.js facade routes to it. Shipped
+    # alongside so `await native.http.request(...)` etc. resolve in the browser.
+    native_dest = out / "client" / "native"
+    native_dest.mkdir(parents=True, exist_ok=True)
+    for asset in _NATIVE_ASSETS:
+        source = client / "native" / asset
+        if not source.is_file():
+            raise BuildError(f"missing native asset: {source}")
+        shutil.copyfile(source, native_dest / asset)
+    for rel in ("push/web-push-client.js", "pwa/install-prompt.js"):
+        source = client / rel
+        if not source.is_file():
+            raise BuildError(f"missing native dependency: {source}")
+        dest = out / "client" / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, dest)
 
     (out / "index.html").write_text(_index_html_transpile(name), encoding="utf-8")
     return tuple(sorted(TRANSPILE_ARTIFACT_FILES))

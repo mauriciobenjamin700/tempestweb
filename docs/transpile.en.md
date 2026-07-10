@@ -402,8 +402,9 @@ spirit of `mypy --strict`.
 !!! info "In the subset today"
     - **Expressions:** arithmetic (`+ - * / %`), comparison (`== != < <= > >=`),
       boolean (`and`/`or`), unary (`not`/`-`), ternary (`a if c else b`), list
-      comprehensions (`[e for x in it if c]`), `in`/`not in`, indexing,
-      f-strings, expression lambdas.
+      and dict comprehensions (`[e for x in it if c]`, `{k: v for x in it}`),
+      `list`/`tuple`/`set`/`dict` literals, `in`/`not in`, indexing, f-strings
+      (incl. `{x:.2f}`, `{x!s}`, `{x!r}`), expression lambdas.
     - **Statements:** `if`/`elif`/`else`, `for … in`, assignment, `+=` and
       friends, `return`.
     - **Structures:** a state `@dataclass` (fields + methods), `make_state()`,
@@ -433,7 +434,9 @@ spirit of `mypy --strict`.
     expands to primitives at `build()` time — many from data/loops — so they are
     not auto-portable to a Python-free runtime. The layout aliases `HStack` /
     `VStack` are the exception (they expand to `Row`/`Column`). Also out:
-    dict/set/tuple and f-strings with a format spec.
+    multi-loop or destructured comprehensions (`for k, v in …`), and f-string
+    format specs beyond `.Nf` (e.g. alignment `{x:>5}`, dynamic `{x:.{n}f}`,
+    the `!a` conversion).
 
 ## Recap
 

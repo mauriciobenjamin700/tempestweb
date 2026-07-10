@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 
 from tempestweb.transpile.errors import TranspileError
 
@@ -230,9 +231,15 @@ class _Generator:
         if isinstance(node, ast.BinOp):
             return self._binop(node, indent)
         if isinstance(node, ast.List):
-            return self._list(node, indent)
+            return self._array(node.elts, indent)
+        if isinstance(node, ast.Tuple):
+            return self._array(node.elts, indent)
+        if isinstance(node, ast.Set):
+            return f"new Set({self._array(node.elts, indent)})"
         if isinstance(node, ast.Dict):
             return self._dict(node, indent)
+        if isinstance(node, ast.DictComp):
+            return self._dictcomp(node, indent)
         if isinstance(node, ast.Call):
             return self._call(node, indent)
         if isinstance(node, ast.Lambda):
@@ -281,17 +288,86 @@ class _Generator:
             if isinstance(value, ast.Constant) and isinstance(value.value, str):
                 parts.append(value.value.replace("`", "\\`").replace("$", "\\$"))
             elif isinstance(value, ast.FormattedValue):
-                if value.format_spec is not None or value.conversion not in (-1, None):
-                    raise TranspileError(
-                        "f-string format specs / conversions (e.g. `{x:.2f}`, "
-                        "`{x!r}`) are not supported",
-                        value,
-                        self.filename,
-                    )
-                parts.append(f"${{{self.expr(value.value, indent)}}}")
+                parts.append(self._formatted_value(value, indent))
             else:
                 raise TranspileError("unsupported f-string part", value, self.filename)
         return "`" + "".join(parts) + "`"
+
+    def _formatted_value(self, node: ast.FormattedValue, indent: int) -> str:
+        """Emit a ``${...}`` interpolation for one f-string ``{expr}`` slot.
+
+        Supports the common formatting cases and rejects the rest with a located
+        error:
+
+        - ``{x!s}`` → ``String(x)``; ``{x!r}`` → ``JSON.stringify(x)``.
+        - ``{x:.Nf}`` → ``(x).toFixed(N)`` (fixed-point float formatting).
+
+        Args:
+            node: The ``FormattedValue`` node.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS template-literal substitution (``${...}``).
+
+        Raises:
+            TranspileError: For unsupported conversions/specs (``!a``, dynamic
+                specs, or any spec other than ``.Nf``).
+        """
+        expr = self.expr(node.value, indent)
+        conversion = node.conversion
+        spec = node.format_spec
+        if spec is not None:
+            if conversion not in (-1, None):
+                raise TranspileError(
+                    "combining a conversion and a format spec (e.g. `{x!r:>5}`) "
+                    "is not supported",
+                    node,
+                    self.filename,
+                )
+            text = self._const_spec(spec)
+            match = re.fullmatch(r"\.(\d+)f", text)
+            if match is None:
+                raise TranspileError(
+                    f"f-string format spec {text!r} is not supported "
+                    "(only fixed-point `.Nf`)",
+                    node,
+                    self.filename,
+                )
+            return f"${{({expr}).toFixed({match.group(1)})}}"
+        if conversion in (-1, None):
+            return f"${{{expr}}}"
+        if conversion == ord("s"):
+            return f"${{String({expr})}}"
+        if conversion == ord("r"):
+            return f"${{JSON.stringify({expr})}}"
+        raise TranspileError(
+            "f-string conversion `!a` (ascii) is not supported", node, self.filename
+        )
+
+    def _const_spec(self, spec: ast.expr) -> str:
+        """Return the text of a constant f-string format spec.
+
+        Args:
+            spec: The ``format_spec`` node (a ``JoinedStr``).
+
+        Returns:
+            The literal spec text (e.g. ``".2f"``).
+
+        Raises:
+            TranspileError: If the spec interpolates a value (``{x:.{n}f}``).
+        """
+        if (
+            isinstance(spec, ast.JoinedStr)
+            and len(spec.values) == 1
+            and isinstance(spec.values[0], ast.Constant)
+            and isinstance(spec.values[0].value, str)
+        ):
+            return spec.values[0].value
+        raise TranspileError(
+            "dynamic f-string format specs (e.g. `{x:.{n}f}`) are not supported",
+            spec,
+            self.filename,
+        )
 
     def _binop(self, node: ast.BinOp, indent: int) -> str:
         """Emit an arithmetic binary operation."""
@@ -406,13 +482,25 @@ class _Generator:
             raise TranspileError("slices are not supported", node, self.filename)
         return f"{value}[{self.expr(node.slice, indent)}]"
 
-    def _list(self, node: ast.List, indent: int) -> str:
-        """Emit an array literal, multiline when it holds elements."""
-        if not node.elts:
+    def _array(self, elts: list[ast.expr], indent: int) -> str:
+        """Emit a JS array literal, multiline when it holds elements.
+
+        Backs Python ``list`` **and** ``tuple`` literals — JS has no tuple type,
+        so a tuple becomes a plain (mutable) array; its immutability is not
+        enforced in the transpiled output.
+
+        Args:
+            elts: The element expressions.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS array source.
+        """
+        if not elts:
             return "[]"
         inner = indent + 1
         pad = _INDENT * inner
-        items = ",\n".join(f"{pad}{self.expr(el, inner)}" for el in node.elts)
+        items = ",\n".join(f"{pad}{self.expr(el, inner)}" for el in elts)
         return "[\n" + items + ",\n" + _INDENT * indent + "]"
 
     def _dict(self, node: ast.Dict, indent: int) -> str:
@@ -436,6 +524,31 @@ class _Generator:
             else:
                 pairs.append(f"[{self.expr(key, indent)}]: {val}")
         return "{ " + ", ".join(pairs) + " }"
+
+    def _dictcomp(self, node: ast.DictComp, indent: int) -> str:
+        """Emit a dict comprehension via ``Object.fromEntries``.
+
+        ``{k: v for x in it if cond}`` →
+        ``Object.fromEntries(it.filter((x) => cond).map((x) => [k, v]))``.
+        Only a single ``for`` clause (with optional ``if``s) over a plain-name
+        target is supported.
+        """
+        if len(node.generators) != 1:
+            raise TranspileError(
+                "only single-loop comprehensions are supported", node, self.filename
+            )
+        gen = node.generators[0]
+        if not isinstance(gen.target, ast.Name):
+            raise TranspileError(
+                "comprehension target must be a plain name", node, self.filename
+            )
+        var = gen.target.id
+        result = self.expr(gen.iter, indent)
+        for cond in gen.ifs:
+            result = f"{result}.filter(({var}) => {self.expr(cond, indent)})"
+        key = self.expr(node.key, indent)
+        value = self.expr(node.value, indent)
+        return f"Object.fromEntries({result}.map(({var}) => [{key}, {value}]))"
 
     def _call(self, node: ast.Call, indent: int) -> str:
         """Emit a call.

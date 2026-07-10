@@ -87,11 +87,12 @@ def test_transpile_build_rejects_out_of_subset_app(tmp_path: Path) -> None:
     """A valid-but-out-of-subset app fails the build with a clear transpile error.
 
     The app renders fine as Python (so the build's load/render gate passes), but
-    the ``*`` operator is outside the spike subset — the transpile step turns the
-    ``TranspileError`` into a ``BuildError``.
+    a multi-loop comprehension is outside the subset — the transpile step turns
+    the ``TranspileError`` into a ``BuildError``.
     """
     root = _project(tmp_path)
-    # A set literal is valid Python (the view renders fine) but outside the subset.
+    # A multi-loop comprehension is valid Python (the view renders fine) but
+    # outside the subset — only single-loop comprehensions transpile.
     (root / "app.py").write_text(
         "from dataclasses import dataclass\n"
         "from tempest_core import App, Column, Text, Widget\n\n"
@@ -101,7 +102,9 @@ def test_transpile_build_rejects_out_of_subset_app(tmp_path: Path) -> None:
         "def make_state() -> State:\n"
         "    return State()\n\n"
         "def view(app: App[State]) -> Widget:\n"
-        '    return Column(children=[Text(content=c, key=c) for c in {"a"}])\n',
+        "    return Column(children=[\n"
+        '        Text(content=a, key=a) for a in ["x"] for b in ["y"]\n'
+        "    ])\n",
         encoding="utf-8",
     )
     with pytest.raises(BuildError, match="transpile failed"):

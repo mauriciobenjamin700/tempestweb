@@ -297,10 +297,35 @@ def test_native_import_rejects_non_native_symbol() -> None:
         transpile_source("from tempestweb import server\n", filename="app.py")
 
 
-def test_unsupported_construct_raises() -> None:
-    """A construct still outside the subset is a compile error."""
-    with pytest.raises(TranspileError):
-        gen("def f(a):\n    return {k: v for k, v in a}\n")  # dict comprehension
+def test_set_literal() -> None:
+    """A set literal becomes `new Set([...])`."""
+    assert "new Set([" in gen("def f():\n    return {1, 2, 3}\n")
+
+
+def test_tuple_literal_becomes_array() -> None:
+    """A tuple literal becomes a JS array (no tuple type in JS)."""
+    js = gen("def f():\n    return (1, 2)\n")
+    assert "return [" in js and "1," in js and "2," in js
+
+
+def test_dict_comprehension() -> None:
+    """A dict comprehension becomes `Object.fromEntries(...map(...))`."""
+    js = gen("def f(it):\n    return {k: k * 2 for k in it if k}\n")
+    assert "Object.fromEntries(" in js
+    assert ".filter((k) => k)" in js
+    assert ".map((k) => [k, (k * 2)])" in js
+
+
+def test_fstring_fixed_point_spec() -> None:
+    """`f'{x:.2f}'` maps to `(x).toFixed(2)`."""
+    js = gen("def f(x):\n    return f'{x:.2f}'\n")
+    assert "${(x).toFixed(2)}" in js
+
+
+def test_fstring_conversions() -> None:
+    """`!s`/`!r` map to `String(...)`/`JSON.stringify(...)`."""
+    assert "${String(x)}" in gen("def f(x):\n    return f'{x!s}'\n")
+    assert "${JSON.stringify(x)}" in gen("def f(x):\n    return f'{x!r}'\n")
 
 
 # Every out-of-subset construct must fail loud with a TranspileError (file:line),
@@ -312,8 +337,6 @@ _UNSUPPORTED: dict[str, str] = {
     "global": "def f():\n    global g\n",
     "yield": "def f():\n    yield 1\n",
     "walrus": "def f(x):\n    return (y := x)\n",
-    "set": "def f():\n    return {1, 2}\n",
-    "tuple": "def f():\n    return (1, 2)\n",
     "raise": "def f():\n    raise ValueError('x')\n",
     "assert": "def f(x):\n    assert x\n",
     "del": "def f(x):\n    del x\n",
@@ -321,9 +344,11 @@ _UNSUPPORTED: dict[str, str] = {
     "kwargs": "def f(**kw):\n    return kw\n",
     "fn_decorator": "@deco\ndef f():\n    pass\n",
     "class_decorator": "@deco\nclass C:\n    x: int = 0\n",
-    "fstring_spec": "def f(x):\n    return f'{x:.2f}'\n",
-    "fstring_conv": "def f(x):\n    return f'{x!r}'\n",
-    "dict_comp": "def f(a):\n    return {k: v for k, v in a}\n",
+    "fstring_align_spec": "def f(x):\n    return f'{x:>5}'\n",
+    "fstring_dynamic_spec": "def f(x, n):\n    return f'{x:.{n}f}'\n",
+    "fstring_ascii_conv": "def f(x):\n    return f'{x!a}'\n",
+    "dict_comp_tuple_target": "def f(a):\n    return {k: v for k, v in a}\n",
+    "multiloop_comp": "def f(a, b):\n    return [x for x in a for y in b]\n",
     "plain_import": "import os\n",
 }
 

@@ -269,6 +269,20 @@ def test_motion_imports_map_to_motion_module() -> None:
     assert "Transition({ duration_ms: 300, curve: Curve.EASE })" in js
 
 
+def test_animation_imports_map_to_animation_module() -> None:
+    """`AnimationController`/`Tween` route to ./animation.js; class calls new."""
+    js = gen(
+        "from tempest_core import AnimationController, Tween\n"
+        "from tempest_core.style import Curve\n\n"
+        "def view(app):\n"
+        "    c = AnimationController(0.4, curve=Curve.EASE_OUT)\n"
+        "    return Tween(begin=0.0, end=1.0).at(c.value)\n"
+    )
+    assert 'from "./animation.js"' in js
+    assert "new AnimationController(0.4, { curve: Curve.EASE_OUT })" in js
+    assert "new Tween({ begin: 0.0, end: 1.0 }).at(c.value)" in js
+
+
 def test_route_fixture_matches_core() -> None:
     """The routes_from_path parity fixture byte-matches a fresh core render."""
     from tests.conformance import _transpile_routes as gen_r

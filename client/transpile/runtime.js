@@ -65,6 +65,10 @@ export class App {
     this._theme = new Theme();
     /** @type {MediaQueryData} — the viewport snapshot (mirrors App.media). */
     this._media = new MediaQueryData();
+    /** @type {Set<Object>} — registered animation controllers (App clock). */
+    this._animations = new Set();
+    /** @type {?() => void} — hook the runtime installs to start the frame loop. */
+    this._onAnimate = null;
   }
 
   /**
@@ -179,6 +183,37 @@ export class App {
     if (this._onSetState !== null) {
       this._onSetState();
     }
+  }
+
+  /**
+   * Register an animation controller on the app's frame clock (mirrors the core
+   * App.register_animation): binds it and starts the runtime's frame loop.
+   * @param {Object} ctrl  An AnimationController.
+   * @returns {void}
+   */
+  register_animation(ctrl) {
+    ctrl.bind(this);
+    this._animations.add(ctrl);
+    if (this._onAnimate !== null) {
+      this._onAnimate();
+    }
+  }
+
+  /**
+   * Unregister an animation controller from the frame clock.
+   * @param {Object} ctrl  An AnimationController.
+   * @returns {void}
+   */
+  unregister_animation(ctrl) {
+    this._animations.delete(ctrl);
+  }
+
+  /**
+   * Whether any animation is currently registered (mirrors the core property).
+   * @returns {boolean}
+   */
+  get has_animations() {
+    return this._animations.size > 0;
   }
 }
 
@@ -334,6 +369,39 @@ export function mountApp(root, { makeState, view }) {
   // Report the viewport (size + dark mode + orientation) so the app renders
   // responsively; keeps app.media in sync on resize / color-scheme change.
   const media = installMedia(transport);
+
+  // Animation frame loop: while controllers are registered, tick each with the
+  // per-frame dt, re-render (so the view reads their new `value`), and drop any
+  // that settled. Driven by requestAnimationFrame (falls back to setTimeout).
+  let running = false;
+  /** @type {?number} — previous frame timestamp; null before the first frame. */
+  let lastFrame = null;
+  const raf =
+    typeof globalThis.requestAnimationFrame === "function"
+      ? globalThis.requestAnimationFrame.bind(globalThis)
+      : (fn) => setTimeout(() => fn(Date.now()), 16);
+  const frame = (now) => {
+    const dt = lastFrame === null ? 0 : (now - lastFrame) / 1000;
+    lastFrame = now;
+    for (const ctrl of [...app._animations]) {
+      if (ctrl._advance(dt)) {
+        app.unregister_animation(ctrl);
+      }
+    }
+    app._rerender();
+    if (app._animations.size > 0) {
+      raf(frame);
+    } else {
+      running = false;
+    }
+  };
+  app._onAnimate = () => {
+    if (!running) {
+      running = true;
+      lastFrame = null;
+      raf(frame);
+    }
+  };
 
   return {
     root: handle.root,

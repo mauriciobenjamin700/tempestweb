@@ -345,10 +345,36 @@ def view(app: App[MyState]) -> Widget:
     (Playwright confirmou a transição CSS aplicada). Curvas: `linear`, `ease`,
     `ease-in`, `ease-out`, `ease-in-out`, `bounce`, `elastic`.
 
-!!! note "AnimationController"
-    O tween **imperativo** (`AnimationController.forward()`, dirigido por frame)
-    ainda não está no Modo C — use transições declarativas, que cobrem o caso
-    canônico. É a peça avançada restante da cobertura do core.
+### Animação imperativa (AnimationController)
+
+Para controle por frame, use `AnimationController` + `Tween` — o runtime dirige
+os controllers num loop `requestAnimationFrame`, computando o valor a cada frame
+e re-renderizando.
+
+```python
+from tempest_core.animation import AnimationController, Tween
+from tempest_core.style import Curve
+
+
+def make_state() -> S:
+    s = S()
+    s.anim = AnimationController(0.6, curve=Curve.EASE_OUT)
+    return s
+
+
+def view(app: App[S]) -> Widget:
+    w = Tween(begin=100.0, end=340.0).at(app.state.anim.value)
+
+    def go() -> None:
+        app.state.anim.forward()
+        app.register_animation(app.state.anim)
+
+    return Container(key="box", style=Style(width=w))
+```
+
+`forward()`/`reverse()`/`stop()`, curvas eased **e springs** (`Spring`) — mesma
+matemática do core. Verificado no Playwright: a largura anima 100→340 (ease-out)
+e assenta. **Isto fecha 100% da cobertura do tempest-core no Modo C.**
 
 ## O subset suportado
 

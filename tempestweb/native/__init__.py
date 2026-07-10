@@ -56,6 +56,13 @@ from tempestweb.native.audio import PlayResult
 from tempestweb.native.bridges import FFIBridge, ProxyBridge
 from tempestweb.native.camera import Photo, capture
 from tempestweb.native.clipboard import read, write
+from tempestweb.native.contract import (
+    CAPABILITIES,
+    MODE_C_CAPABILITIES,
+    Capability,
+    capability_names,
+    mode_c_capability_names,
+)
 from tempestweb.native.dispatch import (
     NATIVE_RESULT_PREFIX,
     BrowserUnavailableError,
@@ -119,6 +126,12 @@ __all__ = [
     "notifications",
     "onnx",
     "storage",
+    # capability contract (the single source of truth across surfaces)
+    "CAPABILITIES",
+    "MODE_C_CAPABILITIES",
+    "Capability",
+    "capability_names",
+    "mode_c_capability_names",
     # dispatch core + bridges (the Mode-A vs Mode-B seam)
     "NATIVE_RESULT_PREFIX",
     "BrowserUnavailableError",

@@ -23,6 +23,8 @@
 import { mount } from "../tempestweb.js";
 import { diff } from "./diff.js";
 import { NavStack, Route, routesFromPath } from "./nav.js";
+import { MediaQueryData, Theme } from "./theme.js";
+import { installMedia } from "./media.js";
 
 /**
  * @typedef {import("../transport.js").Node} Node
@@ -59,6 +61,10 @@ export class App {
     this._onSetState = null;
     /** @type {NavStack} — the navigation stack (mirrors the core App.nav). */
     this._nav = new NavStack({ stack: [new Route({ name: "/" })] });
+    /** @type {Theme} — the active theme (mirrors the core App.theme). */
+    this._theme = new Theme();
+    /** @type {MediaQueryData} — the viewport snapshot (mirrors App.media). */
+    this._media = new MediaQueryData();
   }
 
   /**
@@ -75,6 +81,43 @@ export class App {
    */
   get nav() {
     return this._nav;
+  }
+
+  /**
+   * The active theme (mirrors the core App.theme).
+   * @returns {Theme}
+   */
+  get theme() {
+    return this._theme;
+  }
+
+  /**
+   * The current viewport snapshot (mirrors the core App.media).
+   * @returns {MediaQueryData}
+   */
+  get media() {
+    return this._media;
+  }
+
+  /**
+   * Swap the active theme and re-render.
+   * @param {Theme} theme  The new theme.
+   * @returns {void}
+   */
+  set_theme(theme) {
+    this._theme = theme;
+    this._rerender();
+  }
+
+  /**
+   * Update the viewport snapshot and re-render (called by the runtime on a
+   * `media` event from the browser).
+   * @param {MediaQueryData} media  The new viewport snapshot.
+   * @returns {void}
+   */
+  _setMedia(media) {
+    this._media = media;
+    this._rerender();
   }
 
   /**
@@ -238,6 +281,11 @@ export function mountApp(root, { makeState, view }) {
         }
         return;
       }
+      // Viewport → view: a resize / dark-mode change updates app.media.
+      if (event.type === "media") {
+        app._setMedia(new MediaQueryData(event.payload ?? {}));
+        return;
+      }
       if (event.key == null) {
         return;
       }
@@ -283,6 +331,9 @@ export function mountApp(root, { makeState, view }) {
   };
 
   const handle = mount(root, transport, node);
+  // Report the viewport (size + dark mode + orientation) so the app renders
+  // responsively; keeps app.media in sync on resize / color-scheme change.
+  const media = installMedia(transport);
 
   return {
     root: handle.root,
@@ -291,6 +342,9 @@ export function mountApp(root, { makeState, view }) {
       return node;
     },
     patchLog,
-    unmount: handle.unmount,
+    unmount() {
+      media.dispose();
+      handle.unmount();
+    },
   };
 }

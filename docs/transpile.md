@@ -290,6 +290,36 @@ Troque `app.state.lang` num handler e a UI re-renderiza no novo idioma —
 verificado no Playwright (PT → EN ao vivo). A tabela `MESSAGES` é uma **constante
 de módulo** (agora suportada no subset).
 
+## Tema + responsividade
+
+O Modo C expõe `app.theme` e `app.media` como nos Modos A/B. `app.theme.is_dark()`
+resolve claro/escuro (`DARK`/`LIGHT` absolutos; `SYSTEM` segue o SO); `app.media`
+carrega `width`/`height`/`platform_dark_mode`/`orientation` — sincronizado com o
+browser (matchMedia + resize) → a UI **re-renderiza responsivamente**.
+
+```python
+from tempest_core import App, Column, Text, Theme, ThemeMode, Widget
+
+
+def view(app: App[MyState]) -> Widget:
+    dark = app.theme.is_dark(platform_dark_mode=app.media.platform_dark_mode)
+    wide = app.media.width >= 600.0
+
+    def toggle() -> None:
+        app.set_theme(Theme(mode=ThemeMode.LIGHT if dark else ThemeMode.DARK))
+
+    return Column(children=[
+        Text(content=("escuro" if dark else "claro"), key="s"),
+        Text(content=("largo" if wide else "estreito"), key="l"),
+    ])
+```
+
+!!! check "Responsividade adaptativa"
+    Redimensione a janela ou mude o `prefers-color-scheme` do SO e o `view`
+    re-renderiza — verificado no Playwright (400px→estreito, 900px→largo; toggle
+    de tema claro↔escuro). Os breakpoints do core (`Breakpoints`: sm/md/lg/xl)
+    também estão disponíveis.
+
 ## O subset suportado
 
 O Modo C aceita um **subset tipado** de Python — o suficiente para a camada de

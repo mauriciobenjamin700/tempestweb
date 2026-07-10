@@ -387,3 +387,30 @@ test("a navigate event resets the stack from the path (deep link)", () => {
 });
 
 import { routesFromPath as routesFromPathTest } from "../../client/transpile/nav.js";
+
+// ---- Mode C theme + responsiveness ----------------------------------------
+
+import { MediaQueryData, Theme, ThemeMode } from "../../client/transpile/theme.js";
+
+test("app.set_theme and media updates re-render the view", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  class ThemeState extends State {}
+  const mod = {
+    makeState: () => new ThemeState(),
+    view: (app) => {
+      const dark = app.theme.is_dark({ platform_dark_mode: app.media.platform_dark_mode });
+      const wide = app.media.width >= 600;
+      return Text({ content: `${dark ? "dark" : "light"}/${wide ? "wide" : "narrow"}`, key: "t" });
+    },
+  };
+  const handle = mountApp(dom.root, mod);
+  const label = () => dom.root.querySelector("[data-tw-key=\"t\"]").textContent;
+  assert.equal(label(), "light/narrow");
+
+  handle.app.set_theme(new Theme({ mode: ThemeMode.DARK }));
+  assert.equal(label(), "dark/narrow");
+
+  handle.app._setMedia(new MediaQueryData({ width: 1024, height: 768 }));
+  assert.equal(label(), "dark/wide");
+});

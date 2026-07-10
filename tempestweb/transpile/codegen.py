@@ -30,8 +30,14 @@ _NATIVE_NAMES: frozenset[str] = frozenset({"native"})
 _NAV_NAMES: frozenset[str] = frozenset({"Route", "NavStack", "routes_from_path"})
 # Localization helpers, imported from `./i18n.js` in Mode C.
 _I18N_NAMES: frozenset[str] = frozenset({"translate", "t", "Locale"})
+# Theme + responsiveness primitives, imported from `./theme.js` in Mode C.
+_THEME_NAMES: frozenset[str] = frozenset(
+    {"Theme", "ThemeMode", "MediaQueryData", "Breakpoints"}
+)
 # Imported JS classes that must be constructed with `new` (Route(...) -> new Route).
-_JS_CLASSES: frozenset[str] = frozenset({"Route", "NavStack", "Locale"})
+_JS_CLASSES: frozenset[str] = frozenset(
+    {"Route", "NavStack", "Locale", "Theme", "MediaQueryData", "Breakpoints"}
+)
 # Pure field validators (from tempest_core.validators), ported to ./validators.js.
 _VALIDATOR_NAMES: frozenset[str] = frozenset(
     {
@@ -705,6 +711,7 @@ class _Generator:
         native = sorted(used & _NATIVE_NAMES)
         nav = sorted(used & _NAV_NAMES)
         i18n = sorted(used & _I18N_NAMES)
+        theme = sorted(used & _THEME_NAMES)
         validators = sorted(used & _VALIDATOR_NAMES)
         widgets = sorted(
             used
@@ -712,6 +719,7 @@ class _Generator:
             - _NATIVE_NAMES
             - _NAV_NAMES
             - _I18N_NAMES
+            - _THEME_NAMES
             - _VALIDATOR_NAMES
         )
         lines: list[str] = []
@@ -725,6 +733,8 @@ class _Generator:
             lines.append(f'import {{ {", ".join(nav)} }} from "./nav.js";')
         if i18n:
             lines.append(f'import {{ {", ".join(i18n)} }} from "./i18n.js";')
+        if theme:
+            lines.append(f'import {{ {", ".join(theme)} }} from "./theme.js";')
         if validators:
             module = "./validators.js"
             lines.append(f'import {{ {", ".join(validators)} }} from "{module}";')

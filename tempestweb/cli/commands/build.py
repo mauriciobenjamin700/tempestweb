@@ -83,6 +83,8 @@ _TRANSPILE_ASSETS: tuple[str, ...] = (
     "validators.js",
     "nav.js",
     "i18n.js",
+    "theme.js",
+    "media.js",
 )
 
 #: The generated app module's filename inside the transpile artifact.

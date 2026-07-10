@@ -258,6 +258,17 @@ def test_theme_imports_map_to_theme_module() -> None:
     assert "app.theme.is_dark({ platform_dark_mode:" in js
 
 
+def test_motion_imports_map_to_motion_module() -> None:
+    """`Transition`/`Curve` route to ./motion.js (no `new` — a Style value)."""
+    js = gen(
+        "from tempest_core.style import Curve, Transition\n\n"
+        "def view(app):\n"
+        "    return Transition(duration_ms=300, curve=Curve.EASE)\n"
+    )
+    assert 'from "./motion.js"' in js
+    assert "Transition({ duration_ms: 300, curve: Curve.EASE })" in js
+
+
 def test_route_fixture_matches_core() -> None:
     """The routes_from_path parity fixture byte-matches a fresh core render."""
     from tests.conformance import _transpile_routes as gen_r

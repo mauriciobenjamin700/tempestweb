@@ -321,6 +321,36 @@ def view(app: App[MyState]) -> Widget:
     light↔dark). The core breakpoints (`Breakpoints`: sm/md/lg/xl) are available
     too.
 
+## Animation (transitions)
+
+Animate declaratively: give a widget's `Style` a `Transition` and the **browser**
+tweens it when a styled field changes (width, color, opacity) — no Python
+runtime, no frame driver.
+
+```python
+from tempest_core import App, Container, Style, Widget
+from tempest_core.style import Color, Curve, Transition
+
+
+def view(app: App[MyState]) -> Widget:
+    w = 320.0 if app.state.big else 120.0
+    return Container(key="box", style=Style(
+        width=w,
+        background=Color(r=103, g=80, b=164, a=1.0),
+        transition=Transition(duration_ms=400, curve=Curve.EASE_IN_OUT),
+    ))
+```
+
+!!! check "Verified"
+    Flipping `app.state.big` in a handler animates the width 120→320px over 400ms
+    (Playwright confirmed the CSS transition is applied). Curves: `linear`,
+    `ease`, `ease-in`, `ease-out`, `ease-in-out`, `bounce`, `elastic`.
+
+!!! note "AnimationController"
+    The **imperative** tween (`AnimationController.forward()`, frame-driven) is not
+    in Mode C yet — use declarative transitions, which cover the canonical case.
+    It is the remaining advanced piece of core coverage.
+
 ## The supported subset
 
 Mode C accepts a **typed subset** of Python — enough for the app layer. A

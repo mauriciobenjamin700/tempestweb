@@ -80,6 +80,17 @@ export function Style(partial = {}) {
 }
 
 /**
+ * Build a `Color` (the `{ r, g, b, a }` wire shape). Mirrors
+ * `tempest_core.style.Color`; a Style field value, so no `new`.
+ *
+ * @param {{r?: number, g?: number, b?: number, a?: number}} [args]
+ * @returns {{r: number, g: number, b: number, a: number}}
+ */
+export function Color({ r = 0, g = 0, b = 0, a = 1.0 } = {}) {
+  return { r, g, b, a };
+}
+
+/**
  * Edge helpers — a box's four side offsets in px (`{ top, right, bottom, left }`).
  */
 export const Edge = Object.freeze({

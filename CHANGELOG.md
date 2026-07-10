@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.18.0] — 2026-07-10
+
+### Added
+
+- **More Mode C native capabilities.** `share`, `audio`, `file`, and
+  `notifications` (notify + request_permission) join the Mode C facade, alongside
+  http/storage/clipboard/geolocation/cookies. All route to the shared
+  `client/native` glue; the capability contract marks them `mode_c` and the
+  conformance test enforces the facade matches that subset.
+- **`tempest_core.validators` in Mode C.** `client/transpile/validators.js` is a
+  faithful port of the core's BR field validators (`validate_cpf`/`cnpj`/`email`/
+  `phone`) — same algorithms and PT-BR messages. The transpiler routes
+  `from tempest_core.validators import ...` to it, so a transpiled form validates
+  client-side with no Python. Parity is locked by a core-derived fixture.
+
 ## [0.17.0] — 2026-07-10
 
 ### Added

@@ -26,6 +26,16 @@ __all__: list[str] = ["generate"]
 _RUNTIME_NAMES: frozenset[str] = frozenset({"App", "State"})
 # The native-capability namespace, imported from `./native.js` in Mode C.
 _NATIVE_NAMES: frozenset[str] = frozenset({"native"})
+# Pure field validators (from tempest_core.validators), ported to ./validators.js.
+_VALIDATOR_NAMES: frozenset[str] = frozenset(
+    {
+        "validate_cpf",
+        "validate_cnpj",
+        "validate_email",
+        "validate_phone",
+        "EMAIL_PATTERN",
+    }
+)
 # Type-only imports that carry no runtime value and are dropped from the output.
 _TYPE_ONLY_NAMES: frozenset[str] = frozenset({"Widget"})
 # API identifiers renamed from Python's snake_case to the JS client's camelCase.
@@ -617,10 +627,11 @@ class _Generator:
         importable.add("State")
 
     def _imports(self, used: set[str]) -> str:
-        """Emit the fixed runtime + widgets + native import lines for used names."""
-        runtime = sorted((used & _RUNTIME_NAMES) - _NATIVE_NAMES)
+        """Emit the runtime + widgets + native + validators import lines."""
+        runtime = sorted(used & _RUNTIME_NAMES)
         native = sorted(used & _NATIVE_NAMES)
-        widgets = sorted(used - _RUNTIME_NAMES - _NATIVE_NAMES)
+        validators = sorted(used & _VALIDATOR_NAMES)
+        widgets = sorted(used - _RUNTIME_NAMES - _NATIVE_NAMES - _VALIDATOR_NAMES)
         lines: list[str] = []
         if runtime:
             lines.append(f'import {{ {", ".join(runtime)} }} from "./runtime.js";')
@@ -628,6 +639,9 @@ class _Generator:
             lines.append(f'import {{ {", ".join(widgets)} }} from "./widgets.js";')
         if native:
             lines.append(f'import {{ {", ".join(native)} }} from "./native.js";')
+        if validators:
+            module = "./validators.js"
+            lines.append(f'import {{ {", ".join(validators)} }} from "{module}";')
         return "\n".join(lines)
 
     def _class(self, node: ast.ClassDef) -> str:

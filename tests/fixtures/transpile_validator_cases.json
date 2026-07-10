@@ -1,0 +1,97 @@
+[
+  {
+    "validator": "validate_cpf",
+    "input": "529.982.247-25",
+    "expected": null
+  },
+  {
+    "validator": "validate_cpf",
+    "input": "52998224725",
+    "expected": null
+  },
+  {
+    "validator": "validate_cpf",
+    "input": "111.111.111-11",
+    "expected": "CPF inválido"
+  },
+  {
+    "validator": "validate_cpf",
+    "input": "123",
+    "expected": "CPF deve ter 11 dígitos"
+  },
+  {
+    "validator": "validate_cpf",
+    "input": "abc",
+    "expected": "CPF deve ter 11 dígitos"
+  },
+  {
+    "validator": "validate_cnpj",
+    "input": "11.222.333/0001-81",
+    "expected": null
+  },
+  {
+    "validator": "validate_cnpj",
+    "input": "11222333000181",
+    "expected": null
+  },
+  {
+    "validator": "validate_cnpj",
+    "input": "00000000000000",
+    "expected": "CNPJ inválido"
+  },
+  {
+    "validator": "validate_cnpj",
+    "input": "1",
+    "expected": "CNPJ deve ter 14 dígitos"
+  },
+  {
+    "validator": "validate_email",
+    "input": "a@b.co",
+    "expected": null
+  },
+  {
+    "validator": "validate_email",
+    "input": "bad",
+    "expected": "E-mail inválido"
+  },
+  {
+    "validator": "validate_email",
+    "input": "x@y",
+    "expected": "E-mail inválido"
+  },
+  {
+    "validator": "validate_email",
+    "input": "user@domain.com",
+    "expected": null
+  },
+  {
+    "validator": "validate_email",
+    "input": " a@b.co ",
+    "expected": null
+  },
+  {
+    "validator": "validate_phone",
+    "input": "(11) 98765-4321",
+    "expected": null
+  },
+  {
+    "validator": "validate_phone",
+    "input": "11987654321",
+    "expected": null
+  },
+  {
+    "validator": "validate_phone",
+    "input": "1132654321",
+    "expected": null
+  },
+  {
+    "validator": "validate_phone",
+    "input": "123",
+    "expected": "Telefone inválido"
+  },
+  {
+    "validator": "validate_phone",
+    "input": "",
+    "expected": "Telefone inválido"
+  }
+]

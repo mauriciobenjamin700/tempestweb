@@ -120,6 +120,69 @@ export const native = Object.freeze({
     get_position: (high_accuracy = true) =>
       call("geolocation.get", { high_accuracy }),
   }),
+  share: Object.freeze({
+    /** Whether the OS share sheet is available. @returns {Promise<boolean>} */
+    is_supported: () => call("share.is_supported", {}).then((r) => r.supported),
+    /**
+     * Open the OS share sheet (falls back gracefully when unsupported).
+     * @param {{title?: string, text?: string, url?: string,
+     *          files?: Array<Object>}} [opts]
+     * @returns {Promise<{outcome: string}>}
+     */
+    share: (opts = {}) =>
+      call("share.share", {
+        title: opts.title ?? "",
+        text: opts.text ?? "",
+        url: opts.url ?? "",
+        files: opts.files ?? [],
+      }),
+  }),
+  audio: Object.freeze({
+    /**
+     * Play a short sound on a channel.
+     * @param {string} src  The audio asset URL.
+     * @param {{volume?: number, channel?: string}} [opts]
+     * @returns {Promise<Object>}  {played, blocked}.
+     */
+    play: (src, opts = {}) =>
+      call("audio.play", {
+        src,
+        volume: opts.volume ?? 1.0,
+        channel: opts.channel ?? "default",
+      }),
+    /** Stop a channel's sound. @returns {Promise<void>} */
+    stop: (channel = "default") => call("audio.stop", { channel }),
+  }),
+  file: Object.freeze({
+    /**
+     * Pick a file (opens the native picker).
+     * @param {{accept?: string, capture?: ?string}} [opts]
+     * @returns {Promise<Object>}  The picked file descriptor.
+     */
+    pick: (opts = {}) =>
+      call("file.pick", { accept: opts.accept ?? "image/*", capture: opts.capture ?? null }),
+    /**
+     * Share or download a generated file.
+     * @param {string} filename  The suggested file name.
+     * @param {string} dataBase64  The base64-encoded file bytes.
+     * @param {{mimeType?: string}} [opts]
+     * @returns {Promise<Object>}  How the file was delivered.
+     */
+    save: (filename, dataBase64, opts = {}) =>
+      call("file.save", {
+        filename,
+        data_base64: dataBase64,
+        mime_type: opts.mimeType ?? "application/octet-stream",
+      }),
+  }),
+  notifications: Object.freeze({
+    /** Show a notification. @returns {Promise<void>} */
+    notify: (title, opts = {}) =>
+      call("notifications.notify", { title, body: opts.body ?? "" }),
+    /** Request notification permission. @returns {Promise<string>} */
+    request_permission: () =>
+      call("notifications.request_permission", {}).then((r) => r.permission),
+  }),
   cookies: Object.freeze({
     /** Read a cookie by name. @returns {Promise<?string>} */
     get: (name) => call("cookies.get", { name }).then((r) => r.value),

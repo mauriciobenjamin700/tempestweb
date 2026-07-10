@@ -21,6 +21,7 @@ import {
 } from "../../client/transpile/widgets.js";
 import { mountApp, State } from "../../client/transpile/runtime.js";
 import * as widgets from "../../client/transpile/widgets.gen.js";
+import { HStack, VStack } from "../../client/transpile/components.js";
 import { makeState, view } from "../../client/transpile/counter.gen.js";
 
 // ---- 1. diff conformance against the core-derived golden -------------------
@@ -90,6 +91,26 @@ test("every generated builder returns a well-formed IR node", () => {
     assert.ok(Array.isArray(node.children), `${name}: children array`);
     assert.ok("attrs" in node.props, `${name}: attrs`);
     assert.ok("style" in node.props, `${name}: style key present`);
+  }
+});
+
+test("HStack/VStack expand to Row/Column matching the core (order-agnostic)", () => {
+  const samples = fixture("transpile_component_samples.json");
+  const drop = (n) => ({
+    type: n.type,
+    props: n.props,
+    children: (n.children ?? []).map(drop),
+  });
+  const cases = {
+    hstack_default: HStack({ children: [Text({ content: "a", key: "a" })] }),
+    hstack_lg_between: HStack({ gap: "lg", justify: "space-between" }),
+    hstack_float: HStack({ gap: 8.0 }),
+    vstack_sm: VStack({ children: [Text({ content: "a", key: "a" })], gap: "sm" }),
+    vstack_start: VStack({ children: [Text({ content: "a", key: "a" })], align: "start" }),
+  };
+  for (const [name, built] of Object.entries(cases)) {
+    // diff() ignores prop key order, so an empty diff means the trees are equal.
+    assert.deepEqual(diff(drop(samples[name]), drop(built)), [], `${name} diverged from core`);
   }
 });
 

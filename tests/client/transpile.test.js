@@ -9,7 +9,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixture, freshDom } from "./setup.js";
 import { diff } from "../../client/transpile/diff.js";
-import { Button, Column, Edge, Row, Style, Text } from "../../client/transpile/widgets.js";
+import {
+  Button,
+  Column,
+  Container,
+  Edge,
+  Row,
+  Style,
+  Text,
+} from "../../client/transpile/widgets.js";
 import { mountApp } from "../../client/transpile/runtime.js";
 import { makeState, view } from "../../client/transpile/counter.gen.js";
 
@@ -48,6 +56,20 @@ test("Column/Row are flex containers carrying their children", () => {
   const row = Row({ children: [] });
   assert.equal(row.type, "Row");
   assert.equal(row.key, null);
+});
+
+test("Container is a layout box with the semantic-tag escape hatch", () => {
+  const node = Container({
+    key: "nav",
+    tag: "nav",
+    attrs: { "hx-get": "/x" },
+    children: [Text({ content: "a" })],
+  });
+  assert.equal(node.type, "Container");
+  assert.equal(node.props.tag, "nav");
+  assert.deepEqual(node.props.attrs, { "hx-get": "/x" });
+  assert.equal(node.props.style, null); // pure layout, no baked style
+  assert.equal(node.children.length, 1);
 });
 
 test("Style fills the full shape with nulls; only set fields differ", () => {

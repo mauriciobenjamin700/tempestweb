@@ -91,16 +91,17 @@ def test_transpile_build_rejects_out_of_subset_app(tmp_path: Path) -> None:
     ``TranspileError`` into a ``BuildError``.
     """
     root = _project(tmp_path)
+    # A non-`setattr` lambda is valid Python (renders fine) but outside the subset.
     (root / "app.py").write_text(
         "from dataclasses import dataclass\n"
-        "from tempest_core import App, Column, Text, Widget\n\n"
+        "from tempest_core import App, Button, Widget\n\n"
         "@dataclass\n"
         "class State:\n"
         "    value: int = 0\n\n"
         "def make_state() -> State:\n"
         "    return State()\n\n"
         "def view(app: App[State]) -> Widget:\n"
-        '    return Column(children=[Text(content=f"{app.state.value * 2}")])\n',
+        '    return Button(label="x", on_click=lambda: None, key="b")\n',
         encoding="utf-8",
     )
     with pytest.raises(BuildError, match="transpile failed"):

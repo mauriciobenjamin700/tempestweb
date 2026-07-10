@@ -174,6 +174,39 @@ export function Row({ children = [], key = null, style = null }) {
 }
 
 /**
+ * Build a `Container` IR node (a single-child styled box / layout wrapper).
+ *
+ * A pure layout widget: no baked style (its default `style` is `null`, like the
+ * core). Supports the semantic-tag escape hatch (`tag`/`attrs`) for htmx-ready
+ * markup, mirroring `tempest_core`'s Container.
+ *
+ * @param {{children?: Node[], key?: ?string, style?: ?Object, tag?: ?string,
+ *          attrs?: Object<string, string>}} args
+ * @returns {Node}
+ */
+export function Container({
+  children = [],
+  key = null,
+  style = null,
+  tag = null,
+  attrs = {},
+}) {
+  return {
+    type: "Container",
+    key,
+    props: {
+      attrs,
+      focus_order: null,
+      focusable: null,
+      semantics: null,
+      style,
+      tag,
+    },
+    children,
+  };
+}
+
+/**
  * Resolve a Button's baked style from its variant/size/color_scheme.
  *
  * Mirrors the core: the default Material 3 style for the combination (from the

@@ -180,10 +180,20 @@ pelo base theme).
   de Button (variant × size × color_scheme) com o core real e grava o `style`
   resolvido; `widgets.js` faz o lookup e mescla o `style` explícito por cima (os
   campos setados do usuário vencem) — paridade MD3 com A/B, verificado no
-  Playwright (botões solid/primary preenchidos). **Falta:** `state_styles`
-  (hover/pressed) e os demais widgets estilizados (Input, Card, Chip, …).
-- **C2 — cobertura do subset.** Mais widgets/componentes, `if`/`for` em `view`,
-  list comprehensions → `.map`, f-strings compostas, métodos de state.
+  Playwright (botões solid/primary preenchidos). **`state_styles` (hover/pressed)
+  é N/A:** o IR não carrega estado de interação — os Modos A/B também não aplicam
+  hover/pressed via IR, então a paridade já está atingida. **Falta:** os demais
+  widgets estilizados (Input, Card, Chip, …) — cada um com seu style resolvido na
+  tabela (Input tem eixos field_variant × size × color_scheme + handler
+  `on_change`, é o próximo batch).
+- **C2 — cobertura do subset. 🚧 em progresso.** Expressões: operadores
+  aritméticos (`* / %`), comparação (`== != < <= > >=`), booleanos (`and`/`or`),
+  unários (`not`/`-`), ternário (`a if c else b`), comprehensions
+  (`[e for x in it if c]` → `.filter().map()`), `in`/`not in` → `.includes()`,
+  subscript. Statements: `if`/`elif`/`else`, `for … in` → `for…of`, `Assign`
+  (`const`), `AugAssign` (`+=`…). Novo widget: `Container` (layout + escape-hatch
+  `tag`/`attrs`). **Falta:** métodos de state (classe → métodos JS), mais widgets,
+  dict/set/tuple, f-string com format-spec.
 - **C3 — CLI. ✅ feito.** `tempestweb build --mode transpile <path>` (e
   `run --mode transpile`, que serve o bundle estático como o wasm) transpila o
   `app.py` do projeto para `client/transpile/app.gen.js` e emite um bundle

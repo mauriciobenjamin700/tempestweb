@@ -17,12 +17,12 @@ export function makeState() {
 export function view(app) {
   const increment = () => {
     app.setState((s) => {
-      s.value = s.value + 1;
+      s.value = (s.value + 1);
     });
   };
   const decrement = () => {
     app.setState((s) => {
-      s.value = s.value - 1;
+      s.value = (s.value - 1);
     });
   };
   return Column({

@@ -39,7 +39,7 @@ def test_set_state_lambda_setattr_to_assignment() -> None:
     )
     assert "const inc = () => {" in js
     assert "app.setState((s) => {" in js
-    assert "s.value = s.value + 1;" in js
+    assert "s.value = (s.value + 1);" in js
 
 
 def test_fstring_becomes_template_literal() -> None:
@@ -61,7 +61,66 @@ def test_unsupported_import_raises_with_location() -> None:
     assert "app.py:1:" in str(exc.value)
 
 
-def test_unsupported_operator_raises() -> None:
-    """An operator outside the subset is a compile error."""
+def test_arithmetic_operators() -> None:
+    """`*`, `/`, `%` transpile (parenthesized) alongside `+`/`-`."""
+    js = gen("def f(a, b):\n    return a * b % 2\n")
+    assert "((a * b) % 2)" in js
+
+
+def test_comparison_and_boolean_and_unary() -> None:
+    """Comparisons, boolean and unary operators map to JS forms."""
+    js = gen("def f(a, b):\n    return a >= b and not a\n")
+    assert "(a >= b && !a)" in js
+
+
+def test_ternary_conditional_expression() -> None:
+    """`a if c else b` becomes a JS conditional expression."""
+    js = gen('def f(x):\n    return "hi" if x else "bye"\n')
+    assert '(x ? "hi" : "bye")' in js
+
+
+def test_list_comprehension_becomes_map() -> None:
+    """A list comprehension becomes a chained `.filter().map()`."""
+    js = gen("def f(xs):\n    return [Text(content=x) for x in xs if x]\n")
+    assert "xs.filter((x) => x).map((x) => Text({ content: x }))" in js
+
+
+def test_membership_uses_includes() -> None:
+    """`x in xs` becomes `xs.includes(x)`."""
+    js = gen("def f(x, xs):\n    return x in xs\n")
+    assert "xs.includes(x)" in js
+
+
+def test_if_elif_else_statement() -> None:
+    """`if`/`elif`/`else` chains map to JS `if`/`else if`/`else`."""
+    js = gen(
+        "def f(x):\n"
+        "    if x > 0:\n        y = 1\n"
+        "    elif x < 0:\n        y = 2\n"
+        "    else:\n        y = 3\n"
+    )
+    assert "if (x > 0) {" in js
+    assert "} else if (x < 0) {" in js
+    assert "} else {" in js
+
+
+def test_for_loop_and_augmented_assignment() -> None:
+    """`for x in it:` becomes `for (const x of it)`, `+=` stays `+=`."""
+    js = gen(
+        "def f(items):\n    total = 0\n    for item in items:\n        total += item\n"
+    )
+    assert "for (const item of items) {" in js
+    assert "total += item;" in js
+    assert "const total = 0;" in js
+
+
+def test_subscript_index() -> None:
+    """`xs[i]` transpiles to `xs[i]`."""
+    js = gen("def f(xs, i):\n    return xs[i]\n")
+    assert "return xs[i];" in js
+
+
+def test_unsupported_construct_raises() -> None:
+    """A construct still outside the subset is a compile error."""
     with pytest.raises(TranspileError):
-        gen("def f(a, b):\n    return a * b\n")
+        gen("def f(a):\n    return {k: v for k, v in a}\n")  # dict comprehension

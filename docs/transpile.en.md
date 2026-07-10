@@ -92,6 +92,13 @@ Serve it with any static host (or locally):
 tempestweb run --mode transpile --path examples/counter
 ```
 
+While developing, use the **livereload** loop — edit `app.py` and the browser
+reloads with the recompiled bundle:
+
+```bash
+tempestweb dev --mode transpile --path examples/counter
+```
+
 !!! check "What happened"
     Your `view()` became `app.gen.js` — native JavaScript. The runtime holds the
     state, runs `view()`, **diffs** in JS and applies **granular patches** to the
@@ -231,8 +238,7 @@ spirit of `mypy --strict`.
     expands to primitives at `build()` time — many from data/loops — so they are
     not auto-portable to a Python-free runtime. The layout aliases `HStack` /
     `VStack` are the exception (they expand to `Row`/`Column`). Also out:
-    dict/set/tuple, f-strings with a format spec, and `dev --mode transpile`
-    (watch → recompile).
+    dict/set/tuple and f-strings with a format spec.
 
 ## Recap
 

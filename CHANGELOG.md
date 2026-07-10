@@ -4,6 +4,18 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.14.0] — 2026-07-10
+
+### Added
+
+- **Mode C — `tempestweb dev --mode transpile` (watch + livereload).** The dev
+  loop now serves the transpile mode with browser livereload, completing the CLI
+  story (`build` / `run` / `dev`) for Mode C. It builds the static bundle, serves
+  it over the dev HTTP app, and rebuilds on every watched change before reloading
+  the tab; a failing rebuild (syntax error or out-of-subset construct) is reported
+  and skipped so the last good bundle keeps serving. Both static modes (wasm,
+  transpile) share the devserver; Mode B still uses `run --mode server`.
+
 ## [0.13.0] — 2026-07-10
 
 ### Added

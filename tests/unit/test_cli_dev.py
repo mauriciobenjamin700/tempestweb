@@ -85,3 +85,27 @@ async def test_serve_dev_missing_server_extra_raises_friendly(
     monkeypatch.setitem(sys.modules, "tempestweb.devserver", None)
     with pytest.raises(DevError, match=r"'server' extra"):
         await serve_dev(root, mode="wasm")
+
+
+async def test_serve_dev_rejects_server_mode(tmp_path: Path) -> None:
+    """`dev` serves the static modes; Mode B is redirected to `run --mode server`."""
+    root = _project(tmp_path)
+    with pytest.raises(DevError, match=r"static modes"):
+        await serve_dev(root, mode="server")
+
+
+async def test_serve_dev_accepts_transpile_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`dev --mode transpile` passes the mode guard and reaches the build step."""
+    root = _project(tmp_path)
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("sentinel-build")
+
+    # Get past the guard, then fail at the build so we don't bind a socket.
+    monkeypatch.setattr(
+        "tempestweb.cli.commands.build.build_artifact", _boom, raising=True
+    )
+    with pytest.raises(DevError, match=r"initial build failed: sentinel-build"):
+        await serve_dev(root, mode="transpile")

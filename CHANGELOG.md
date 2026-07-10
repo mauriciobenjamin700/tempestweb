@@ -4,6 +4,22 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.22.0] — 2026-07-10
+
+### Added
+
+- **Animation in Mode C (declarative transitions) — core coverage closed.** Give
+  a widget's `Style` a `Transition` and the browser tweens it when a styled field
+  changes (width/color/opacity) — no Python runtime, no frame driver.
+  `client/transpile/motion.js` ports `tempest_core.style`'s `Transition` + `Curve`
+  (linear/ease/ease-in/out/in-out/bounce/elastic); `Color` joins the Style-value
+  helpers. Verified live (Playwright): a box animates width 120→320px over a
+  400ms CSS transition. This closes `tempest_core` coverage in Mode C — widgets,
+  layout components, native (10 capabilities), validators, navigation, i18n,
+  theme + responsiveness, and animation. The imperative, frame-driven
+  `AnimationController` remains the one advanced piece (declarative transitions
+  cover the canonical case).
+
 ## [0.21.0] — 2026-07-10
 
 ### Added

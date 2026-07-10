@@ -26,6 +26,10 @@ __all__: list[str] = ["generate"]
 _RUNTIME_NAMES: frozenset[str] = frozenset({"App", "State"})
 # The native-capability namespace, imported from `./native.js` in Mode C.
 _NATIVE_NAMES: frozenset[str] = frozenset({"native"})
+# Navigation primitives, imported from `./nav.js` in Mode C.
+_NAV_NAMES: frozenset[str] = frozenset({"Route", "NavStack", "routes_from_path"})
+# Imported JS classes that must be constructed with `new` (Route(...) -> new Route).
+_JS_CLASSES: frozenset[str] = frozenset({"Route", "NavStack"})
 # Pure field validators (from tempest_core.validators), ported to ./validators.js.
 _VALIDATOR_NAMES: frozenset[str] = frozenset(
     {
@@ -314,6 +318,9 @@ class _Generator:
         ``native.http.request("GET", url, json=body)``) → the positional args
         followed by a trailing options object holding the keywords.
         """
+        builtin = self._builtin_call(node, indent)
+        if builtin is not None:
+            return builtin
         func = self.expr(node.func, indent)
         if node.keywords and not node.args:
             return self._object_call(func, node, indent)
@@ -328,9 +335,36 @@ class _Generator:
                 pairs.append(f"{_js_name(kw.arg)}: {self.expr(kw.value, indent)}")
             parts.append("{ " + ", ".join(pairs) + " }")
         args = ", ".join(parts)
-        is_class = isinstance(node.func, ast.Name) and node.func.id in self.class_names
+        is_class = isinstance(node.func, ast.Name) and (
+            node.func.id in self.class_names or node.func.id in _JS_CLASSES
+        )
         prefix = "new " if is_class else ""
         return f"{prefix}{func}({args})"
+
+    def _builtin_call(self, node: ast.Call, indent: int) -> str | None:
+        """Emit a Python builtin that maps to a JS idiom, or None if not a builtin.
+
+        Supports the common pure builtins a ``view`` uses: ``len(x)`` →
+        ``x.length``, ``str(x)`` → ``String(x)``, ``int``/``float`` → ``Number``,
+        ``bool`` → ``Boolean``, ``abs`` → ``Math.abs``. Only the single-argument,
+        keyword-free forms are handled.
+        """
+        if not isinstance(node.func, ast.Name) or node.keywords or len(node.args) != 1:
+            return None
+        arg = self.expr(node.args[0], indent)
+        name = node.func.id
+        if name == "len":
+            return f"{arg}.length"
+        simple: dict[str, str] = {
+            "str": "String",
+            "int": "Number",
+            "float": "Number",
+            "bool": "Boolean",
+            "abs": "Math.abs",
+        }
+        if name in simple:
+            return f"{simple[name]}({arg})"
+        return None
 
     def _object_call(self, func: str, node: ast.Call, indent: int) -> str:
         """Emit a widget-style call whose kwargs become a single object arg.
@@ -343,14 +377,20 @@ class _Generator:
             if kw.arg is None:
                 raise TranspileError("**kwargs is not supported", node, self.filename)
             pairs.append((_js_name(kw.arg), self.expr(kw.value, indent + 1)))
+        # A keyword-only call of a class (a dataclass, or an imported JS class like
+        # Route) is a constructor — `new Route({ name })`, not `Route({ name })`.
+        is_class = isinstance(node.func, ast.Name) and (
+            node.func.id in self.class_names or node.func.id in _JS_CLASSES
+        )
+        prefix = "new " if is_class else ""
         multiline = any("\n" in value for _, value in pairs)
         if not multiline:
             body = ", ".join(f"{key}: {value}" for key, value in pairs)
-            return f"{func}({{ {body} }})"
+            return f"{prefix}{func}({{ {body} }})"
         inner = indent + 1
         pad = _INDENT * inner
         lines = ",\n".join(f"{pad}{key}: {value}" for key, value in pairs)
-        return f"{func}({{\n{lines},\n{_INDENT * indent}}})"
+        return f"{prefix}{func}({{\n{lines},\n{_INDENT * indent}}})"
 
     def _lambda(self, node: ast.Lambda, indent: int) -> str:
         """Emit an arrow function.
@@ -630,8 +670,11 @@ class _Generator:
         """Emit the runtime + widgets + native + validators import lines."""
         runtime = sorted(used & _RUNTIME_NAMES)
         native = sorted(used & _NATIVE_NAMES)
+        nav = sorted(used & _NAV_NAMES)
         validators = sorted(used & _VALIDATOR_NAMES)
-        widgets = sorted(used - _RUNTIME_NAMES - _NATIVE_NAMES - _VALIDATOR_NAMES)
+        widgets = sorted(
+            used - _RUNTIME_NAMES - _NATIVE_NAMES - _NAV_NAMES - _VALIDATOR_NAMES
+        )
         lines: list[str] = []
         if runtime:
             lines.append(f'import {{ {", ".join(runtime)} }} from "./runtime.js";')
@@ -639,6 +682,8 @@ class _Generator:
             lines.append(f'import {{ {", ".join(widgets)} }} from "./widgets.js";')
         if native:
             lines.append(f'import {{ {", ".join(native)} }} from "./native.js";')
+        if nav:
+            lines.append(f'import {{ {", ".join(nav)} }} from "./nav.js";')
         if validators:
             module = "./validators.js"
             lines.append(f'import {{ {", ".join(validators)} }} from "{module}";')

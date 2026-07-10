@@ -236,6 +236,35 @@ def view(app: App[DataState]) -> Widget:
     algorithm and PT-BR messages as the core (a faithful port, locked by a
     fixture). Pairs with `Input` + state for validated, server-free forms.
 
+## Navigation (routes + URL)
+
+Mode C speaks the same navigation as Modes A/B: `app.push(Route(...))`,
+`app.pop()`, `app.replace(...)`, `app.nav.top` — synced with the browser URL
+(deep links + back/forward) automatically.
+
+```python
+from tempest_core import App, Button, Column, Route, Text, Widget
+
+
+def view(app: App[MyState]) -> Widget:
+    def open_product() -> None:
+        app.push(Route(name="/products/42"))
+
+    route = app.nav.top
+    return Column(children=[
+        Text(content=f"route: {route.name}", key="r"),
+        Button(label="open product", on_click=open_product, key="p"),
+        Button(label="back", on_click=lambda e: app.pop(), key="b"),
+    ])
+```
+
+!!! info "URL ↔ stack"
+    `app.push`/`pop` push/pop the URL (`pushState`); a deep link or the browser
+    back button reset the stack from the path (`routes_from_path`) — identical to
+    Modes A/B. **Path/query params:** the route `name` carries the full path
+    (including `?query`), as the core models it; read segments via
+    `app.nav.stack`. A typed-param router is a core-level evolution.
+
 ## The supported subset
 
 Mode C accepts a **typed subset** of Python — enough for the app layer. A

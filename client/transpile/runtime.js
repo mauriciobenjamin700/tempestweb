@@ -22,6 +22,7 @@
 
 import { mount } from "../tempestweb.js";
 import { diff } from "./diff.js";
+import { NavStack, Route, routesFromPath } from "./nav.js";
 
 /**
  * @typedef {import("../transport.js").Node} Node
@@ -56,6 +57,8 @@ export class App {
     this._state = state;
     /** @type {?() => void} */
     this._onSetState = null;
+    /** @type {NavStack} — the navigation stack (mirrors the core App.nav). */
+    this._nav = new NavStack({ stack: [new Route({ name: "/" })] });
   }
 
   /**
@@ -67,6 +70,14 @@ export class App {
   }
 
   /**
+   * The navigation stack. `app.nav.top` is the current route.
+   * @returns {NavStack}
+   */
+  get nav() {
+    return this._nav;
+  }
+
+  /**
    * Mutate the state in place, then re-render.
    *
    * @param {(state: State) => void} mutator  Applies the state change in place.
@@ -74,6 +85,54 @@ export class App {
    */
   setState(mutator) {
     mutator(this._state);
+    this._rerender();
+  }
+
+  /**
+   * Push a route onto the navigation stack and re-render.
+   * @param {Route} route  The route to push.
+   * @returns {void}
+   */
+  push(route) {
+    this._nav = new NavStack({ stack: [...this._nav.stack, route] });
+    this._rerender();
+  }
+
+  /**
+   * Pop the top route (never pops the root). Re-renders when it popped.
+   * @returns {boolean}  Whether a route was popped.
+   */
+  pop() {
+    if (this._nav.stack.length <= 1) {
+      return false;
+    }
+    this._nav = new NavStack({ stack: this._nav.stack.slice(0, -1) });
+    this._rerender();
+    return true;
+  }
+
+  /**
+   * Replace the top route with another and re-render.
+   * @param {Route} route  The replacement route.
+   * @returns {void}
+   */
+  replace(route) {
+    this._nav = new NavStack({ stack: [...this._nav.stack.slice(0, -1), route] });
+    this._rerender();
+  }
+
+  /**
+   * Reset the whole navigation stack (used by deep-link / back-forward).
+   * @param {Route[]} routes  The new stack, root-first.
+   * @returns {void}
+   */
+  reset(routes) {
+    this._nav = new NavStack({ stack: routes });
+    this._rerender();
+  }
+
+  /** Trigger the mounted re-render, if wired. @returns {void} */
+  _rerender() {
     if (this._onSetState !== null) {
       this._onSetState();
     }
@@ -153,14 +212,32 @@ export function mountApp(root, { makeState, view }) {
 
   /** @type {?(patches: Patch[]) => void} */
   let deliver = null;
+  /** @type {?(path: string) => void} — view→URL sink (wired by mount via router). */
+  let navSink = null;
+  // The last top-route path the URL reflects, so an imperative push/pop that
+  // changes it triggers a pushState (mirrors the server session's view→URL leg).
+  let lastPath = app.nav.top.name;
 
   /** @type {import("../transport.js").Transport} */
   const transport = {
     onPatches(handler) {
       deliver = handler;
     },
+    /** Register the view→URL sink (mount wires it to the router's navigateTo). */
+    onNavigate(handler) {
+      navSink = handler;
+    },
     /** @param {TWEvent} event */
     sendEvent(event) {
+      // URL→view: a deep link / back-forward resets the nav stack from the path.
+      if (event.type === "navigate") {
+        const path = event.payload?.path;
+        if (typeof path === "string" && path) {
+          lastPath = path; // this change came FROM the URL; don't echo it back
+          app.reset(routesFromPath(path));
+        }
+        return;
+      }
       if (event.key == null) {
         return;
       }
@@ -192,6 +269,15 @@ export function mountApp(root, { makeState, view }) {
       patchLog.push(patches);
       if (deliver !== null) {
         deliver(patches);
+      }
+    }
+    // view→URL: if the app navigated imperatively (push/pop/replace) the top
+    // path changed — tell the router to pushState the new URL.
+    const path = app.nav.top.name;
+    if (path !== lastPath) {
+      lastPath = path;
+      if (navSink !== null) {
+        navSink(path);
       }
     }
   };

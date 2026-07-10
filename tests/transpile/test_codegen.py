@@ -201,6 +201,34 @@ def test_validator_fixture_matches_core() -> None:
     assert on_disk == gen_v.render_fixture_text()
 
 
+def test_navigation_imports_map_to_nav_module() -> None:
+    """`Route`/`NavStack` route to ./nav.js; nav calls transpile."""
+    js = gen(
+        "from tempest_core import App, Route, Widget\n\n"
+        "def view(app):\n"
+        '    app.push(Route(name="/about"))\n'
+        "    return app.nav.top.name\n"
+    )
+    assert 'import { Route } from "./nav.js";' in js
+    assert 'app.push(new Route({ name: "/about" }));' in js
+    assert "return app.nav.top.name;" in js
+
+
+def test_builtins_map_to_js_idioms() -> None:
+    """`len`/`str`/`abs` map to JS idioms."""
+    assert "x.length" in gen("def f(x):\n    return len(x)\n")
+    assert "String(x)" in gen("def f(x):\n    return str(x)\n")
+    assert "Math.abs(x)" in gen("def f(x):\n    return abs(x)\n")
+
+
+def test_route_fixture_matches_core() -> None:
+    """The routes_from_path parity fixture byte-matches a fresh core render."""
+    from tests.conformance import _transpile_routes as gen_r
+
+    on_disk = gen_r.ROUTES_FIXTURE.read_text(encoding="utf-8")
+    assert on_disk == gen_r.render_fixture_text()
+
+
 def test_native_import_rejects_non_native_symbol() -> None:
     """`from tempestweb import` only allows `native`."""
     with pytest.raises(TranspileError, match="only `native`"):

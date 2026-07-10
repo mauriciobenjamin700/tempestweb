@@ -28,8 +28,10 @@ _RUNTIME_NAMES: frozenset[str] = frozenset({"App", "State"})
 _NATIVE_NAMES: frozenset[str] = frozenset({"native"})
 # Navigation primitives, imported from `./nav.js` in Mode C.
 _NAV_NAMES: frozenset[str] = frozenset({"Route", "NavStack", "routes_from_path"})
+# Localization helpers, imported from `./i18n.js` in Mode C.
+_I18N_NAMES: frozenset[str] = frozenset({"translate", "t", "Locale"})
 # Imported JS classes that must be constructed with `new` (Route(...) -> new Route).
-_JS_CLASSES: frozenset[str] = frozenset({"Route", "NavStack"})
+_JS_CLASSES: frozenset[str] = frozenset({"Route", "NavStack", "Locale"})
 # Pure field validators (from tempest_core.validators), ported to ./validators.js.
 _VALIDATOR_NAMES: frozenset[str] = frozenset(
     {
@@ -593,7 +595,10 @@ class _Generator:
             elif isinstance(node, ast.ClassDef):
                 self.class_names.add(node.name)
                 top_level.append(node)
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            elif isinstance(
+                node,
+                (ast.FunctionDef, ast.AsyncFunctionDef, ast.Assign, ast.AnnAssign),
+            ):
                 top_level.append(node)
             elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
                 continue  # module docstring
@@ -611,12 +616,40 @@ class _Generator:
             if isinstance(node, ast.ClassDef):
                 bodies.append(self._class(node))
                 self.referenced.add("State")
+            elif isinstance(node, ast.Assign | ast.AnnAssign):
+                bodies.append(self._module_const(node))
             else:
                 assert isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                 bodies.append(self._function(node))
 
         imports = self._imports(self.referenced & importable)
         return "\n\n".join([imports, *bodies]) + "\n"
+
+    def _module_const(self, node: ast.Assign | ast.AnnAssign) -> str:
+        """Emit a module-level constant (e.g. a translations table) as `const`.
+
+        A single ``NAME = value`` or annotated ``NAME: T = value`` becomes a
+        top-level ``const NAME = value;``. Tuple/multiple targets are unsupported.
+        """
+        target: ast.expr
+        value: ast.expr | None
+        if isinstance(node, ast.AnnAssign):
+            target, value = node.target, node.value
+        else:
+            if len(node.targets) != 1:
+                raise TranspileError(
+                    "multiple assignment targets are not supported",
+                    node,
+                    self.filename,
+                )
+            target, value = node.targets[0], node.value
+        if not isinstance(target, ast.Name) or value is None:
+            raise TranspileError(
+                "only a single named module constant with a value is supported",
+                node,
+                self.filename,
+            )
+        return f"const {target.id} = {self.expr(value, 0)};"
 
     def _collect_imports(
         self, node: ast.Import | ast.ImportFrom, importable: set[str]
@@ -671,9 +704,15 @@ class _Generator:
         runtime = sorted(used & _RUNTIME_NAMES)
         native = sorted(used & _NATIVE_NAMES)
         nav = sorted(used & _NAV_NAMES)
+        i18n = sorted(used & _I18N_NAMES)
         validators = sorted(used & _VALIDATOR_NAMES)
         widgets = sorted(
-            used - _RUNTIME_NAMES - _NATIVE_NAMES - _NAV_NAMES - _VALIDATOR_NAMES
+            used
+            - _RUNTIME_NAMES
+            - _NATIVE_NAMES
+            - _NAV_NAMES
+            - _I18N_NAMES
+            - _VALIDATOR_NAMES
         )
         lines: list[str] = []
         if runtime:
@@ -684,6 +723,8 @@ class _Generator:
             lines.append(f'import {{ {", ".join(native)} }} from "./native.js";')
         if nav:
             lines.append(f'import {{ {", ".join(nav)} }} from "./nav.js";')
+        if i18n:
+            lines.append(f'import {{ {", ".join(i18n)} }} from "./i18n.js";')
         if validators:
             module = "./validators.js"
             lines.append(f'import {{ {", ".join(validators)} }} from "{module}";')

@@ -15,3 +15,6 @@
 // widgets.gen.js already re-exports Edge/Style from widget-support.js, so a single
 // star re-export gives the app every builder plus the Style/Edge helpers.
 export * from "./widgets.gen.js";
+
+// Ergonomic layout components (the portable subset of tempest_core.components).
+export { HStack, VStack } from "./components.js";

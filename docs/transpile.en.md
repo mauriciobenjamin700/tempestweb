@@ -206,6 +206,8 @@ spirit of `mypy --strict`.
       friends, `return`.
     - **Structures:** a state `@dataclass` (fields + methods), `make_state()`,
       `view()` with handler closures.
+    - **Layout components:** `HStack` / `VStack` (SwiftUI-style ergonomic
+      aliases) — `gap` as a token (`"md"`) or px, `align`/`justify` direct.
     - **Widgets:** **all ~64 `tempest_core` widgets** — layout (`Column`, `Row`,
       `Container`, `Stack`, `Wrap`, `ScrollView`, `SafeArea`, `Spacer`), display
       (`Text`, `Icon`, `Image`, `Svg`, `Spinner`, `Skeleton`, `ProgressBar`),
@@ -224,9 +226,13 @@ spirit of `mypy --strict`.
     registered but inert for now.
 
 !!! warning "Still outside the subset"
-    `tempest_core.components` (compositions like Card/DataTable/Tabs — the layer
-    above widgets), dict/set/tuple, f-strings with a format spec, and
-    `dev --mode transpile` (watch → recompile).
+    Most of `tempest_core.components` (Card, DataTable, Tabs, charts, form
+    inputs …). Unlike the widgets, components are **Python composition** that
+    expands to primitives at `build()` time — many from data/loops — so they are
+    not auto-portable to a Python-free runtime. The layout aliases `HStack` /
+    `VStack` are the exception (they expand to `Row`/`Column`). Also out:
+    dict/set/tuple, f-strings with a format spec, and `dev --mode transpile`
+    (watch → recompile).
 
 ## Recap
 

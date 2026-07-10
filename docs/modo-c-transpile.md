@@ -191,8 +191,15 @@ pelo base theme).
   keyed por evento DOM — ligados por tipo IR (`Button`→click,
   `Input`/`Checkbox`→input/change, `Switch` div→click). Golden tests travam ambos
   os módulos gerados contra o core; galeria multi-widget verificada no Playwright.
-  **Falta:** `tempest_core.components` (Card/DataTable/Tabs — composições, camada
-  acima dos widgets) e eventos exóticos que o cliente ainda não emite.
+  **Falta:** eventos exóticos que o cliente ainda não emite.
+- **Componentes de layout (`HStack`/`VStack`). ✅** Único subset portável de
+  `tempest_core.components`: expandem em `Row`/`Column` com `gap` (token via
+  `spacing.gen.js` ou px) + `align`/`justify`. Hand-authored em `components.js`,
+  travados por fixture derivada do core (`transpile_component_samples.json`,
+  comparação order-agnostic via `diff`). **O resto dos componentes fica fora:**
+  são composição Python que expande no `build()` (muitos data/loop-driven, ex.:
+  Card/DataTable/Tabs/charts) — não auto-portáveis para um runtime sem Python sem
+  compilar o source de composição do core (projeto separado maior).
 - **C2 — cobertura do subset. 🚧 em progresso.** Expressões: operadores
   aritméticos (`* / %`), comparação (`== != < <= > >=`), booleanos (`and`/`or`),
   unários (`not`/`-`), ternário (`a if c else b`), comprehensions

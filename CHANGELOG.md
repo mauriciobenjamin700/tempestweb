@@ -4,6 +4,27 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.13.0] — 2026-07-10
+
+### Added
+
+- **Mode C — the ergonomic layout components `HStack` / `VStack`.** The
+  `tempest_core.components` layer is Python composition (each expands to a
+  primitive widget tree at `build()` time), so it is not auto-portable to a
+  Python-free runtime — except the pure layout aliases, which expand to a plain
+  `Row` / `Column`. `HStack`/`VStack` are now available in Mode C
+  (`client/transpile/components.js`): a `gap` as a spacing token (`"md"`,
+  resolved via the core-derived `spacing.gen.js`) or a raw px, plus direct
+  `align`/`justify`. Parity with the core is locked by a core-derived fixture
+  (order-agnostic) and byte-match golden tests.
+
+### Note
+
+- The rest of `tempest_core.components` (Card, DataTable, Tabs, charts, form
+  inputs) stays out of Mode C: their composition is data/loop-driven Python that
+  a zero-Python runtime cannot reproduce without compiling the core's own
+  composition source. Use Modes A/B for those, or compose from primitives.
+
 ## [0.12.0] — 2026-07-10
 
 ### Added

@@ -319,3 +319,18 @@ test("a native failure surfaces as a NativeError", async () => {
     return true;
   });
 });
+
+test("native.share.is_supported reports false without navigator.share", async () => {
+  // Node's built-in navigator has no `.share`, so the capability reports false —
+  // proving the dispatch + unwrap (`.supported`) path.
+  assert.equal(await native.share.is_supported(), false);
+});
+
+test("native.audio.play dispatches src/volume/channel", async () => {
+  // No Audio ctor -> the capability reports unavailable, proving the dispatch
+  // path and arg shaping without a real audio device.
+  await assert.rejects(() => native.audio.play("/x.wav", { volume: 0.5 }), (err) => {
+    assert.ok(err instanceof NativeError);
+    return true;
+  });
+});

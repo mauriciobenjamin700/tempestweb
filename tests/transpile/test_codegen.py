@@ -182,6 +182,25 @@ def test_dict_literal_becomes_object() -> None:
     assert 'f({ "a": 1, "b": app.state.x })' in js
 
 
+def test_validators_import_maps_to_validators_module() -> None:
+    """`from tempest_core.validators import ...` routes to ./validators.js."""
+    js = gen(
+        "from tempest_core.validators import validate_email\n\n"
+        "def view(app):\n"
+        "    return validate_email(app.state.x)\n"
+    )
+    assert 'import { validate_email } from "./validators.js";' in js
+    assert "return validate_email(app.state.x);" in js
+
+
+def test_validator_fixture_matches_core() -> None:
+    """The validator-parity fixture byte-matches a fresh core render."""
+    from tests.conformance import _transpile_validators as gen_v
+
+    on_disk = gen_v.VALIDATORS_FIXTURE.read_text(encoding="utf-8")
+    assert on_disk == gen_v.render_fixture_text()
+
+
 def test_native_import_rejects_non_native_symbol() -> None:
     """`from tempestweb import` only allows `native`."""
     with pytest.raises(TranspileError, match="only `native`"):

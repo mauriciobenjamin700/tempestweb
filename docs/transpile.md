@@ -227,7 +227,14 @@ def view(app: App[DataState]) -> Widget:
     Um handler pode ser `async def` e usar `await`. O re-render acontece quando o
     `set_state` roda (depois do `await`), então a UI reflete o resultado assim que
     a capacidade resolve. Capacidades disponíveis no Modo C: `http`, `storage`
-    (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`.
+    (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`, `share`,
+    `audio`, `file`, `notifications`.
+
+!!! tip "Validadores de campo"
+    `from tempest_core.validators import validate_email, validate_cpf,
+    validate_cnpj, validate_phone` roda **client-side** no Modo C, com o mesmo
+    algoritmo e as mesmas mensagens PT-BR do core (port fiel, travado por fixture).
+    Combina com `Input` + estado para forms validados sem servidor.
 
 ## O subset suportado
 

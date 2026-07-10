@@ -376,6 +376,22 @@ def view(app: App[S]) -> Widget:
 matemática do core. Verificado no Playwright: a largura anima 100→340 (ease-out)
 e assenta. **Isto fecha 100% da cobertura do tempest-core no Modo C.**
 
+## O tour completo
+
+Tudo acima — estado com métodos, navegação, i18n, tema + responsividade, um
+formulário validado e uma animação imperativa — vive junto num único app de
+referência, [`examples/transpile-tour`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/examples/transpile-tour/app.py):
+
+```bash
+tempestweb build --mode transpile --path examples/transpile-tour
+tempestweb dev   --mode transpile --path examples/transpile-tour   # livereload
+```
+
+!!! tip "Um só `view`, todos os modos"
+    O mesmo `view()` do tour roda inalterado nos Modos A e B. O `build` valida
+    isso renderizando pelo core real — uma API que só existisse no Modo C
+    quebraria o build, então o tour é prova viva de portabilidade.
+
 ## O subset suportado
 
 O Modo C aceita um **subset tipado** de Python — o suficiente para a camada de

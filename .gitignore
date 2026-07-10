@@ -27,3 +27,5 @@ node_modules/
 # Local session permissions (not shared)
 .claude/settings.local.json
 .playwright-mcp/
+# Ad-hoc Playwright verification screenshots
+verify-*.png

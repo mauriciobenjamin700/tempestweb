@@ -124,6 +124,7 @@ plugins:
             "Execution modes": "Modos de execução"
             "Running Mode B (server)": "Rodando o Modo B (servidor)"
             "Static SSR": "SSR estático"
+            "Mode C — transpile": "Modo C — transpile"
             "Wire contract": "Contrato de fronteira"
             Capabilities: Capacidades
             "PWA & offline": "PWA e offline"
@@ -223,6 +224,7 @@ nav:
       - "Execution modes":
           - "Running Mode B (server)": examples/server-mode.md
   - Static SSR: ssr.md
+  - Mode C — transpile: transpile.md
   - Wire contract: wire-contract.md
   - Capabilities: capabilities.md
   - PWA & offline: pwa.md

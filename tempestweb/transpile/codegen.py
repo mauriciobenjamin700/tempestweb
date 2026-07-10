@@ -324,16 +324,7 @@ class _Generator:
                     node,
                     self.filename,
                 )
-            text = self._const_spec(spec)
-            match = re.fullmatch(r"\.(\d+)f", text)
-            if match is None:
-                raise TranspileError(
-                    f"f-string format spec {text!r} is not supported "
-                    "(only fixed-point `.Nf`)",
-                    node,
-                    self.filename,
-                )
-            return f"${{({expr}).toFixed({match.group(1)})}}"
+            return f"${{{self._format_spec_js(expr, self._const_spec(spec), node)}}}"
         if conversion in (-1, None):
             return f"${{{expr}}}"
         if conversion == ord("s"):
@@ -343,6 +334,70 @@ class _Generator:
         raise TranspileError(
             "f-string conversion `!a` (ascii) is not supported", node, self.filename
         )
+
+    def _format_spec_js(self, expr: str, text: str, node: ast.AST) -> str:
+        """Map a Python numeric format spec to an equivalent JS expression.
+
+        Supported specs (a focused, faithful subset):
+
+        - ``.Nf`` → ``(x).toFixed(N)`` — fixed-point.
+        - ``,.Nf`` → ``(x).toLocaleString("en-US", {min/maxFractionDigits: N})``
+          — grouped thousands with fixed decimals.
+        - ``,`` → ``(x).toLocaleString("en-US")`` — grouped thousands.
+        - ``.N%`` → ``((x) * 100).toFixed(N) + "%"`` — percent (``N`` defaults 0).
+        - ``d`` / ``,d`` → truncated integer, optionally grouped.
+
+        Args:
+            expr: The already-emitted JS for the interpolated value.
+            text: The literal format-spec text (without the leading ``:``).
+            node: The owning node, for the error location.
+
+        Returns:
+            The JS expression producing the formatted string.
+
+        Raises:
+            TranspileError: For any spec outside the supported subset (e.g.
+                alignment/fill, sign, binary/hex, exponent).
+        """
+        match = re.fullmatch(r"(,)?(?:\.(\d+))?([fF%d])?", text)
+        grouped = bool(match and match.group(1))
+        precision = match.group(2) if match else None
+        kind = match.group(3) if match else None
+        if match is None or not (grouped or precision is not None or kind):
+            raise TranspileError(
+                f"f-string format spec {text!r} is not supported "
+                "(supported: `.Nf`, `,`, `,.Nf`, `.N%`, `d`, `,d`)",
+                node,
+                self.filename,
+            )
+        if kind in ("f", "F"):
+            if precision is None:
+                raise TranspileError(
+                    "fixed-point spec needs a precision (e.g. `.2f`)",
+                    node,
+                    self.filename,
+                )
+            if grouped:
+                return (
+                    f'({expr}).toLocaleString("en-US", '
+                    f"{{ minimumFractionDigits: {precision}, "
+                    f"maximumFractionDigits: {precision} }})"
+                )
+            return f"({expr}).toFixed({precision})"
+        if kind == "%":
+            digits = precision if precision is not None else "0"
+            return f'(({expr}) * 100).toFixed({digits}) + "%"'
+        if precision is not None:
+            raise TranspileError(
+                f"format spec {text!r} sets a precision without a float type "
+                "(use `.Nf` or `.N%`)",
+                node,
+                self.filename,
+            )
+        if kind == "d":
+            trunc = f"Math.trunc({expr})"
+            return f'{trunc}.toLocaleString("en-US")' if grouped else f"String({trunc})"
+        return f'({expr}).toLocaleString("en-US")'
 
     def _const_spec(self, spec: ast.expr) -> str:
         """Return the text of a constant f-string format spec.
@@ -584,27 +639,72 @@ class _Generator:
     def _builtin_call(self, node: ast.Call, indent: int) -> str | None:
         """Emit a Python builtin that maps to a JS idiom, or None if not a builtin.
 
-        Supports the common pure builtins a ``view`` uses: ``len(x)`` →
-        ``x.length``, ``str(x)`` → ``String(x)``, ``int``/``float`` → ``Number``,
-        ``bool`` → ``Boolean``, ``abs`` → ``Math.abs``. Only the single-argument,
-        keyword-free forms are handled.
+        Supports the pure builtins a ``view`` commonly uses:
+
+        - single-arg casts/measures: ``len(x)`` → ``x.length``, ``str`` →
+          ``String``, ``int``/``float`` → ``Number``, ``bool`` → ``Boolean``,
+          ``abs`` → ``Math.abs``;
+        - ``round(x)`` → ``Math.round(x)``, ``round(x, n)`` →
+          ``Number((x).toFixed(n))``;
+        - ``min``/``max`` — variadic (``Math.min(a, b)``) or over one iterable
+          (``Math.min(...it)``);
+        - ``sum(it)`` → ``it.reduce((a, b) => a + b, 0)``;
+        - ``range(stop)`` / ``range(start, stop[, step])`` → a materialized array
+          (so a comprehension's ``.map``/``.filter`` chain has something to run
+          on — JS has no lazy ``range``).
+
+        Keyword arguments are never a builtin here (returns ``None``).
         """
-        if not isinstance(node.func, ast.Name) or node.keywords or len(node.args) != 1:
+        if not isinstance(node.func, ast.Name) or node.keywords:
             return None
-        arg = self.expr(node.args[0], indent)
         name = node.func.id
-        if name == "len":
-            return f"{arg}.length"
-        simple: dict[str, str] = {
-            "str": "String",
-            "int": "Number",
-            "float": "Number",
-            "bool": "Boolean",
-            "abs": "Math.abs",
-        }
-        if name in simple:
-            return f"{simple[name]}({arg})"
+        args = [self.expr(a, indent) for a in node.args]
+        count = len(args)
+        if name == "range" and count in (1, 2, 3):
+            return self._range(args)
+        if name == "len" and count == 1:
+            return f"{args[0]}.length"
+        if name == "round" and count == 1:
+            return f"Math.round({args[0]})"
+        if name == "round" and count == 2:
+            return f"Number(({args[0]}).toFixed({args[1]}))"
+        if name == "sum" and count == 1:
+            return f"{args[0]}.reduce((a, b) => a + b, 0)"
+        if name in ("min", "max"):
+            js = "Math.min" if name == "min" else "Math.max"
+            if count == 1:
+                return f"{js}(...{args[0]})"
+            if count >= 2:
+                return f"{js}({', '.join(args)})"
+        if count == 1:
+            simple: dict[str, str] = {
+                "str": "String",
+                "int": "Number",
+                "float": "Number",
+                "bool": "Boolean",
+                "abs": "Math.abs",
+            }
+            if name in simple:
+                return f"{simple[name]}({args[0]})"
         return None
+
+    @staticmethod
+    def _range(args: list[str]) -> str:
+        """Materialize a Python ``range(...)`` as a JS array.
+
+        Args:
+            args: The already-emitted JS for 1–3 range arguments
+                (``stop`` | ``start, stop`` | ``start, stop, step``).
+
+        Returns:
+            An ``Array.from(...)`` expression producing the same integers.
+        """
+        if len(args) == 1:
+            return f"Array.from({{ length: {args[0]} }}, (_, i) => i)"
+        start, stop = args[0], args[1]
+        step = args[2] if len(args) == 3 else "1"
+        length = f"Math.max(0, Math.ceil(({stop} - {start}) / {step}))"
+        return f"Array.from({{ length: {length} }}, (_, i) => {start} + i * {step})"
 
     def _object_call(self, func: str, node: ast.Call, indent: int) -> str:
         """Emit a widget-style call whose kwargs become a single object arg.

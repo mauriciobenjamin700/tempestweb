@@ -404,7 +404,11 @@ spirit of `mypy --strict`.
       boolean (`and`/`or`), unary (`not`/`-`), ternary (`a if c else b`), list
       and dict comprehensions (`[e for x in it if c]`, `{k: v for x in it}`),
       `list`/`tuple`/`set`/`dict` literals, `in`/`not in`, indexing, f-strings
-      (incl. `{x:.2f}`, `{x!s}`, `{x!r}`), expression lambdas.
+      (formats `{x:.2f}`, `{x:,}`, `{x:,.2f}`, `{x:.1%}`, `{x:d}`; conversions
+      `{x!s}`, `{x!r}`), expression lambdas.
+    - **Builtins:** `len`, `str`/`int`/`float`/`bool`, `abs`, `round(x[, n])`,
+      `min`/`max` (variadic or over one iterable), `sum(it)`, `range(...)`
+      (materialized to an array).
     - **Statements:** `if`/`elif`/`else`, `for … in`, assignment, `+=` and
       friends, `return`.
     - **Structures:** a state `@dataclass` (fields + methods), `make_state()`,
@@ -435,8 +439,8 @@ spirit of `mypy --strict`.
     not auto-portable to a Python-free runtime. The layout aliases `HStack` /
     `VStack` are the exception (they expand to `Row`/`Column`). Also out:
     multi-loop or destructured comprehensions (`for k, v in …`), and f-string
-    format specs beyond `.Nf` (e.g. alignment `{x:>5}`, dynamic `{x:.{n}f}`,
-    the `!a` conversion).
+    format specs beyond the supported set (e.g. alignment `{x:>5}`, sign
+    `{x:+.2f}`, hex/bin `{x:x}`, dynamic `{x:.{n}f}`, the `!a` conversion).
 
 ## Recap
 

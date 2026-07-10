@@ -4,6 +4,20 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.20.0] — 2026-07-10
+
+### Added
+
+- **i18n in Mode C (`translate`/`t` + `Locale`).** The core's localization works
+  in the transpile mode: look a key up in a `{language: {key: template}}` table by
+  the locale's language and interpolate `{name}`, mirroring `tempest_core.i18n`
+  (including the miss/fallback rules). `client/transpile/i18n.js` ports it; the
+  transpiler routes `from tempest_core import translate, t, Locale` to it.
+  Verified live (Playwright): a language toggle flips PT → EN reactively.
+- **Module-level constants in the subset.** A top-level `NAME = {...}` (e.g. a
+  translations table) now transpiles to a `const`, so apps can define shared data
+  outside `view`.
+
 ## [0.19.0] — 2026-07-10
 
 ### Added

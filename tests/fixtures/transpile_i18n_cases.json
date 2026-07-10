@@ -1,0 +1,58 @@
+{
+  "table": {
+    "pt": {
+      "hello": "Olá, {name}",
+      "bye": "Tchau"
+    },
+    "en": {
+      "hello": "Hi, {name}",
+      "bye": "Bye"
+    }
+  },
+  "cases": [
+    {
+      "language": "pt",
+      "key": "hello",
+      "params": {
+        "name": "Ana"
+      },
+      "expected": "Olá, Ana"
+    },
+    {
+      "language": "en",
+      "key": "hello",
+      "params": {
+        "name": "Bob"
+      },
+      "expected": "Hi, Bob"
+    },
+    {
+      "language": "pt",
+      "key": "bye",
+      "params": {},
+      "expected": "Tchau"
+    },
+    {
+      "language": "pt",
+      "key": "missing_key",
+      "params": {
+        "name": "X"
+      },
+      "expected": "missing_key"
+    },
+    {
+      "language": "de",
+      "key": "hello",
+      "params": {
+        "name": "Z"
+      },
+      "expected": "hello"
+    },
+    {
+      "language": "pt",
+      "key": "hello",
+      "params": {},
+      "expected": "Olá, {name}"
+    }
+  ]
+}

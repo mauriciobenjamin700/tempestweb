@@ -266,6 +266,30 @@ def view(app: App[MyState]) -> Widget:
     segmentos por `app.nav.stack`. Um router com params tipados é evolução no
     nível do core.
 
+## Localização (i18n)
+
+`translate` / `t` + `Locale` do core funcionam no Modo C: busca a chave na tabela
+`{idioma: {chave: template}}` pelo idioma do locale e interpola `{name}` — mesma
+semântica e fallbacks do core (chave/idioma ausente → a própria chave).
+
+```python
+from tempest_core import App, Locale, Text, Widget, t
+
+MESSAGES = {
+    "pt": {"greet": "Olá, {name}!"},
+    "en": {"greet": "Hello, {name}!"},
+}
+
+
+def view(app: App[MyState]) -> Widget:
+    loc = Locale(language=app.state.lang)
+    return Text(content=t("greet", locale=loc, translations=MESSAGES, name="Ana"), key="g")
+```
+
+Troque `app.state.lang` num handler e a UI re-renderiza no novo idioma —
+verificado no Playwright (PT → EN ao vivo). A tabela `MESSAGES` é uma **constante
+de módulo** (agora suportada no subset).
+
 ## O subset suportado
 
 O Modo C aceita um **subset tipado** de Python — o suficiente para a camada de

@@ -265,6 +265,31 @@ def view(app: App[MyState]) -> Widget:
     (including `?query`), as the core models it; read segments via
     `app.nav.stack`. A typed-param router is a core-level evolution.
 
+## Localization (i18n)
+
+The core's `translate` / `t` + `Locale` work in Mode C: look a key up in the
+`{language: {key: template}}` table by the locale's language and interpolate
+`{name}` — same semantics and fallbacks as the core (missing key/language → the
+key itself).
+
+```python
+from tempest_core import App, Locale, Text, Widget, t
+
+MESSAGES = {
+    "pt": {"greet": "Olá, {name}!"},
+    "en": {"greet": "Hello, {name}!"},
+}
+
+
+def view(app: App[MyState]) -> Widget:
+    loc = Locale(language=app.state.lang)
+    return Text(content=t("greet", locale=loc, translations=MESSAGES, name="Ana"), key="g")
+```
+
+Flip `app.state.lang` in a handler and the UI re-renders in the new language —
+verified live (Playwright, PT → EN). The `MESSAGES` table is a **module constant**
+(now supported in the subset).
+
 ## The supported subset
 
 Mode C accepts a **typed subset** of Python — enough for the app layer. A

@@ -221,6 +221,29 @@ def test_builtins_map_to_js_idioms() -> None:
     assert "Math.abs(x)" in gen("def f(x):\n    return abs(x)\n")
 
 
+def test_i18n_imports_and_module_const() -> None:
+    """`t`/`Locale` route to ./i18n.js; a module-level table becomes a const."""
+    js = gen(
+        "from tempest_core import Locale, t\n\n"
+        'MESSAGES = {"pt": {"hi": "Olá"}}\n\n'
+        "def view(app):\n"
+        '    loc = Locale(language="pt")\n'
+        '    return t("hi", locale=loc, translations=MESSAGES)\n'
+    )
+    assert 'import { Locale, t } from "./i18n.js";' in js
+    assert 'const MESSAGES = { "pt": { "hi":' in js
+    assert 'const loc = new Locale({ language: "pt" });' in js
+    assert 't("hi", { locale: loc, translations: MESSAGES })' in js
+
+
+def test_i18n_fixture_matches_core() -> None:
+    """The i18n parity fixture byte-matches a fresh core render."""
+    from tests.conformance import _transpile_i18n as gen_i
+
+    on_disk = gen_i.I18N_FIXTURE.read_text(encoding="utf-8")
+    assert on_disk == gen_i.render_fixture_text()
+
+
 def test_route_fixture_matches_core() -> None:
     """The routes_from_path parity fixture byte-matches a fresh core render."""
     from tests.conformance import _transpile_routes as gen_r

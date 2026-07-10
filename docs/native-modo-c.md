@@ -92,8 +92,13 @@ concordarem — mas a implementação é sempre por plataforma. Recomendação: 
   cookies.py` (awaitable Python) + `client/native/cookies.js` (handler
   `document.cookie`, registrado no `HANDLERS`) + fachada Modo C. Verificado nos
   três modos (Playwright no Modo C).
-- **N-C4 — contrato compartilhado (opcional, futuro):** extrair as assinaturas/
-  DTOs para um módulo reusável por tempestroid.
+- **N-C4 — contrato de capacidades. ✅** `tempestweb/native/contract.py` é a
+  **fonte única**: `CAPABILITIES` (nome dotted + grupo + flag `mode_c`) e
+  `MODE_C_CAPABILITIES`. Testes de conformidade parseiam as superfícies JS e
+  exigem concordância — `client/native/index.js` `HANDLERS` == contrato; a fachada
+  `client/transpile/native.js` == subset `mode_c`; cada grupo tem submódulo Python.
+  Adicionar uma capacidade em uma superfície só quebra o CI. É o candidato à
+  extração para um módulo compartilhado que o `tempestroid` (mobile) espelharia.
 
 ## Bundle do Modo C
 

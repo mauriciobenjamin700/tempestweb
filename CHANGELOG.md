@@ -4,6 +4,18 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.17.0] — 2026-07-10
+
+### Added
+
+- **Native-capability contract (single source of truth).**
+  `tempestweb.native.contract` pins the set of native capabilities and which are
+  exposed in Mode C. Conformance tests assert the three surfaces agree — the
+  Python awaitables, the JS `HANDLERS` (`client/native/index.js`), and the Mode C
+  facade (`client/transpile/native.js`) — so a capability added to one surface
+  but not the others fails CI. It is the extraction candidate for a shared
+  contract `tempestroid` (mobile) could mirror.
+
 ## [0.16.0] — 2026-07-10
 
 ### Added

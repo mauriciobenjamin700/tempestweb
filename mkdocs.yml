@@ -49,6 +49,7 @@ exclude_docs: |
   roadmap.md
   contract.md
   arquitetura.md
+  modo-c-transpile.md
   agents/
 
 plugins:

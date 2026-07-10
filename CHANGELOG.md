@@ -4,6 +4,28 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.15.0] — 2026-07-10
+
+### Added
+
+- **Native capabilities in Mode C (via the typed Python interface).** The same
+  `tempestweb.native` API used by Modes A/B now works in the transpile mode:
+  `http`/requests, `storage` (IndexedDB/localStorage), `clipboard`,
+  `geolocation`, and the new `cookies`. A transpiled `await native.http.request(
+  ...)` becomes an in-process JS call to the shared browser glue
+  (`client/native/*.js`) through the `dispatch` registry — no Python, no bridge,
+  no network. The `client/transpile/native.js` facade mirrors the Python API;
+  `from tempestweb import native` is routed to it by the transpiler. Verified live
+  (Playwright): a transpiled app round-trips a cookie and a storage value.
+- **`async`/`await` in the transpile subset.** `async def` handlers and `await`
+  expressions transpile (methods and nested defs too); the runtime tolerates an
+  async handler (re-render on `set_state` after the await). Also added: dict
+  literals → JS objects, and mixed positional+keyword calls → a trailing options
+  object (e.g. `native.http.request("GET", url, json=body)`).
+- **`cookies` native capability (all modes).** A new typed awaitable
+  (`native.cookies.get/set/remove/all`) over `document.cookie`, served by
+  `client/native/cookies.js` in every mode. Non-HttpOnly cookies only.
+
 ## [0.14.0] — 2026-07-10
 
 ### Added

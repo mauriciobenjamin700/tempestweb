@@ -290,6 +290,37 @@ Flip `app.state.lang` in a handler and the UI re-renders in the new language —
 verified live (Playwright, PT → EN). The `MESSAGES` table is a **module constant**
 (now supported in the subset).
 
+## Theme + responsiveness
+
+Mode C exposes `app.theme` and `app.media` like Modes A/B.
+`app.theme.is_dark()` resolves light/dark (`DARK`/`LIGHT` absolute; `SYSTEM`
+follows the OS); `app.media` carries `width`/`height`/`platform_dark_mode`/
+`orientation`, synced with the browser (matchMedia + resize) so the UI
+**re-renders responsively**.
+
+```python
+from tempest_core import App, Column, Text, Theme, ThemeMode, Widget
+
+
+def view(app: App[MyState]) -> Widget:
+    dark = app.theme.is_dark(platform_dark_mode=app.media.platform_dark_mode)
+    wide = app.media.width >= 600.0
+
+    def toggle() -> None:
+        app.set_theme(Theme(mode=ThemeMode.LIGHT if dark else ThemeMode.DARK))
+
+    return Column(children=[
+        Text(content=("dark" if dark else "light"), key="s"),
+        Text(content=("wide" if wide else "narrow"), key="l"),
+    ])
+```
+
+!!! check "Adaptive responsiveness"
+    Resize the window or change the OS `prefers-color-scheme` and `view`
+    re-renders — verified in the browser (400px→narrow, 900px→wide; theme toggle
+    light↔dark). The core breakpoints (`Breakpoints`: sm/md/lg/xl) are available
+    too.
+
 ## The supported subset
 
 Mode C accepts a **typed subset** of Python — enough for the app layer. A

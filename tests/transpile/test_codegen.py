@@ -244,6 +244,20 @@ def test_i18n_fixture_matches_core() -> None:
     assert on_disk == gen_i.render_fixture_text()
 
 
+def test_theme_imports_map_to_theme_module() -> None:
+    """`Theme`/`ThemeMode`/`MediaQueryData` route to ./theme.js; class calls new."""
+    js = gen(
+        "from tempest_core import Theme, ThemeMode\n\n"
+        "def view(app):\n"
+        "    t = Theme(mode=ThemeMode.DARK)\n"
+        "    return app.theme.is_dark("
+        "platform_dark_mode=app.media.platform_dark_mode)\n"
+    )
+    assert 'from "./theme.js"' in js
+    assert "new Theme({ mode: ThemeMode.DARK })" in js
+    assert "app.theme.is_dark({ platform_dark_mode:" in js
+
+
 def test_route_fixture_matches_core() -> None:
     """The routes_from_path parity fixture byte-matches a fresh core render."""
     from tests.conformance import _transpile_routes as gen_r

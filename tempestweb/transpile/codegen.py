@@ -31,6 +31,7 @@ _NAME_MAP: dict[str, str] = {
     "make_state": "makeState",
     "set_state": "setState",
     "on_click": "onClick",
+    "color_scheme": "colorScheme",
 }
 _INDENT: str = "  "
 

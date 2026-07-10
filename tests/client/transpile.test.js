@@ -67,6 +67,34 @@ test("Button keeps its click closure off the wire (on_click null, onClick fn)", 
   assert.equal(hit, 1);
 });
 
+test("Button resolves its Material 3 variant style (solid/md/primary default)", () => {
+  const node = Button({ label: "+", key: "inc" });
+  const style = node.props.style;
+  // A default solid/primary button paints a filled background with light text,
+  // a pill radius and comfortable padding — resolved from the core-derived table.
+  assert.notEqual(style, null);
+  assert.notEqual(style.background, null, "solid variant has a filled background");
+  assert.notEqual(style.color, null);
+  assert.equal(style.radius, 999.0);
+  assert.equal(node.props.variant, "solid");
+  assert.equal(node.props.color_scheme, "primary");
+});
+
+test("an explicit Button style layers over the resolved base (caller wins)", () => {
+  const override = Style({ radius: 4.0 });
+  const node = Button({ label: "x", style: override });
+  assert.equal(node.props.style.radius, 4.0, "caller's set field wins");
+  // Fields the caller did NOT set keep the resolved base (not nulled out).
+  assert.notEqual(node.props.style.background, null);
+});
+
+test("Button variant/size/colorScheme select different resolved styles", () => {
+  const solid = Button({ label: "a" }).props.style;
+  const ghost = Button({ label: "a", variant: "ghost" }).props.style;
+  // A ghost button is not a filled solid one — the table distinguishes variants.
+  assert.notDeepEqual(solid, ghost);
+});
+
 // ---- 3. runtime drives a real generated module ----------------------------
 
 test("mountApp renders the counter's initial tree", () => {

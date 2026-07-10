@@ -74,6 +74,7 @@ _TRANSPILE_ASSETS: tuple[str, ...] = (
     "runtime.js",
     "widgets.js",
     "diff.js",
+    "widget-styles.gen.js",
 )
 
 #: The generated app module's filename inside the transpile artifact.

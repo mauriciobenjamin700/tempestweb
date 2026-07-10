@@ -18,6 +18,8 @@
 //
 // See docs/contract.md (wire format) and docs/modo-c-transpile.md (Mode C).
 
+import { WIDGET_STYLES } from "./widget-styles.gen.js";
+
 /**
  * @typedef {import("../transport.js").Node} Node
  */
@@ -172,32 +174,71 @@ export function Row({ children = [], key = null, style = null }) {
 }
 
 /**
- * Build a `Button` IR node.
+ * Resolve a Button's baked style from its variant/size/color_scheme.
  *
- * The wire prop `on_click` is always `null` (a serialized reference in the core;
- * see the module header). The actual JS click closure is stashed on the separate,
- * non-wire `onClick` field that {@link import("./diff.js").diff} never inspects —
- * the runtime (`client/transpile/runtime.js`) collects handlers from it by key.
+ * Mirrors the core: the default Material 3 style for the combination (from the
+ * build-time-introspected {@link WIDGET_STYLES} table) is the base, and an
+ * explicit `style` is merged **on top** — the caller's set (non-null) fields win.
+ * The result is a full `Style` object (unset fields `null`), matching the core's
+ * wire shape so the diff stays stable across re-renders.
  *
- * @param {{label: string, onClick?: ?Function, key?: ?string, style?: ?Object}} args
+ * @param {string} variant  The button variant (e.g. `"solid"`).
+ * @param {string} size  The density size (e.g. `"md"`).
+ * @param {string} colorScheme  The Material 3 color scheme (e.g. `"primary"`).
+ * @param {?Object} override  The caller's explicit style, or `null`.
+ * @returns {Object<string, *>}  The resolved, full Style object.
+ */
+function resolveButtonStyle(variant, size, colorScheme, override) {
+  const base = WIDGET_STYLES.Button?.[variant]?.[size]?.[colorScheme] ?? {};
+  const merged = { ...base };
+  if (override != null) {
+    for (const [field, value] of Object.entries(override)) {
+      if (value !== null && value !== undefined) {
+        merged[field] = value;
+      }
+    }
+  }
+  return Style(merged);
+}
+
+/**
+ * Build a `Button` IR node with its Material 3 variant style resolved.
+ *
+ * The `variant`/`size`/`color_scheme` select the baked default style (see
+ * {@link resolveButtonStyle}); an explicit `style` layers over it. The wire prop
+ * `on_click` is always `null` (a serialized reference in the core; see the module
+ * header). The actual JS click closure is stashed on the separate, non-wire
+ * `onClick` field that {@link import("./diff.js").diff} never inspects — the
+ * runtime (`client/transpile/runtime.js`) collects handlers from it by key.
+ *
+ * @param {{label: string, onClick?: ?Function, key?: ?string, style?: ?Object,
+ *          variant?: string, size?: string, colorScheme?: string}} args
  * @returns {Node & {onClick: ?Function}}
  */
-export function Button({ label, onClick = null, key = null, style = null }) {
+export function Button({
+  label,
+  onClick = null,
+  key = null,
+  style = null,
+  variant = "solid",
+  size = "md",
+  colorScheme = "primary",
+}) {
   return {
     type: "Button",
     key,
     props: {
       attrs: {},
-      color_scheme: "primary",
+      color_scheme: colorScheme,
       focus_order: null,
       focusable: null,
       label,
       on_click: null,
       semantics: null,
-      size: "md",
-      style,
+      size,
+      style: resolveButtonStyle(variant, size, colorScheme, style),
       tag: null,
-      variant: "solid",
+      variant,
     },
     children: [],
     // Non-wire: the live click closure, collected by the runtime, ignored by diff.

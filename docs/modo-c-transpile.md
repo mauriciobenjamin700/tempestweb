@@ -182,11 +182,17 @@ pelo base theme).
   campos setados do usuário vencem) — paridade MD3 com A/B, verificado no
   Playwright (botões solid/primary preenchidos). **`state_styles` (hover/pressed)
   é N/A:** o IR não carrega estado de interação — os Modos A/B também não aplicam
-  hover/pressed via IR, então a paridade já está atingida. **`Input` feito**
-  (eixos field_variant × size × color_scheme na tabela + handler `on_change`
-  fiado pelo runtime; o `<input>` é renderizado pelo `dom.js` compartilhado —
-  binding reativo de duas vias verificado no Playwright). **Falta:** os demais
-  widgets estilizados (Card, Chip, Switch, Checkbox, Slider, …).
+  hover/pressed via IR, então a paridade já está atingida.
+- **Port completo dos widgets. ✅** Os **~64 widgets** do `tempest_core` têm
+  builders JS **gerados por introspecção** (`widgets.gen.js` +
+  `_transpile_widgets.py`), com o estilo MD3 resolvido dos 14 styled
+  (`widget-styles.gen.js`, eixos variant/field_variant × size × color_scheme,
+  normalizados com `"_"`). Handlers stashados num mapa não-wire `__handlers`
+  keyed por evento DOM — ligados por tipo IR (`Button`→click,
+  `Input`/`Checkbox`→input/change, `Switch` div→click). Golden tests travam ambos
+  os módulos gerados contra o core; galeria multi-widget verificada no Playwright.
+  **Falta:** `tempest_core.components` (Card/DataTable/Tabs — composições, camada
+  acima dos widgets) e eventos exóticos que o cliente ainda não emite.
 - **C2 — cobertura do subset. 🚧 em progresso.** Expressões: operadores
   aritméticos (`* / %`), comparação (`== != < <= > >=`), booleanos (`and`/`or`),
   unários (`not`/`-`), ternário (`a if c else b`), comprehensions

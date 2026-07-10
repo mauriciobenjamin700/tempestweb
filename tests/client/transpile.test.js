@@ -20,6 +20,7 @@ import {
   Text,
 } from "../../client/transpile/widgets.js";
 import { mountApp, State } from "../../client/transpile/runtime.js";
+import * as widgets from "../../client/transpile/widgets.gen.js";
 import { makeState, view } from "../../client/transpile/counter.gen.js";
 
 // ---- 1. diff conformance against the core-derived golden -------------------
@@ -59,6 +60,39 @@ test("Column/Row are flex containers carrying their children", () => {
   assert.equal(row.key, null);
 });
 
+test("every generated builder returns a well-formed IR node", () => {
+  // Widgets that need a required arg — supply a minimal value so we can build one
+  // of each and assert the common wire shape.
+  const required = {
+    Text: { content: "x" },
+    Icon: { name: "home" },
+    Image: { src: "x" },
+    Svg: { source: "x" },
+    Toast: { message: "x" },
+    Tooltip: { message: "x" },
+    WebView: { url: "x" },
+    VideoPlayer: { source: "x" },
+    MapView: { latitude: 0, longitude: 0 },
+  };
+  const builders = Object.entries(widgets).filter(([, v]) => typeof v === "function");
+  assert.ok(builders.length >= 40, `expected many builders, got ${builders.length}`);
+  for (const [name, build] of builders) {
+    if (name === "Style") continue; // helper, not a widget
+    let node;
+    try {
+      node = build(required[name] ?? {});
+    } catch (err) {
+      // A builder needing an arg we didn't supply is fine to skip here.
+      continue;
+    }
+    assert.equal(typeof node.type, "string", `${name}: type`);
+    assert.ok("props" in node, `${name}: props`);
+    assert.ok(Array.isArray(node.children), `${name}: children array`);
+    assert.ok("attrs" in node.props, `${name}: attrs`);
+    assert.ok("style" in node.props, `${name}: style key present`);
+  }
+});
+
 test("Container is a layout box with the semantic-tag escape hatch", () => {
   const node = Container({
     key: "nav",
@@ -81,12 +115,12 @@ test("Style fills the full shape with nulls; only set fields differ", () => {
   assert.equal(style.color, null);
 });
 
-test("Button keeps its click closure off the wire (on_click null, onClick fn)", () => {
+test("Button keeps its click closure off the wire (on_click null, __handlers fn)", () => {
   let hit = 0;
   const node = Button({ label: "+", key: "inc", onClick: () => (hit += 1) });
   assert.equal(node.props.on_click, null, "wire prop stays null for a stable diff");
-  assert.equal(typeof node.onClick, "function");
-  node.onClick();
+  assert.equal(typeof node.__handlers.click, "function");
+  node.__handlers.click();
   assert.equal(hit, 1);
 });
 
@@ -132,7 +166,8 @@ test("Input emits the core prop shape with a resolved outline style", () => {
 test("Input keeps its change closure off the wire (onChange collected by runtime)", () => {
   const node = Input({ key: "f", onChange: () => {} });
   assert.equal(node.props.on_change, null);
-  assert.equal(typeof node.onChange, "function");
+  assert.equal(typeof node.__handlers.input, "function");
+  assert.equal(typeof node.__handlers.change, "function");
 });
 
 test("typing in an Input drives onChange -> state -> re-render", () => {

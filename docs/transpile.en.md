@@ -206,12 +206,27 @@ spirit of `mypy --strict`.
       friends, `return`.
     - **Structures:** a state `@dataclass` (fields + methods), `make_state()`,
       `view()` with handler closures.
-    - **Widgets:** `Text`, `Column`, `Row`, `Container`, `Button`, and `Input`
-      (with resolved MD3 style).
+    - **Widgets:** **all ~64 `tempest_core` widgets** — layout (`Column`, `Row`,
+      `Container`, `Stack`, `Wrap`, `ScrollView`, `SafeArea`, `Spacer`), display
+      (`Text`, `Icon`, `Image`, `Svg`, `Spinner`, `Skeleton`, `ProgressBar`),
+      input (`Button`, `Input`, `TextArea`, `Switch`, `Checkbox`, `Slider`,
+      `RangeSlider`, `Dropdown`, `DatePicker`, …), overlays (`Dialog`,
+      `BottomSheet`, `Popover`, `Toast`, `Tooltip`), gestures (`GestureDetector`,
+      `Draggable`, `PanHandler`, …), and more. The JS builders are **generated**
+      by introspecting the core (`widgets.gen.js`), with the resolved MD3 style
+      for the 14 styled widgets.
+
+!!! note "Per-widget events"
+    Each handler binds to the DOM event the renderer (`dom.js`) emits for that
+    widget: `Button.on_click` → click; `Input`/`Checkbox` (native controls) →
+    `input`/`change`; a `Switch` (a div) → click. Handlers for widgets whose
+    event the client does not yet emit (e.g. `on_scan`, `on_reorder`) are
+    registered but inert for now.
 
 !!! warning "Still outside the subset"
-    Other styled widgets (Card, Chip, Switch, Slider, …), dict/set/tuple,
-    f-strings with a format spec, and `dev --mode transpile` (watch → recompile).
+    `tempest_core.components` (compositions like Card/DataTable/Tabs — the layer
+    above widgets), dict/set/tuple, f-strings with a format spec, and
+    `dev --mode transpile` (watch → recompile).
 
 ## Recap
 

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>counter — Mode C (transpile)</title>
+  </head>
+  <body>
+    <!--
+      Spike harness for Mode C (transpile). Serves the generated counter.gen.js on
+      the native JS runtime — ZERO Python at runtime. A real CLI target
+      (`tempestweb build --mode transpile`) lands in phase C3; this static page is
+      the manual/Playwright verification surface until then.
+    -->
+    <div id="app"></div>
+    <script type="module">
+      import { mountApp } from "./runtime.js";
+      import { makeState, view } from "./counter.gen.js";
+
+      mountApp(document.getElementById("app"), { makeState, view });
+    </script>
+  </body>
+</html>

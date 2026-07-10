@@ -4,6 +4,37 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.10.0] — 2026-07-09
+
+### Added
+
+- **Mode C — transpile (experimental, spike C0).** A third execution mode
+  alongside **A (WASM)** and **B (server)**: the typed-Python *app layer* is
+  transcribed to **native JavaScript** — zero Python runtime in the browser,
+  static hosting, great first-paint/SEO. The "TypeScript story" for Python. It
+  reuses the whole shared JS renderer (`client/dom.js`, `style.js`, `events.js`):
+  only the app layer is compiled.
+  - **Compiler** (`tempestweb.transpile`) — an `ast`-based codegen for a small,
+    typed Python subset (`@dataclass` state, `view()`, handler closures,
+    `setattr` mutations, f-strings, keyword-only widget calls). Out-of-subset
+    constructs raise `TranspileError` with a `file:line` diagnostic.
+  - **Native JS runtime** (`client/transpile/`) — `diff.js` (a faithful port of
+    the core reconciler, locked against a core-derived golden covering all five
+    patch kinds), `widgets.js` (IR builders), `runtime.js` (`State`/`App` + the
+    render loop). A generated `counter.gen.js` runs the canonical counter.
+  - Verified live in the browser (Playwright): the counter renders and updates
+    with **granular Update patches** (no root re-render), zero Python at runtime.
+  - **Experimental / spike.** Widget style fidelity (MD3 defaults), a
+    `tempestweb build --mode transpile` CLI target, and a wider subset are the
+    next phases (C1–C5). See `docs/modo-c-transpile.md`. The public API may
+    change; not yet recommended for production apps.
+
+### Changed
+
+- **Pinned `tempest-core>=0.11.0`** (was `>=0.9.0`). The conformance goldens are
+  regenerated from the new core; no wire-shape change beyond what 0.9.0 already
+  carried (`Widget.tag` / `Widget.attrs`).
+
 ## [0.9.0] — 2026-07-04
 
 ### Added

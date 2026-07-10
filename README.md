@@ -5,10 +5,12 @@
 docs site (PT-BR default + EN-US), deployed to GitHub Pages.
 
 > Build web apps in **typed Python**. One declarative widget tree, a **DOM**
-> renderer, and **two execution modes** that share 100% of the application code:
+> renderer, and **three execution modes** that share 100% of the application code:
 > **Mode A (WASM)** runs your Python in the browser via Pyodide; **Mode B
 > (server)** runs it on the server (FastAPI) and talks to a thin JS client over
-> **WebSocket or SSE**. Installable **PWA**, **offline-first** (service worker +
+> **WebSocket or SSE**; **Mode C (transpile, experimental)** transcribes your
+> Python to **native JavaScript** — zero Python runtime, static hosting, great
+> first-paint/SEO. Installable **PWA**, **offline-first** (service worker +
 > IndexedDB), and **WebPush** are first-class — parity with `tempest-react-sdk`.
 
 Sister project to [tempestroid](../tempestroid) — same "one tree, multiple
@@ -87,6 +89,39 @@ port mirrors `client/style.js`), and the new `tempest-core` 0.9.0 `Widget.tag` /
 See the [Static SSR guide](https://mauriciobenjamin700.github.io/tempestweb/ssr/)
 ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/ssr/)).
 
+## Mode C — transpile to native JS (experimental) 🧪
+
+The "TypeScript story" for Python: you write the typed-Python app; a compiler
+transcribes the **app layer** (state, `view()`, handlers) to **native
+JavaScript**, reusing the whole shared JS renderer. **Zero Python runtime** in the
+browser — static hosting, small bundle, great first-paint/SEO.
+
+```python
+# examples/counter/app.py  (unchanged from Modes A/B)
+@dataclass
+class CounterState:
+    value: int = 0
+
+def view(app: App[CounterState]) -> Widget:
+    def increment() -> None:
+        app.set_state(lambda s: setattr(s, "value", s.value + 1))
+    return Column(children=[
+        Text(content=f"Count: {app.state.value}", key="label"),
+        Button(label="+", on_click=increment, key="inc"),
+    ])
+```
+
+```python
+from tempestweb.transpile import transpile_file
+
+js: str = transpile_file("examples/counter/app.py")  # -> native ES module
+```
+
+The generated module runs on the native runtime (`client/transpile/runtime.js`)
+with a JS `diff` locked against a core-derived golden. **Experimental (spike
+C0)**: MD3 style fidelity, a `build --mode transpile` CLI, and a wider subset are
+next (phases C1–C5). See [`docs/modo-c-transpile.md`](docs/modo-c-transpile.md).
+
 ## Develop
 
 ```bash
@@ -102,6 +137,7 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | `tempestweb/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — 54 Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
 | `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`, `sse.py`). |
 | `tempestweb/html/` | Static SSR leaf renderer — `render_to_html` / `render_document` / `style_to_css` (Python port of `client/style.js`). |
+| `tempestweb/transpile/` | **Mode C (experimental):** `ast`-based Python→JS compiler for the app layer. Paired with the native runtime in `client/transpile/` (`diff.js` · `widgets.js` · `runtime.js`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
 | `tempestweb/native/` | Web API capability adapters — http, audio, share, geo, clipboard, storage, camera (Track N). |
 | `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |

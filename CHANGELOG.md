@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.19.0] — 2026-07-10
+
+### Added
+
+- **Navigation in Mode C (routes + URL sync).** The transpile mode now speaks the
+  core navigation API — `app.push(Route(...))`, `app.pop()`, `app.replace(...)`,
+  `app.reset(...)`, and `app.nav.top` — synced with the browser URL. A push/pop
+  `pushState`-s the new path; a deep link or back/forward resets the stack from
+  the path (`routesFromPath`), so the same `view()` runs under Modes A/B/C.
+  `client/transpile/nav.js` ports `tempest_core.navigation` (Route kept at strict
+  parity, since the transpile build validates through the real core).
+- **Transpiler: common builtins.** `len` → `.length`, and `str`/`int`/`float`/
+  `bool`/`abs` map to their JS idioms; keyword-only class calls (e.g.
+  `Route(name=...)`) emit `new`.
+
 ## [0.18.0] — 2026-07-10
 
 ### Added

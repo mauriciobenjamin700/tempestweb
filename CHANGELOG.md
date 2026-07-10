@@ -4,6 +4,20 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.21.0] — 2026-07-10
+
+### Added
+
+- **Theme + responsiveness in Mode C.** The transpile mode exposes `app.theme`
+  and `app.media` like Modes A/B: `app.theme.is_dark()` resolves light/dark
+  (`SYSTEM` follows the OS), and `app.media` (width/height/platform_dark_mode/
+  orientation) is kept in sync with the browser via matchMedia + resize, so the
+  view re-renders responsively. `app.set_theme(Theme(...))` swaps the theme.
+  `client/transpile/theme.js` ports `tempest_core.theme` (ThemeMode/Theme/
+  MediaQueryData/Breakpoints); `client/transpile/media.js` reports the viewport.
+  Verified live (Playwright): a resize flips narrow↔wide and a toggle flips
+  light↔dark.
+
 ## [0.20.0] — 2026-07-10
 
 ### Added

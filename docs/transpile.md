@@ -92,6 +92,13 @@ Sirva com qualquer host estático (ou localmente):
 tempestweb run --mode transpile --path examples/counter
 ```
 
+Durante o desenvolvimento, use o loop com **livereload** — edite o `app.py` e o
+browser recarrega com o bundle recompilado:
+
+```bash
+tempestweb dev --mode transpile --path examples/counter
+```
+
 !!! check "O que aconteceu"
     Seu `view()` virou `app.gen.js` — JavaScript nativo. O runtime segura o
     estado, roda `view()`, faz o **diff** em JS e aplica **patches granulares** ao
@@ -231,8 +238,7 @@ no espírito do `mypy --strict`.
     Python** que expande em primitivos no `build()` — muitos a partir de dados/
     loops — então não são auto-portáveis para um runtime sem Python. Os aliases de
     layout `HStack`/`VStack` são a exceção (expandem em `Row`/`Column`). Também
-    fora: dict/set/tuple, f-strings com format-spec, e o `dev --mode transpile`
-    (watch → recompila).
+    fora: dict/set/tuple, f-strings com format-spec.
 
 ## Recapitulando
 

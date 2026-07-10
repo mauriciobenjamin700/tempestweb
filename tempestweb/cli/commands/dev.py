@@ -137,18 +137,21 @@ async def serve_dev(
     host: str | None = None,
     port: int | None = None,
 ) -> None:
-    """Build, serve and livereload a Mode A project until stopped (blocking).
+    """Build, serve and livereload a static project until stopped (blocking).
 
-    Builds the wasm bundle once, serves it over the dev HTTP app with a browser
-    livereload channel, and runs the file watcher. On every reload-worthy change
-    the bundle is rebuilt **before** the browser is told to reload, so the tab
-    always picks up the fresh build. A rebuild that fails (e.g. a syntax error in
-    the edited app) is reported and skipped — the last good bundle keeps serving.
+    Builds the static bundle once (Mode A **wasm** or Mode C **transpile**),
+    serves it over the dev HTTP app with a browser livereload channel, and runs
+    the file watcher. On every reload-worthy change the bundle is rebuilt
+    **before** the browser is told to reload, so the tab always picks up the fresh
+    build. A rebuild that fails (e.g. a syntax error or an out-of-subset construct
+    in the edited app) is reported and skipped — the last good bundle keeps
+    serving.
 
     Args:
         project_root: The project directory.
-        mode: Execution mode. Only ``"wasm"`` is served here; ``"server"`` is
-            served by ``tempestweb run --mode server`` (the built FastAPI host).
+        mode: Execution mode. Serves the static modes — ``"wasm"`` and
+            ``"transpile"`` — here; ``"server"`` (Mode B) is served by
+            ``tempestweb run --mode server`` (the built FastAPI host).
         host: Override the bind address. Defaults to the project config's host.
         port: Override the bind port. Defaults to the project config's port.
 
@@ -161,9 +164,9 @@ async def serve_dev(
         from tempestweb.devserver import create_dev_app, make_server
     except ImportError as exc:  # noqa: TRY003 - actionable install hint
         raise DevError(
-            "serving Mode A needs the 'server' extra (Starlette + uvicorn). "
+            "the dev server needs the 'server' extra (Starlette + uvicorn). "
             "Install it with: uv add 'tempestweb[server]' "
-            "(or pip install 'tempestweb[server]'). The built wasm artifact "
+            "(or pip install 'tempestweb[server]'). The built static artifact "
             "itself never embeds a server — this is only for local serving."
         ) from exc
 
@@ -171,10 +174,10 @@ async def serve_dev(
     resolved_mode = mode or config.mode
     if resolved_mode not in VALID_MODES:
         raise DevError(f"invalid mode {resolved_mode!r}; expected one of {VALID_MODES}")
-    if resolved_mode != "wasm":
+    if resolved_mode not in ("wasm", "transpile"):
         raise DevError(
-            "dev livereload serves Mode A (wasm); for Mode B use "
-            "`tempestweb run --mode server` (uvicorn hosts the built app)."
+            "dev livereload serves the static modes (wasm, transpile); for Mode B "
+            "use `tempestweb run --mode server` (uvicorn hosts the built app)."
         )
 
     try:

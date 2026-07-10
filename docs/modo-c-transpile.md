@@ -214,8 +214,9 @@ pelo base theme).
   `app.py` do projeto para `client/transpile/app.gen.js` e emite um bundle
   estático: `index.html` que monta via `mountApp` + o cliente compartilhado + o
   runtime nativo (diff/widgets/runtime). Zero Python, servível por qualquer CDN.
-  Fora do subset → `BuildError` claro. Falta ainda `dev --mode transpile` (watch →
-  recompila).
+  Fora do subset → `BuildError` claro. **`dev --mode transpile`** (watch →
+  recompila + livereload) também disponível — reusa o devserver estático do
+  Modo A; verificado editando `app.py` e vendo o bundle recompilar ao vivo.
 - **C4 — erros de subset.** Fora do subset = erro de compilação claro
   (arquivo:linha), no espírito do `mypy --strict`.
 - **C5 — diff otimizado + keys**, paridade total com o reconciliador do core.

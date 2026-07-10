@@ -64,9 +64,9 @@ def build_parser() -> argparse.ArgumentParser:
     dev = sub.add_parser("dev", help="Run the dev loop (watch + reload).")
     dev.add_argument(
         "--mode",
-        choices=["wasm", "server"],
+        choices=["wasm", "transpile"],
         default="wasm",
-        help="Execution mode for the dev session.",
+        help="Static mode to serve with livereload (wasm or transpile).",
     )
     dev.add_argument(
         "--path",

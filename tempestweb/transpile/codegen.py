@@ -31,6 +31,14 @@ _NAME_MAP: dict[str, str] = {
     "make_state": "makeState",
     "set_state": "setState",
     "on_click": "onClick",
+    "on_change": "onChange",
+    "color_scheme": "colorScheme",
+    "field_variant": "fieldVariant",
+    "max_length": "maxLength",
+    "leading_icon": "leadingIcon",
+    "trailing_icon": "trailingIcon",
+    # A dataclass method's `self` receiver is JS's `this`.
+    "self": "this",
 }
 _INDENT: str = "  "
 
@@ -91,6 +99,18 @@ class _Generator:
             return self._call(node, indent)
         if isinstance(node, ast.Lambda):
             return self._lambda(node, indent)
+        if isinstance(node, ast.Compare):
+            return self._compare(node, indent)
+        if isinstance(node, ast.BoolOp):
+            return self._boolop(node, indent)
+        if isinstance(node, ast.UnaryOp):
+            return self._unaryop(node, indent)
+        if isinstance(node, ast.IfExp):
+            return self._ifexp(node, indent)
+        if isinstance(node, ast.ListComp):
+            return self._listcomp(node, indent)
+        if isinstance(node, ast.Subscript):
+            return self._subscript(node, indent)
         raise TranspileError(
             f"expression {type(node).__name__} is not supported", node, self.filename
         )
@@ -127,8 +147,14 @@ class _Generator:
         return "`" + "".join(parts) + "`"
 
     def _binop(self, node: ast.BinOp, indent: int) -> str:
-        """Emit a binary operation (only + and - in the subset)."""
-        ops: dict[type[ast.operator], str] = {ast.Add: "+", ast.Sub: "-"}
+        """Emit an arithmetic binary operation."""
+        ops: dict[type[ast.operator], str] = {
+            ast.Add: "+",
+            ast.Sub: "-",
+            ast.Mult: "*",
+            ast.Div: "/",
+            ast.Mod: "%",
+        }
         op = ops.get(type(node.op))
         if op is None:
             raise TranspileError(
@@ -136,7 +162,102 @@ class _Generator:
                 node,
                 self.filename,
             )
-        return f"{self.expr(node.left, indent)} {op} {self.expr(node.right, indent)}"
+        left = self.expr(node.left, indent)
+        right = self.expr(node.right, indent)
+        return f"({left} {op} {right})"
+
+    def _compare(self, node: ast.Compare, indent: int) -> str:
+        """Emit a comparison. Chained comparisons are joined with ``&&``.
+
+        ``in`` / ``not in`` become ``.includes(...)`` membership tests.
+        """
+        ops: dict[type[ast.cmpop], str] = {
+            ast.Eq: "===",
+            ast.NotEq: "!==",
+            ast.Lt: "<",
+            ast.LtE: "<=",
+            ast.Gt: ">",
+            ast.GtE: ">=",
+        }
+        parts: list[str] = []
+        left = node.left
+        for op, right in zip(node.ops, node.comparators, strict=True):
+            left_js = self.expr(left, indent)
+            right_js = self.expr(right, indent)
+            if isinstance(op, ast.In):
+                parts.append(f"{right_js}.includes({left_js})")
+            elif isinstance(op, ast.NotIn):
+                parts.append(f"!{right_js}.includes({left_js})")
+            else:
+                symbol = ops.get(type(op))
+                if symbol is None:
+                    raise TranspileError(
+                        f"comparison {type(op).__name__} is not supported",
+                        node,
+                        self.filename,
+                    )
+                parts.append(f"{left_js} {symbol} {right_js}")
+            left = right
+        return parts[0] if len(parts) == 1 else "(" + " && ".join(parts) + ")"
+
+    def _boolop(self, node: ast.BoolOp, indent: int) -> str:
+        """Emit a boolean operation (``and`` → ``&&``, ``or`` → ``||``)."""
+        op = "&&" if isinstance(node.op, ast.And) else "||"
+        joined = f" {op} ".join(self.expr(value, indent) for value in node.values)
+        return f"({joined})"
+
+    def _unaryop(self, node: ast.UnaryOp, indent: int) -> str:
+        """Emit a unary operation (``not`` → ``!``, unary ``-``/``+``)."""
+        ops: dict[type[ast.unaryop], str] = {
+            ast.Not: "!",
+            ast.USub: "-",
+            ast.UAdd: "+",
+        }
+        op = ops.get(type(node.op))
+        if op is None:
+            raise TranspileError(
+                f"unary operator {type(node.op).__name__} is not supported",
+                node,
+                self.filename,
+            )
+        return f"{op}{self.expr(node.operand, indent)}"
+
+    def _ifexp(self, node: ast.IfExp, indent: int) -> str:
+        """Emit a conditional expression (``a if c else b`` → ``c ? a : b``)."""
+        test = self.expr(node.test, indent)
+        body = self.expr(node.body, indent)
+        orelse = self.expr(node.orelse, indent)
+        return f"({test} ? {body} : {orelse})"
+
+    def _listcomp(self, node: ast.ListComp, indent: int) -> str:
+        """Emit a list comprehension as chained ``.filter().map()``.
+
+        ``[expr for x in it if cond]`` → ``it.filter((x) => cond).map((x) => expr)``.
+        Only a single ``for`` clause (with optional ``if``s) is supported.
+        """
+        if len(node.generators) != 1:
+            raise TranspileError(
+                "only single-loop comprehensions are supported", node, self.filename
+            )
+        gen = node.generators[0]
+        if not isinstance(gen.target, ast.Name):
+            raise TranspileError(
+                "comprehension target must be a plain name", node, self.filename
+            )
+        var = gen.target.id
+        iterable = self.expr(gen.iter, indent)
+        result = iterable
+        for cond in gen.ifs:
+            result = f"{result}.filter(({var}) => {self.expr(cond, indent)})"
+        element = self.expr(node.elt, indent)
+        return f"{result}.map(({var}) => {element})"
+
+    def _subscript(self, node: ast.Subscript, indent: int) -> str:
+        """Emit an index/subscript access (``x[i]`` → ``x[i]``)."""
+        value = self.expr(node.value, indent)
+        if isinstance(node.slice, ast.Slice):
+            raise TranspileError("slices are not supported", node, self.filename)
+        return f"{value}[{self.expr(node.slice, indent)}]"
 
     def _list(self, node: ast.List, indent: int) -> str:
         """Emit an array literal, multiline when it holds elements."""
@@ -180,8 +301,10 @@ class _Generator:
     def _lambda(self, node: ast.Lambda, indent: int) -> str:
         """Emit an arrow function.
 
-        The only supported body is ``setattr(obj, "name", value)`` (an in-place
-        state mutation), emitted as a block arrow with a single assignment.
+        A ``setattr(obj, "name", value)`` body (an in-place state mutation) is
+        emitted as a block arrow with a single assignment; any other supported
+        expression body becomes a concise expression arrow — e.g.
+        ``lambda s: s.increment()`` → ``(s) => s.increment()``.
         """
         params = ", ".join(a.arg for a in node.args.args)
         body = node.body
@@ -199,11 +322,7 @@ class _Generator:
             inner = _INDENT * (indent + 1)
             close = _INDENT * indent
             return f"({params}) => {{\n{inner}{target}.{attr} = {value};\n{close}}}"
-        raise TranspileError(
-            'only `setattr(obj, "name", value)` lambdas are supported',
-            node,
-            self.filename,
-        )
+        return f"({params}) => {self.expr(body, indent)}"
 
     # -- statements ---------------------------------------------------------
 
@@ -226,11 +345,97 @@ class _Generator:
             return self._nested_def(node, indent)
         if isinstance(node, ast.Expr):
             return [f"{_INDENT * indent}{self.expr(node.value, indent)};"]
+        if isinstance(node, ast.If):
+            return self._if(node, indent)
+        if isinstance(node, ast.For):
+            return self._for(node, indent)
+        if isinstance(node, ast.Assign):
+            return self._assign(node, indent)
+        if isinstance(node, ast.AugAssign):
+            return self._augassign(node, indent)
         if isinstance(node, (ast.Pass, ast.AnnAssign)):
             return []
         raise TranspileError(
             f"statement {type(node).__name__} is not supported", node, self.filename
         )
+
+    def _if(self, node: ast.If, indent: int) -> list[str]:
+        """Emit an ``if`` / ``elif`` / ``else`` chain as JS if / else-if / else."""
+        pad = _INDENT * indent
+        lines = [f"{pad}if ({self.expr(node.test, indent)}) {{"]
+        lines.extend(self._body(node.body, indent + 1))
+        orelse = node.orelse
+        # A single nested If in orelse is an ``elif`` — chain it as ``else if``.
+        while len(orelse) == 1 and isinstance(orelse[0], ast.If):
+            elif_node = orelse[0]
+            lines.append(f"{pad}}} else if ({self.expr(elif_node.test, indent)}) {{")
+            lines.extend(self._body(elif_node.body, indent + 1))
+            orelse = elif_node.orelse
+        if orelse:
+            lines.append(f"{pad}}} else {{")
+            lines.extend(self._body(orelse, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+
+    def _for(self, node: ast.For, indent: int) -> list[str]:
+        """Emit a ``for x in it:`` loop as ``for (const x of it) {...}``."""
+        if node.orelse:
+            raise TranspileError("for/else is not supported", node, self.filename)
+        if not isinstance(node.target, ast.Name):
+            raise TranspileError(
+                "for-loop target must be a plain name", node, self.filename
+            )
+        pad = _INDENT * indent
+        iterable = self.expr(node.iter, indent)
+        lines = [f"{pad}for (const {node.target.id} of {iterable}) {{"]
+        lines.extend(self._body(node.body, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+
+    def _assign(self, node: ast.Assign, indent: int) -> list[str]:
+        """Emit an assignment.
+
+        A single ``Name`` target is declared with ``const``; an attribute or
+        subscript target is a plain assignment (the object already exists).
+        Multiple/tuple targets are unsupported.
+        """
+        if len(node.targets) != 1:
+            raise TranspileError(
+                "multiple assignment targets are not supported", node, self.filename
+            )
+        target = node.targets[0]
+        value = self.expr(node.value, indent)
+        pad = _INDENT * indent
+        if isinstance(target, ast.Name):
+            return [f"{pad}const {target.id} = {value};"]
+        if isinstance(target, (ast.Attribute, ast.Subscript)):
+            return [f"{pad}{self.expr(target, indent)} = {value};"]
+        raise TranspileError(
+            f"assignment target {type(target).__name__} is not supported",
+            node,
+            self.filename,
+        )
+
+    def _augassign(self, node: ast.AugAssign, indent: int) -> list[str]:
+        """Emit an augmented assignment (``x += 1`` → ``x += 1;``)."""
+        ops: dict[type[ast.operator], str] = {
+            ast.Add: "+=",
+            ast.Sub: "-=",
+            ast.Mult: "*=",
+            ast.Div: "/=",
+            ast.Mod: "%=",
+        }
+        op = ops.get(type(node.op))
+        if op is None:
+            raise TranspileError(
+                f"augmented operator {type(node.op).__name__} is not supported",
+                node,
+                self.filename,
+            )
+        pad = _INDENT * indent
+        target = self.expr(node.target, indent)
+        value = self.expr(node.value, indent)
+        return [f"{pad}{target} {op} {value};"]
 
     def _return(self, node: ast.Return, indent: int) -> list[str]:
         """Emit a return statement."""
@@ -357,8 +562,14 @@ class _Generator:
         return "\n".join(lines)
 
     def _class(self, node: ast.ClassDef) -> str:
-        """Emit a `@dataclass` as `export class X extends State { constructor }`."""
+        """Emit a `@dataclass` as `export class X extends State { … }`.
+
+        Annotated fields become constructor assignments; methods become JS class
+        methods (the ``self`` receiver maps to ``this`` and is dropped from the
+        parameter list).
+        """
         fields: list[tuple[str, str]] = []
+        methods: list[ast.FunctionDef] = []
         for stmt in node.body:
             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
                 if stmt.value is None:
@@ -368,11 +579,13 @@ class _Generator:
                         self.filename,
                     )
                 fields.append((stmt.target.id, self.expr(stmt.value, 2)))
+            elif isinstance(stmt, ast.FunctionDef):
+                methods.append(stmt)
             elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
                 continue  # class docstring
             else:
                 raise TranspileError(
-                    "only annotated fields are supported in a dataclass",
+                    "only annotated fields and methods are supported in a dataclass",
                     stmt,
                     self.filename,
                 )
@@ -382,8 +595,22 @@ class _Generator:
         for name, value in fields:
             lines.append(f"{_INDENT * 2}this.{name} = {value};")
         lines.append(f"{_INDENT}}}")
+        for method in methods:
+            lines.append("")
+            lines.extend(self._method(method))
         lines.append("}")
         return "\n".join(lines)
+
+    def _method(self, node: ast.FunctionDef) -> list[str]:
+        """Emit a dataclass method as a JS class method (drops the `self` param)."""
+        params = [a.arg for a in node.args.args]
+        if params and params[0] == "self":
+            params = params[1:]
+        pad = _INDENT
+        lines = [f"{pad}{_js_name(node.name)}({', '.join(params)}) {{"]
+        lines.extend(self._body(node.body, 2))
+        lines.append(f"{pad}}}")
+        return lines
 
     def _function(self, node: ast.FunctionDef) -> str:
         """Emit a top-level `def` as `export function name(params) {...}`."""

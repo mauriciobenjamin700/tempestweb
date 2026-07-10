@@ -174,15 +174,35 @@ compilador, prova no Playwright. **Estilo mínimo/ausente** (botões nus estiliz
 pelo base theme).
 
 **Adiante (fases C1+):**
-- **C1 — fidelidade de estilo.** O estilo default MD3 dos widgets vive no
-  `tempest_core` (Python). Decisão em aberto: (a) portar a lógica p/ JS; (b)
-  transpilar as próprias classes de widget do core pelo nosso compilador; (c)
-  introspecção em build-time do core instalado → tabela de defaults `.gen.js`.
-  Recomendado avaliar (c) primeiro (auto-sincroniza com a versão pinada, sem port
-  manual), medindo se cobre estilos dependentes de variant/color_scheme/size.
-- **C2 — cobertura do subset.** Mais widgets/componentes, `if`/`for` em `view`,
-  list comprehensions → `.map`, f-strings compostas, métodos de state.
-- **C3 — CLI.** `tempestweb build/run --mode transpile` + `dev` (watch → recompila).
+- **C1 — fidelidade de estilo. 🚧 Button feito** (via estratégia **(c)**:
+  introspecção em build-time do core instalado → tabela `widget-styles.gen.js`).
+  O gerador (`tests/conformance/_transpile_widget_styles.py`) constrói cada combo
+  de Button (variant × size × color_scheme) com o core real e grava o `style`
+  resolvido; `widgets.js` faz o lookup e mescla o `style` explícito por cima (os
+  campos setados do usuário vencem) — paridade MD3 com A/B, verificado no
+  Playwright (botões solid/primary preenchidos). **`state_styles` (hover/pressed)
+  é N/A:** o IR não carrega estado de interação — os Modos A/B também não aplicam
+  hover/pressed via IR, então a paridade já está atingida. **`Input` feito**
+  (eixos field_variant × size × color_scheme na tabela + handler `on_change`
+  fiado pelo runtime; o `<input>` é renderizado pelo `dom.js` compartilhado —
+  binding reativo de duas vias verificado no Playwright). **Falta:** os demais
+  widgets estilizados (Card, Chip, Switch, Checkbox, Slider, …).
+- **C2 — cobertura do subset. 🚧 em progresso.** Expressões: operadores
+  aritméticos (`* / %`), comparação (`== != < <= > >=`), booleanos (`and`/`or`),
+  unários (`not`/`-`), ternário (`a if c else b`), comprehensions
+  (`[e for x in it if c]` → `.filter().map()`), `in`/`not in` → `.includes()`,
+  subscript, lambdas de expressão (`lambda s: s.inc()`). Statements: `if`/`elif`/
+  `else`, `for … in` → `for…of`, `Assign` (`const`), `AugAssign` (`+=`…).
+  **Métodos de state** (classe → métodos JS; `self` → `this`). Novo widget:
+  `Container` (layout + escape-hatch `tag`/`attrs`). **Falta:** mais widgets,
+  dict/set/tuple, f-string com format-spec.
+- **C3 — CLI. ✅ feito.** `tempestweb build --mode transpile <path>` (e
+  `run --mode transpile`, que serve o bundle estático como o wasm) transpila o
+  `app.py` do projeto para `client/transpile/app.gen.js` e emite um bundle
+  estático: `index.html` que monta via `mountApp` + o cliente compartilhado + o
+  runtime nativo (diff/widgets/runtime). Zero Python, servível por qualquer CDN.
+  Fora do subset → `BuildError` claro. Falta ainda `dev --mode transpile` (watch →
+  recompila).
 - **C4 — erros de subset.** Fora do subset = erro de compilação claro
   (arquivo:linha), no espírito do `mypy --strict`.
 - **C5 — diff otimizado + keys**, paridade total com o reconciliador do core.

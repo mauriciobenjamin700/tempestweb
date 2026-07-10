@@ -9,8 +9,10 @@ live here, re-exported by their original modules for a stable import surface.
 
 from __future__ import annotations
 
-#: The two execution modes a project can build/run as.
-VALID_MODES: tuple[str, ...] = ("wasm", "server")
+#: The execution modes a project can build/run as. ``transpile`` (experimental)
+#: transcribes the Python app layer to native JS — a static bundle with no
+#: Python runtime (see :mod:`tempestweb.transpile`).
+VALID_MODES: tuple[str, ...] = ("wasm", "server", "transpile")
 
 #: The mode a freshly scaffolded project defaults to.
 DEFAULT_MODE: str = "wasm"

@@ -11,6 +11,7 @@ reaching into submodules.
 
 from tempestweb.cli.commands import (
     SERVER_ARTIFACT_FILES,
+    TRANSPILE_ARTIFACT_FILES,
     WASM_ARTIFACT_FILES,
     BuildError,
     BuildResult,
@@ -55,6 +56,7 @@ __all__ = [
     "DEFAULT_MODE",
     "PROJECT_FILES",
     "SERVER_ARTIFACT_FILES",
+    "TRANSPILE_ARTIFACT_FILES",
     "VALID_MODES",
     "WASM_ARTIFACT_FILES",
     "BuildError",

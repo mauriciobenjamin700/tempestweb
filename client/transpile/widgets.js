@@ -18,6 +18,8 @@
 //
 // See docs/contract.md (wire format) and docs/modo-c-transpile.md (Mode C).
 
+import { WIDGET_STYLES } from "./widget-styles.gen.js";
+
 /**
  * @typedef {import("../transport.js").Node} Node
  */
@@ -172,35 +174,173 @@ export function Row({ children = [], key = null, style = null }) {
 }
 
 /**
- * Build a `Button` IR node.
+ * Build a `Container` IR node (a single-child styled box / layout wrapper).
  *
- * The wire prop `on_click` is always `null` (a serialized reference in the core;
- * see the module header). The actual JS click closure is stashed on the separate,
- * non-wire `onClick` field that {@link import("./diff.js").diff} never inspects —
- * the runtime (`client/transpile/runtime.js`) collects handlers from it by key.
+ * A pure layout widget: no baked style (its default `style` is `null`, like the
+ * core). Supports the semantic-tag escape hatch (`tag`/`attrs`) for htmx-ready
+ * markup, mirroring `tempest_core`'s Container.
  *
- * @param {{label: string, onClick?: ?Function, key?: ?string, style?: ?Object}} args
+ * @param {{children?: Node[], key?: ?string, style?: ?Object, tag?: ?string,
+ *          attrs?: Object<string, string>}} args
+ * @returns {Node}
+ */
+export function Container({
+  children = [],
+  key = null,
+  style = null,
+  tag = null,
+  attrs = {},
+}) {
+  return {
+    type: "Container",
+    key,
+    props: {
+      attrs,
+      focus_order: null,
+      focusable: null,
+      semantics: null,
+      style,
+      tag,
+    },
+    children,
+  };
+}
+
+/**
+ * Resolve a widget's baked style from the introspected defaults table.
+ *
+ * Mirrors the core: the default Material 3 style for the widget's
+ * variant/size/color_scheme combination (from the build-time-introspected
+ * {@link WIDGET_STYLES} table) is the base, and an explicit `style` is merged
+ * **on top** — the caller's set (non-null) fields win. The result is a full
+ * `Style` object (unset fields `null`), matching the core's wire shape so the
+ * diff stays stable across re-renders.
+ *
+ * @param {string} widget  The widget type name (e.g. `"Button"`, `"Input"`).
+ * @param {string} variant  The style variant axis (variant / field_variant).
+ * @param {string} size  The density size (e.g. `"md"`).
+ * @param {string} colorScheme  The Material 3 color scheme (e.g. `"primary"`).
+ * @param {?Object} override  The caller's explicit style, or `null`.
+ * @returns {Object<string, *>}  The resolved, full Style object.
+ */
+function resolveWidgetStyle(widget, variant, size, colorScheme, override) {
+  const base = WIDGET_STYLES[widget]?.[variant]?.[size]?.[colorScheme] ?? {};
+  const merged = { ...base };
+  if (override != null) {
+    for (const [field, value] of Object.entries(override)) {
+      if (value !== null && value !== undefined) {
+        merged[field] = value;
+      }
+    }
+  }
+  return Style(merged);
+}
+
+/**
+ * Build a `Button` IR node with its Material 3 variant style resolved.
+ *
+ * The `variant`/`size`/`color_scheme` select the baked default style (see
+ * {@link resolveButtonStyle}); an explicit `style` layers over it. The wire prop
+ * `on_click` is always `null` (a serialized reference in the core; see the module
+ * header). The actual JS click closure is stashed on the separate, non-wire
+ * `onClick` field that {@link import("./diff.js").diff} never inspects — the
+ * runtime (`client/transpile/runtime.js`) collects handlers from it by key.
+ *
+ * @param {{label: string, onClick?: ?Function, key?: ?string, style?: ?Object,
+ *          variant?: string, size?: string, colorScheme?: string}} args
  * @returns {Node & {onClick: ?Function}}
  */
-export function Button({ label, onClick = null, key = null, style = null }) {
+export function Button({
+  label,
+  onClick = null,
+  key = null,
+  style = null,
+  variant = "solid",
+  size = "md",
+  colorScheme = "primary",
+}) {
   return {
     type: "Button",
     key,
     props: {
       attrs: {},
-      color_scheme: "primary",
+      color_scheme: colorScheme,
       focus_order: null,
       focusable: null,
       label,
       on_click: null,
       semantics: null,
-      size: "md",
-      style,
+      size,
+      style: resolveWidgetStyle("Button", variant, size, colorScheme, style),
       tag: null,
-      variant: "solid",
+      variant,
     },
     children: [],
     // Non-wire: the live click closure, collected by the runtime, ignored by diff.
     onClick,
+  };
+}
+
+/**
+ * Build an `Input` IR node (a text field) with its Material 3 style resolved.
+ *
+ * The `fieldVariant`/`size`/`colorScheme` select the baked default style; an
+ * explicit `style` layers over it. The wire prop `on_change` is always `null`
+ * (see the module header on handlers); the live change closure is stashed on the
+ * non-wire `onChange` field, collected by the runtime and dispatched on
+ * `input`/`change` events by key. The shared renderer (`client/dom.js`) renders
+ * the `<input>` and applies its `value` — Mode C reuses it unchanged.
+ *
+ * @param {{value?: string, placeholder?: string, onChange?: ?Function,
+ *          key?: ?string, style?: ?Object, fieldVariant?: string, size?: string,
+ *          colorScheme?: string, secure?: boolean, pattern?: ?string,
+ *          error?: string, keyboard?: string, maxLength?: ?number,
+ *          leadingIcon?: ?string, trailingIcon?: ?string}} args
+ * @returns {Node & {onChange: ?Function}}
+ */
+export function Input({
+  value = "",
+  placeholder = "",
+  onChange = null,
+  key = null,
+  style = null,
+  fieldVariant = "outline",
+  size = "md",
+  colorScheme = "primary",
+  secure = false,
+  pattern = null,
+  error = "",
+  keyboard = "text",
+  maxLength = null,
+  leadingIcon = null,
+  trailingIcon = null,
+}) {
+  return {
+    type: "Input",
+    key,
+    props: {
+      attrs: {},
+      color_scheme: colorScheme,
+      error,
+      field_variant: fieldVariant,
+      focus_order: null,
+      focusable: null,
+      keyboard,
+      leading_icon: leadingIcon,
+      max_length: maxLength,
+      on_change: null,
+      pattern,
+      placeholder,
+      secure,
+      semantics: null,
+      size,
+      style: resolveWidgetStyle("Input", fieldVariant, size, colorScheme, style),
+      tag: null,
+      trailing_icon: trailingIcon,
+      value,
+    },
+    children: [],
+    // Non-wire: the live change closure, collected by the runtime, ignored by diff.
+    onChange,
   };
 }

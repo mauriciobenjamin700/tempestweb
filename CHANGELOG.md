@@ -4,6 +4,40 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.11.0] — 2026-07-09
+
+### Added
+
+- **Mode C — `tempestweb build --mode transpile` (experimental).** The transpile
+  mode is now a real CLI target: `build --mode transpile <path>` (and
+  `run --mode transpile`, which static-hosts the bundle like wasm) transcribes
+  the project's `app.py` to `client/transpile/app.gen.js` and emits a **fully
+  static** artifact — an `index.html` that mounts via `mountApp`, the shared JS
+  client, and the native runtime (diff/widgets/runtime). Zero Python at runtime,
+  servable by any CDN. An out-of-subset app fails with a clear `BuildError`.
+- **Mode C — Button & Input Material 3 style fidelity.** A build-time generator
+  introspects the real `tempest_core`, resolving each Button (variant × size ×
+  color_scheme) and Input (field_variant × size × color_scheme) style into a
+  native JS data module (`widget-styles.gen.js`); the widget builders look it up
+  and merge an explicit `style` on top. Transpiled buttons/fields now render with
+  their MD3 look — parity with Modes A/B, verified live (Playwright). A golden
+  test byte-matches the table against the core. (`state_styles` hover/pressed is
+  N/A: the IR carries no interaction state.)
+- **Mode C — `Input` with reactive two-way binding.** The native runtime
+  dispatches handlers by `"eventType:key"`, so `input`/`change` events reach an
+  `Input`'s `on_change`; the shared `dom.js` renders the `<input>`. Typing drives
+  `on_change → set_state → re-render` end-to-end with no Python — verified in the
+  browser with a live `Hello, {name}!` form.
+- **Mode C — wider Python subset.** The transpiler now handles arithmetic
+  (`* / %`), comparisons, boolean/unary operators, ternary expressions, list
+  comprehensions (`→ .filter().map()`), `in`/`not in`, subscript, expression
+  lambdas, `if`/`elif`/`else`, `for … in`, assignment/`+=`, and **dataclass
+  methods** (`self → this`). New `Container` widget (layout + `tag`/`attrs`
+  escape hatch).
+- **Bilingual Mode C tutorial docs.** A tiangolo-style page (PT-BR default +
+  EN-US) in the docs nav, covering the first build, generated output, state
+  methods, reactive forms, and the supported subset.
+
 ## [0.10.0] — 2026-07-09
 
 ### Added

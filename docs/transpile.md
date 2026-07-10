@@ -403,8 +403,11 @@ no espírito do `mypy --strict`.
       booleanos (`and`/`or`), unários (`not`/`-`), ternário (`a if c else b`),
       comprehensions de lista e de dict (`[e for x in it if c]`,
       `{k: v for x in it}`), literais `list`/`tuple`/`set`/`dict`, `in`/`not in`,
-      indexação, f-strings (incl. `{x:.2f}`, `{x!s}`, `{x!r}`), lambdas de
-      expressão.
+      indexação, f-strings (formatos `{x:.2f}`, `{x:,}`, `{x:,.2f}`, `{x:.1%}`,
+      `{x:d}`; conversões `{x!s}`, `{x!r}`), lambdas de expressão.
+    - **Builtins:** `len`, `str`/`int`/`float`/`bool`, `abs`, `round(x[, n])`,
+      `min`/`max` (variádico ou sobre um iterável), `sum(it)`, `range(...)`
+      (materializado em array).
     - **Statements:** `if`/`elif`/`else`, `for … in`, atribuição, `+=` e afins,
       `return`.
     - **Estruturas:** `@dataclass` de estado (campos + métodos), `make_state()`,
@@ -435,8 +438,8 @@ no espírito do `mypy --strict`.
     loops — então não são auto-portáveis para um runtime sem Python. Os aliases de
     layout `HStack`/`VStack` são a exceção (expandem em `Row`/`Column`). Também
     fora: comprehensions multi-loop ou com alvo desestruturado (`for k, v in …`),
-    e format-specs de f-string além de `.Nf` (ex.: alinhamento `{x:>5}`,
-    dinâmico `{x:.{n}f}`, conversão `!a`).
+    e format-specs de f-string além dos suportados (ex.: alinhamento `{x:>5}`,
+    sinal `{x:+.2f}`, hex/bin `{x:x}`, dinâmico `{x:.{n}f}`, conversão `!a`).
 
 ## Recapitulando
 

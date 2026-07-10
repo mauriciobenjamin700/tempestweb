@@ -328,6 +328,32 @@ def test_fstring_conversions() -> None:
     assert "${JSON.stringify(x)}" in gen("def f(x):\n    return f'{x!r}'\n")
 
 
+def test_fstring_grouped_and_percent_specs() -> None:
+    """Thousands `,`, grouped `,.Nf` and percent `.N%` specs map to JS."""
+    assert 'toLocaleString("en-US")' in gen("def f(x):\n    return f'{x:,}'\n")
+    grouped = gen("def f(x):\n    return f'{x:,.2f}'\n")
+    assert "minimumFractionDigits: 2" in grouped
+    assert '((x) * 100).toFixed(1) + "%"' in gen("def f(x):\n    return f'{x:.1%}'\n")
+
+
+def test_range_materializes_to_array() -> None:
+    """`range(...)` becomes an `Array.from(...)` (JS has no lazy range)."""
+    assert "Array.from({ length: 3 }, (_, i) => i)" in gen(
+        "def f():\n    return range(3)\n"
+    )
+    two = gen("def f():\n    return range(1, 5)\n")
+    assert "Array.from({ length: Math.max(0, Math.ceil((5 - 1) / 1)) }" in two
+
+
+def test_numeric_builtins() -> None:
+    """`round`/`min`/`max`/`sum` map to their JS idioms."""
+    assert "Math.round(x)" in gen("def f(x):\n    return round(x)\n")
+    assert "Number((x).toFixed(2))" in gen("def f(x):\n    return round(x, 2)\n")
+    assert "Math.min(1, x)" in gen("def f(x):\n    return min(1, x)\n")
+    assert "Math.max(...it)" in gen("def f(it):\n    return max(it)\n")
+    assert "reduce((a, b) => a + b, 0)" in gen("def f(it):\n    return sum(it)\n")
+
+
 # Every out-of-subset construct must fail loud with a TranspileError (file:line),
 # never silently mis-transpile or crash — the graduation-quality guarantee.
 _UNSUPPORTED: dict[str, str] = {
@@ -345,6 +371,9 @@ _UNSUPPORTED: dict[str, str] = {
     "fn_decorator": "@deco\ndef f():\n    pass\n",
     "class_decorator": "@deco\nclass C:\n    x: int = 0\n",
     "fstring_align_spec": "def f(x):\n    return f'{x:>5}'\n",
+    "fstring_sign_spec": "def f(x):\n    return f'{x:+.2f}'\n",
+    "fstring_hex_spec": "def f(x):\n    return f'{x:x}'\n",
+    "fstring_precision_no_type": "def f(x):\n    return f'{x:.3}'\n",
     "fstring_dynamic_spec": "def f(x, n):\n    return f'{x:.{n}f}'\n",
     "fstring_ascii_conv": "def f(x):\n    return f'{x!a}'\n",
     "dict_comp_tuple_target": "def f(a):\n    return {k: v for k, v in a}\n",

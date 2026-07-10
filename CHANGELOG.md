@@ -4,6 +4,25 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.26.0] — 2026-07-10
+
+### Added
+
+- **More builtins in the transpiler.** `round(x[, n])`, `min`/`max` (variadic or
+  over one iterable), `sum(it)`, and `range(...)` — the last materialized to a
+  JS array so a comprehension's `.map`/`.filter` chain has something to iterate
+  (JS has no lazy range). This closes a correctness gap: comprehensions over
+  `range(...)` now actually run in the browser.
+- **Richer f-string number formatting.** Beyond `.Nf`: thousands grouping
+  (`{x:,}` → `toLocaleString`), grouped fixed-point (`{x:,.2f}`), percent
+  (`{x:.1%}`) and integer (`{x:d}`, `{x:,d}`). Unsupported specs (alignment,
+  sign, hex/bin, dynamic `{x:.{n}f}`, `!a`) still fail loud with a located
+  `TranspileError`.
+
+  Verified live (Playwright): a built app renders `total=1,234,567.89`,
+  `ratio=12.6%`, and a `range(1, 5)` comprehension `squares=1,4,9,16 sum=30`,
+  zero Python in the browser.
+
 ## [0.25.0] — 2026-07-10
 
 ### Added

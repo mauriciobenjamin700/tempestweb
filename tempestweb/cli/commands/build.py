@@ -73,6 +73,8 @@ _CLIENT_ASSETS: tuple[str, ...] = (
 _TRANSPILE_ASSETS: tuple[str, ...] = (
     "runtime.js",
     "widgets.js",
+    "widgets.gen.js",
+    "widget-support.js",
     "diff.js",
     "widget-styles.gen.js",
 )

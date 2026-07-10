@@ -83,11 +83,12 @@ export class App {
 /**
  * Walk an IR tree collecting an `"eventType:key" -> handler` map.
  *
- * A handler is a node's non-wire event closure set by a widget builder (see
- * widgets.js): `Button.onClick` binds the `click` event; `Input.onChange` binds
- * both `input` and `change`. The map is keyed by `"<eventType>:<key>"` so the
- * transport can dispatch by the wire event's type and key. Rebuilt after every
- * render so it always points at the current tree's closures.
+ * A widget builder (see widgets.gen.js) stashes its event closures in a non-wire
+ * `__handlers` map keyed by DOM event type — e.g. a Button's `{ click }`, an
+ * Input's `{ input, change }`. This flattens every keyed node's `__handlers` into
+ * a `"<eventType>:<key>"` lookup so the transport can dispatch by the wire event's
+ * type and key. Rebuilt after every render so it always points at the current
+ * tree's closures.
  *
  * @param {Node} node  The root of the IR tree to walk.
  * @returns {Map<string, Function>}  Handlers keyed by `"eventType:key"`.
@@ -95,15 +96,13 @@ export class App {
 function collectHandlers(node) {
   /** @type {Map<string, Function>} */
   const handlers = new Map();
-  /** @param {Node & {onClick?: ?Function, onChange?: ?Function}} current */
+  /** @param {Node & {__handlers?: Object<string, ?Function>}} current */
   const walk = (current) => {
-    if (current.key != null) {
-      if (typeof current.onClick === "function") {
-        handlers.set(`click:${current.key}`, current.onClick);
-      }
-      if (typeof current.onChange === "function") {
-        handlers.set(`input:${current.key}`, current.onChange);
-        handlers.set(`change:${current.key}`, current.onChange);
+    if (current.key != null && current.__handlers != null) {
+      for (const [eventType, handler] of Object.entries(current.__handlers)) {
+        if (typeof handler === "function") {
+          handlers.set(`${eventType}:${current.key}`, handler);
+        }
       }
     }
     for (const child of current.children ?? []) {

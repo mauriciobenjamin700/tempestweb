@@ -26,48 +26,69 @@ from typing import Any
 from tempest_core import Button, build
 from tempest_core.style import Size, Variant
 from tempest_core.variants import VALID_COLOR_SCHEMES
+from tempest_core.widgets import Input
+from tempest_core.widgets.inputs import FieldVariant
 
 CLIENT_DIR: Path = Path(__file__).resolve().parents[2] / "client" / "transpile"
 STYLES_MODULE: Path = CLIENT_DIR / "widget-styles.gen.js"
 
 #: The parameter spaces the table is built over, sorted for a stable output.
 _VARIANTS: tuple[str, ...] = tuple(v.value for v in Variant)
+_FIELD_VARIANTS: tuple[str, ...] = tuple(v.value for v in FieldVariant)
 _SIZES: tuple[str, ...] = tuple(s.value for s in Size)
 _SCHEMES: tuple[str, ...] = tuple(sorted(VALID_COLOR_SCHEMES))
 
 
-def _resolved_style(variant: str, size: str, scheme: str) -> dict[str, Any]:
-    """Return the core-resolved non-null style for a Button combination.
+def _nonnull_style(node: Any) -> dict[str, Any]:
+    """Return the non-null fields of a built node's resolved style.
 
     Args:
-        variant: The button variant (e.g. ``"solid"``).
-        size: The density size (e.g. ``"md"``).
-        scheme: The Material 3 color scheme (e.g. ``"primary"``).
+        node: A ``build(...)`` result whose ``props["style"]`` is a ``Style``.
 
     Returns:
-        The non-null fields of the style the core bakes into the built IR.
+        The non-null fields of the style the core baked into the IR.
     """
-    node = build(Button(label="x", variant=variant, size=size, color_scheme=scheme))
-    style = node.props["style"]
-    dumped: dict[str, Any] = style.model_dump(mode="json")
+    dumped: dict[str, Any] = node.props["style"].model_dump(mode="json")
     return {key: value for key, value in dumped.items() if value is not None}
+
+
+def _button_style(variant: str, size: str, scheme: str) -> dict[str, Any]:
+    """Return the core-resolved non-null style for a Button combination."""
+    return _nonnull_style(
+        build(Button(label="x", variant=variant, size=size, color_scheme=scheme))
+    )
+
+
+def _input_style(field_variant: str, size: str, scheme: str) -> dict[str, Any]:
+    """Return the core-resolved non-null style for an Input combination."""
+    return _nonnull_style(
+        build(Input(field_variant=field_variant, size=size, color_scheme=scheme))
+    )
 
 
 def build_table() -> dict[str, Any]:
     """Build the ``{widget: {variant: {size: {scheme: style}}}}`` style table.
 
     Returns:
-        The nested table of resolved non-null styles for every Button combination.
+        The nested table of resolved non-null styles per widget. ``Button`` is
+        keyed by ``variant``; ``Input`` by ``field_variant`` — both then by
+        ``size`` and ``color_scheme``.
     """
-    button: dict[str, Any] = {}
-    for variant in _VARIANTS:
-        by_size: dict[str, Any] = {}
-        for size in _SIZES:
-            by_size[size] = {
-                scheme: _resolved_style(variant, size, scheme) for scheme in _SCHEMES
-            }
-        button[variant] = by_size
-    return {"Button": button}
+    button: dict[str, Any] = {
+        variant: {
+            size: {scheme: _button_style(variant, size, scheme) for scheme in _SCHEMES}
+            for size in _SIZES
+        }
+        for variant in _VARIANTS
+    }
+    field_input: dict[str, Any] = {
+        variant: {
+            size: {scheme: _input_style(variant, size, scheme) for scheme in _SCHEMES}
+            for size in _SIZES
+        }
+        for variant in _FIELD_VARIANTS
+    }
+    return {"Button": button, "Input": field_input}
 
 
 def render_module_text() -> str:

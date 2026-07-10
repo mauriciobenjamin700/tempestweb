@@ -31,7 +31,14 @@ _NAME_MAP: dict[str, str] = {
     "make_state": "makeState",
     "set_state": "setState",
     "on_click": "onClick",
+    "on_change": "onChange",
     "color_scheme": "colorScheme",
+    "field_variant": "fieldVariant",
+    "max_length": "maxLength",
+    "leading_icon": "leadingIcon",
+    "trailing_icon": "trailingIcon",
+    # A dataclass method's `self` receiver is JS's `this`.
+    "self": "this",
 }
 _INDENT: str = "  "
 
@@ -294,8 +301,10 @@ class _Generator:
     def _lambda(self, node: ast.Lambda, indent: int) -> str:
         """Emit an arrow function.
 
-        The only supported body is ``setattr(obj, "name", value)`` (an in-place
-        state mutation), emitted as a block arrow with a single assignment.
+        A ``setattr(obj, "name", value)`` body (an in-place state mutation) is
+        emitted as a block arrow with a single assignment; any other supported
+        expression body becomes a concise expression arrow — e.g.
+        ``lambda s: s.increment()`` → ``(s) => s.increment()``.
         """
         params = ", ".join(a.arg for a in node.args.args)
         body = node.body
@@ -313,11 +322,7 @@ class _Generator:
             inner = _INDENT * (indent + 1)
             close = _INDENT * indent
             return f"({params}) => {{\n{inner}{target}.{attr} = {value};\n{close}}}"
-        raise TranspileError(
-            'only `setattr(obj, "name", value)` lambdas are supported',
-            node,
-            self.filename,
-        )
+        return f"({params}) => {self.expr(body, indent)}"
 
     # -- statements ---------------------------------------------------------
 
@@ -557,8 +562,14 @@ class _Generator:
         return "\n".join(lines)
 
     def _class(self, node: ast.ClassDef) -> str:
-        """Emit a `@dataclass` as `export class X extends State { constructor }`."""
+        """Emit a `@dataclass` as `export class X extends State { … }`.
+
+        Annotated fields become constructor assignments; methods become JS class
+        methods (the ``self`` receiver maps to ``this`` and is dropped from the
+        parameter list).
+        """
         fields: list[tuple[str, str]] = []
+        methods: list[ast.FunctionDef] = []
         for stmt in node.body:
             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
                 if stmt.value is None:
@@ -568,11 +579,13 @@ class _Generator:
                         self.filename,
                     )
                 fields.append((stmt.target.id, self.expr(stmt.value, 2)))
+            elif isinstance(stmt, ast.FunctionDef):
+                methods.append(stmt)
             elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
                 continue  # class docstring
             else:
                 raise TranspileError(
-                    "only annotated fields are supported in a dataclass",
+                    "only annotated fields and methods are supported in a dataclass",
                     stmt,
                     self.filename,
                 )
@@ -582,8 +595,22 @@ class _Generator:
         for name, value in fields:
             lines.append(f"{_INDENT * 2}this.{name} = {value};")
         lines.append(f"{_INDENT}}}")
+        for method in methods:
+            lines.append("")
+            lines.extend(self._method(method))
         lines.append("}")
         return "\n".join(lines)
+
+    def _method(self, node: ast.FunctionDef) -> list[str]:
+        """Emit a dataclass method as a JS class method (drops the `self` param)."""
+        params = [a.arg for a in node.args.args]
+        if params and params[0] == "self":
+            params = params[1:]
+        pad = _INDENT
+        lines = [f"{pad}{_js_name(node.name)}({', '.join(params)}) {{"]
+        lines.extend(self._body(node.body, 2))
+        lines.append(f"{pad}}}")
+        return lines
 
     def _function(self, node: ast.FunctionDef) -> str:
         """Emit a top-level `def` as `export function name(params) {...}`."""

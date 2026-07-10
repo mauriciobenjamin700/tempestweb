@@ -14,11 +14,12 @@ import {
   Column,
   Container,
   Edge,
+  Input,
   Row,
   Style,
   Text,
 } from "../../client/transpile/widgets.js";
-import { mountApp } from "../../client/transpile/runtime.js";
+import { mountApp, State } from "../../client/transpile/runtime.js";
 import { makeState, view } from "../../client/transpile/counter.gen.js";
 
 // ---- 1. diff conformance against the core-derived golden -------------------
@@ -115,6 +116,56 @@ test("Button variant/size/colorScheme select different resolved styles", () => {
   const ghost = Button({ label: "a", variant: "ghost" }).props.style;
   // A ghost button is not a filled solid one — the table distinguishes variants.
   assert.notDeepEqual(solid, ghost);
+});
+
+test("Input emits the core prop shape with a resolved outline style", () => {
+  const node = Input({ value: "hi", placeholder: "name", key: "f" });
+  assert.equal(node.type, "Input");
+  assert.equal(node.props.value, "hi");
+  assert.equal(node.props.placeholder, "name");
+  assert.equal(node.props.field_variant, "outline");
+  assert.equal(node.props.on_change, null, "handler stays off the wire");
+  assert.notEqual(node.props.style.border, null, "outline field has a border");
+  assert.equal(node.props.style.radius, 8.0);
+});
+
+test("Input keeps its change closure off the wire (onChange collected by runtime)", () => {
+  const node = Input({ key: "f", onChange: () => {} });
+  assert.equal(node.props.on_change, null);
+  assert.equal(typeof node.onChange, "function");
+});
+
+test("typing in an Input drives onChange -> state -> re-render", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  class FormState extends State {
+    constructor() {
+      super();
+      this.text = "";
+    }
+  }
+  const mod = {
+    makeState: () => new FormState(),
+    view: (app) =>
+      Column({
+        children: [
+          Input({
+            value: app.state.text,
+            key: "f",
+            onChange: (e) => app.setState((s) => (s.text = e.payload.value)),
+          }),
+        ],
+      }),
+  };
+
+  const handle = mountApp(dom.root, mod);
+  const field = dom.root.querySelector("[data-tw-key=\"f\"]");
+  field.value = "hello";
+  field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+  assert.equal(handle.app.state.text, "hello");
+  assert.ok(handle.patchLog.length >= 1, "the re-render emitted a patch");
 });
 
 // ---- 3. runtime drives a real generated module ----------------------------

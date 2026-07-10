@@ -207,22 +207,24 @@ export function Container({
 }
 
 /**
- * Resolve a Button's baked style from its variant/size/color_scheme.
+ * Resolve a widget's baked style from the introspected defaults table.
  *
- * Mirrors the core: the default Material 3 style for the combination (from the
- * build-time-introspected {@link WIDGET_STYLES} table) is the base, and an
- * explicit `style` is merged **on top** — the caller's set (non-null) fields win.
- * The result is a full `Style` object (unset fields `null`), matching the core's
- * wire shape so the diff stays stable across re-renders.
+ * Mirrors the core: the default Material 3 style for the widget's
+ * variant/size/color_scheme combination (from the build-time-introspected
+ * {@link WIDGET_STYLES} table) is the base, and an explicit `style` is merged
+ * **on top** — the caller's set (non-null) fields win. The result is a full
+ * `Style` object (unset fields `null`), matching the core's wire shape so the
+ * diff stays stable across re-renders.
  *
- * @param {string} variant  The button variant (e.g. `"solid"`).
+ * @param {string} widget  The widget type name (e.g. `"Button"`, `"Input"`).
+ * @param {string} variant  The style variant axis (variant / field_variant).
  * @param {string} size  The density size (e.g. `"md"`).
  * @param {string} colorScheme  The Material 3 color scheme (e.g. `"primary"`).
  * @param {?Object} override  The caller's explicit style, or `null`.
  * @returns {Object<string, *>}  The resolved, full Style object.
  */
-function resolveButtonStyle(variant, size, colorScheme, override) {
-  const base = WIDGET_STYLES.Button?.[variant]?.[size]?.[colorScheme] ?? {};
+function resolveWidgetStyle(widget, variant, size, colorScheme, override) {
+  const base = WIDGET_STYLES[widget]?.[variant]?.[size]?.[colorScheme] ?? {};
   const merged = { ...base };
   if (override != null) {
     for (const [field, value] of Object.entries(override)) {
@@ -269,12 +271,76 @@ export function Button({
       on_click: null,
       semantics: null,
       size,
-      style: resolveButtonStyle(variant, size, colorScheme, style),
+      style: resolveWidgetStyle("Button", variant, size, colorScheme, style),
       tag: null,
       variant,
     },
     children: [],
     // Non-wire: the live click closure, collected by the runtime, ignored by diff.
     onClick,
+  };
+}
+
+/**
+ * Build an `Input` IR node (a text field) with its Material 3 style resolved.
+ *
+ * The `fieldVariant`/`size`/`colorScheme` select the baked default style; an
+ * explicit `style` layers over it. The wire prop `on_change` is always `null`
+ * (see the module header on handlers); the live change closure is stashed on the
+ * non-wire `onChange` field, collected by the runtime and dispatched on
+ * `input`/`change` events by key. The shared renderer (`client/dom.js`) renders
+ * the `<input>` and applies its `value` — Mode C reuses it unchanged.
+ *
+ * @param {{value?: string, placeholder?: string, onChange?: ?Function,
+ *          key?: ?string, style?: ?Object, fieldVariant?: string, size?: string,
+ *          colorScheme?: string, secure?: boolean, pattern?: ?string,
+ *          error?: string, keyboard?: string, maxLength?: ?number,
+ *          leadingIcon?: ?string, trailingIcon?: ?string}} args
+ * @returns {Node & {onChange: ?Function}}
+ */
+export function Input({
+  value = "",
+  placeholder = "",
+  onChange = null,
+  key = null,
+  style = null,
+  fieldVariant = "outline",
+  size = "md",
+  colorScheme = "primary",
+  secure = false,
+  pattern = null,
+  error = "",
+  keyboard = "text",
+  maxLength = null,
+  leadingIcon = null,
+  trailingIcon = null,
+}) {
+  return {
+    type: "Input",
+    key,
+    props: {
+      attrs: {},
+      color_scheme: colorScheme,
+      error,
+      field_variant: fieldVariant,
+      focus_order: null,
+      focusable: null,
+      keyboard,
+      leading_icon: leadingIcon,
+      max_length: maxLength,
+      on_change: null,
+      pattern,
+      placeholder,
+      secure,
+      semantics: null,
+      size,
+      style: resolveWidgetStyle("Input", fieldVariant, size, colorScheme, style),
+      tag: null,
+      trailing_icon: trailingIcon,
+      value,
+    },
+    children: [],
+    // Non-wire: the live change closure, collected by the runtime, ignored by diff.
+    onChange,
   };
 }

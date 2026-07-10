@@ -120,6 +120,30 @@ def test_subscript_index() -> None:
     assert "return xs[i];" in js
 
 
+def test_dataclass_method_becomes_js_method() -> None:
+    """A dataclass method becomes a JS class method (self -> this, dropped param)."""
+    js = gen(
+        "@dataclass\n"
+        "class Counter:\n"
+        "    value: int = 0\n"
+        "    def increment(self) -> None:\n"
+        "        self.value += 1\n"
+    )
+    assert "increment() {" in js
+    assert "this.value += 1;" in js
+    assert "(self)" not in js  # the receiver is dropped
+
+
+def test_expression_lambda_calls_state_method() -> None:
+    """A non-setattr lambda body becomes a concise expression arrow."""
+    js = gen(
+        "def view(app):\n"
+        "    def inc() -> None:\n"
+        "        app.set_state(lambda s: s.increment())\n"
+    )
+    assert "app.setState((s) => s.increment());" in js
+
+
 def test_unsupported_construct_raises() -> None:
     """A construct still outside the subset is a compile error."""
     with pytest.raises(TranspileError):

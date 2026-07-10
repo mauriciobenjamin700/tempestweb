@@ -415,3 +415,51 @@ test("app.set_theme and media updates re-render the view", () => {
   handle.app._setMedia(new MediaQueryData({ width: 1024, height: 768 }));
   assert.equal(label(), "dark/wide");
 });
+
+// ---- Mode C imperative animation (frame loop) -----------------------------
+
+import { AnimationController, Tween } from "../../client/transpile/animation.js";
+
+test("registering a controller drives the frame loop until it settles", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  // A controllable rAF: collect callbacks, pump them manually with timestamps.
+  const queue = [];
+  globalThis.requestAnimationFrame = (fn) => queue.push(fn);
+  try {
+    class AnimState extends State {
+      constructor() {
+        super();
+        this.anim = new AnimationController(1.0);
+      }
+    }
+    const mod = {
+      makeState: () => new AnimState(),
+      view: (app) =>
+        Text({ content: String(Math.round(new Tween({ begin: 0, end: 100 }).at(app.state.anim.value))), key: "v" }),
+    };
+    const handle = mountApp(dom.root, mod);
+    const label = () => dom.root.querySelector("[data-tw-key=\"v\"]").textContent;
+    assert.equal(label(), "0");
+
+    handle.app.state.anim.forward();
+    handle.app.register_animation(handle.app.state.anim);
+    assert.equal(handle.app.has_animations, true);
+
+    // Pump frames: t=0, 0.5s, 1.1s (settles).
+    let t = 0;
+    const pump = (ms) => {
+      t += ms;
+      const fns = queue.splice(0);
+      for (const fn of fns) fn(t);
+    };
+    pump(0);
+    pump(500);
+    assert.notEqual(label(), "0"); // advanced
+    pump(700); // total 1200ms > 1000ms duration -> settles at 100
+    assert.equal(label(), "100");
+    assert.equal(handle.app.has_animations, false);
+  } finally {
+    delete globalThis.requestAnimationFrame;
+  }
+});

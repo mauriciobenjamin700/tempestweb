@@ -4,6 +4,31 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.24.0] — 2026-07-10
+
+### Added
+
+- **Canonical Mode C tour example (`examples/transpile-tour`).** One app that
+  exercises the whole app-layer surface at once — state with methods, navigation
+  (routes + URL), i18n, theme + responsiveness, a validated form (native
+  `validate_email`) and an imperative animation (`AnimationController`/`Tween`).
+  Verified live (Playwright): navigation, form validation ("E-mail inválido"),
+  theme/lang toggles and the animated box all work with zero Python in the
+  browser. Documented as "O tour completo" in the transpile guide (PT + EN).
+
+### Fixed
+
+- **Function-scope hoisting in the transpiler.** A name assigned inside an
+  `if`/`for` block (e.g. `body = Column(...)` in a branch) was emitted as a
+  block-scoped `const` and became invisible to the rest of the function —
+  a runtime `ReferenceError` in JS. Such names now hoist to a single
+  function-top `let`; top-level-only names keep their `const`.
+- **Fail-loud on out-of-subset constructs.** Variadic/keyword-only parameters,
+  function decorators, non-dataclass class decorators and f-string format-specs
+  were silently mis-transpiled. Each now raises a located `TranspileError`
+  (`file:line`), matching the `mypy --strict` spirit. `field(default=…)` and
+  `field(default_factory=list/dict/set)` are now honored.
+
 ## [0.23.0] — 2026-07-10
 
 ### Added

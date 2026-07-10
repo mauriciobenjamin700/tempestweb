@@ -301,3 +301,36 @@ def test_unsupported_construct_raises() -> None:
     """A construct still outside the subset is a compile error."""
     with pytest.raises(TranspileError):
         gen("def f(a):\n    return {k: v for k, v in a}\n")  # dict comprehension
+
+
+# Every out-of-subset construct must fail loud with a TranspileError (file:line),
+# never silently mis-transpile or crash — the graduation-quality guarantee.
+_UNSUPPORTED: dict[str, str] = {
+    "while": "def f(x):\n    while x:\n        pass\n",
+    "try": "def f():\n    try:\n        pass\n    except Exception:\n        pass\n",
+    "with": "def f():\n    with x() as h:\n        pass\n",
+    "global": "def f():\n    global g\n",
+    "yield": "def f():\n    yield 1\n",
+    "walrus": "def f(x):\n    return (y := x)\n",
+    "set": "def f():\n    return {1, 2}\n",
+    "tuple": "def f():\n    return (1, 2)\n",
+    "raise": "def f():\n    raise ValueError('x')\n",
+    "assert": "def f(x):\n    assert x\n",
+    "del": "def f(x):\n    del x\n",
+    "starargs": "def f(*args):\n    return args\n",
+    "kwargs": "def f(**kw):\n    return kw\n",
+    "fn_decorator": "@deco\ndef f():\n    pass\n",
+    "class_decorator": "@deco\nclass C:\n    x: int = 0\n",
+    "fstring_spec": "def f(x):\n    return f'{x:.2f}'\n",
+    "fstring_conv": "def f(x):\n    return f'{x!r}'\n",
+    "dict_comp": "def f(a):\n    return {k: v for k, v in a}\n",
+    "plain_import": "import os\n",
+}
+
+
+@pytest.mark.parametrize("name", sorted(_UNSUPPORTED))
+def test_out_of_subset_fails_loud(name: str) -> None:
+    """Each unsupported construct raises a located TranspileError (no crash)."""
+    with pytest.raises(TranspileError) as exc:
+        transpile_source(_UNSUPPORTED[name], filename="app.py")
+    assert "app.py:" in str(exc.value), name

@@ -377,6 +377,22 @@ def view(app: App[S]) -> Widget:
 same math as the core. Verified in the browser: the width animates 100→340
 (ease-out) and settles. **This closes 100% of tempest-core coverage in Mode C.**
 
+## The complete tour
+
+Everything above — state with methods, navigation, i18n, theme + responsiveness,
+a validated form and an imperative animation — lives together in one reference
+app, [`examples/transpile-tour`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/examples/transpile-tour/app.py):
+
+```bash
+tempestweb build --mode transpile --path examples/transpile-tour
+tempestweb dev   --mode transpile --path examples/transpile-tour   # livereload
+```
+
+!!! tip "One `view`, every mode"
+    The tour's `view()` runs unchanged in Modes A and B. `build` proves it by
+    rendering through the real core — an API that only existed in Mode C would
+    break the build, so the tour is living proof of portability.
+
 ## The supported subset
 
 Mode C accepts a **typed subset** of Python — enough for the app layer. A

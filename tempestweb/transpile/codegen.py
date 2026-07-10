@@ -86,6 +86,100 @@ def _js_name(name: str) -> str:
     return _NAME_MAP.get(name, name)
 
 
+def _param_names(args: ast.arguments, node: ast.AST, filename: str) -> list[str]:
+    """Return a function's positional parameter names, rejecting the rest.
+
+    Variadic (``*args``/``**kwargs``), keyword-only and positional-only params
+    are outside the subset — they would be silently dropped, so raise instead.
+
+    Args:
+        args: The function's ``ast.arguments``.
+        node: The owning node (for the error location).
+        filename: The source file name (for the diagnostic).
+
+    Returns:
+        The plain positional parameter names.
+
+    Raises:
+        TranspileError: If the signature uses an unsupported parameter form.
+    """
+    if args.vararg is not None or args.kwarg is not None:
+        raise TranspileError(
+            "variadic parameters (*args / **kwargs) are not supported",
+            node,
+            filename,
+        )
+    if args.kwonlyargs or getattr(args, "posonlyargs", []):
+        raise TranspileError(
+            "keyword-only / positional-only parameters are not supported",
+            node,
+            filename,
+        )
+    return [a.arg for a in args.args]
+
+
+def _reject_fn_decorators(
+    node: ast.FunctionDef | ast.AsyncFunctionDef, filename: str
+) -> None:
+    """Raise if a function carries a decorator (unsupported in the subset)."""
+    if node.decorator_list:
+        raise TranspileError("function decorators are not supported", node, filename)
+
+
+def _assigned_names(stmts: list[ast.stmt]) -> set[str]:
+    """Collect plain ``Name`` targets assigned in a function body.
+
+    Descends into ``if``/``for`` blocks (their assignments share the function
+    scope in Python) but not into nested ``def``/``class`` scopes. Used to hoist
+    those names to a single function-top ``let`` (see
+    :meth:`_Generator._emit_fn_body`).
+
+    Args:
+        stmts: The statements to scan.
+
+    Returns:
+        The set of assigned local names.
+    """
+    names: set[str] = set()
+    for stmt in stmts:
+        if isinstance(stmt, ast.Assign):
+            for target in stmt.targets:
+                if isinstance(target, ast.Name):
+                    names.add(target.id)
+        elif (
+            isinstance(stmt, ast.AnnAssign)
+            and isinstance(stmt.target, ast.Name)
+            and stmt.value is not None
+        ):
+            names.add(stmt.target.id)
+        elif isinstance(stmt, (ast.If, ast.For)):
+            names |= _assigned_names(stmt.body)
+            names |= _assigned_names(stmt.orelse)
+    return names
+
+
+def _hoisted_names(stmts: list[ast.stmt]) -> set[str]:
+    """Collect names assigned *inside* a function's ``if``/``for`` blocks.
+
+    Only these need hoisting to a function-top ``let`` — a JS ``const`` inside a
+    block would trap them there, but Python keeps them visible for the rest of
+    the function. Names assigned only at the top level stay ``const`` (cleaner
+    output, and immutable-by-default).
+
+    Args:
+        stmts: The function's top-level statements.
+
+    Returns:
+        The set of block-assigned names to hoist.
+    """
+    names: set[str] = set()
+    for stmt in stmts:
+        if isinstance(stmt, (ast.If, ast.For)):
+            names |= _assigned_names(stmt.body)
+            names |= _assigned_names(stmt.orelse)
+    return names
+
+
 class _Generator:
     """Single-module AST-to-JS emitter.
 
@@ -104,6 +198,10 @@ class _Generator:
         # Identifiers actually referenced in the emitted JS, so imports reflect
         # what the output uses (not merely what the Python source imported).
         self.referenced: set[str] = set()
+        # Per-function set of names hoisted to a `let` at the function top, so an
+        # assignment inside an `if`/`for` block stays visible afterwards (Python
+        # scoping) instead of being trapped in the JS block by `const`.
+        self._scopes: list[set[str]] = []
 
     # -- expressions --------------------------------------------------------
 
@@ -183,6 +281,13 @@ class _Generator:
             if isinstance(value, ast.Constant) and isinstance(value.value, str):
                 parts.append(value.value.replace("`", "\\`").replace("$", "\\$"))
             elif isinstance(value, ast.FormattedValue):
+                if value.format_spec is not None or value.conversion not in (-1, None):
+                    raise TranspileError(
+                        "f-string format specs / conversions (e.g. `{x:.2f}`, "
+                        "`{x!r}`) are not supported",
+                        value,
+                        self.filename,
+                    )
                 parts.append(f"${{{self.expr(value.value, indent)}}}")
             else:
                 raise TranspileError("unsupported f-string part", value, self.filename)
@@ -422,7 +527,7 @@ class _Generator:
         expression body becomes a concise expression arrow — e.g.
         ``lambda s: s.increment()`` → ``(s) => s.increment()``.
         """
-        params = ", ".join(a.arg for a in node.args.args)
+        params = ", ".join(_param_names(node.args, node, self.filename))
         body = node.body
         if (
             isinstance(body, ast.Call)
@@ -523,6 +628,11 @@ class _Generator:
         value = self.expr(node.value, indent)
         pad = _INDENT * indent
         if isinstance(target, ast.Name):
+            # If the name was hoisted to a function-top `let` (so it stays visible
+            # outside an if/for block — Python scoping), assign plainly; otherwise
+            # declare it with `const`.
+            if self._scopes and target.id in self._scopes[-1]:
+                return [f"{pad}{target.id} = {value};"]
             return [f"{pad}const {target.id} = {value};"]
         if isinstance(target, (ast.Attribute, ast.Subscript)):
             return [f"{pad}{self.expr(target, indent)} = {value};"]
@@ -566,12 +676,39 @@ class _Generator:
 
         An `async def` becomes an `async` arrow, so `await` inside it is valid.
         """
-        params = ", ".join(a.arg for a in node.args.args)
+        _reject_fn_decorators(node, self.filename)
+        params = ", ".join(_param_names(node.args, node, self.filename))
         pad = _INDENT * indent
         prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
         lines = [f"{pad}const {_js_name(node.name)} = {prefix}({params}) => {{"]
-        lines.extend(self._body(node.body, indent + 1))
+        lines.extend(self._emit_fn_body(node.body, indent + 1))
         lines.append(f"{pad}}};")
+        return lines
+
+    def _emit_fn_body(self, body: list[ast.stmt], indent: int) -> list[str]:
+        """Emit a function body, hoisting its assigned names to a top `let`.
+
+        Names assigned inside ``if``/``for`` blocks are declared once at the top
+        so they follow Python's function scoping rather than being trapped in a
+        JS block by ``const``. Top-level-only names stay ``const``. Nested
+        function scopes are not descended into.
+
+        Args:
+            body: The function's statements.
+            indent: The body indentation depth.
+
+        Returns:
+            The emitted lines, a leading ``let`` declaration first when needed.
+        """
+        stmts = self._strip_docstring(body)
+        names = sorted(_hoisted_names(stmts))
+        self._scopes.append(set(names))
+        lines: list[str] = []
+        if names:
+            lines.append(f"{_INDENT * indent}let {', '.join(names)};")
+        for stmt in stmts:
+            lines.extend(self.stmt(stmt, indent))
+        self._scopes.pop()
         return lines
 
     def _body(self, body: list[ast.stmt], indent: int) -> list[str]:
@@ -762,6 +899,45 @@ class _Generator:
             lines.append(f'import {{ {", ".join(validators)} }} from "{module}";')
         return "\n".join(lines)
 
+    def _field_default(self, value: ast.expr) -> str:
+        """Emit a dataclass field's default, resolving ``dataclasses.field(...)``.
+
+        ``field(default=X)`` → ``X``; ``field(default_factory=list)`` → ``[]`` and
+        ``default_factory=dict`` → ``{}`` (the common mutable-default forms). A
+        plain value is emitted as-is.
+
+        Args:
+            value: The field's default expression.
+
+        Returns:
+            The JS initializer source.
+
+        Raises:
+            TranspileError: If a ``field(...)`` form is not one of the above.
+        """
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and (value.func.id == "field")
+        ):
+            factories = {"list": "[]", "dict": "{}", "set": "new Set()"}
+            for kw in value.keywords:
+                if kw.arg == "default":
+                    return self.expr(kw.value, 2)
+                if (
+                    kw.arg == "default_factory"
+                    and isinstance(kw.value, ast.Name)
+                    and kw.value.id in factories
+                ):
+                    return factories[kw.value.id]
+            raise TranspileError(
+                "unsupported dataclass field(...) — use default= or "
+                "default_factory=list/dict",
+                value,
+                self.filename,
+            )
+        return self.expr(value, 2)
+
     def _class(self, node: ast.ClassDef) -> str:
         """Emit a `@dataclass` as `export class X extends State { … }`.
 
@@ -769,6 +945,14 @@ class _Generator:
         methods (the ``self`` receiver maps to ``this`` and is dropped from the
         parameter list).
         """
+        for decorator in node.decorator_list:
+            name = decorator.id if isinstance(decorator, ast.Name) else None
+            if name != "dataclass":
+                raise TranspileError(
+                    "only the @dataclass decorator is supported on a class",
+                    node,
+                    self.filename,
+                )
         fields: list[tuple[str, str]] = []
         methods: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
         for stmt in node.body:
@@ -779,7 +963,7 @@ class _Generator:
                         stmt,
                         self.filename,
                     )
-                fields.append((stmt.target.id, self.expr(stmt.value, 2)))
+                fields.append((stmt.target.id, self._field_default(stmt.value)))
             elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 methods.append(stmt)
             elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
@@ -804,22 +988,24 @@ class _Generator:
 
     def _method(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
         """Emit a dataclass method as a JS class method (drops the `self` param)."""
-        params = [a.arg for a in node.args.args]
+        _reject_fn_decorators(node, self.filename)
+        params = _param_names(node.args, node, self.filename)
         if params and params[0] == "self":
             params = params[1:]
         pad = _INDENT
         prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
         lines = [f"{pad}{prefix}{_js_name(node.name)}({', '.join(params)}) {{"]
-        lines.extend(self._body(node.body, 2))
+        lines.extend(self._emit_fn_body(node.body, 2))
         lines.append(f"{pad}}}")
         return lines
 
     def _function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
         """Emit a top-level `def` as `export function name(params) {...}`."""
-        params = ", ".join(a.arg for a in node.args.args)
+        _reject_fn_decorators(node, self.filename)
+        params = ", ".join(_param_names(node.args, node, self.filename))
         prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
         lines = [f"export {prefix}function {_js_name(node.name)}({params}) {{"]
-        lines.extend(self._body(node.body, 1))
+        lines.extend(self._emit_fn_body(node.body, 1))
         lines.append("}")
         return "\n".join(lines)
 

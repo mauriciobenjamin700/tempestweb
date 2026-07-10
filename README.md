@@ -118,9 +118,18 @@ js: str = transpile_file("examples/counter/app.py")  # -> native ES module
 ```
 
 The generated module runs on the native runtime (`client/transpile/runtime.js`)
-with a JS `diff` locked against a core-derived golden. **Experimental (spike
-C0)**: MD3 style fidelity, a `build --mode transpile` CLI, and a wider subset are
-next (phases C1–C5). See [`docs/modo-c-transpile.md`](docs/modo-c-transpile.md).
+with a JS `diff` locked against a core-derived golden. Coverage is now **100% of
+`tempest_core`**: all ~64 widgets, MD3 styling, state-with-methods, navigation
+(routes + URL), i18n, theme + responsiveness, native capabilities (http/storage/
+cookies/…), field validators and both declarative and imperative animation. The
+`tempestweb build/dev --mode transpile` CLI emits a static, CDN-servable bundle.
+
+See the canonical [`examples/transpile-tour`](examples/transpile-tour/app.py) —
+one app exercising the whole surface — and the guide
+([PT](https://mauriciobenjamin700.github.io/tempestweb/transpile/) ·
+[EN](https://mauriciobenjamin700.github.io/tempestweb/en/transpile/)). Still
+**experimental**: the typed subset is deliberately restricted (out-of-subset
+constructs fail loud with `file:line`) and the API may change.
 
 ## Develop
 

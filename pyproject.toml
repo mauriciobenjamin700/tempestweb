@@ -1,7 +1,7 @@
 [project]
 name = "tempestweb"
-version = "0.9.0"
-description = "Build web apps in typed Python — one tree, a DOM renderer, two execution modes (WASM + server)."
+version = "0.10.0"
+description = "Build web apps in typed Python — one tree, a DOM renderer, three execution modes (WASM + server + transpile)."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -10,7 +10,7 @@ dependencies = [
     # Renderer-agnostic UI core (IR/reconciler/state/style/widgets) — the single
     # source of truth, imported directly as ``tempest_core``. pydantic comes
     # transitively via it.
-    "tempest-core>=0.9.0",
+    "tempest-core>=0.11.0",
 ]
 
 [project.optional-dependencies]

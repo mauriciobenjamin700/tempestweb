@@ -4,6 +4,20 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.23.0] — 2026-07-10
+
+### Added
+
+- **Imperative animation in Mode C (`AnimationController`/`Tween`/`Spring`).**
+  Frame-driven animation now works in the transpile mode: `AnimationController`
+  drives a normalized value (eased ramp or damped spring) on a
+  `requestAnimationFrame` loop the runtime owns, and `Tween` maps it to a float/
+  Color/Edge for a `Style`. `client/transpile/animation.js` is a faithful port of
+  `tempest_core.animation` (curve math + ramp/spring integration + lerps); the App
+  gains `register_animation`/`unregister_animation`/`has_animations`. Verified live
+  (Playwright): a box animates width 100→340 over an ease-out ramp and settles.
+  **This closes 100% of `tempest_core` coverage in Mode C.**
+
 ## [0.22.0] — 2026-07-10
 
 ### Added

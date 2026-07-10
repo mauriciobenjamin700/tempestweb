@@ -1,0 +1,53 @@
+[
+  {
+    "path": "/",
+    "names": [
+      "/"
+    ]
+  },
+  {
+    "path": "/about",
+    "names": [
+      "/",
+      "/about"
+    ]
+  },
+  {
+    "path": "/a/b/c",
+    "names": [
+      "/",
+      "/a",
+      "/a/b",
+      "/a/b/c"
+    ]
+  },
+  {
+    "path": "/users/123",
+    "names": [
+      "/",
+      "/users",
+      "/users/123"
+    ]
+  },
+  {
+    "path": "/search?q=abc&page=2",
+    "names": [
+      "/",
+      "/search?q=abc&page=2"
+    ]
+  },
+  {
+    "path": "/user/123?tab=info",
+    "names": [
+      "/",
+      "/user",
+      "/user/123?tab=info"
+    ]
+  },
+  {
+    "path": "",
+    "names": [
+      "/"
+    ]
+  }
+]

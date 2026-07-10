@@ -236,6 +236,36 @@ def view(app: App[DataState]) -> Widget:
     algoritmo e as mesmas mensagens PT-BR do core (port fiel, travado por fixture).
     Combina com `Input` + estado para forms validados sem servidor.
 
+## Navegação (rotas + URL)
+
+O Modo C fala a mesma navegação dos Modos A/B: `app.push(Route(...))`,
+`app.pop()`, `app.replace(...)`, `app.nav.top` — sincronizados com a URL do
+browser (deep-link + voltar/avançar) automaticamente.
+
+```python
+from tempest_core import App, Button, Column, Route, Text, Widget
+
+
+def view(app: App[MyState]) -> Widget:
+    def open_product() -> None:
+        app.push(Route(name="/products/42"))
+
+    route = app.nav.top
+    return Column(children=[
+        Text(content=f"rota: {route.name}", key="r"),
+        Button(label="abrir produto", on_click=open_product, key="p"),
+        Button(label="voltar", on_click=lambda e: app.pop(), key="b"),
+    ])
+```
+
+!!! info "URL ↔ stack"
+    `app.push`/`pop` empurram/voltam a URL (`pushState`); um deep-link ou o
+    botão voltar do browser resetam a stack a partir do path
+    (`routes_from_path`) — idêntico aos Modos A/B. **Path/query params:** o `name`
+    da rota carrega o path completo (incl. `?query`), como no core; leia os
+    segmentos por `app.nav.stack`. Um router com params tipados é evolução no
+    nível do core.
+
 ## O subset suportado
 
 O Modo C aceita um **subset tipado** de Python — o suficiente para a camada de

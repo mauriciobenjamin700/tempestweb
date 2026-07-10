@@ -334,3 +334,56 @@ test("native.audio.play dispatches src/volume/channel", async () => {
     return true;
   });
 });
+
+// ---- Mode C navigation ----------------------------------------------------
+
+import { Route } from "../../client/transpile/nav.js";
+
+test("app.push/pop navigate the stack and re-render", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  class NavState extends State {}
+  const mod = {
+    makeState: () => new NavState(),
+    view: (app) =>
+      Column({
+        children: [
+          Text({ content: app.nav.top.name, key: "route" }),
+          Button({
+            label: "go",
+            key: "go",
+            onClick: () => app.push(new Route({ name: "/about" })),
+          }),
+          Button({ label: "back", key: "back", onClick: () => app.pop() }),
+        ],
+      }),
+  };
+  const handle = mountApp(dom.root, mod);
+  assert.equal(dom.root.querySelector("[data-tw-key=\"route\"]").textContent, "/");
+
+  dom.root.querySelector("[data-tw-key=\"go\"]")
+    .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  assert.equal(handle.app.nav.top.name, "/about");
+  assert.equal(dom.root.querySelector("[data-tw-key=\"route\"]").textContent, "/about");
+
+  dom.root.querySelector("[data-tw-key=\"back\"]")
+    .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  assert.equal(handle.app.nav.top.name, "/");
+});
+
+test("a navigate event resets the stack from the path (deep link)", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  class NavState extends State {}
+  const mod = {
+    makeState: () => new NavState(),
+    view: (app) => Text({ content: app.nav.top.name, key: "route" }),
+  };
+  const handle = mountApp(dom.root, mod);
+  // Simulate the router reporting a deep-linked path.
+  handle.app.reset(routesFromPathTest("/a/b"));
+  assert.equal(handle.app.nav.top.name, "/a/b");
+  assert.deepEqual(handle.app.nav.stack.map((r) => r.name), ["/", "/a", "/a/b"]);
+});
+
+import { routesFromPath as routesFromPathTest } from "../../client/transpile/nav.js";

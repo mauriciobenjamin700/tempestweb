@@ -4,6 +4,16 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.16.0] — 2026-07-10
+
+### Added
+
+- **Mode C `storage` is IndexedDB-backed.** The transpile-mode `storage`
+  capability now persists over IndexedDB via a minimal async KV
+  (`client/native/idb-kv.js`) injected as `deps.store`, falling back to
+  localStorage only when IndexedDB is unavailable. Verified live (Playwright):
+  values land in the `tempestweb/kv` object store, not localStorage.
+
 ## [0.15.0] — 2026-07-10
 
 ### Added

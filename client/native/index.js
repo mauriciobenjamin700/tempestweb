@@ -98,7 +98,7 @@ export const HANDLERS = {
  * Resolve the live browser globals as the default dependency set.
  * @returns {NativeDeps}
  */
-function defaultDeps() {
+export function browserDeps() {
   const g = /** @type {any} */ (globalThis);
   return {
     fetch: g.fetch ? g.fetch.bind(g) : undefined,
@@ -109,6 +109,9 @@ function defaultDeps() {
     document: g.document,
   };
 }
+
+/** @deprecated internal alias retained for the dispatch default. */
+const defaultDeps = browserDeps;
 
 /**
  * A typed error a capability handler can throw to set the result error code.

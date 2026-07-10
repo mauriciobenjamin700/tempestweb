@@ -483,3 +483,45 @@ test("cookies.get without a document reports unsupported", async () => {
   assert.equal(res.ok, false);
   assert.equal(res.error, "unsupported");
 });
+
+// --- IndexedDB KV store (idb-kv) -------------------------------------------
+
+import { createIdbKv } from "../../client/native/idb-kv.js";
+
+test("createIdbKv returns null when IndexedDB is unavailable", () => {
+  assert.equal(createIdbKv(undefined), null);
+});
+
+test("storage: put/get/list/remove over an injected KV store (idb path)", async () => {
+  // An in-memory stand-in for the idb-kv interface storage.js drives via
+  // deps.store — the same path createIdbKv fills in the browser.
+  const map = new Map();
+  const store = {
+    async get(k) {
+      return map.has(k) ? map.get(k) : null;
+    },
+    async put(k, v) {
+      map.set(k, String(v));
+    },
+    async remove(k) {
+      map.delete(k);
+    },
+    async keys() {
+      return [...map.keys()];
+    },
+  };
+  const deps = { store };
+
+  await dispatch(call("storage.put", { name: "a", content: "1" }), deps);
+  const got = await dispatch(call("storage.get", { name: "a" }), deps);
+  assert.equal(got.ok, true);
+  assert.equal(got.value.content, "1");
+
+  const list = await dispatch(call("storage.list"), deps);
+  assert.deepEqual(list.value.keys, ["a"]);
+
+  await dispatch(call("storage.remove", { name: "a" }), deps);
+  const gone = await dispatch(call("storage.get", { name: "a" }), deps);
+  assert.equal(gone.ok, false);
+  assert.equal(gone.error, "not_found");
+});

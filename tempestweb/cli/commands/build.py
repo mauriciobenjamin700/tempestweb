@@ -48,6 +48,7 @@ WASM_RUNTIME_PACKAGES: tuple[str, ...] = ("pydantic",)
 __all__ = [
     "WASM_ARTIFACT_FILES",
     "SERVER_ARTIFACT_FILES",
+    "TRANSPILE_ARTIFACT_FILES",
     "BuildError",
     "BuildResult",
     "build_artifact",
@@ -65,6 +66,18 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "router.js",
     "constants.js",
 )
+
+# Mode C (transpile) native-runtime modules (client/transpile/*.js): the diff,
+# the IR widget builders, and the State/App runtime. Copied into a transpile/
+# subdir of the artifact's client/, next to the generated app module.
+_TRANSPILE_ASSETS: tuple[str, ...] = (
+    "runtime.js",
+    "widgets.js",
+    "diff.js",
+)
+
+#: The generated app module's filename inside the transpile artifact.
+_TRANSPILE_APP_MODULE: str = "app.gen.js"
 
 # Icon set modules (client/icons/*.js): the resolver plus the vendored Lucide and
 # Material Symbols path data. Imported by dom.js (`./icons/index.js`), so they are
@@ -141,6 +154,17 @@ SERVER_ARTIFACT_FILES: tuple[str, ...] = (
     "index.html",
     *(f"static/{asset}" for asset in (*_CLIENT_ASSETS, "transport-ws.js")),
     *(f"static/icons/{asset}" for asset in _ICON_ASSETS),
+)
+
+# Files a transpile artifact must contain, relative to the artifact root. No
+# Python and no transport: the generated app module runs on the native runtime,
+# which builds its own in-process transport.
+TRANSPILE_ARTIFACT_FILES: tuple[str, ...] = (
+    "index.html",
+    *(f"client/{asset}" for asset in _CLIENT_ASSETS),
+    *(f"client/icons/{asset}" for asset in _ICON_ASSETS),
+    *(f"client/transpile/{asset}" for asset in _TRANSPILE_ASSETS),
+    f"client/transpile/{_TRANSPILE_APP_MODULE}",
 )
 
 
@@ -426,6 +450,42 @@ def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
         written.append(asset)
     # The icon resolver + vendored sets live in an icons/ subdir, imported by
     # dom.js as `./icons/index.js`; preserve that layout next to the flat assets.
+    icons_dest = dest / "icons"
+    icons_dest.mkdir(parents=True, exist_ok=True)
+    for asset in _ICON_ASSETS:
+        source = client / "icons" / asset
+        if not source.is_file():
+            raise BuildError(f"missing icon asset: {source}")
+        shutil.copyfile(source, icons_dest / asset)
+        written.append(f"icons/{asset}")
+    return written
+
+
+def _copy_client_no_transport(client: Path, dest: Path) -> list[str]:
+    """Copy the shared client assets (no transport) plus icons into ``dest``.
+
+    Like :func:`_copy_client` but omits the mode-specific transport file — Mode C
+    (transpile) needs no transport, since the native runtime builds its own
+    in-process one.
+
+    Args:
+        client: The repository's ``client/`` directory.
+        dest: The artifact subdirectory to copy assets into.
+
+    Returns:
+        The asset filenames that were copied.
+
+    Raises:
+        BuildError: If an expected client asset is missing.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    written: list[str] = []
+    for asset in _CLIENT_ASSETS:
+        source = client / asset
+        if not source.is_file():
+            raise BuildError(f"missing client asset: {source}")
+        shutil.copyfile(source, dest / asset)
+        written.append(asset)
     icons_dest = dest / "icons"
     icons_dest.mkdir(parents=True, exist_ok=True)
     for asset in _ICON_ASSETS:
@@ -769,6 +829,10 @@ def build_artifact(
             project_root=config.root,
             wasm=config.wasm,
         )
+    elif resolved_mode == "transpile":
+        files = _build_transpile(
+            out, client, config.name, app_source, config.entrypoint_path.name
+        )
     else:
         files = _build_server(out, client, config.name, app_source)
 
@@ -941,3 +1005,93 @@ def _build_server(
     (out / "index.html").write_text(_index_html_server(name), encoding="utf-8")
     _copy_client(client, out / "static", "transport-ws.js")
     return tuple(sorted(SERVER_ARTIFACT_FILES))
+
+
+def _index_html_transpile(name: str) -> str:
+    """Render the ``index.html`` shell for a transpile artifact (Mode C).
+
+    The shell imports the native runtime and the generated app module and mounts
+    the app with :func:`mountApp` — no transport, no Python, no network. The app
+    runs entirely as native JavaScript in the tab.
+
+    Args:
+        name: The project name (page title).
+
+    Returns:
+        The HTML document that boots the transpiled app in the browser.
+    """
+    return f"""\
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{name}</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import {{ mountApp }} from "./client/transpile/runtime.js";
+      import {{ makeState, view }} from "./client/transpile/{_TRANSPILE_APP_MODULE}";
+
+      mountApp(document.getElementById("app"), {{ makeState, view }});
+    </script>
+  </body>
+</html>
+"""
+
+
+def _build_transpile(
+    out: Path, client: Path, name: str, app_source: str, entry_name: str
+) -> tuple[str, ...]:
+    """Write the transpile (native-JS static) artifact layout into ``out`` (Mode C).
+
+    Transcribes the project's Python app layer to a native ES module and copies
+    the shared client plus the native runtime (diff/widgets/runtime) into
+    ``client/transpile/``. The result is a fully static bundle — zero Python at
+    runtime — servable by any host/CDN.
+
+    Args:
+        out: The artifact root.
+        client: The shared ``client/`` directory.
+        name: The project name.
+        app_source: The project's entrypoint source to transpile.
+        entry_name: The entrypoint file name (for the generated banner).
+
+    Returns:
+        The artifact-relative paths written, sorted.
+
+    Raises:
+        BuildError: If the app source falls outside the transpilable subset or a
+            required client/transpile asset is missing.
+    """
+    from tempestweb.transpile import TranspileError, transpile_source
+
+    banner = (
+        f"// {_TRANSPILE_APP_MODULE} — GENERATED from {entry_name} "
+        "by tempestweb transpile (Mode C). Do not edit."
+    )
+    try:
+        generated = transpile_source(app_source, filename=entry_name, banner=banner)
+    except TranspileError as exc:
+        raise BuildError(f"transpile failed: {exc}") from exc
+
+    # Shared client assets (the leaf renderer) with no transport — the native
+    # runtime supplies its own in-process transport.
+    written = _copy_client_no_transport(client, out / "client")
+
+    # The native runtime trio + the generated app module under client/transpile/.
+    transpile_src = client / "transpile"
+    transpile_dest = out / "client" / "transpile"
+    transpile_dest.mkdir(parents=True, exist_ok=True)
+    for asset in _TRANSPILE_ASSETS:
+        source = transpile_src / asset
+        if not source.is_file():
+            raise BuildError(f"missing transpile asset: {source}")
+        shutil.copyfile(source, transpile_dest / asset)
+        written.append(f"transpile/{asset}")
+    (transpile_dest / _TRANSPILE_APP_MODULE).write_text(generated, encoding="utf-8")
+    written.append(f"transpile/{_TRANSPILE_APP_MODULE}")
+
+    (out / "index.html").write_text(_index_html_transpile(name), encoding="utf-8")
+    return tuple(sorted(TRANSPILE_ARTIFACT_FILES))

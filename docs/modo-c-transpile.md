@@ -182,7 +182,13 @@ pelo base theme).
   manual), medindo se cobre estilos dependentes de variant/color_scheme/size.
 - **C2 — cobertura do subset.** Mais widgets/componentes, `if`/`for` em `view`,
   list comprehensions → `.map`, f-strings compostas, métodos de state.
-- **C3 — CLI.** `tempestweb build/run --mode transpile` + `dev` (watch → recompila).
+- **C3 — CLI. ✅ feito.** `tempestweb build --mode transpile <path>` (e
+  `run --mode transpile`, que serve o bundle estático como o wasm) transpila o
+  `app.py` do projeto para `client/transpile/app.gen.js` e emite um bundle
+  estático: `index.html` que monta via `mountApp` + o cliente compartilhado + o
+  runtime nativo (diff/widgets/runtime). Zero Python, servível por qualquer CDN.
+  Fora do subset → `BuildError` claro. Falta ainda `dev --mode transpile` (watch →
+  recompila).
 - **C4 — erros de subset.** Fora do subset = erro de compilação claro
   (arquivo:linha), no espírito do `mypy --strict`.
 - **C5 — diff otimizado + keys**, paridade total com o reconciliador do core.

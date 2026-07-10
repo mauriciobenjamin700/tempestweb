@@ -8,6 +8,7 @@ re-exported here so callers import at the package level.
 
 from tempestweb.cli.commands.build import (
     SERVER_ARTIFACT_FILES,
+    TRANSPILE_ARTIFACT_FILES,
     WASM_ARTIFACT_FILES,
     BuildError,
     BuildResult,
@@ -26,6 +27,7 @@ from tempestweb.cli.commands.sync import SyncError, SyncResult, sync_modules
 
 __all__ = [
     "SERVER_ARTIFACT_FILES",
+    "TRANSPILE_ARTIFACT_FILES",
     "WASM_ARTIFACT_FILES",
     "BuildError",
     "BuildResult",

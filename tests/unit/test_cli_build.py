@@ -9,6 +9,7 @@ import pytest
 
 from tempestweb.cli import (
     SERVER_ARTIFACT_FILES,
+    TRANSPILE_ARTIFACT_FILES,
     WASM_ARTIFACT_FILES,
     BuildError,
     BuildResult,
@@ -41,6 +42,69 @@ def test_build_server_layout(tmp_path: Path) -> None:
     for rel in SERVER_ARTIFACT_FILES:
         assert (result.out_dir / rel).is_file(), rel
     assert set(result.files) == set(SERVER_ARTIFACT_FILES)
+
+
+def test_build_transpile_layout(tmp_path: Path) -> None:
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="transpile")
+    assert result.mode == "transpile"
+    assert result.out_dir == (root / "dist" / "transpile").resolve()
+    for rel in TRANSPILE_ARTIFACT_FILES:
+        assert (result.out_dir / rel).is_file(), rel
+    assert set(result.files) == set(TRANSPILE_ARTIFACT_FILES)
+    # No Python, no transport file, no Pyodide payload in a transpile artifact.
+    assert not (result.out_dir / "app.py").exists()
+    assert not (result.out_dir / WASM_PACKAGE_ARCHIVE).exists()
+
+
+def test_transpile_emits_generated_native_module(tmp_path: Path) -> None:
+    """The generated app module is native JS importing the runtime + widgets."""
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="transpile")
+    gen = (result.out_dir / "client" / "transpile" / "app.gen.js").read_text(
+        encoding="utf-8"
+    )
+    assert "GENERATED from app.py" in gen
+    assert 'from "./runtime.js"' in gen
+    assert 'from "./widgets.js"' in gen
+    assert "export function view(app)" in gen
+    assert "app.setState(" in gen  # set_state -> setState
+
+
+def test_transpile_index_mounts_via_native_runtime(tmp_path: Path) -> None:
+    """The shell mounts through mountApp with no transport and no Python."""
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="transpile")
+    html = (result.out_dir / "index.html").read_text(encoding="utf-8")
+    assert "<title>buildme</title>" in html
+    assert "mountApp" in html
+    assert "./client/transpile/runtime.js" in html
+    assert "./client/transpile/app.gen.js" in html
+    assert "Pyodide" not in html and "transport" not in html
+
+
+def test_transpile_build_rejects_out_of_subset_app(tmp_path: Path) -> None:
+    """A valid-but-out-of-subset app fails the build with a clear transpile error.
+
+    The app renders fine as Python (so the build's load/render gate passes), but
+    the ``*`` operator is outside the spike subset — the transpile step turns the
+    ``TranspileError`` into a ``BuildError``.
+    """
+    root = _project(tmp_path)
+    (root / "app.py").write_text(
+        "from dataclasses import dataclass\n"
+        "from tempest_core import App, Column, Text, Widget\n\n"
+        "@dataclass\n"
+        "class State:\n"
+        "    value: int = 0\n\n"
+        "def make_state() -> State:\n"
+        "    return State()\n\n"
+        "def view(app: App[State]) -> Widget:\n"
+        '    return Column(children=[Text(content=f"{app.state.value * 2}")])\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(BuildError, match="transpile failed"):
+        build_artifact(root, mode="transpile")
 
 
 def test_wasm_index_html_titles_project(tmp_path: Path) -> None:

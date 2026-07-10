@@ -38,7 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="tempestweb",
-        description="Build web apps in typed Python (WASM + server modes).",
+        description="Build web apps in typed Python (WASM + server + transpile modes).",
     )
     sub = parser.add_subparsers(dest="command", required=False)
 
@@ -79,9 +79,10 @@ def build_parser() -> argparse.ArgumentParser:
     build = sub.add_parser("build", help="Build a deployable artifact.")
     build.add_argument(
         "--mode",
-        choices=["wasm", "server"],
+        choices=["wasm", "server", "transpile"],
         default="wasm",
-        help="wasm = static bundle (Pyodide); server = FastAPI app.",
+        help="wasm = static bundle (Pyodide); server = FastAPI app; "
+        "transpile = static bundle of native JS (no Python runtime, experimental).",
     )
     build.add_argument(
         "--path",
@@ -101,7 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     run = sub.add_parser("run", help="Build and serve the app locally.")
-    run.add_argument("--mode", choices=["wasm", "server"], default="wasm")
+    run.add_argument("--mode", choices=["wasm", "server", "transpile"], default="wasm")
     run.add_argument(
         "--path",
         default=".",

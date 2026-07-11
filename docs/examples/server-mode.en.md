@@ -44,7 +44,7 @@ tempestweb has a central premise: **application code does not know about the tra
 | Shared state | Impossible across tabs | Possible (sessions in same process) |
 
 !!! tip "Golden rule"
-    Choose the mode on the CLI: `tempestweb dev --mode wasm` (static) or `tempestweb run --mode server` (server) — or at deploy time. `app.py` never changes.
+    Choose the mode on the CLI: `tempestweb dev --mode wasm` (static) or `tempestweb dev --mode server` (server) — or at deploy time. `app.py` never changes.
 
 ---
 
@@ -76,7 +76,7 @@ This is `examples/counter/app.py`. Copy it exactly as is — it runs in **both m
 This exact ``view`` runs unchanged in both modes:
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport — that is the whole point.
 """
@@ -339,7 +339,7 @@ def _json_safe(value: Any) -> Any:
 tempestweb dev --mode wasm --path examples/counter
 
 # Mode B — Python on the server (FastAPI + WebSocket)
-tempestweb run --mode server --path examples/counter
+tempestweb dev --mode server --path examples/counter
 ```
 
 !!! tip "Same command, different mode"

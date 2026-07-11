@@ -28,7 +28,7 @@ Here is `examples/device-panel/app.py` in full, ready to copy:
 The same ``view`` runs unchanged in both interactive modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 A small control panel wiring several of the new ``native`` capabilities to
 buttons: buzz the device (``vibration``), keep the screen awake
@@ -232,7 +232,7 @@ This example runs in **Modes A/B** — the same `app.py`, without changing a lin
 
 ```bash
 tempestweb dev --mode wasm    --path examples/device-panel   # Python in the browser (Pyodide)
-tempestweb run --mode server  --path examples/device-panel   # Python on the server (FastAPI + WS)
+tempestweb dev --mode server  --path examples/device-panel   # Python on the server (FastAPI + WS)
 ```
 
 !!! warning "Secure context and user gesture"

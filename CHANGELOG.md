@@ -4,6 +4,38 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.52.0] — 2026-07-11
+
+### Changed
+
+- **`tempestweb dev` now serves all three modes with watch + reload**, becoming the
+  single command for local development. Previously `dev` only served the static
+  modes (`wasm`, `transpile`) while Mode B lived under `run`. Now:
+  - `tempestweb dev --mode wasm` (default) — Mode A with browser live-reload.
+  - `tempestweb dev --mode server` — Mode B (FastAPI + uvicorn), automatically
+    rebuilding and restarting the server on every edit.
+  - `tempestweb dev --mode transpile` — Mode C with live-reload.
+- **`tempestweb run` is now the no-watcher serve command** (production-like): it
+  builds once and serves the app as-is, across all three modes, without the dev
+  watcher or livereload. It is what the generated deploy Dockerfile runs. Use `dev`
+  while developing and `run` to serve as built — neither is deprecated.
+
+### Added
+
+- **Global `-V` / `--version` flag** on the CLI to print the installed version.
+- **`--help` epilogue with worked examples** for every subcommand.
+- **New "Using the CLI" documentation page** (`docs/cli.md` + `docs/cli.en.md`) —
+  a tutorial-first walkthrough of `new`, `dev` (all three modes), `run`, `build`,
+  `deploy`, `vapid`, and `sync`, ending with a subcommand reference table.
+
+### Fixed
+
+- **Reload storm in the dev watcher.** The watcher had no exclusion for the build
+  output directory, so a rebuild writing into `dist/` retriggered the watcher in an
+  endless rebuild/restart loop (one edit could fan out into dozens of restarts).
+  `FileWatcher` now takes an `ignore` list and both dev loops exclude the artifact
+  output dir, so one edit yields exactly one rebuild.
+
 ## [0.51.0] — 2026-07-11
 
 ### Added

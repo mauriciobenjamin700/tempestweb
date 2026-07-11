@@ -469,7 +469,7 @@ Like :mod:`examples.fetch.app`, this exact ``view`` runs unchanged in both
 modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 It demonstrates an async native-capability handler: pressing *Capture* runs an
 ``async`` handler that:
@@ -860,7 +860,7 @@ Python roda **dentro do browser** via Pyodide. A câmera é acessada diretamente
 ### Modo B — Python no servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/photo-capture
+tempestweb dev --mode server --path examples/photo-capture
 ```
 
 Python roda no servidor; o `ProxyBridge` serializa o `native_call` e o envia ao cliente pelo WebSocket. O cliente JS captura a foto e devolve o `native_result` com os bytes base64. O servidor desserializa, cria o `Photo` e continua o handler.

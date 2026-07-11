@@ -486,7 +486,7 @@ Here is the full `app.py`, ready to copy:
 Like :mod:`examples.counter.app`, this exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 This example demonstrates the PWA/WebPush flow:
 
@@ -837,7 +837,7 @@ hop.
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/pwa-webpush
+tempestweb dev --mode server --path examples/pwa-webpush
 ```
 
 Python runs on the server. Each `await app.state.request_permission()` serialises a

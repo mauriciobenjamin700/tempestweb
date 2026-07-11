@@ -438,7 +438,7 @@ Like every tempestweb example, this exact ``view`` runs unchanged in both
 execution modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport — that is the whole point.
 """
@@ -697,7 +697,7 @@ tempestweb dev --mode wasm --path examples/faq-accordion
 Run in **Mode B** (Python on the server via FastAPI + WebSocket):
 
 ```bash
-tempestweb run --mode server --path examples/faq-accordion
+tempestweb dev --mode server --path examples/faq-accordion
 ```
 
 Open `http://localhost:8000` in your browser. You should see:

@@ -44,8 +44,8 @@ tempestweb dev --mode transpile --path examples/transpile-tour
 
 !!! tip "Run it in Modes A/B too"
     ```bash
-    tempestweb run --mode wasm   --path examples/transpile-tour   # Python in the browser
-    tempestweb run --mode server --path examples/transpile-tour   # Python on the server
+    tempestweb dev --mode wasm   --path examples/transpile-tour   # Python in the browser
+    tempestweb dev --mode server --path examples/transpile-tour   # Python on the server
     ```
     Not a single line of `app.py` changes between modes.
 

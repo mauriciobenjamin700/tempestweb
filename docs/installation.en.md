@@ -100,19 +100,29 @@ never a positional `.py` file.
 | Command | What it does |
 |---|---|
 | `tempestweb new <name>` | Scaffold a runnable project (counter + `tempestweb.toml`). |
-| `tempestweb dev --mode <wasm\|transpile>` | Static dev loop with hot-reload. |
-| `tempestweb run --mode <wasm\|server\|transpile>` | Build **and** serve locally (Mode B/server lives here). |
+| `tempestweb dev --mode <wasm\|server\|transpile>` | Develop locally with watch + reload — **serves every mode**, including **Mode B (server)**. |
 | `tempestweb build --mode <wasm\|server\|transpile>` | Emit the artifact to `dist/<mode>/`. |
+| `tempestweb run --mode <wasm\|server\|transpile>` | Serve the app **as built, no watcher** (production-like). |
 | `tempestweb sync` | Sync the client assets into the project. |
 | `tempestweb deploy` | Package the artifact for publishing. |
 | `tempestweb vapid` | Generate VAPID keys for Web Push. |
 
-!!! warning "`dev` has no `server` mode"
-    `tempestweb dev` only serves the **static** modes (`wasm`, `transpile`). To run
-    **Mode B** (Python on the server, FastAPI + WebSocket) use
-    `tempestweb run --mode server`.
+!!! tip "`dev` to develop, `run` to serve"
+    `tempestweb dev` runs any mode locally with watch + reload — including **Mode
+    B** (Python on the server, FastAPI + WebSocket), which rebuilds and restarts
+    the server on every edit:
 
-Done — jump straight into the [Tutorial](tutorial/index.md). 🚀
+    ```bash
+    tempestweb dev --mode wasm       # Mode A (default): Python in the browser
+    tempestweb dev --mode server     # Mode B: FastAPI + uvicorn, restart on save
+    tempestweb dev --mode transpile  # Mode C: native JS, live-reload
+    ```
+
+    `tempestweb run` instead builds once and serves **without a watcher** — the
+    production-like path (it's what the `tempestweb deploy` Dockerfile runs).
+
+Want the full walkthrough of each subcommand? See
+[Using the CLI](cli.md). Or jump straight into the [Tutorial](tutorial/index.md). 🚀
 
 ---
 

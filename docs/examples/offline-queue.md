@@ -32,8 +32,8 @@ ordem FIFO. 🚀
 ## Rodando ▶
 
 ```bash
-tempestweb run --mode wasm     --path examples/offline-queue   # Python no browser (Pyodide)
-tempestweb run --mode server   --path examples/offline-queue   # Python no servidor (FastAPI + WS)
+tempestweb dev --mode wasm     --path examples/offline-queue   # Python no browser (Pyodide)
+tempestweb dev --mode server   --path examples/offline-queue   # Python no servidor (FastAPI + WS)
 ```
 
 O **mesmo** `view` roda inalterado nos dois modos — ele lê `event.value` do

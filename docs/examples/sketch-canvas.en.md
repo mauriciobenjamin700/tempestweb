@@ -523,7 +523,7 @@ the reconciler diffs it as a single value field — one ``Update`` per change.
 Both modes work unchanged::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -999,7 +999,7 @@ Python runs **inside the browser** via Pyodide. No server required.
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/sketch-canvas
+tempestweb dev --mode server --path examples/sketch-canvas
 ```
 
 Python runs on the server; the browser receives JSON patches over the WebSocket and applies them to the DOM.

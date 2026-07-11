@@ -641,7 +641,7 @@ tempestweb dev --mode wasm --path examples/kanban-board
 Run in **Mode B** (Python on the server via FastAPI + WebSocket):
 
 ```bash
-tempestweb run --mode server --path examples/kanban-board
+tempestweb dev --mode server --path examples/kanban-board
 ```
 
 Open `http://localhost:8000` in your browser. You should see:

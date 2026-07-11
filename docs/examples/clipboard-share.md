@@ -357,7 +357,7 @@ Aqui está o arquivo completo, pronto para copiar:
 Like :mod:`examples.counter.app`, this exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 The demo presents a short text snippet alongside two action buttons:
 
@@ -621,7 +621,7 @@ Python roda **dentro do browser** via Pyodide. A `FFIBridge` é instalada automa
 ### Modo B — Python no servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/clipboard-share
+tempestweb dev --mode server --path examples/clipboard-share
 ```
 
 Python roda no servidor; a `ProxyBridge` é instalada automaticamente pela sessão WebSocket. Cada chamada a `clipboard.write` ou `share.share` vai até o browser pelo WebSocket, o JS executa a Web API, e o resultado volta para o Python pelo mesmo canal.

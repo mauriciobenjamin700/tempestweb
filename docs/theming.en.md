@@ -55,9 +55,9 @@ def view(app: App[State]) -> Widget:
 Run it in all three modes — it looks identical:
 
 ```bash
-tempestweb run --mode wasm       # Python in the browser (Pyodide)
-tempestweb run --mode server     # Python on the server (FastAPI + WebSocket)
-tempestweb run --mode transpile  # app transcribed to native JS (static bundle)
+tempestweb dev --mode wasm       # Python in the browser (Pyodide)
+tempestweb dev --mode server     # Python on the server (FastAPI + WebSocket)
+tempestweb dev --mode transpile  # app transcribed to native JS (static bundle)
 ```
 
 What you just got for free:

@@ -567,7 +567,7 @@ submit attempt.
 Run in either mode — the app never names the transport::
 
     tempestweb dev --mode wasm
-    tempestweb run --mode server
+    tempestweb dev --mode server
 """
 
 from __future__ import annotations
@@ -1000,7 +1000,7 @@ The CLI starts a local server, opens your browser, and loads Pyodide. All Python
 ### Server mode (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/br-cadastro
+tempestweb dev --mode server --path examples/br-cadastro
 ```
 
 Python runs on the server. The browser receives UI patches over WebSocket. The end-user experience is identical.

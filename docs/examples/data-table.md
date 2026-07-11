@@ -407,7 +407,7 @@ Juntando tudo, o `app.py` final fica assim:
 This exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -594,7 +594,7 @@ de acordo com o modo que você quer usar:
 === "Modo B — Servidor (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb run --mode server --path examples/data-table
+    tempestweb dev --mode server --path examples/data-table
     ```
 
     O Python roda no servidor. Cada sessão tem seu próprio `DataTableState`

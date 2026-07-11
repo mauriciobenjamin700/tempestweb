@@ -27,8 +27,8 @@ rules that run **purely in Python**. Errors are mirrored back onto each field. ð
 ## Running â–¶
 
 ```bash
-tempestweb run --mode wasm     --path examples/form   # Python in the browser (Pyodide)
-tempestweb run --mode server   --path examples/form   # Python on the server (FastAPI + WS)
+tempestweb dev --mode wasm     --path examples/form   # Python in the browser (Pyodide)
+tempestweb dev --mode server   --path examples/form   # Python on the server (FastAPI + WS)
 ```
 
 ---

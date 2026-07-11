@@ -27,8 +27,8 @@ aparece numa lista com um checkbox por item. 🚀
 ## Rodando ▶
 
 ```bash
-tempestweb run --mode wasm     --path examples/todo   # Python no browser (Pyodide)
-tempestweb run --mode server   --path examples/todo   # Python no servidor (FastAPI + WS)
+tempestweb dev --mode wasm     --path examples/todo   # Python no browser (Pyodide)
+tempestweb dev --mode server   --path examples/todo   # Python no servidor (FastAPI + WS)
 ```
 
 ---

@@ -98,7 +98,7 @@ WebSocket (or SSE). Like Phoenix LiveView:
 === "Command"
 
     ```bash
-    tempestweb run --mode server --path examples/counter
+    tempestweb dev --mode server --path examples/counter
     # serves at http://127.0.0.1:8000
     ```
 

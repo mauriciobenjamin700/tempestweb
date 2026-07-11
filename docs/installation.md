@@ -100,19 +100,29 @@ nunca um arquivo `.py` posicional.
 | Comando | O que faz |
 |---|---|
 | `tempestweb new <nome>` | Scaffold de um projeto rodável (counter + `tempestweb.toml`). |
-| `tempestweb dev --mode <wasm\|transpile>` | Dev-loop estático com hot-reload. |
-| `tempestweb run --mode <wasm\|server\|transpile>` | Builda **e** serve localmente (o Modo B/servidor mora aqui). |
+| `tempestweb dev --mode <wasm\|server\|transpile>` | Desenvolve localmente com watch + reload — **serve todos os modos**, inclusive o **Modo B (servidor)**. |
 | `tempestweb build --mode <wasm\|server\|transpile>` | Gera o artefato em `dist/<modo>/`. |
+| `tempestweb run --mode <wasm\|server\|transpile>` | Serve o app **como buildado, sem watcher** (produção-like). |
 | `tempestweb sync` | Sincroniza os assets do cliente para dentro do projeto. |
 | `tempestweb deploy` | Empacota o artefato para publicação. |
 | `tempestweb vapid` | Gera as chaves VAPID para Web Push. |
 
-!!! warning "O `dev` não tem modo `server`"
-    O `tempestweb dev` só serve os modos **estáticos** (`wasm`, `transpile`). Para
-    rodar o **Modo B** (Python no servidor, FastAPI + WebSocket) use
-    `tempestweb run --mode server`.
+!!! tip "`dev` para desenvolver, `run` para servir"
+    O `tempestweb dev` roda qualquer modo localmente com watch + reload — incluindo
+    o **Modo B** (Python no servidor, FastAPI + WebSocket), que faz rebuild e
+    reinicia o servidor a cada edição:
 
-Pronto — pule direto para o [Tutorial](tutorial/index.md). 🚀
+    ```bash
+    tempestweb dev --mode wasm       # Modo A (default): Python no browser
+    tempestweb dev --mode server     # Modo B: FastAPI + uvicorn, restart a cada save
+    tempestweb dev --mode transpile  # Modo C: JS nativo, live-reload
+    ```
+
+    Já o `tempestweb run` builda uma vez e serve **sem watcher** — o caminho
+    produção-like (é o que o Dockerfile do `tempestweb deploy` executa).
+
+Quer o passo a passo completo de cada subcomando? Veja
+[Usando a CLI](cli.md). Ou pule direto para o [Tutorial](tutorial/index.md). 🚀
 
 ---
 

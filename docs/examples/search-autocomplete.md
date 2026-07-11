@@ -67,7 +67,7 @@ list changes whenever the query *or* the category filter changes.
 Run in either mode — the ``view`` function is transport-agnostic::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -677,7 +677,7 @@ Salve o arquivo em `examples/search-autocomplete/app.py` e escolha o modo:
 === "Modo Server (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb run --mode server --path examples/search-autocomplete
+    tempestweb dev --mode server --path examples/search-autocomplete
     ```
 
     Um servidor FastAPI sobe localmente. O cliente JS conecta via WebSocket,

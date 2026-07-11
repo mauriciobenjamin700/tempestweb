@@ -814,7 +814,7 @@ tempestweb dev --mode wasm --path examples/router-drawer
 **Mode B — Python on the server (FastAPI + WebSocket):**
 
 ```bash
-tempestweb run --mode server --path examples/router-drawer
+tempestweb dev --mode server --path examples/router-drawer
 ```
 
 Open `http://localhost:8000` and:

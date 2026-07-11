@@ -48,9 +48,9 @@ def view(app: App[State]) -> Widget:
 Rode nos três modos — o desenho é idêntico:
 
 ```bash
-tempestweb run --mode wasm       # Python no browser (Pyodide)
-tempestweb run --mode server     # Python no servidor (FastAPI + WebSocket)
-tempestweb run --mode transpile  # app transcrito para JS nativo (bundle estático)
+tempestweb dev --mode wasm       # Python no browser (Pyodide)
+tempestweb dev --mode server     # Python no servidor (FastAPI + WebSocket)
+tempestweb dev --mode transpile  # app transcrito para JS nativo (bundle estático)
 ```
 
 !!! info "Por que dois conjuntos?"

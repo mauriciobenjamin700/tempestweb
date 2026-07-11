@@ -72,7 +72,7 @@ shows navigation shortcuts identical to the bottom bar so the layout works at
 any screen width. Both modes run this exact ``view`` unchanged::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport — that is the whole point.
 """
@@ -893,7 +893,7 @@ tempestweb dev --mode wasm --path examples/dashboard-shell
 Run in **Mode B** (Python on the server via FastAPI + WebSocket):
 
 ```bash
-tempestweb run --mode server --path examples/dashboard-shell
+tempestweb dev --mode server --path examples/dashboard-shell
 ```
 
 Open `http://localhost:8000` in your browser. You should see:

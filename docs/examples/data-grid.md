@@ -254,7 +254,7 @@ return Column(
 This exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 It showcases the core ``DataTable`` (header + string matrix with app-driven
 sort), a ``SearchBar`` that filters the rows by mutating state, and ``Badge``
@@ -452,7 +452,7 @@ def view(app: App[DataGridState]) -> Widget:
 === "Modo B — Servidor (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb run --mode server --path examples/data-grid
+    tempestweb dev --mode server --path examples/data-grid
     ```
 
 !!! check "Verificação"

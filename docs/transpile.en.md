@@ -97,7 +97,7 @@ dist/transpile/
 Serve it with any static host (or locally):
 
 ```bash
-tempestweb run --mode transpile --path examples/counter
+tempestweb dev --mode transpile --path examples/counter
 ```
 
 While developing, use the **livereload** loop — edit `app.py` and the browser

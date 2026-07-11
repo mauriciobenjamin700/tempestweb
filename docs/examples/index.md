@@ -168,7 +168,7 @@ Cada um isola **uma única capacidade** no menor código possível — ótimos p
 de uma sentada. Não têm página dedicada; rode qualquer um com:
 
 ```bash
-tempestweb run --path examples/<dir>
+tempestweb dev --path examples/<dir>
 ```
 
 Todos rodam nos **Modos A/B**.

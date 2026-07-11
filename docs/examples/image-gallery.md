@@ -520,7 +520,7 @@ lives in state, and ``None`` means the lightbox is closed.
 Run unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport — that is the whole point.
 """
@@ -998,7 +998,7 @@ O Python roda **dentro do browser** via Pyodide. Nenhum servidor necessário.
 ### Modo B — Python no servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/image-gallery
+tempestweb dev --mode server --path examples/image-gallery
 ```
 
 O Python roda no servidor; o browser recebe patches JSON pelo WebSocket e aplica ao DOM.

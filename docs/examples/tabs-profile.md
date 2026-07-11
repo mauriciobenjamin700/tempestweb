@@ -576,7 +576,7 @@ tempestweb dev --mode wasm --path examples/tabs-profile
 Execute no **Modo B** (Python no servidor via FastAPI + WebSocket):
 
 ```bash
-tempestweb run --mode server --path examples/tabs-profile
+tempestweb dev --mode server --path examples/tabs-profile
 ```
 
 Abra `http://localhost:8000` no browser. Você deve ver:

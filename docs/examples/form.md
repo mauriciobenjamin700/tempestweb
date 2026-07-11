@@ -28,8 +28,8 @@ campo. 🚀
 ## Rodando ▶
 
 ```bash
-tempestweb run --mode wasm     --path examples/form   # Python no browser (Pyodide)
-tempestweb run --mode server   --path examples/form   # Python no servidor (FastAPI + WS)
+tempestweb dev --mode wasm     --path examples/form   # Python no browser (Pyodide)
+tempestweb dev --mode server   --path examples/form   # Python no servidor (FastAPI + WS)
 ```
 
 ---

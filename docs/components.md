@@ -114,8 +114,8 @@ def view(app: App[LoginState]) -> Widget:
 É isso. Esse é o exemplo `examples/login_demo` — roda igual nos dois modos:
 
 ```bash
-tempestweb run --mode wasm     # Python no browser (Pyodide)
-tempestweb run --mode server   # Python no servidor (FastAPI + WebSocket)
+tempestweb dev --mode wasm     # Python no browser (Pyodide)
+tempestweb dev --mode server   # Python no servidor (FastAPI + WebSocket)
 ```
 
 !!! info "Por que controlado?"

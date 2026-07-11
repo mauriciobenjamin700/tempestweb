@@ -97,7 +97,7 @@ dist/transpile/
 Sirva com qualquer host estático (ou localmente):
 
 ```bash
-tempestweb run --mode transpile --path examples/counter
+tempestweb dev --mode transpile --path examples/counter
 ```
 
 Durante o desenvolvimento, use o loop com **livereload** — edite o `app.py` e o

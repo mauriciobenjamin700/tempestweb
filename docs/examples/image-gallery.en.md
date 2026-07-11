@@ -15,7 +15,7 @@ A dark-themed gallery featuring:
 - 🔢 `1 / 12` counter centred between the buttons
 
 !!! note "Note — one state, two modes"
-    The field `selected: int | None` is the only piece of state. `None` = gallery open; an integer = lightbox open. tempestweb runs this same code unchanged in Mode A (WASM/Pyodide) and Mode B (server + WebSocket).
+    The field `selected: int | None` is the only piece of state. `None` = gallery open; an integer = lightbox open. tempestweb devs this same code unchanged in Mode A (WASM/Pyodide) and Mode B (server + WebSocket).
 
 ---
 
@@ -520,7 +520,7 @@ lives in state, and ``None`` means the lightbox is closed.
 Run unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport — that is the whole point.
 """
@@ -998,7 +998,7 @@ Python runs **inside the browser** via Pyodide. No server required.
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/image-gallery
+tempestweb dev --mode server --path examples/image-gallery
 ```
 
 Python runs on the server; the browser receives JSON patches over the WebSocket and applies them to the DOM.

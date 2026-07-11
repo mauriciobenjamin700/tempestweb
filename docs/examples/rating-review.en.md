@@ -507,7 +507,7 @@ Here is the complete `app.py`, ready to copy and paste:
 This exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 The demo builds a complete product-review form:
 
@@ -866,7 +866,7 @@ tempestweb dev --mode wasm --path examples/rating-review
 Run in **Mode B** (Python on the server via FastAPI + WebSocket):
 
 ```bash
-tempestweb run --mode server --path examples/rating-review
+tempestweb dev --mode server --path examples/rating-review
 ```
 
 Open `http://localhost:8000` in your browser. You should see:

@@ -26,8 +26,8 @@ uma busca I/O-bound e re-renderiza com o resultado. Sem travar a UI. 🚀
 ## Rodando ▶
 
 ```bash
-tempestweb run --mode wasm     --path examples/fetch   # Python no browser (Pyodide)
-tempestweb run --mode server   --path examples/fetch   # Python no servidor (FastAPI + WS)
+tempestweb dev --mode wasm     --path examples/fetch   # Python no browser (Pyodide)
+tempestweb dev --mode server   --path examples/fetch   # Python no servidor (FastAPI + WS)
 ```
 
 ---

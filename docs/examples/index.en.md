@@ -168,7 +168,7 @@ Each isolates **a single capability** in the smallest possible code — great fo
 one-sitting read. They have no dedicated page; run any of them with:
 
 ```bash
-tempestweb run --path examples/<dir>
+tempestweb dev --path examples/<dir>
 ```
 
 They all run in **Modes A/B**.

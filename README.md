@@ -59,20 +59,25 @@ tempestweb dev                         # http://127.0.0.1:8000, hot-reload (wasm
 
 The scaffold's `app.py` exposes the two callables every project needs —
 `make_state()` and `view(app)` — and `tempestweb.toml` names the entrypoint
-(`app.py` by default, configurable). Then pick a mode at build/run time, never in
-the app:
+(`app.py` by default, configurable). `tempestweb dev` runs any mode locally with
+hot-reload — pick the mode at dev/build time, never in the app:
 
 ```bash
-tempestweb build --mode wasm       --path myapp   # static Pyodide bundle
-tempestweb run   --mode server     --path myapp   # Mode B: FastAPI + WebSocket
-tempestweb build --mode transpile  --path myapp   # native JS, CDN-servable
+tempestweb dev   --mode wasm       --path myapp   # Mode A: Python in the browser
+tempestweb dev   --mode server     --path myapp   # Mode B: FastAPI + WebSocket
+tempestweb dev   --mode transpile  --path myapp   # Mode C: native JS bundle
+tempestweb build --mode transpile  --path myapp   # emit a static, CDN-servable bundle
 ```
 
-> `dev` serves the static modes (`wasm`/`transpile`); **Mode B (server)** is served
-> by `run --mode server`. Every command takes the project **directory** via
-> `--path` (default: cwd) — not a positional `.py` file.
+> `dev` serves **all three modes** with watch + reload — including **Mode B
+> (server)**, which rebuilds and restarts on every edit. To serve the built app
+> **without** a watcher (production-like), use `tempestweb run --mode server` — it's
+> what the generated deploy Dockerfile runs. Every command takes the project
+> **directory** via `--path` (default: cwd) — not a positional `.py` file. Check
+> your install with `tempestweb --version`.
 
-Full walkthrough: the [Installation](https://mauriciobenjamin700.github.io/tempestweb/en/installation/)
+Full walkthrough: the [Using the CLI](https://mauriciobenjamin700.github.io/tempestweb/en/cli/),
+[Installation](https://mauriciobenjamin700.github.io/tempestweb/en/installation/)
 and [Tutorial](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/) guides.
 
 ## How it works

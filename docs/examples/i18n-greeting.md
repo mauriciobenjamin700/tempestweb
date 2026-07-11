@@ -658,7 +658,7 @@ O Python roda **dentro do browser** via Pyodide. Sem servidor necessário.
 ### Modo B — Python no servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/i18n-greeting
+tempestweb dev --mode server --path examples/i18n-greeting
 ```
 
 O Python roda no servidor; o browser recebe patches JSON pelo WebSocket e aplica ao DOM.

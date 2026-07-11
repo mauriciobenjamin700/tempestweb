@@ -223,7 +223,7 @@ region that swaps based on the selected navigation item.
 Like every tempestweb example, this exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport — that is the whole point.
 """
@@ -401,7 +401,7 @@ def view(app: App[ShellState]) -> Widget:
 === "Mode B — Server (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb run --mode server --path examples/core-app-shell
+    tempestweb dev --mode server --path examples/core-app-shell
     ```
 
 !!! check "Verification"

@@ -486,7 +486,7 @@ Abra um terminal na raiz do projeto e escolha o modo:
 === "Modo B — Servidor (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb run --mode server --path examples/signup-wizard
+    tempestweb dev --mode server --path examples/signup-wizard
     ```
 
     Python roda no servidor; um cliente JS fino se conecta por WebSocket e aplica

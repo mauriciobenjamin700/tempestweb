@@ -115,8 +115,8 @@ That's it. This is the `examples/login_demo` example — it runs the same in bot
 modes:
 
 ```bash
-tempestweb run --mode wasm     # Python in the browser (Pyodide)
-tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+tempestweb dev --mode wasm     # Python in the browser (Pyodide)
+tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 ```
 
 !!! info "Why controlled?"

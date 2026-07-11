@@ -76,7 +76,7 @@ This example wires the full O4 auth surface into a realistic login-gate pattern:
 The ``view`` is transport-agnostic and runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 
 No bridge is needed: the initial mount calls no native capability, so
 ``build(view(app))`` is green with no bridge installed.
@@ -916,7 +916,7 @@ Save the file as `examples/auth-jwt/app.py` and pick a mode:
 === "Server mode (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb run --mode server --path examples/auth-jwt
+    tempestweb dev --mode server --path examples/auth-jwt
     ```
 
     A FastAPI server starts locally. The JS client sends input and click events

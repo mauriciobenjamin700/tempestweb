@@ -501,7 +501,7 @@ Demonstrates:
 Run unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -900,7 +900,7 @@ Python runs **inside the browser** via Pyodide. No server required.
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb run --mode server --path examples/onboarding-carousel
+tempestweb dev --mode server --path examples/onboarding-carousel
 ```
 
 Python runs on the server; the browser receives JSON patches over the WebSocket and applies them to the DOM.

@@ -516,10 +516,12 @@ spirit of `mypy --strict`.
       `min`/`max` (variadic or over one iterable), `sum(it)`, `range(...)`
       (materialized to an array).
     - **Statements:** `if`/`elif`/`else`, `for … in`, `while`, `break`/
-      `continue`, `try`/`except`/`finally` (single `except`), assignment, `+=`
-      and friends, `return`.
-    - **Structures:** a state `@dataclass` (fields + methods), `make_state()`,
-      `view()` with handler closures.
+      `continue`, `try`/`except`/`finally` (a single `except` catches all;
+      multiple dispatch by exception class name), `with … as x` (the
+      `__enter__`/`__exit__` protocol), assignment, `+=` and friends, `return`.
+    - **Structures:** a state `@dataclass` (fields + methods), dataclass
+      inheritance (`class B(A)` → `extends`), `make_state()`, `view()` with
+      handler closures.
     - **Layout components:** `HStack` / `VStack` (SwiftUI-style ergonomic
       aliases) — `gap` as a token (`"md"`) or px, `align`/`justify` direct.
     - **Widgets:** **all ~64 `tempest_core` widgets** — layout (`Column`, `Row`,

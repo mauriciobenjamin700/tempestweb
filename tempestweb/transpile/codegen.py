@@ -146,6 +146,8 @@ def _child_blocks(stmt: ast.stmt) -> list[list[ast.stmt]]:
             stmt.finalbody,
             *(handler.body for handler in stmt.handlers),
         ]
+    if isinstance(stmt, ast.With):
+        return [stmt.body]
     return []
 
 
@@ -190,6 +192,12 @@ def _hoisted_names(stmts: list[ast.stmt]) -> set[str]:
             elif not isinstance(
                 stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
             ):
+                # A `with ... as x` binding leaks to the function scope in Python,
+                # so always hoist its target to a `let`.
+                if isinstance(stmt, ast.With):
+                    for item in stmt.items:
+                        if isinstance(item.optional_vars, ast.Name):
+                            hoisted.add(item.optional_vars.id)
                 for child in _child_blocks(stmt):
                     walk(child, top=False)
 
@@ -806,6 +814,8 @@ class _Generator:
             return self._for(node, indent)
         if isinstance(node, ast.While):
             return self._while(node, indent)
+        if isinstance(node, (ast.With, ast.AsyncWith)):
+            return self._with(node, indent)
         if isinstance(node, ast.Try):
             return self._try(node, indent)
         if isinstance(node, ast.Break):
@@ -869,28 +879,135 @@ class _Generator:
         lines.append(f"{pad}}}")
         return lines
 
+    def _with(self, node: ast.With | ast.AsyncWith, indent: int) -> list[str]:
+        """Emit a ``with cm as x:`` via the context-manager protocol.
+
+        Mirrors Python faithfully for managers that expose ``__enter__`` /
+        ``__exit__`` (a transpiled dataclass with those methods qualifies):
+        ``x = cm.__enter__()`` then a ``try/finally`` whose ``finally`` calls
+        ``cm.__exit__(null, null, null)``. An ``async with`` awaits both. Only a
+        single context manager is supported; ``as`` must bind a plain name.
+        """
+        if len(node.items) != 1:
+            raise TranspileError(
+                "only a single context manager is supported in `with`",
+                node,
+                self.filename,
+            )
+        item = node.items[0]
+        is_async = isinstance(node, ast.AsyncWith)
+        awaited = "await " if is_async else ""
+        enter = "__aenter__" if is_async else "__enter__"
+        exit_ = "__aexit__" if is_async else "__exit__"
+        pad = _INDENT * indent
+        inner = indent + 1
+        ipad = _INDENT * inner
+        manager = self.expr(item.context_expr, indent)
+        lines = [f"{pad}{{", f"{ipad}const _cm = {manager};"]
+        if item.optional_vars is not None:
+            if not isinstance(item.optional_vars, ast.Name):
+                raise TranspileError(
+                    "`with ... as <name>` must bind a plain name",
+                    node,
+                    self.filename,
+                )
+            target = _js_name(item.optional_vars.id)
+            lines.append(f"{ipad}{target} = {awaited}_cm.{enter}();")
+        else:
+            lines.append(f"{ipad}{awaited}_cm.{enter}();")
+        lines.append(f"{ipad}try {{")
+        lines.extend(self._body(node.body, inner + 1))
+        lines.append(f"{ipad}}} finally {{")
+        lines.append(f"{_INDENT * (inner + 1)}{awaited}_cm.{exit_}(null, null, null);")
+        lines.append(f"{ipad}}}")
+        lines.append(f"{pad}}}")
+        return lines
+
+    @staticmethod
+    def _is_catch_all(handler: ast.ExceptHandler) -> bool:
+        """Whether an ``except`` clause catches everything (bare / broad)."""
+        return handler.type is None or (
+            isinstance(handler.type, ast.Name)
+            and handler.type.id in ("Exception", "BaseException")
+        )
+
+    def _exc_condition(self, type_node: ast.expr, var: str) -> str:
+        """Build the JS test matching an ``except`` type against a caught error.
+
+        Match is by exception **class name** (``err.name === "ValueError"`` /
+        ``["A","B"].includes(err.name)``) — JS has no Python exception classes,
+        so a browser/JS error (whose ``name`` is e.g. ``"TypeError"``) only
+        matches when the names coincide.
+        """
+        if isinstance(type_node, ast.Name):
+            return f'{var}.name === "{type_node.id}"'
+        if isinstance(type_node, ast.Tuple) and all(
+            isinstance(elt, ast.Name) for elt in type_node.elts
+        ):
+            names = ", ".join(f'"{elt.id}"' for elt in type_node.elts)  # type: ignore[attr-defined]
+            return f"[{names}].includes({var}.name)"
+        raise TranspileError(
+            "unsupported except type; use `except Name` or `except (A, B)`",
+            type_node,
+            self.filename,
+        )
+
+    def _catch(self, handlers: list[ast.ExceptHandler], indent: int) -> list[str]:
+        """Emit the ``} catch (...) { ... }`` block for a try's handlers.
+
+        A single ``except`` catches any error (the declared type is
+        informational — pragmatic for Mode C, where errors are JS errors).
+        Multiple ``except`` clauses dispatch by exception class name, in order,
+        with a trailing broad/bare clause as the ``else`` — or ``throw`` to
+        re-raise when none matches (faithful propagation).
+        """
+        pad = _INDENT * indent
+        body_indent = indent + 1
+        bpad = _INDENT * body_indent
+        if len(handlers) == 1 and self._is_catch_all(handlers[0]):
+            handler = handlers[0]
+            lines = [f"{pad}}} catch ({handler.name or '_err'}) {{"]
+            lines.extend(self._body(handler.body, body_indent))
+            return lines
+
+        alias_pad = _INDENT * (body_indent + 1)
+        lines = [f"{pad}}} catch (_err) {{"]
+        catch_all = next((h for h in handlers if self._is_catch_all(h)), None)
+        typed = [h for h in handlers if not self._is_catch_all(h)]
+        keyword = "if"
+        for handler in typed:
+            # `typed` excludes catch-all handlers, so the type is always present.
+            assert handler.type is not None
+            cond = self._exc_condition(handler.type, "_err")
+            lines.append(f"{bpad}{keyword} ({cond}) {{")
+            if handler.name:
+                lines.append(f"{alias_pad}const {handler.name} = _err;")
+            lines.extend(self._body(handler.body, body_indent + 1))
+            keyword = "} else if"
+        lines.append(f"{bpad}}} else {{")
+        if catch_all is not None:
+            if catch_all.name:
+                lines.append(f"{alias_pad}const {catch_all.name} = _err;")
+            lines.extend(self._body(catch_all.body, body_indent + 1))
+        else:
+            lines.append(f"{alias_pad}throw _err;")
+        lines.append(f"{bpad}}}")
+        return lines
+
     def _try(self, node: ast.Try, indent: int) -> list[str]:
         """Emit a ``try/except/finally`` as JS ``try/catch/finally``.
 
-        JS has a single catch binding, so only one ``except`` clause is
-        supported; its exception type is informational (JS catches everything).
-        ``try/else`` (the ``else`` runs when no exception fired) is unsupported.
-        The caught error binds to the handler's name, or ``_err`` when anonymous.
+        A single ``except`` catches everything (type informational); multiple
+        clauses dispatch by exception class name (see :meth:`_catch`).
+        ``try/else`` (runs only when no exception fired) is unsupported.
         """
         if node.orelse:
             raise TranspileError("try/else is not supported", node, self.filename)
-        if len(node.handlers) > 1:
-            raise TranspileError(
-                "only a single except clause is supported", node, self.filename
-            )
         pad = _INDENT * indent
         lines = [f"{pad}try {{"]
         lines.extend(self._body(node.body, indent + 1))
         if node.handlers:
-            handler = node.handlers[0]
-            name = handler.name or "_err"
-            lines.append(f"{pad}}} catch ({name}) {{")
-            lines.extend(self._body(handler.body, indent + 1))
+            lines.extend(self._catch(node.handlers, indent))
         if node.finalbody:
             lines.append(f"{pad}}} finally {{")
             lines.extend(self._body(node.finalbody, indent + 1))
@@ -1223,17 +1340,37 @@ class _Generator:
         return self.expr(value, 2)
 
     def _class(self, node: ast.ClassDef) -> str:
-        """Emit a `@dataclass` as `export class X extends State { … }`.
+        """Emit a `@dataclass` as `export class X extends <base> { … }`.
 
         Annotated fields become constructor assignments; methods become JS class
         methods (the ``self`` receiver maps to ``this`` and is dropped from the
-        parameter list).
+        parameter list). A dataclass with no base extends the runtime ``State``;
+        a dataclass inheriting another transpiled dataclass extends it directly
+        (``super()`` chains the parent constructor, then the subclass's own field
+        defaults are assigned — overriding an inherited default when they clash).
         """
         for decorator in node.decorator_list:
             name = decorator.id if isinstance(decorator, ast.Name) else None
             if name != "dataclass":
                 raise TranspileError(
                     "only the @dataclass decorator is supported on a class",
+                    node,
+                    self.filename,
+                )
+        base = "State"
+        if node.bases:
+            if len(node.bases) != 1 or not isinstance(node.bases[0], ast.Name):
+                raise TranspileError(
+                    "a dataclass may inherit at most one base, "
+                    "another @dataclass in this module",
+                    node,
+                    self.filename,
+                )
+            base = node.bases[0].id
+            if base not in self.class_names:
+                raise TranspileError(
+                    f"unknown base class {base!r}; a dataclass can only inherit "
+                    "another @dataclass defined in the same module",
                     node,
                     self.filename,
                 )
@@ -1258,11 +1395,18 @@ class _Generator:
                     stmt,
                     self.filename,
                 )
-        lines = [f"export class {node.name} extends State {{"]
-        lines.append(f"{_INDENT}constructor() {{")
-        lines.append(f"{_INDENT * 2}super();")
+        # The constructor takes an options object so a dataclass can be built
+        # with field overrides (`Doubler(n=5)` -> `new Doubler({ n: 5 })`); a
+        # missing key falls back to the field default. `super(opts)` threads the
+        # overrides to an inherited base (State's implicit ctor ignores them).
+        lines = [f"export class {node.name} extends {base} {{"]
+        lines.append(f"{_INDENT}constructor(opts = {{}}) {{")
+        lines.append(f"{_INDENT * 2}super(opts);")
         for name, value in fields:
-            lines.append(f"{_INDENT * 2}this.{name} = {value};")
+            lines.append(
+                f"{_INDENT * 2}this.{name} = "
+                f"opts.{name} !== undefined ? opts.{name} : {value};"
+            )
         lines.append(f"{_INDENT}}}")
         for method in methods:
             lines.append("")

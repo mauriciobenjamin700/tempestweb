@@ -18,9 +18,21 @@ def test_dataclass_becomes_state_subclass() -> None:
     """A defaulted dataclass field becomes a constructor assignment."""
     js = gen("@dataclass\nclass S:\n    value: int = 0\n")
     assert "export class S extends State {" in js
-    assert "super();" in js
-    assert "this.value = 0;" in js
+    assert "constructor(opts = {}) {" in js
+    assert "super(opts);" in js
+    # The field takes an override from opts, falling back to its default.
+    assert "this.value = opts.value !== undefined ? opts.value : 0;" in js
     assert 'import { State } from "./runtime.js";' in js
+
+
+def test_dataclass_constructs_with_field_overrides() -> None:
+    """`Foo(x=5)` -> `new Foo({ x: 5 })`, and the ctor honors the override."""
+    js = gen(
+        "@dataclass\nclass Foo:\n    x: int = 0\n\n"
+        "def make_state() -> Foo:\n    return Foo(x=5)\n"
+    )
+    assert "return new Foo({ x: 5 });" in js
+    assert "this.x = opts.x !== undefined ? opts.x : 0;" in js
 
 
 def test_make_state_and_new_class() -> None:
@@ -360,20 +372,82 @@ def test_break_and_continue() -> None:
 
 
 def test_try_except_finally() -> None:
-    """`try`/`except`/`finally` maps to JS try/catch/finally; error name binds."""
+    """`try`/`except`/`finally` maps to JS try/catch/finally.
+
+    A typed `except` matches by class name and re-raises otherwise (Python's
+    selectivity, preserved for A/B/C parity); its bound name aliases the error.
+    """
     js = gen(
         "def f():\n    try:\n        go()\n    except ValueError as e:\n"
         "        log(e)\n    finally:\n        done()\n"
     )
     assert "try {" in js
-    assert "} catch (e) {" in js
+    assert "} catch (_err) {" in js
+    assert 'if (_err.name === "ValueError") {' in js
+    assert "const e = _err;" in js
+    assert "throw _err;" in js
     assert "} finally {" in js
+
+
+def test_single_broad_except_catches_all() -> None:
+    """A lone `except Exception` catches everything (no type check)."""
+    js = gen(
+        "def f():\n    try:\n        go()\n    except Exception as e:\n        h(e)\n"
+    )
+    assert "} catch (e) {" in js
+    assert "_err" not in js
 
 
 def test_try_bare_except_binds_placeholder() -> None:
     """A bare `except:` binds a `_err` placeholder (JS needs a binding)."""
     js = gen("def f():\n    try:\n        go()\n    except Exception:\n        pass\n")
     assert "} catch (_err) {" in js
+
+
+def test_multiple_except_dispatches_by_name() -> None:
+    """Several `except` clauses dispatch by exception class name, else re-raise."""
+    js = gen(
+        "def f():\n    try:\n        go()\n"
+        "    except ValueError as e:\n        h1(e)\n"
+        "    except (KeyError, IndexError):\n        h2()\n"
+    )
+    assert 'if (_err.name === "ValueError") {' in js
+    assert "const e = _err;" in js
+    assert '["KeyError", "IndexError"].includes(_err.name)' in js
+    assert "throw _err;" in js  # no catch-all -> re-raise
+
+
+def test_multiple_except_with_broad_fallback() -> None:
+    """A trailing `except Exception` becomes the `else` (no re-raise)."""
+    js = gen(
+        "def f():\n    try:\n        go()\n"
+        "    except ValueError:\n        h1()\n"
+        "    except Exception:\n        h2()\n"
+    )
+    assert "} else {" in js
+    assert "throw _err;" not in js
+
+
+def test_dataclass_inheritance() -> None:
+    """A dataclass inheriting another extends it; super() chains the base ctor."""
+    js = gen(
+        "@dataclass\nclass Base:\n    a: int = 1\n\n"
+        "@dataclass\nclass Derived(Base):\n    b: int = 2\n"
+    )
+    assert "export class Base extends State {" in js
+    assert "export class Derived extends Base {" in js
+    assert js.count("super(opts);") == 2
+    assert "this.b = opts.b !== undefined ? opts.b : 2;" in js
+
+
+def test_with_uses_enter_exit_protocol() -> None:
+    """`with cm as x:` calls __enter__/__exit__ and hoists the leaked target."""
+    js = gen("def view(app):\n    with cm() as h:\n        use(h)\n    return h\n")
+    assert "let h;" in js  # leaks to function scope like Python
+    assert "const _cm = cm();" in js
+    assert "h = _cm.__enter__();" in js
+    assert "} finally {" in js
+    assert "_cm.__exit__(null, null, null);" in js
 
 
 def test_range_materializes_to_array() -> None:
@@ -397,16 +471,19 @@ def test_numeric_builtins() -> None:
 # Every out-of-subset construct must fail loud with a TranspileError (file:line),
 # never silently mis-transpile or crash — the graduation-quality guarantee.
 _UNSUPPORTED: dict[str, str] = {
-    "with": "def f():\n    with x() as h:\n        pass\n",
     "while_else": "def f(x):\n    while x:\n        pass\n    else:\n        pass\n",
     "try_else": (
         "def f():\n    try:\n        go()\n    except Exception:\n        pass\n"
         "    else:\n        ok()\n"
     ),
-    "multi_except": (
-        "def f():\n    try:\n        go()\n    except ValueError:\n        pass\n"
-        "    except KeyError:\n        pass\n"
+    "with_multiple_items": "def f():\n    with a() as x, b() as y:\n        pass\n",
+    "with_non_name_target": "def f():\n    with a() as obj.attr:\n        pass\n",
+    "dataclass_multiple_bases": (
+        "@dataclass\nclass A:\n    x: int = 0\n\n"
+        "@dataclass\nclass B:\n    y: int = 0\n\n"
+        "@dataclass\nclass C(A, B):\n    z: int = 0\n"
     ),
+    "dataclass_unknown_base": "@dataclass\nclass C(Unknown):\n    z: int = 0\n",
     "global": "def f():\n    global g\n",
     "yield": "def f():\n    yield 1\n",
     "walrus": "def f(x):\n    return (y := x)\n",

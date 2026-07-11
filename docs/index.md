@@ -6,10 +6,10 @@ execução</strong> que compartilham 100% do código de aplicação.</em></p>
 
 ---
 
-**tempestweb** é o irmão web do
-[tempestroid](https://github.com/mauriciobenjamin700) — a mesma ideia de **uma
-árvore, múltiplos renderizadores**. Você escreve uma função `view()` em Python e
-ela roda, sem alteração, em **três modos**:
+**tempestweb** é um framework para construir web apps escrevendo **Python
+tipado**. Você descreve a UI como uma **árvore declarativa de widgets** numa
+função `view()`, e o framework a renderiza no **DOM**. A mesma `view()`, sem
+alterar uma linha, roda em **três modos de execução**:
 
 <div class="grid cards" markdown>
 
@@ -107,6 +107,17 @@ modos.
 !!! info "Idioma"
     Esta documentação é **bilíngue**. Use o seletor de idioma no topo da página
     para alternar entre **Português (Brasil)** e **English (US)**.
+
+## Relação com o tempestroid
+
+O tempestweb é o **irmão web** do
+[tempestroid](https://github.com/mauriciobenjamin700), o framework mobile da mesma
+família. Os dois seguem a filosofia **"uma árvore, múltiplos renderizadores"** e
+compartilham o mesmo núcleo renderer-agnostic — o pacote
+[`tempest-core`](https://pypi.org/project/tempest-core/) (IR, `diff`/patch,
+estado, estilo, widgets). O tempestroid renderiza para telas nativas; o tempestweb
+renderiza para o DOM. Se você já conhece um, o modelo mental transfere direto —
+mas **não é preciso conhecer o tempestroid** para usar o tempestweb.
 
 ## Convenções do projeto
 

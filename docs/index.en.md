@@ -6,10 +6,10 @@ that share 100% of the application code.</em></p>
 
 ---
 
-**tempestweb** is the web sibling of
-[tempestroid](https://github.com/mauriciobenjamin700) — the same **one tree,
-multiple renderers** idea. You write a `view()` function in Python and it runs,
-unchanged, in **three modes**:
+**tempestweb** is a framework for building web apps by writing **typed Python**.
+You describe the UI as a **declarative tree of widgets** in a `view()` function,
+and the framework renders it to the **DOM**. The same `view()`, without changing a
+line, runs in **three execution modes**:
 
 <div class="grid cards" markdown>
 
@@ -106,6 +106,17 @@ renderer is the **same** across all three modes.
 !!! info "Language"
     This documentation is **bilingual**. Use the language selector at the top of
     the page to switch between **Português (Brasil)** and **English (US)**.
+
+## Relationship to tempestroid
+
+tempestweb is the **web sibling** of
+[tempestroid](https://github.com/mauriciobenjamin700), the mobile framework in the
+same family. Both follow the **"one tree, multiple renderers"** philosophy and
+share the same renderer-agnostic core — the
+[`tempest-core`](https://pypi.org/project/tempest-core/) package (IR, `diff`/patch,
+state, style, widgets). tempestroid renders to native screens; tempestweb renders
+to the DOM. If you already know one, the mental model transfers directly — but
+**you don't need to know tempestroid** to use tempestweb.
 
 ## Project conventions
 

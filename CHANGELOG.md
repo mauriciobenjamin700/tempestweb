@@ -4,6 +4,20 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.39.0] — 2026-07-11
+
+### Added
+
+- **`tempestweb new --template pwa`** — scaffold an installable, offline Mode C
+  PWA in one command. The template pre-configures `tempestweb.toml` with
+  `mode = "transpile"` + a `[pwa]` manifest block, and ships an `app.py` with a
+  counter and an **Install** button (`native.install`). The default template
+  (a two-mode counter) is unchanged; `render_files`/`scaffold_project`/
+  `create_project` gain a `template` argument, and an unknown template fails
+  loud (`UnknownTemplateError`). Verified: the scaffolded project renders
+  through the real core and builds into a full PWA (manifest + service worker +
+  transpiled install button).
+
 ## [0.38.0] — 2026-07-11
 
 ### Added

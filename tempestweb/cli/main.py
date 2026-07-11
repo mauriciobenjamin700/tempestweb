@@ -55,6 +55,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Write into an existing non-empty directory.",
     )
     new.add_argument(
+        "--template",
+        choices=["default", "pwa"],
+        default="default",
+        help="Scaffold template: default (two-mode counter) or pwa "
+        "(Mode C installable/offline PWA).",
+    )
+    new.add_argument(
         "--no-verify",
         dest="verify",
         action="store_false",
@@ -164,6 +171,7 @@ def _cmd_new(args: argparse.Namespace) -> int:
             parent=args.into,
             force=args.force,
             verify=args.verify,
+            template=args.template,
         )
     except NewError as exc:
         print(f"tempestweb new: {exc}", file=sys.stderr)
@@ -171,7 +179,12 @@ def _cmd_new(args: argparse.Namespace) -> int:
     print(f"Created {result.root}")
     for rel in result.files:
         print(f"  + {rel}")
-    print(f"\nNext:\n  cd {result.root.name}\n  tempestweb dev")
+    dev_cmd = (
+        "tempestweb dev --mode transpile"
+        if args.template == "pwa"
+        else ("tempestweb dev")
+    )
+    print(f"\nNext:\n  cd {result.root.name}\n  {dev_cmd}")
     return 0
 
 

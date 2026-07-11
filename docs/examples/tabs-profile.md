@@ -61,8 +61,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     AppBar,
     Avatar,
     Card,
@@ -70,15 +70,15 @@ from tempestweb._core.components import (
     ListTile,
     Scaffold,
 )
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets import (
+from tempest_core.style import AlignItems, Edge, FontWeight
+from tempest_core.widgets import (
     Column,
     Row,
     Switch,
     TabView,
     Text,
 )
-from tempestweb._core.widgets.events import RouteChangeEvent, ToggleEvent
+from tempest_core.widgets.events import RouteChangeEvent, ToggleEvent
 
 _TABS: list[str] = ["Overview", "Activity", "Settings"]
 
@@ -479,9 +479,9 @@ def view(app: App[ProfileState]) -> Widget:
     """Render the tabbed-profile UI from the current state.
 
     The active section is determined by ``app.state.active_tab``.  Tapping a
-    tab fires a :class:`~tempestweb._core.widgets.events.RouteChangeEvent`;
+    tab fires a :class:`~tempest_core.widgets.events.RouteChangeEvent`;
     the handler reads ``event.params["index"]`` and writes it back via
-    :meth:`~tempestweb._core.core.state.App.set_state`.
+    :meth:`~tempest_core.core.state.App.set_state`.
 
     Args:
         app: The application handle exposing ``state`` and ``set_state``.

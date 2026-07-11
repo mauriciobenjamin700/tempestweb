@@ -85,6 +85,9 @@ plugins:
             "Best practices": "Boas práticas"
             Examples: Exemplos
             "Example gallery": "Galeria de exemplos"
+            "To-do list": "Lista de tarefas"
+            Form: "Formulário"
+            "Async fetch": "Fetch assíncrono"
             Stopwatch: Cronômetro
             "Temperature converter": "Conversor de temperatura"
             "Data table": "Tabela de dados"
@@ -123,9 +126,11 @@ plugins:
             "JWT auth gate": "Gate de autenticação JWT"
             "PWA & offline examples": "PWA e offline"
             "PWA install + WebPush": "Instalação PWA + WebPush"
+            "Offline queue": "Fila offline"
             "WebPush end-to-end (server)": "WebPush ponta a ponta (servidor)"
             "Execution modes": "Modos de execução"
             "Running Mode B (server)": "Rodando o Modo B (servidor)"
+            "Mode C tour (transpile)": "Tour do Modo C (transpile)"
             "Static SSR": "SSR estático"
             "Mode C — transpile": "Modo C — transpile"
             "Wire contract": "Contrato de fronteira"
@@ -191,6 +196,9 @@ nav:
   - Best practices: best-practices.md
   - Examples:
       - "Example gallery": examples/index.md
+      - "To-do list": examples/todo.md
+      - Form: examples/form.md
+      - "Async fetch": examples/fetch.md
       - Stopwatch: examples/stopwatch.md
       - "Temperature converter": examples/temperature-converter.md
       - "Data table": examples/data-table.md
@@ -230,9 +238,11 @@ nav:
           - "JWT auth gate": examples/auth-jwt.md
       - "PWA & offline examples":
           - "PWA install + WebPush": examples/pwa-webpush.md
+          - "Offline queue": examples/offline-queue.md
           - "WebPush end-to-end (server)": examples/webpush-server.md
       - "Execution modes":
           - "Running Mode B (server)": examples/server-mode.md
+          - "Mode C tour (transpile)": examples/transpile-tour.md
   - Static SSR: ssr.md
   - Wire contract: wire-contract.md
   - Observability: observability.md

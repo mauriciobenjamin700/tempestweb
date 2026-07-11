@@ -114,7 +114,7 @@ def make_state() -> GalleryState:
 We centralise colours in named constants to avoid scattering raw numbers throughout the code:
 
 ```python
-from tempestweb._core.style import (
+from tempest_core.style import (
     AlignItems,
     Color,
     Edge,
@@ -149,8 +149,8 @@ _CARD_SHADOW: Shadow = Shadow(
 Each grid cell is a `GestureDetector` that sets `state.selected = index` on tap:
 
 ```python
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.widgets import (
+from tempest_core import App, Style, Widget
+from tempest_core.widgets import (
     Button,
     Column,
     Container,
@@ -513,7 +513,7 @@ Here is the full file, ready to copy:
 """Image gallery with lightbox — demonstrates LazyGrid, Image, and Dialog overlays.
 
 A virtualized grid of photo thumbnails; tapping any thumbnail opens a full-screen
-:class:`~tempestweb._core.widgets.Dialog` lightbox showing the selected image,
+:class:`~tempest_core.widgets.Dialog` lightbox showing the selected image,
 its caption and navigation controls (Previous / Next / Close).  The selected index
 lives in state, and ``None`` means the lightbox is closed.
 
@@ -529,8 +529,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import (
+from tempest_core import App, Style, Widget
+from tempest_core.style import (
     AlignItems,
     Color,
     Edge,
@@ -539,7 +539,7 @@ from tempestweb._core.style import (
     Shadow,
     TextAlign,
 )
-from tempestweb._core.widgets import (
+from tempest_core.widgets import (
     Button,
     Column,
     Container,

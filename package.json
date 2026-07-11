@@ -8,6 +8,6 @@
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",
-    "jsdom": "^24.0.0"
+    "jsdom": "^29.1.1"
   }
 }

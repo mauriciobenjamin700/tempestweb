@@ -50,6 +50,68 @@ pip install "tempestweb[webpush]"         # notificações push (Trilho P)
     `uv add tempestweb` (ou `uv add "tempestweb[server,cli]"`) funciona igual e é
     mais rápido, com lockfile reprodutível.
 
+## Criar seu primeiro projeto
+
+Instalou o `cli`? Então **não escreva os arquivos na mão** — a CLI monta um
+projeto rodável para você:
+
+```bash
+tempestweb new todolist       # cria a pasta todolist/ com um counter funcional
+cd todolist
+tempestweb dev                # sobe em http://127.0.0.1:8000 com hot-reload
+```
+
+O `tempestweb new` escreve quatro arquivos:
+
+```text
+todolist/
+├── app.py              # a UI: expõe make_state() e view() — o counter inicial
+├── tempestweb.toml     # config do projeto (nome, entrypoint, modo/porta padrão)
+├── README.md
+└── .gitignore
+```
+
+!!! question "O arquivo **precisa** se chamar `app.py`?"
+    Por padrão, sim — a CLI procura `app.py` na raiz do projeto. Mas o nome é
+    **configurável**: o `tempestweb.toml` aponta o entrypoint, então você pode
+    renomear.
+
+    ```toml
+    [project]
+    name = "todolist"
+    entrypoint = "app.py"   # troque para "main.py", "src/app.py", etc.
+    ```
+
+    O único requisito é que esse módulo exponha **duas** callables: `make_state()`
+    (o estado inicial) e `view(app)` (a árvore de widgets). Sem elas o build falha
+    com `must define a callable make_state/view`.
+
+!!! tip "Sem `tempestweb.toml`?"
+    Funciona mesmo assim — todo campo tem default (`entrypoint = "app.py"`,
+    `mode = "wasm"`, porta 8000). O `tempestweb.toml` só é necessário para
+    **mudar** um default. Se você criou o projeto na mão com só um `app.py`, o
+    `tempestweb build --mode wasm` já roda.
+
+### Comandos da CLI
+
+Todos recebem o **diretório** do projeto via `--path` (padrão: diretório atual) —
+nunca um arquivo `.py` posicional.
+
+| Comando | O que faz |
+|---|---|
+| `tempestweb new <nome>` | Scaffold de um projeto rodável (counter + `tempestweb.toml`). |
+| `tempestweb dev --mode <wasm\|transpile>` | Dev-loop estático com hot-reload. |
+| `tempestweb run --mode <wasm\|server\|transpile>` | Builda **e** serve localmente (o Modo B/servidor mora aqui). |
+| `tempestweb build --mode <wasm\|server\|transpile>` | Gera o artefato em `dist/<modo>/`. |
+| `tempestweb sync` | Sincroniza os assets do cliente para dentro do projeto. |
+| `tempestweb deploy` | Empacota o artefato para publicação. |
+| `tempestweb vapid` | Gera as chaves VAPID para Web Push. |
+
+!!! warning "O `dev` não tem modo `server`"
+    O `tempestweb dev` só serve os modos **estáticos** (`wasm`, `transpile`). Para
+    rodar o **Modo B** (Python no servidor, FastAPI + WebSocket) use
+    `tempestweb run --mode server`.
+
 Pronto — pule direto para o [Tutorial](tutorial/index.md). 🚀
 
 ---

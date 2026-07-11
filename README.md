@@ -47,6 +47,34 @@ the ideal layered structure (routes · pages · components · styles · controll
 services · storages · schemas · utils · core), mirroring `tempest-fastapi-sdk`, so
 your app doesn't rot into garbage code.
 
+## Get started
+
+```bash
+pip install "tempestweb[server,cli]"   # or: uv add "tempestweb[server,cli]"
+
+tempestweb new myapp                   # scaffold app.py + tempestweb.toml
+cd myapp
+tempestweb dev                         # http://127.0.0.1:8000, hot-reload (wasm)
+```
+
+The scaffold's `app.py` exposes the two callables every project needs —
+`make_state()` and `view(app)` — and `tempestweb.toml` names the entrypoint
+(`app.py` by default, configurable). Then pick a mode at build/run time, never in
+the app:
+
+```bash
+tempestweb build --mode wasm       --path myapp   # static Pyodide bundle
+tempestweb run   --mode server     --path myapp   # Mode B: FastAPI + WebSocket
+tempestweb build --mode transpile  --path myapp   # native JS, CDN-servable
+```
+
+> `dev` serves the static modes (`wasm`/`transpile`); **Mode B (server)** is served
+> by `run --mode server`. Every command takes the project **directory** via
+> `--path` (default: cwd) — not a positional `.py` file.
+
+Full walkthrough: the [Installation](https://mauriciobenjamin700.github.io/tempestweb/en/installation/)
+and [Tutorial](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/) guides.
+
 ## How it works
 
 ```text

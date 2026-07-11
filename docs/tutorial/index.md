@@ -41,6 +41,12 @@ Vamos um conceito por página, na ordem:
     Você só precisa ter feito a [Instalação](../installation.md). Cada página
     assume apenas a anterior — comece pela página 1 e siga em frente.
 
+!!! note "Quer só rodar, não digitar?"
+    O `tempestweb new <nome>` já scaffolda exatamente este counter (com
+    `tempestweb.toml`) num projeto rodável — veja
+    [Criar seu primeiro projeto](../installation.md#criar-seu-primeiro-projeto).
+    Este tutorial reconstrói o mesmo app do zero para explicar cada peça.
+
 ## O que vamos construir
 
 Ao final, este é o app completo — exatamente o que vive em

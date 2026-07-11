@@ -42,6 +42,12 @@ We go one concept per page, in order:
     You only need to have done the [Installation](../installation.md). Each page
     assumes only the previous one — start on page one and keep going.
 
+!!! note "Just want to run it, not type it?"
+    `tempestweb new <name>` scaffolds exactly this counter (with `tempestweb.toml`)
+    as a runnable project — see
+    [Create your first project](../installation.md#create-your-first-project).
+    This tutorial rebuilds the same app from scratch to explain every piece.
+
 ## What we will build
 
 By the end, this is the complete app — exactly what lives in

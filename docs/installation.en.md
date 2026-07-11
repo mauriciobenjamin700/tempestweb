@@ -50,6 +50,68 @@ pip install "tempestweb[webpush]"         # push notifications (Track P)
     `uv add tempestweb` (or `uv add "tempestweb[server,cli]"`) works the same and
     is faster, with a reproducible lockfile.
 
+## Create your first project
+
+Installed the `cli`? Then **don't hand-write the files** — the CLI scaffolds a
+runnable project for you:
+
+```bash
+tempestweb new todolist       # creates the todolist/ folder with a working counter
+cd todolist
+tempestweb dev                # serves at http://127.0.0.1:8000 with hot-reload
+```
+
+`tempestweb new` writes four files:
+
+```text
+todolist/
+├── app.py              # the UI: exposes make_state() and view() — the starter counter
+├── tempestweb.toml     # project config (name, entrypoint, default mode/port)
+├── README.md
+└── .gitignore
+```
+
+!!! question "Does the file **have** to be named `app.py`?"
+    By default, yes — the CLI looks for `app.py` at the project root. But the name
+    is **configurable**: `tempestweb.toml` points at the entrypoint, so you can
+    rename it.
+
+    ```toml
+    [project]
+    name = "todolist"
+    entrypoint = "app.py"   # change to "main.py", "src/app.py", etc.
+    ```
+
+    The only requirement is that this module exposes **two** callables:
+    `make_state()` (the initial state) and `view(app)` (the widget tree). Without
+    them the build fails with `must define a callable make_state/view`.
+
+!!! tip "No `tempestweb.toml`?"
+    It still works — every field has a default (`entrypoint = "app.py"`,
+    `mode = "wasm"`, port 8000). `tempestweb.toml` is only needed to **change** a
+    default. If you created the project by hand with just an `app.py`,
+    `tempestweb build --mode wasm` already runs.
+
+### CLI commands
+
+Each takes the project **directory** via `--path` (default: current directory) —
+never a positional `.py` file.
+
+| Command | What it does |
+|---|---|
+| `tempestweb new <name>` | Scaffold a runnable project (counter + `tempestweb.toml`). |
+| `tempestweb dev --mode <wasm\|transpile>` | Static dev loop with hot-reload. |
+| `tempestweb run --mode <wasm\|server\|transpile>` | Build **and** serve locally (Mode B/server lives here). |
+| `tempestweb build --mode <wasm\|server\|transpile>` | Emit the artifact to `dist/<mode>/`. |
+| `tempestweb sync` | Sync the client assets into the project. |
+| `tempestweb deploy` | Package the artifact for publishing. |
+| `tempestweb vapid` | Generate VAPID keys for Web Push. |
+
+!!! warning "`dev` has no `server` mode"
+    `tempestweb dev` only serves the **static** modes (`wasm`, `transpile`). To run
+    **Mode B** (Python on the server, FastAPI + WebSocket) use
+    `tempestweb run --mode server`.
+
 Done — jump straight into the [Tutorial](tutorial/index.md). 🚀
 
 ---

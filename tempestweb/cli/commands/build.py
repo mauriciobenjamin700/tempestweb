@@ -115,10 +115,14 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "idb-kv.js",
     "install.js",
     "notifications.js",
+    "offline.js",
     "onnx.js",
     "share.js",
     "storage.js",
 )
+# Offline-queue client modules (native/offline.js wraps these); shipped under
+# client/offline/ so its `../offline/{store,sync}.js` imports resolve.
+_OFFLINE_ASSETS: tuple[str, ...] = ("store.js", "sync.js")
 
 # Subpackages of ``tempestweb`` the Mode A runtime needs in the browser. The
 # server/CLI/devserver stacks (and their Starlette/uvicorn deps) are omitted —
@@ -158,6 +162,7 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     *(f"client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
     *(f"client/icons/{asset}" for asset in _ICON_ASSETS),
     *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
+    *(f"client/offline/{asset}" for asset in _OFFLINE_ASSETS),
     "client/push/web-push-client.js",
     "client/pwa/install-prompt.js",
 )
@@ -182,6 +187,7 @@ TRANSPILE_ARTIFACT_FILES: tuple[str, ...] = (
     f"client/transpile/{_TRANSPILE_APP_MODULE}",
     # Native capability tree — the facade (transpile/native.js) routes to it.
     *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
+    *(f"client/offline/{asset}" for asset in _OFFLINE_ASSETS),
     "client/push/web-push-client.js",
     "client/pwa/install-prompt.js",
     # PWA layer: manifest, service worker + registration, icons. Mode C is a
@@ -473,6 +479,29 @@ def _build_pwa(
     sw = sw.replace('"__PRECACHE_MANIFEST__"', json.dumps(json.dumps(list(precache))))
     (out / "sw.js").write_text(sw, encoding="utf-8")
     shutil.copyfile(register_source, out / "register.js")
+
+
+def _copy_offline(client: Path, out: Path) -> None:
+    """Copy the offline-queue client modules into ``out/client/offline/``.
+
+    ``client/native/offline.js`` imports ``../offline/{store,sync}.js``, so any
+    artifact that ships the native tree (its ``index.js`` eagerly loads
+    ``offline.js``) must ship these too.
+
+    Args:
+        out: The artifact root.
+        client: The shared ``client/`` directory.
+
+    Raises:
+        BuildError: If an offline module is missing.
+    """
+    offline_dest = out / "client" / "offline"
+    offline_dest.mkdir(parents=True, exist_ok=True)
+    for asset in _OFFLINE_ASSETS:
+        source = client / "offline" / asset
+        if not source.is_file():
+            raise BuildError(f"missing offline asset: {source}")
+        shutil.copyfile(source, offline_dest / asset)
 
 
 def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
@@ -997,6 +1026,8 @@ def _build_wasm(
         if not source.is_file():
             raise BuildError(f"missing native asset: {source}")
         shutil.copyfile(source, native_dest / asset)
+    # Offline-queue modules native/offline.js imports (../offline/{store,sync}).
+    _copy_offline(client, out)
     # The notifications bridge imports the WebPush client from client/push/.
     push_source = client / "push" / "web-push-client.js"
     if not push_source.is_file():
@@ -1035,6 +1066,8 @@ def _build_wasm(
         "/app.py",
         f"/{WASM_PACKAGE_ARCHIVE}",
         *(f"/client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
+        *(f"/client/native/{asset}" for asset in _NATIVE_ASSETS),
+        *(f"/client/offline/{asset}" for asset in _OFFLINE_ASSETS),
         *(f"/{asset}" for asset in assets),
         *(s if s.startswith("/") else f"/{s}" for s in local_scripts),
         *(f"/pyodide/{file_name}" for file_name in vendored),
@@ -1195,6 +1228,8 @@ def _build_transpile(
         dest = out / "client" / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, dest)
+    # Offline-queue modules native/offline.js imports (../offline/{store,sync}).
+    _copy_offline(client, out)
 
     # App-shell precache: the whole static bundle. Absolute, root-relative URLs
     # so the service worker's exact-path match (see chooseStrategy) is cache-first
@@ -1209,6 +1244,7 @@ def _build_transpile(
         *(f"/client/transpile/{asset}" for asset in _TRANSPILE_ASSETS),
         f"/client/transpile/{_TRANSPILE_APP_MODULE}",
         *(f"/client/native/{asset}" for asset in _NATIVE_ASSETS),
+        *(f"/client/offline/{asset}" for asset in _OFFLINE_ASSETS),
         "/client/push/web-push-client.js",
         "/client/pwa/install-prompt.js",
         *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),

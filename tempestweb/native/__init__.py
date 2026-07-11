@@ -49,6 +49,7 @@ from tempestweb.native import (
     http,
     install,
     notifications,
+    offline,
     onnx,
     storage,
 )
@@ -97,6 +98,11 @@ from tempestweb.native.notifications import (
     subscribe,
     unsubscribe,
 )
+from tempestweb.native.offline import Mutation, ReplayResult
+from tempestweb.native.offline import enqueue as offline_enqueue
+from tempestweb.native.offline import pending as offline_pending
+from tempestweb.native.offline import replay as offline_replay
+from tempestweb.native.offline import size as offline_size
 from tempestweb.native.onnx import OnnxModel, Tensor
 from tempestweb.native.share import (
     ShareOutcome,
@@ -124,6 +130,7 @@ __all__ = [
     "http",
     "install",
     "notifications",
+    "offline",
     "onnx",
     "storage",
     # capability contract (the single source of truth across surfaces)
@@ -185,6 +192,13 @@ __all__ = [
     "InstallState",
     "install_prompt",
     "install_state",
+    # offline (durable mutation queue + replay)
+    "Mutation",
+    "ReplayResult",
+    "offline_enqueue",
+    "offline_pending",
+    "offline_replay",
+    "offline_size",
     # notifications
     "NotificationPermission",
     "notify",

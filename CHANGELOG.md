@@ -4,6 +4,22 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.47.0] — 2026-07-11
+
+### Added
+
+- **Dependabot (Track S — S7 complete).** `.github/dependabot.yml` opens weekly
+  update PRs for pip, GitHub Actions and npm. With `SECURITY.md` + the CI
+  `pip-audit` job, S7 is closed.
+
+### Changed
+
+- Roadmap: Track S production-readiness state marked **done** for the security +
+  deploy core (S0/S1/S2/S3/S5/S6/S7/S11 ✅); the remaining 🔶 (S4 Redis backend,
+  S8 OpenTelemetry, S9/S10 CI gates) are enhancements, not blockers — Mode B runs
+  in a professional environment today behind the reference nginx with a
+  `SecurityConfig`.
+
 ## [0.46.0] — 2026-07-11
 
 ### Added

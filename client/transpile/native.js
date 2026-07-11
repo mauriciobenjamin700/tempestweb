@@ -469,4 +469,175 @@ export const native = Object.freeze({
      */
     get_otp: () => call("webauthn.get_otp", {}).then((r) => r.code),
   }),
+  bluetooth: Object.freeze({
+    /** Whether the Web Bluetooth API is available. @returns {Promise<boolean>} */
+    is_supported: () => call("bluetooth.is_supported", {}).then((r) => r.supported),
+    /**
+     * Request a device and connect its GATT server.
+     * @param {{filters?:Array<Object>, optional_services?:Array<string>}} [opts]
+     * @returns {Promise<{id:number, name:string}>}
+     */
+    request: (opts = {}) =>
+      call("bluetooth.request", {
+        filters: opts.filters ?? [],
+        optional_services: opts.optional_services ?? [],
+      }),
+    /**
+     * Read a GATT characteristic value as base64.
+     * @param {number} id  The device id from `request`.
+     * @param {string} service  The service UUID.
+     * @param {string} characteristic  The characteristic UUID.
+     * @returns {Promise<string>}  The base64-encoded value.
+     */
+    read: (id, service, characteristic) =>
+      call("bluetooth.read", { id, service, characteristic }).then((r) => r.data_base64),
+    /**
+     * Write base64 bytes to a GATT characteristic.
+     * @param {number} id  The device id from `request`.
+     * @param {string} service  The service UUID.
+     * @param {string} characteristic  The characteristic UUID.
+     * @param {string} data_base64  The base64-encoded bytes.
+     * @returns {Promise<void>}
+     */
+    write: (id, service, characteristic, data_base64) =>
+      call("bluetooth.write", { id, service, characteristic, data_base64 }),
+  }),
+  contacts: Object.freeze({
+    /** Whether the Contact Picker API is available. @returns {Promise<boolean>} */
+    is_supported: () => call("contacts.is_supported", {}).then((r) => r.supported),
+    /**
+     * Open the OS contact picker.
+     * @param {Array<string>} properties  The properties to request (e.g. ["name"]).
+     * @param {{multiple?:boolean}} [opts]
+     * @returns {Promise<Array<Object>>}  The selected contacts.
+     */
+    select: (properties, opts = {}) =>
+      call("contacts.select", { properties, multiple: opts.multiple ?? false }).then(
+        (r) => r.contacts,
+      ),
+  }),
+  eyedropper: Object.freeze({
+    /**
+     * Open the eyedropper and return the picked sRGB hex color.
+     * @returns {Promise<string>}  The sRGB hex string (e.g. "#ff0000").
+     */
+    open: () => call("eyedropper.open", {}).then((r) => r.srgb_hex),
+  }),
+  gamepad: Object.freeze({
+    /**
+     * Snapshot the connected gamepads' button and axis state.
+     * @returns {Promise<Array<Object>>}
+     */
+    state: () => call("gamepad.state", {}).then((r) => r.gamepads),
+  }),
+  hid: Object.freeze({
+    /** Whether the WebHID API is available. @returns {Promise<boolean>} */
+    is_supported: () => call("hid.is_supported", {}).then((r) => r.supported),
+    /**
+     * Request HID device access.
+     * @param {{filters?:Array<Object>}} [opts]
+     * @returns {Promise<Array<Object>>}  The granted devices.
+     */
+    request: (opts = {}) =>
+      call("hid.request", { filters: opts.filters ?? [] }).then((r) => r.devices),
+  }),
+  midi: Object.freeze({
+    /** Whether the Web MIDI API is available. @returns {Promise<boolean>} */
+    is_supported: () => call("midi.is_supported", {}).then((r) => r.supported),
+    /**
+     * Request MIDI access and list the ports.
+     * @param {{sysex?:boolean}} [opts]
+     * @returns {Promise<{inputs:Array<Object>, outputs:Array<Object>}>}
+     */
+    request_access: (opts = {}) =>
+      call("midi.request_access", { sysex: opts.sysex ?? false }),
+    /**
+     * Send a raw MIDI message to an output port.
+     * @param {string} output_id  The output port id.
+     * @param {Array<number>} data  The raw MIDI bytes.
+     * @returns {Promise<void>}
+     */
+    send: (output_id, data) => call("midi.send", { output_id, data }),
+  }),
+  nfc: Object.freeze({
+    /** Whether the Web NFC API is available. @returns {Promise<boolean>} */
+    is_supported: () => call("nfc.is_supported", {}).then((r) => r.supported),
+    /**
+     * Write an NDEF message to a nearby NFC tag.
+     * @param {Array<Object>} records  The NDEF records to write.
+     * @returns {Promise<void>}
+     */
+    write: (records) => call("nfc.write", { records }),
+  }),
+  payment: Object.freeze({
+    /** Whether the Payment Request API is available. @returns {Promise<boolean>} */
+    is_supported: () => call("payment.is_supported", {}).then((r) => r.supported),
+    /**
+     * Open the payment sheet.
+     * @param {Array<Object>} methods  The supported payment methods.
+     * @param {Object} details  The payment details (total, items).
+     * @param {Object} [opts]  The payment options.
+     * @returns {Promise<Object>}  The completed payment response.
+     */
+    request: (methods, details, opts = {}) =>
+      call("payment.request", { methods, details, options: opts }).then((r) => r.response),
+  }),
+  pip: Object.freeze({
+    /**
+     * Enter Picture-in-Picture for a video.
+     * @param {{selector?:string}} [opts]
+     * @returns {Promise<boolean>}  Whether PiP is now active.
+     */
+    request: (opts = {}) =>
+      call("pip.request", { selector: opts.selector ?? "video" }).then((r) => r.active),
+    /** Exit Picture-in-Picture. @returns {Promise<boolean>}  Whether PiP is active. */
+    exit: () => call("pip.exit", {}).then((r) => r.active),
+  }),
+  pointerlock: Object.freeze({
+    /**
+     * Request pointer lock on an element.
+     * @param {{selector?:string}} [opts]
+     * @returns {Promise<void>}
+     */
+    request: (opts = {}) => call("pointerlock.request", { selector: opts.selector ?? null }),
+    /** Exit pointer lock. @returns {Promise<void>} */
+    exit: () => call("pointerlock.exit", {}),
+  }),
+  serial: Object.freeze({
+    /** Whether the Web Serial API is available. @returns {Promise<boolean>} */
+    is_supported: () => call("serial.is_supported", {}).then((r) => r.supported),
+    /**
+     * Request a serial port.
+     * @param {{filters?:Array<Object>}} [opts]
+     * @returns {Promise<number>}  The port id.
+     */
+    request: (opts = {}) =>
+      call("serial.request", { filters: opts.filters ?? [] }).then((r) => r.id),
+  }),
+  usb: Object.freeze({
+    /** Whether the WebUSB API is available. @returns {Promise<boolean>} */
+    is_supported: () => call("usb.is_supported", {}).then((r) => r.supported),
+    /**
+     * Request a USB device.
+     * @param {{filters?:Array<Object>}} [opts]
+     * @returns {Promise<{id:number, vendor_id:number, product_id:number,
+     *                    product_name:string}>}
+     */
+    request: (opts = {}) => call("usb.request", { filters: opts.filters ?? [] }),
+  }),
+  webaudio: Object.freeze({
+    /**
+     * Play a short synthesized tone (fire-and-forget).
+     * @param {number} frequency  The tone frequency in Hz.
+     * @param {{duration_ms?:number, type?:string, volume?:number}} [opts]
+     * @returns {Promise<void>}
+     */
+    tone: (frequency, opts = {}) =>
+      call("webaudio.tone", {
+        frequency,
+        duration_ms: opts.duration_ms ?? 200,
+        type: opts.type ?? "sine",
+        volume: opts.volume ?? 1.0,
+      }),
+  }),
 });

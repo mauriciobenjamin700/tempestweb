@@ -57,6 +57,24 @@ import {
 import { bgsyncRegister, bgsyncRegisterPeriodic } from "./bgsync.js";
 import { tabsBroadcast, tabsLock, tabsUnlock } from "./tabs.js";
 import { webauthnCreate, webauthnGet, webauthnGetOtp } from "./webauthn.js";
+import {
+  bluetoothIsSupported,
+  bluetoothRead,
+  bluetoothRequest,
+  bluetoothWrite,
+} from "./bluetooth.js";
+import { contactsIsSupported, contactsSelect } from "./contacts.js";
+import { eyedropperOpen } from "./eyedropper.js";
+import { gamepadState } from "./gamepad.js";
+import { hidIsSupported, hidRequest } from "./hid.js";
+import { midiIsSupported, midiRequestAccess, midiSend } from "./midi.js";
+import { nfcIsSupported, nfcWrite } from "./nfc.js";
+import { paymentIsSupported, paymentRequest } from "./payment.js";
+import { pipExit, pipRequest } from "./pip.js";
+import { pointerlockExit, pointerlockRequest } from "./pointerlock.js";
+import { serialIsSupported, serialRequest } from "./serial.js";
+import { usbIsSupported, usbRequest } from "./usb.js";
+import { webaudioTone } from "./webaudio.js";
 
 /**
  * @typedef {Object} NativeCall
@@ -90,6 +108,7 @@ import { webauthnCreate, webauthnGet, webauthnGetOtp } from "./webauthn.js";
  * @property {Function} [SpeechSynthesisUtterance]  Utterance constructor.
  * @property {Function} [MediaRecorder]  MediaRecorder constructor.
  * @property {Function} [BroadcastChannel]  BroadcastChannel constructor.
+ * @property {Function} [AudioContext]  AudioContext constructor (Web Audio tone).
  * @property {Object} [store]   Owner-scoped IndexedDB store (T9/P2), optional.
  */
 
@@ -167,6 +186,32 @@ export const HANDLERS = {
   "webauthn.create": webauthnCreate,
   "webauthn.get": webauthnGet,
   "webauthn.get_otp": webauthnGetOtp,
+  "bluetooth.is_supported": bluetoothIsSupported,
+  "bluetooth.request": bluetoothRequest,
+  "bluetooth.read": bluetoothRead,
+  "bluetooth.write": bluetoothWrite,
+  "contacts.is_supported": contactsIsSupported,
+  "contacts.select": contactsSelect,
+  "eyedropper.open": eyedropperOpen,
+  "gamepad.state": gamepadState,
+  "hid.is_supported": hidIsSupported,
+  "hid.request": hidRequest,
+  "midi.is_supported": midiIsSupported,
+  "midi.request_access": midiRequestAccess,
+  "midi.send": midiSend,
+  "nfc.is_supported": nfcIsSupported,
+  "nfc.write": nfcWrite,
+  "payment.is_supported": paymentIsSupported,
+  "payment.request": paymentRequest,
+  "pip.request": pipRequest,
+  "pip.exit": pipExit,
+  "pointerlock.request": pointerlockRequest,
+  "pointerlock.exit": pointerlockExit,
+  "serial.is_supported": serialIsSupported,
+  "serial.request": serialRequest,
+  "usb.is_supported": usbIsSupported,
+  "usb.request": usbRequest,
+  "webaudio.tone": webaudioTone,
 };
 
 /**
@@ -188,6 +233,7 @@ export function browserDeps() {
     SpeechSynthesisUtterance: g.SpeechSynthesisUtterance,
     MediaRecorder: g.MediaRecorder,
     BroadcastChannel: g.BroadcastChannel,
+    AudioContext: g.AudioContext || g.webkitAudioContext,
   };
 }
 

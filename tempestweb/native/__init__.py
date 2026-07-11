@@ -43,31 +43,45 @@ from tempestweb.native import (
     audio,
     badge,
     bgsync,
+    bluetooth,
     camera,
     clipboard,
+    contacts,
     cookies,
+    eyedropper,
     file,
     filesystem,
     fullscreen,
+    gamepad,
     geolocation,
+    hid,
     http,
     install,
+    midi,
     network,
+    nfc,
     notifications,
     offline,
     onnx,
     orientation,
+    payment,
+    pip,
+    pointerlock,
     quota,
     recorder,
+    serial,
     speech,
     storage,
     tabs,
+    usb,
     vibration,
     visibility,
     wakelock,
+    webaudio,
     webauthn,
 )
 from tempestweb.native.audio import PlayResult
+from tempestweb.native.bluetooth import BluetoothDevice
 from tempestweb.native.bridges import FFIBridge, ProxyBridge
 from tempestweb.native.camera import Photo, capture
 from tempestweb.native.clipboard import ClipboardImage, read, write
@@ -106,6 +120,7 @@ from tempestweb.native.http import (
 from tempestweb.native.install import InstallState
 from tempestweb.native.install import prompt as install_prompt
 from tempestweb.native.install import state as install_state
+from tempestweb.native.midi import MidiPorts
 from tempestweb.native.network import NetworkState
 from tempestweb.native.notifications import (
     NotificationPermission,
@@ -140,34 +155,48 @@ from tempestweb.native.storage import (
     put,
     remove,
 )
+from tempestweb.native.usb import UsbDevice
 
 __all__ = [
     # capability namespaces (plan-facing: native.http.request, native.audio.play, ...)
     "audio",
     "badge",
     "bgsync",
+    "bluetooth",
     "camera",
     "clipboard",
+    "contacts",
     "cookies",
+    "eyedropper",
     "file",
     "filesystem",
     "fullscreen",
+    "gamepad",
     "geolocation",
+    "hid",
     "http",
     "install",
+    "midi",
     "network",
+    "nfc",
     "notifications",
     "offline",
     "onnx",
     "orientation",
+    "payment",
+    "pip",
+    "pointerlock",
     "quota",
     "recorder",
+    "serial",
     "speech",
     "storage",
     "tabs",
+    "usb",
     "vibration",
     "visibility",
     "wakelock",
+    "webaudio",
     "webauthn",
     # capability contract (the single source of truth across surfaces)
     "CAPABILITIES",
@@ -217,6 +246,10 @@ __all__ = [
     "FileHandle",
     "Recording",
     "Voice",
+    # Tier-3 web capabilities (dataclass results)
+    "BluetoothDevice",
+    "MidiPorts",
+    "UsbDevice",
     # storage (N3)
     "list_keys",
     "put",

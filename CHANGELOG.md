@@ -4,6 +4,20 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.43.0] — 2026-07-11
+
+### Added
+
+- **Deploy & ops (Track S — S4 partial, S5, S7 partial).**
+  - **S4** `GET /health` — unauthenticated liveness/readiness probe returning
+    `{status, sessions, ready}`; `ready` flips to `false` at `max_connections`
+    for load-balancer draining. Horizontal-scale guidance (sticky sessions).
+  - **S5** `examples/deploy/` — a production `Dockerfile` (with `HEALTHCHECK`),
+    `docker-compose.yml` (app + nginx/TLS) and `nginx.conf` (WebSocket upgrade,
+    long streaming timeouts, `ip_hash` stickiness). New `docs/deploy.md` (PT+EN).
+  - **S7** root `SECURITY.md` (private reporting + security model) and a
+    `pip-audit` job in CI.
+
 ## [0.42.0] — 2026-07-11
 
 ### Added

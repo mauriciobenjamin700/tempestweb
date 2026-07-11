@@ -156,7 +156,21 @@ class TempestWebServer(Generic[S]):
         return AppSession(self._state_factory, self._view, transport)
 
     def _register_routes(self) -> None:
-        """Mount the ``/ws``, ``/sse`` and ``/sse/{id}`` routes on ``self.api``."""
+        """Mount the ``/health``, ``/ws``, ``/sse`` and ``/sse/{id}`` routes."""
+
+        @self.api.get("/health")
+        async def health() -> dict[str, Any]:
+            """Liveness/readiness probe (S4): unauthenticated, cheap, no session.
+
+            Returns ``ok`` plus the live session count and, when a cap is set,
+            whether the host still has capacity — for load-balancer draining.
+            """
+            cap = self._security.max_connections
+            return {
+                "status": "ok",
+                "sessions": self._live,
+                "ready": cap is None or self._live < cap,
+            }
 
         @self.api.websocket("/ws")
         async def ws_endpoint(websocket: WebSocket) -> None:

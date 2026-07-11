@@ -191,3 +191,24 @@ def test_no_headers_by_default() -> None:
     client = TestClient(create_app(lambda: _State(), _view))
     resp = client.post("/sse/unknown", json={"type": "x"})
     assert "x-frame-options" not in resp.headers
+
+
+# -- S4: health probe ---------------------------------------------------------
+
+
+def test_health_probe() -> None:
+    """`/health` is unauthenticated, cheap, and reports readiness."""
+    client = _client(authenticate=token_authenticator("sesame"))
+    resp = client.get("/health")  # no token needed
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["sessions"] == 0
+    assert body["ready"] is True
+
+
+def test_health_ready_flag_follows_capacity() -> None:
+    client = _client(max_connections=1)
+    with client.websocket_connect("/ws"):
+        assert client.get("/health").json()["ready"] is False  # full
+    assert client.get("/health").json()["ready"] is True  # slot freed

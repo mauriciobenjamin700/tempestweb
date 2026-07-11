@@ -134,6 +134,17 @@ one app exercising the whole surface — and the guide
 **experimental**: the typed subset is deliberately restricted (out-of-subset
 constructs fail loud with `file:line`) and the API may change.
 
+## Scaffold a PWA
+
+```bash
+tempestweb new myapp --template pwa    # Mode C: installable, offline PWA
+tempestweb build --mode transpile --path myapp
+```
+
+The `pwa` template pre-configures `mode = "transpile"` + a `[pwa]` manifest block
+and ships a counter with an **Install** button. Omit `--template` for the
+two-mode counter starter.
+
 ## WebPush (end-to-end)
 
 Push works client-to-server out of the box. Generate VAPID keys, mount the

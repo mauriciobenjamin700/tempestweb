@@ -25,6 +25,7 @@ def create_project(
     parent: str | Path = ".",
     force: bool = False,
     verify: bool = True,
+    template: str = "default",
 ) -> ScaffoldResult:
     """Scaffold a new project and optionally verify it renders.
 
@@ -34,6 +35,7 @@ def create_project(
         force: Overwrite a non-empty target directory when ``True``.
         verify: When ``True`` (default), load the scaffolded ``app.py`` and
             render its initial view to confirm the project is runnable.
+        template: The scaffold template — ``"default"`` or ``"pwa"``.
 
     Returns:
         The :class:`ScaffoldResult` describing the created tree.
@@ -45,7 +47,7 @@ def create_project(
         raise NewError("project name must not be empty")
 
     try:
-        result = scaffold_project(name, parent=parent, force=force)
+        result = scaffold_project(name, parent=parent, force=force, template=template)
     except Exception as exc:  # noqa: BLE001 - normalize to NewError for the CLI
         raise NewError(str(exc)) from exc
 

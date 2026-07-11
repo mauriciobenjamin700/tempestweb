@@ -421,6 +421,14 @@ tempestweb dev   --mode transpile --path examples/transpile-tour   # livereload
 
 ## PWA: instalável e offline
 
+!!! tip "Comece uma PWA em um comando"
+    ```bash
+    tempestweb new meuapp --template pwa
+    ```
+    Gera um projeto Modo C já configurado (`mode = "transpile"` + bloco `[pwa]`)
+    com um contador e um botão **Install** — pronto pra `tempestweb build
+    --mode transpile`.
+
 Você já tem um bundle 100% estático e sem Python — o alvo **perfeito** para uma
 PWA. Por isso o `build --mode transpile` já emite a camada PWA inteira **sozinho**:
 o usuário pode **instalar** seu app na tela inicial e, depois da primeira visita,

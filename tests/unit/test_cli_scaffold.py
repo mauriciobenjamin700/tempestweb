@@ -15,6 +15,7 @@ from tempestweb.cli import (
     render_files,
     scaffold_project,
 )
+from tempestweb.cli.scaffold import UnknownTemplateError
 
 
 def test_render_files_covers_every_project_file() -> None:
@@ -97,3 +98,28 @@ def test_create_project_reports_unrunnable_scaffold(
     monkeypatch.setattr(new_mod, "scaffold_project", _broken)
     with pytest.raises(NewError, match="not runnable"):
         create_project("broken", parent=tmp_path)
+
+
+def test_pwa_template_renders_transpile_and_manifest() -> None:
+    contents = render_files("mypwa", template="pwa")
+    assert set(contents) == set(PROJECT_FILES)
+    toml = contents["tempestweb.toml"]
+    assert 'mode = "transpile"' in toml
+    assert "[pwa]" in toml
+    assert 'name = "mypwa"' in toml
+    assert "native.install.prompt()" in contents["app.py"]
+    assert "Progressive Web App" in contents["README.md"]
+
+
+def test_unknown_template_raises() -> None:
+    with pytest.raises(UnknownTemplateError):
+        render_files("demo", template="nope")
+
+
+def test_pwa_scaffold_is_runnable(tmp_path: Path) -> None:
+    # verify=True renders the scaffolded app.py through the real core.
+    result = create_project("mypwa", parent=tmp_path, template="pwa")
+    assert (result.root / "app.py").is_file()
+    assert 'mode = "transpile"' in (result.root / "tempestweb.toml").read_text(
+        encoding="utf-8"
+    )

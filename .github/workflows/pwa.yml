@@ -24,7 +24,7 @@ jobs:
     name: PWA unit gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
@@ -57,7 +57,7 @@ jobs:
     # wired this job validates the manifest and is allowed to be a soft signal.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
@@ -76,7 +76,7 @@ jobs:
     # soft until the static build and a test VAPID pair are provisioned in CI.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "22"

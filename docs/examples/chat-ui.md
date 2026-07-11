@@ -62,7 +62,7 @@ appends the user message to state, clears the draft, then appends a canned bot
 reply so the list always grows — making the virtualized :class:`LazyColumn`
 scrolling behaviour obvious with a handful of sends.
 
-An inline :class:`~tempestweb._core.components.feedback.Banner` acts as a toast
+An inline :class:`~tempest_core.components.feedback.Banner` acts as a toast
 when the user tries to send an empty draft, keeping the demo self-contained and
 exercising the feedback component without the overlay API.
 
@@ -77,8 +77,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components.base import (
+from tempest_core import App, Style, Widget
+from tempest_core.components.base import (
     ACCENT,
     BACKGROUND,
     MUTED,
@@ -86,15 +86,15 @@ from tempestweb._core.components.base import (
     ON_SURFACE,
     SURFACE,
 )
-from tempestweb._core.components.feedback import Banner
-from tempestweb._core.style import (
+from tempest_core.components.feedback import Banner
+from tempest_core.style import (
     AlignItems,
     Color,
     Edge,
     FontWeight,
     JustifyContent,
 )
-from tempestweb._core.widgets import (
+from tempest_core.widgets import (
     Button,
     Column,
     Container,
@@ -103,7 +103,7 @@ from tempestweb._core.widgets import (
     Row,
     Text,
 )
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Color palette additions specific to this example

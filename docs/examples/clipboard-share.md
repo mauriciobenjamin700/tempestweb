@@ -97,9 +97,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import App, Style, Widget
+from tempest_core.style import Edge
+from tempest_core.widgets import Button, Column, Row, Spinner, Text
 from tempestweb.native import clipboard
 from tempestweb.native.share import ShareOutcome, ShareResult
 from tempestweb.native.share import share as _native_share
@@ -392,9 +392,9 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Edge
-from tempestweb._core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import App, Style, Widget
+from tempest_core.style import Edge
+from tempest_core.widgets import Button, Column, Row, Spinner, Text
 from tempestweb.native import clipboard
 from tempestweb.native.share import ShareOutcome, ShareResult
 from tempestweb.native.share import share as _native_share
@@ -729,7 +729,7 @@ from typing import Any
 
 import pytest
 
-from tempestweb._core import App, Node, build
+from tempest_core import App, Node, build
 from tempestweb.native import install_bridge, uninstall_bridge
 from tempestweb.native.share import ShareOutcome
 
@@ -894,7 +894,7 @@ async def test_copy_error_transitions_to_error_phase(
 
 async def test_tree_changes_between_idle_and_copied(module: Any, app: App[Any]) -> None:
     """The rebuilt tree differs after a successful copy (diff-friendly)."""
-    from tempestweb._core import diff
+    from tempest_core import diff
 
     install_bridge(FakeBridge())
 

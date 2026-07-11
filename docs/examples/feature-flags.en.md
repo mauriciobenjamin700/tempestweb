@@ -64,9 +64,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Border, Color, Edge, FontWeight
-from tempestweb._core.widgets import Button, Column, Container, Row, Text
+from tempest_core import App, Style, Widget
+from tempest_core.style import Border, Color, Edge, FontWeight
+from tempest_core.widgets import Button, Column, Container, Row, Text
 from tempestweb.observability import (
     FeatureFlagsProvider,
     InMemoryFeatureFlagsAdapter,
@@ -649,9 +649,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.style import Border, Color, Edge, FontWeight
-from tempestweb._core.widgets import Button, Column, Container, Row, Text
+from tempest_core import App, Style, Widget
+from tempest_core.style import Border, Color, Edge, FontWeight
+from tempest_core.widgets import Button, Column, Container, Row, Text
 from tempestweb.observability import (
     FeatureFlagsProvider,
     InMemoryFeatureFlagsAdapter,
@@ -738,7 +738,7 @@ def _header(app: App[FeatureFlagsState]) -> Widget:
         app: The application handle.
 
     Returns:
-        A :class:`~tempestweb._core.widgets.Column` with title and subtitle
+        A :class:`~tempest_core.widgets.Column` with title and subtitle
         text.
     """
     return Container(
@@ -921,7 +921,7 @@ def _flag_row(
         widget_key_prefix: A unique prefix for the row's widget keys.
 
     Returns:
-        A :class:`~tempestweb._core.widgets.Row` with flag info and a button.
+        A :class:`~tempest_core.widgets.Row` with flag info and a button.
     """
     enabled: bool = app.state.flags.is_enabled(flag_key)
     status_text: str = "ON" if enabled else "OFF"
@@ -1062,7 +1062,7 @@ def _counter_badge(app: App[FeatureFlagsState]) -> Widget:
         app: The application handle.
 
     Returns:
-        A :class:`~tempestweb._core.widgets.Text` displaying the counter.
+        A :class:`~tempest_core.widgets.Text` displaying the counter.
     """
     return Text(
         content=f"Flag changes: {app.state.rebuild_counter}",

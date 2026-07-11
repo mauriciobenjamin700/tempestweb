@@ -113,10 +113,10 @@ def make_state() -> SettingsState:
 
 ## Step 3 — Event types
 
-Two event types arrive from input controls. Import them from `tempestweb._core.widgets.events`:
+Two event types arrive from input controls. Import them from `tempest_core.widgets.events`:
 
 ```python
-from tempestweb._core.widgets.events import SlideEvent, ToggleEvent
+from tempest_core.widgets.events import SlideEvent, ToggleEvent
 ```
 
 | Type | Used by | Relevant field |
@@ -133,11 +133,11 @@ from tempestweb._core.widgets.events import SlideEvent, ToggleEvent
 The first section uses `Switch` for the master control and two `Checkbox` widgets for sub-options. The UI is organised in a `_notifications_card` function that takes `app` and returns a `Card`:
 
 ```python
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import AppBar, Card, Divider, Scaffold
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets import Checkbox, Column, Row, Switch, Text
-from tempestweb._core.widgets.events import ToggleEvent
+from tempest_core import App, Style, Widget
+from tempest_core.components import AppBar, Card, Divider, Scaffold
+from tempest_core.style import AlignItems, Edge, FontWeight
+from tempest_core.widgets import Checkbox, Column, Row, Switch, Text
+from tempest_core.widgets.events import ToggleEvent
 
 
 def _notifications_card(app: App[SettingsState]) -> Widget:
@@ -214,9 +214,9 @@ def _notifications_card(app: App[SettingsState]) -> Widget:
 This section introduces `SegmentedControl` (for theme and quality) and `Slider` (for font size):
 
 ```python
-from tempestweb._core.components import SegmentedControl
-from tempestweb._core.widgets import Slider
-from tempestweb._core.widgets.events import SlideEvent
+from tempest_core.components import SegmentedControl
+from tempest_core.widgets import Slider
+from tempest_core.widgets.events import SlideEvent
 
 
 def _appearance_card(app: App[SettingsState]) -> Widget:
@@ -368,7 +368,7 @@ def _audio_card(app: App[SettingsState]) -> Widget:
 `RadioGroup` is the right choice for single selection when all items should be visible at once:
 
 ```python
-from tempestweb._core.components import RadioGroup
+from tempest_core.components import RadioGroup
 
 
 def _language_card(app: App[SettingsState]) -> Widget:
@@ -530,8 +530,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     AppBar,
     Card,
     Divider,
@@ -539,8 +539,8 @@ from tempestweb._core.components import (
     Scaffold,
     SegmentedControl,
 )
-from tempestweb._core.style import AlignItems, Edge, FontWeight
-from tempestweb._core.widgets import (
+from tempest_core.style import AlignItems, Edge, FontWeight
+from tempest_core.widgets import (
     Checkbox,
     Column,
     Row,
@@ -548,7 +548,7 @@ from tempestweb._core.widgets import (
     Switch,
     Text,
 )
-from tempestweb._core.widgets.events import SlideEvent, ToggleEvent
+from tempest_core.widgets.events import SlideEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Constants

@@ -214,10 +214,10 @@ The button-enabling logic is worth noting:
 - `button_enabled = selected >= 0` — the button only reacts to clicks after a selection is made
 
 ```python
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.components import AppBar, Card, Divider, RadioGroup
-from tempestweb._core.style import Color, Edge, FontWeight
-from tempestweb._core.widgets import ProgressBar
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.components import AppBar, Card, Divider, RadioGroup
+from tempest_core.style import Color, Edge, FontWeight
+from tempest_core.widgets import ProgressBar
 
 
 def _question_card(app: App[QuizState]) -> Widget:
@@ -483,9 +483,9 @@ Here is the full file, ready to copy:
 """Quiz app — demonstrates Forms & flow with sequential questions and a final score.
 
 A sequence of multiple-choice questions is presented one at a time. Each question
-exposes its options as a :class:`~tempestweb._core.components.RadioGroup`; the user
+exposes its options as a :class:`~tempest_core.components.RadioGroup`; the user
 picks an answer and presses **Next** (or **Finish** on the last question). A
-:class:`~tempestweb._core.widgets.ProgressBar` tracks progress through the quiz.
+:class:`~tempest_core.widgets.ProgressBar` tracks progress through the quiz.
 After the final question a results screen shows the score, a grade label, and a
 **Restart** button to play again.
 
@@ -501,10 +501,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Button, Column, Row, Style, Text, Widget
-from tempestweb._core.components import AppBar, Card, Divider, RadioGroup
-from tempestweb._core.style import Color, Edge, FontWeight
-from tempestweb._core.widgets import ProgressBar
+from tempest_core import App, Button, Column, Row, Style, Text, Widget
+from tempest_core.components import AppBar, Card, Divider, RadioGroup
+from tempest_core.style import Color, Edge, FontWeight
+from tempest_core.widgets import ProgressBar
 
 # ---------------------------------------------------------------------------
 # Data

@@ -116,7 +116,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
 Each language is represented by a `Locale` object carrying the language code, region, and RTL flag:
 
 ```python
-from tempestweb._core import Locale
+from tempest_core import Locale
 
 LOCALE_LABELS: list[str] = ["English", "Português", "العربية"]
 LOCALES: list[Locale] = [
@@ -171,8 +171,8 @@ def make_state() -> GreetingState:
 Inside `view()`, two handlers respond to user interactions:
 
 ```python
-from tempestweb._core import App, Widget
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core import App, Widget
+from tempest_core.widgets.events import TextChangeEvent
 
 
 def view(app: App[GreetingState]) -> Widget:
@@ -206,7 +206,7 @@ Notice that the handlers are defined **inside** `view()`. They capture `app` by 
 With the locale and handlers in place, we compute the derived strings before building the widget tree:
 
 ```python
-from tempestweb._core import t
+from tempest_core import t
 
 
 def view(app: App[GreetingState]) -> Widget:
@@ -247,10 +247,10 @@ The `**kwargs` are passed directly to `str.format_map()`. This means `"Hello, {n
 Now we assemble the UI. Text alignment mirrors the locale direction:
 
 ```python
-from tempestweb._core import Style
-from tempestweb._core.components import Card, Divider, SegmentedControl
-from tempestweb._core.style import Edge, FontWeight, TextAlign
-from tempestweb._core.widgets import Column, Input, Text
+from tempest_core import Style
+from tempest_core.components import Card, Divider, SegmentedControl
+from tempest_core.style import Edge, FontWeight, TextAlign
+from tempest_core.widgets import Column, Input, Text
 
 
 def view(app: App[GreetingState]) -> Widget:
@@ -361,19 +361,19 @@ def view(app: App[GreetingState]) -> Widget:
 Here is the full file, ready to copy:
 
 ```python
-"""Internationalized greeting — demonstrates :mod:`tempestweb._core.i18n`.
+"""Internationalized greeting — demonstrates :mod:`tempest_core.i18n`.
 
 This example is a non-trivial showcase of the i18n helpers:
 
-* :class:`~tempestweb._core.i18n.Locale` — language, region, RTL flag.
-* :func:`~tempestweb._core.i18n.translate` (alias :data:`~tempestweb._core.i18n.t`)
+* :class:`~tempest_core.i18n.Locale` — language, region, RTL flag.
+* :func:`~tempest_core.i18n.translate` (alias :data:`~tempest_core.i18n.t`)
   — key look-up with ``str.format`` interpolation.
 
 The user can:
 
-1. Pick a language via a :class:`~tempestweb._core.components.SegmentedControl`
+1. Pick a language via a :class:`~tempest_core.components.SegmentedControl`
    (English, Português, العربية).
-2. Type their name into an :class:`~tempestweb._core.widgets.Input`; the greeting
+2. Type their name into an :class:`~tempest_core.widgets.Input`; the greeting
    headline interpolates it in real time.
 3. See a "fun fact" card whose text also re-renders through ``t()``.
 
@@ -385,11 +385,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempestweb._core import App, Locale, Style, Widget, t
-from tempestweb._core.components import Card, Divider, SegmentedControl
-from tempestweb._core.style import Edge, FontWeight, TextAlign
-from tempestweb._core.widgets import Column, Input, Text
-from tempestweb._core.widgets.events import TextChangeEvent
+from tempest_core import App, Locale, Style, Widget, t
+from tempest_core.components import Card, Divider, SegmentedControl
+from tempest_core.style import Edge, FontWeight, TextAlign
+from tempest_core.widgets import Column, Input, Text
+from tempest_core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Translation catalogue
@@ -493,9 +493,9 @@ def make_state() -> GreetingState:
 def view(app: App[GreetingState]) -> Widget:
     """Render the greeting UI from the current state.
 
-    Reads the active :class:`~tempestweb._core.i18n.Locale` from ``app.state``
+    Reads the active :class:`~tempest_core.i18n.Locale` from ``app.state``
     and translates every visible string via
-    :func:`~tempestweb._core.i18n.translate` so that switching the language
+    :func:`~tempest_core.i18n.translate` so that switching the language
     selector re-renders the entire tree in the new locale without any
     conditional logic scattered through the widget tree.
 

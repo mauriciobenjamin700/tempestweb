@@ -57,10 +57,10 @@ Copy it, run it, then read the section-by-section explanation below.
 ```python
 """Login form — demonstrates auth-oriented form validation with brform components.
 
-The form uses :class:`~tempestweb._core.components.EmailInput` and
-:class:`~tempestweb._core.components.PasswordInput` (the pre-built BR-form
-components) together with :class:`~tempestweb._core.widgets.Form` /
-:class:`~tempestweb._core.widgets.FormField` validators to gate submission on
+The form uses :class:`~tempest_core.components.EmailInput` and
+:class:`~tempest_core.components.PasswordInput` (the pre-built BR-form
+components) together with :class:`~tempest_core.widgets.Form` /
+:class:`~tempest_core.widgets.FormField` validators to gate submission on
 both field validity and a fake credential check. The result flips an
 ``authenticated`` flag in state, rendering a success screen or a red error
 banner for wrong credentials.
@@ -77,16 +77,16 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempestweb._core import App, Style, Widget
-from tempestweb._core.components import (
+from tempest_core import App, Style, Widget
+from tempest_core.components import (
     Banner,
     Card,
     Divider,
     EmailInput,
     PasswordInput,
 )
-from tempestweb._core.style import AlignItems, Color, Edge, FontWeight, TextAlign
-from tempestweb._core.widgets import (
+from tempest_core.style import AlignItems, Color, Edge, FontWeight, TextAlign
+from tempest_core.widgets import (
     Button,
     Column,
     Form,
@@ -154,7 +154,7 @@ def _require(message: str) -> Validator:
         message: The error message returned when the value is blank.
 
     Returns:
-        A :data:`~tempestweb._core.widgets.Validator` callable.
+        A :data:`~tempest_core.widgets.Validator` callable.
     """
 
     def rule(value: Any) -> str | None:  # noqa: ANN401
@@ -170,7 +170,7 @@ def _valid_email(message: str) -> Validator:
         message: The error message returned when the address is syntactically invalid.
 
     Returns:
-        A :data:`~tempestweb._core.widgets.Validator` callable.
+        A :data:`~tempest_core.widgets.Validator` callable.
     """
 
     def rule(value: Any) -> str | None:  # noqa: ANN401
@@ -188,7 +188,7 @@ def _min_length(length: int, message: str) -> Validator:
         message: The error message returned when the value is too short.
 
     Returns:
-        A :data:`~tempestweb._core.widgets.Validator` callable.
+        A :data:`~tempest_core.widgets.Validator` callable.
     """
 
     def rule(value: Any) -> str | None:  # noqa: ANN401
@@ -206,7 +206,7 @@ def _success_screen() -> Widget:
     """Render the post-authentication success screen.
 
     Returns:
-        A :class:`~tempestweb._core.widgets.Column` with a success card.
+        A :class:`~tempest_core.widgets.Column` with a success card.
     """
     return Column(
         key="success-screen",
@@ -251,7 +251,7 @@ def _success_screen() -> Widget:
 def view(app: App[LoginState]) -> Widget:
     """Render the login form from the current application state.
 
-    Builds a :class:`~tempestweb._core.widgets.Form` that:
+    Builds a :class:`~tempest_core.widgets.Form` that:
 
     * Validates the email field (required + syntactically valid).
     * Validates the password field (required + minimum 8 characters).
@@ -344,7 +344,7 @@ def view(app: App[LoginState]) -> Widget:
     def submit() -> None:
         """Validate fields and, if valid, check credentials.
 
-        Runs the :class:`~tempestweb._core.widgets.Form` validators first. If
+        Runs the :class:`~tempest_core.widgets.Form` validators first. If
         the form is invalid the per-field errors are reflected into state so the
         components re-render with their red error messages. If the form is valid
         the credentials are checked against the fake store; a mismatch writes an

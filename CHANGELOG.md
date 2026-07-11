@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.28.0] — 2026-07-10
+
+### Added
+
+- **PWA install prompt in Mode C (`native.install`).** The install capability
+  (already present in the dispatch registry and Python surface) is now exposed on
+  the Mode C native facade and marked `mode_c`: `await native.install.state()`
+  returns `{can_install, installed}` and `await native.install.prompt()` fires the
+  browser's stashed `beforeinstallprompt` after a user gesture, resolving to
+  `"accepted"` / `"dismissed"` / `"unavailable"`. `examples/transpile-tour` gains
+  an "install" button. Verified live (Playwright): the facade round-trips
+  end-to-end in the browser (`install.state()` → `{can_install:false,
+  installed:false}`; `beforeinstallprompt` captured and `prompt()` fired — the
+  accept/dismiss step is gesture-dependent and not automatable).
+
 ## [0.27.0] — 2026-07-10
 
 ### Added

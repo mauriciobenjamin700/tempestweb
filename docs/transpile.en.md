@@ -228,7 +228,14 @@ def view(app: App[DataState]) -> Widget:
     `set_state` runs (after the `await`), so the UI reflects the result as soon as
     the capability resolves. Capabilities available in Mode C: `http`, `storage`
     (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`, `share`,
-    `audio`, `file`, `notifications`.
+    `audio`, `file`, `notifications`, `install` (PWA install prompt).
+
+!!! tip "Install the PWA (`native.install`)"
+    `await native.install.state()` reports `{can_install, installed}`; after a
+    user gesture, `await native.install.prompt()` fires the native install prompt
+    and resolves with `"accepted"`, `"dismissed"` or `"unavailable"`. The
+    controller already suppresses the browser's cold mini-infobar, so you show an
+    "Install" button at the right moment.
 
 !!! tip "Field validators"
     `from tempest_core.validators import validate_email, validate_cpf,

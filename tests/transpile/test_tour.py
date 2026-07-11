@@ -27,6 +27,9 @@ def test_tour_transpiles_and_routes_features() -> None:
     assert 'from "./animation.js"' in js
     assert 'from "./validators.js"' in js
     assert 'from "./widgets.js"' in js
+    assert 'from "./native.js"' in js
+    # The PWA install capability routes through the native facade.
+    assert "native.install.prompt()" in js
 
 
 def test_tour_hoists_block_assigned_names() -> None:

@@ -33,6 +33,7 @@ from tempest_core.animation import AnimationController, Tween
 from tempest_core.style import Color, Curve, Edge
 from tempest_core.validators import validate_email
 from tempest_core.widgets import Input
+from tempestweb import native
 
 MESSAGES = {
     "pt": {"title": "Tour do Modo C", "home": "Início", "form": "Formulário"},
@@ -47,6 +48,7 @@ class TourState:
     lang: str = "pt"
     email: str = ""
     email_error: str = ""
+    install: str = ""
     box: object = field(default=None)
 
     def set_email(self, value: str) -> None:
@@ -87,6 +89,10 @@ def view(app: App[TourState]) -> Widget:
     def grow() -> None:
         app.state.box.forward()
         app.register_animation(app.state.box)
+
+    async def do_install() -> None:
+        outcome = await native.install.prompt()
+        app.set_state(lambda s: setattr(s, "install", outcome))
 
     header = Row(
         style=Style(gap=8.0),
@@ -140,6 +146,8 @@ def view(app: App[TourState]) -> Widget:
                     children=[],
                 ),
                 Button(label="grow", on_click=grow, key="grow"),
+                Button(label="install", on_click=do_install, key="install"),
+                Text(content=app.state.install, key="installout"),
                 Button(
                     label=t("form", locale=loc, translations=MESSAGES),
                     on_click=go_form,

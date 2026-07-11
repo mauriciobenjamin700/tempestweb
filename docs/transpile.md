@@ -228,7 +228,14 @@ def view(app: App[DataState]) -> Widget:
     `set_state` roda (depois do `await`), então a UI reflete o resultado assim que
     a capacidade resolve. Capacidades disponíveis no Modo C: `http`, `storage`
     (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`, `share`,
-    `audio`, `file`, `notifications`.
+    `audio`, `file`, `notifications`, `install` (prompt de instalação PWA).
+
+!!! tip "Instalar o PWA (`native.install`)"
+    `await native.install.state()` informa `{can_install, installed}`; após um
+    gesto do usuário, `await native.install.prompt()` dispara o prompt nativo de
+    instalação e resolve com `"accepted"`, `"dismissed"` ou `"unavailable"`. O
+    controller já suprime o mini-infobar frio do browser, então você mostra um
+    botão "Instalar" no momento certo.
 
 !!! tip "Validadores de campo"
     `from tempest_core.validators import validate_email, validate_cpf,

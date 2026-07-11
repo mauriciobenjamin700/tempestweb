@@ -124,6 +124,7 @@ The native bridge (`tempestweb.native`) exposes geolocation, HTTP, camera,
 clipboard, share, and storage — always through injectable callables, so every
 example runs deterministically in tests with a `FakeBridge`.
 
+- [**Device panel**](device-panel.md) — four Tier 1 capabilities (`vibration`, `wakelock`, `fullscreen`, `network`) wired to buttons on a single screen. **[A/B]**
 - [**Weather (HTTP + geolocation)**](weather-native.md) — a chained `async` handler combining `geolocation.get_position` and `http.request`. **[A/B]**
 - [**Copy & share**](clipboard-share.md) — injected `clipboard.write` + `share.share`, driving two `async` handlers. **[A/B]**
 - [**Camera capture**](photo-capture.md) — an `IDLE → CAPTURING → CAPTURED/ERROR` lifecycle with `camera.capture` and a data-URI preview. **[A/B]**

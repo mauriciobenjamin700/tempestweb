@@ -124,6 +124,7 @@ A ponte nativa (`tempestweb.native`) dá acesso a geolocalização, HTTP, câmer
 área de transferência, compartilhamento e armazenamento — sempre via _callables_
 injetáveis, então cada exemplo roda determinístico nos testes com um `FakeBridge`.
 
+- [**Painel do dispositivo**](device-panel.md) — quatro capacidades Tier 1 (`vibration`, `wakelock`, `fullscreen`, `network`) ligadas a botões numa única tela. **[A/B]**
 - [**Clima (HTTP + geolocalização)**](weather-native.md) — handler `async` encadeado combinando `geolocation.get_position` e `http.request`. **[A/B]**
 - [**Copiar e compartilhar**](clipboard-share.md) — `clipboard.write` + `share.share` injetados, dirigindo dois handlers `async`. **[A/B]**
 - [**Captura de câmera**](photo-capture.md) — ciclo `IDLE → CAPTURING → CAPTURED/ERROR` com `camera.capture` e preview por _data URI_. **[A/B]**

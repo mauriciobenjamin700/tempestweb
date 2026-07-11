@@ -4,6 +4,51 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.50.0] — YYYY-MM-DD
+
+### Added
+
+- **Web-platform capability parity (Track T).** The `tempestweb.native` bridge now
+  wraps the bulk of the modern Web Platform, grouped by tier the way the roadmap
+  does:
+  - **Tier 1 (universal):** `vibration`, `badge`, `wakelock`, `fullscreen`,
+    `network` (+ `watch`), `visibility` (+ `watch`), `orientation` (+ `watch`),
+    `quota`, rich `clipboard` (`read_image`/`write_image`), `battery` (`watch`),
+    and `sensors` (`orientation`/`motion`).
+  - **Tier 2 (widely used):** `speech` (TTS `speak`/`voices` + STT `listen`),
+    `recorder` (audio/video/screen), `filesystem` (live handles), `bgsync`
+    (Background + Periodic Sync), `tabs` (broadcast/receive + Web Locks), and
+    `idle` (`watch`).
+  - **Tier 3 (Chromium-only / secure-context):** `bluetooth`, `usb`, `serial`,
+    `hid`, `nfc` (`write`), `contacts`, `payment`, `pip`, `eyedropper`,
+    `pointerlock`, `gamepad` (state + `watch`), `midi` (send + `messages`), and
+    `webaudio` (`tone`). Each ships `is_supported()` + graceful degradation.
+- **Native event channel (T-EV) + streaming capabilities.** A typed Python←client
+  stream exposed as an async iterator, consumed with `async for`. It extends
+  `NativeBridge` with `subscribe`/`event`/`unsubscribe`; leaving the loop (end,
+  `break`, cancellation) closes the subscription automatically. Twelve streaming
+  capabilities ride it: `geolocation.watch`, `sensors.orientation`,
+  `sensors.motion`, `network.watch`, `visibility.watch`, `orientation.watch`,
+  `battery.watch`, `speech.listen`, `idle.watch`, `tabs.receive`, `gamepad.watch`,
+  and `midi.messages`. See `docs/contract.md` ("Canal de eventos nativo").
+- **`examples/device-panel`** — a Tier 1 showcase wiring `vibration`, `wakelock`,
+  `fullscreen`, and `network` to buttons; the same `view` runs unchanged in
+  Modes A/B.
+- **Docs:** bilingual "Native capability reference" (tier-grouped catalog with a
+  runnable snippet per group), "Native event channel" tutorial, and a "Device
+  panel" gallery page.
+
+### Changed
+
+- **CI now runs with `--all-extras`** so the full native surface (and its optional
+  dependencies) is import-tested and exercised in the gate.
+
+### Known gaps
+
+- **`nfc.scan`** (streaming tag reading) is not implemented yet — `nfc.write` and
+  `nfc.is_supported()` are done. It is the one remaining Track T gap and will land
+  over the event channel (T-EV) in a future release.
+
 ## [0.49.0] — 2026-07-11
 
 ### Added

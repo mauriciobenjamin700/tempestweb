@@ -62,11 +62,21 @@ your app doesn't rot into garbage code.
 
 The application's `view()` never names a transport — the same
 `examples/counter/app.py` runs under `--mode wasm`, `--mode server` and
-`--mode transpile` unchanged. Capabilities (`native/`: http, audio, share,
-geolocation, clipboard, storage, camera, install, offline, notifications) are
-typed awaitables with the same Python API in every mode — Mode A calls the Web
-API in-process, Mode B proxies it over a round-trip, Mode C routes to the same JS
-glue via an in-process facade (see [`docs/contract.md`](docs/contract.md)).
+`--mode transpile` unchanged. Capabilities (`native/`) are typed awaitables with
+the same Python API in every mode — Mode A calls the Web API in-process, Mode B
+proxies it over a round-trip, Mode C routes to the same JS glue via an in-process
+facade (see [`docs/contract.md`](docs/contract.md)). Track T brings **web-platform
+parity**: beyond the core (http, audio, share, geolocation, clipboard, storage,
+camera, install, offline, notifications), the bridge now covers **Tier 1** (
+vibration, badge, wakelock, fullscreen, network, visibility, orientation, quota,
+rich clipboard, battery, sensors), **Tier 2** (speech, recorder, filesystem,
+bgsync, tabs, idle), and **Tier 3 / Chromium-only** (bluetooth, usb, serial, hid,
+nfc, contacts, payment, pip, eyedropper, pointerlock, gamepad, midi, webaudio).
+A **native event channel** streams continuous capabilities (geolocation/network/
+battery watch, sensors, STT, …) as typed `async for` iterators. See the
+[capability reference](https://mauriciobenjamin700.github.io/tempestweb/native-reference/)
+([EN](https://mauriciobenjamin700.github.io/tempestweb/en/native-reference/)) and
+the [event-channel guide](https://mauriciobenjamin700.github.io/tempestweb/native-events/).
 
 ## Static SSR — `render_to_html`
 
@@ -204,7 +214,7 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | `tempestweb/html/` | Static SSR leaf renderer — `render_to_html` / `render_document` / `style_to_css` (Python port of `client/style.js`). |
 | `tempestweb/transpile/` | **Mode C:** `ast`-based Python→JS compiler for the app layer. Paired with the native runtime in `client/transpile/` (`diff.js` · `widgets.js` · `runtime.js`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
-| `tempestweb/native/` | Web API capability adapters — http, audio, share, geo, clipboard, storage, camera (Track N). |
+| `tempestweb/native/` | Web API capability adapters (Tracks N + T) — core (http, audio, share, geo, clipboard, storage, camera) plus Tier 1-3 web-platform parity (vibration, wakelock, fullscreen, network, sensors, bluetooth, usb, midi, …) and a streaming event channel (T-EV) consumed with `async for`. |
 | `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
 | `tempestweb/pwa/` | Web App Manifest + icon emitter (Track P). |
 | `tempestweb/cli/` | `tempestweb new/dev/build/run/sync`. |

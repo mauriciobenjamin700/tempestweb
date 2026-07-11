@@ -1,9 +1,11 @@
 # Roadmap e fases
 
-!!! info "Estado atual — atualizado em 2026-06-13"
-    Tracks **T1–T10 + Trilhos 0/W/A/B/P/N/O/E mesclados na `main`** com gate verde
-    (ruff/format/mypy ✓ · pytest 459 pass/1 skip · jsdom 205 pass). Publicado no
-    PyPI: **tempestweb 0.5.1**. Legenda de status: **✅** mesclado e com gate verde ·
+!!! info "Estado atual — atualizado em 2026-07-11"
+    Tracks **Trilhos 0/W/A/B/P/N/O/E/S + Trilho T mesclados na `main`** com gate
+    verde (ruff/format/mypy ✓ · pytest 831 pass/1 skip · jsdom 439 pass). Última
+    versão publicada no PyPI: **tempestweb 0.49.0**; o **Trilho T** (paridade de
+    capacidades com a plataforma web — Tiers 1–3 + canal de eventos nativo T-EV com
+    12 capacidades de stream) chega na **0.50.0**. Legenda de status: **✅** mesclado e com gate verde ·
     **🔶** implementado mas pendente de **verificação real** (browser/device — ver
     `docs/agents/reports/NOTES-T*.md`) · **⬜** não iniciado. Os dois modos rodam um
     app fim-a-fim ao vivo (counter por WS e Pyodide no browser), Trilho E está ✅ ao
@@ -244,13 +246,13 @@ A/B/C); as só-Chromium expõem `is_supported()` + degradação graciosa.
 
 | Fase | Capacidades | Status |
 |---|---|---|
-| T10 | **speech:** `speak(text, opts)` / `cancel()` (TTS, `SpeechSynthesis`) — single-shot; STT (`SpeechRecognition`) é *(stream)* → T-EV | 🔶 (v0.50.0 — TTS `speak/cancel/voices`; STT → T-EV) |
+| T10 | **speech:** `speak(text, opts)` / `cancel()` (TTS, `SpeechSynthesis`) — single-shot; STT (`SpeechRecognition`) é *(stream)* → T-EV | ✅ (v0.50.0 — TTS + STT `listen`) |
 | T11 | **recorder:** `start`/`stop` gravação de áudio/vídeo (`MediaRecorder`) + captura de tela (`getDisplayMedia`) — devolve blob base64 | ✅ (v0.50.0) |
 | T12 | **filesystem:** `open_file`/`save_file`/`open_directory` com handles vivos (`showOpenFilePicker`/`showSaveFilePicker`) + OPFS | ✅ (v0.50.0) |
 | T13 | **bgsync:** registra Background Sync + Periodic Sync (`SyncManager`) — replay real da offline queue pelo SW | ✅ (v0.50.0) |
 | T14 | **webauthn:** `create`/`get` credencial + passkeys (`navigator.credentials`) + **Web OTP** (`OTPCredential`) | ✅ (v0.50.0) |
-| T15 | **tabs:** Broadcast Channel + Web Locks — sincronizar entre abas | 🔶 (v0.50.0 — broadcast send + Web Locks; receber broadcast → T-EV) |
-| T16 | **idle:** Idle Detection (`IdleDetector`) — single-shot state; contínuo *(stream)* → T-EV | 🔴 (IdleDetector é event-based → T-EV) |
+| T15 | **tabs:** Broadcast Channel + Web Locks — sincronizar entre abas | ✅ (v0.50.0 — broadcast send/receive + Web Locks) |
+| T16 | **idle:** Idle Detection (`IdleDetector`) — single-shot state; contínuo *(stream)* → T-EV | ✅ (v0.50.0 — `idle.watch` via T-EV) |
 
 ### Tier 3 — nicho / secure-context / maioria só Chromium
 
@@ -262,14 +264,14 @@ A/B/C); as só-Chromium expõem `is_supported()` + degradação graciosa.
 | T20 | **contacts:** Contact Picker (`navigator.contacts`) | ✅ (v0.50.0) |
 | T21 | **payment:** Payment Request API | ✅ (v0.50.0) |
 | T22 | **misc UI:** Picture-in-Picture · EyeDropper · Pointer Lock | ✅ (v0.50.0) |
-| T23 | **gamepad / midi:** Gamepad API (poll) · Web MIDI (`requestMIDIAccess`) | 🔶 (v0.50.0 — gamepad poll + MIDI send; input contínuo → T-EV) |
+| T23 | **gamepad / midi:** Gamepad API (poll) · Web MIDI (`requestMIDIAccess`) | ✅ (v0.50.0 — gamepad poll+watch, MIDI send+messages) |
 | T24 | **webaudio:** Web Audio API — síntese/análise (`AudioContext`), além do play/stop atual | 🔶 (v0.50.0 — `tone`; grafo síntese/análise futuro) |
 
 ### Canal de eventos (pré-requisito das *(stream)*)
 
 | Fase | Escopo | Status |
 |---|---|---|
-| T-EV | **Canal de eventos nativo:** stream Python←cliente para subscrições contínuas (geolocation watch, sensores, mudanças de rede/visibilidade/orientação/bateria, STT, idle contínuo). Estende o `NativeBridge` com `subscribe`/`unsubscribe` + entrega de eventos (Modo A via callback FFI, Modo B via frame WS/SSE). Desbloqueia os *(stream)* dos Tiers 1–2 | 🔴 |
+| T-EV | **Canal de eventos nativo:** stream Python←cliente para subscrições contínuas (geolocation watch, sensores, mudanças de rede/visibilidade/orientação/bateria, STT, idle contínuo). Estende o `NativeBridge` com `subscribe`/`unsubscribe` + entrega de eventos (Modo A via callback FFI, Modo B via frame WS/SSE). Desbloqueia os *(stream)* dos Tiers 1–2 | ✅ (v0.50.0) |
 
 !!! note "Ordem sugerida"
     Tier 1 primeiro (barato, universal, fecha a paridade PWA), depois T-EV (destrava

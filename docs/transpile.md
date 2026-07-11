@@ -1,4 +1,9 @@
-# Modo C — transpile (Python → JavaScript nativo) 🧪
+# Modo C — transpile (Python → JavaScript nativo) 🚀
+
+!!! abstract "O que você vai aprender"
+    Como transformar o seu `app.py` Python num **bundle estático de JavaScript
+    nativo** — sem runtime Python no browser — e servi-lo por qualquer CDN, já
+    com **PWA instalável e offline** de fábrica.
 
 Os Modos A (WASM) e B (servidor) mantêm o **Python vivo** em tempo de execução —
 no browser (Pyodide) ou no servidor. O **Modo C** faz diferente: um compilador
@@ -6,11 +11,14 @@ transcreve a **camada de app** do seu Python tipado para **JavaScript nativo**.
 Zero runtime Python, hospedagem estática, first-paint e SEO ótimos. É a "história
 do TypeScript" para Python. 🚀
 
-!!! warning "Experimental (spike)"
-    O Modo C está em construção. Ele já roda apps no estilo do contador — estado,
-    `view()`, handlers, Button/Input estilizados — mas a API pode mudar e o
-    subset de Python aceito ainda é restrito. Para telas ricas hoje, use os
-    Modos A/B; volte ao Modo C conforme ele amadurece.
+!!! success "Modo de primeira classe"
+    O Modo C é **maduro e de primeira classe** — cobre **100% dos widgets do
+    `tempest_core`**, um subset amplo de Python tipado (veja
+    [O subset suportado](#o-subset-suportado)) e uma **história completa de PWA**
+    (instalável, offline, fila de mutações, WebPush ponta a ponta). É a escolha
+    recomendada para sites e PWAs públicos. Só um punhado de construtos avançados
+    fica de fora do subset — o compilador falha cedo, com `arquivo:linha`, quando
+    você encosta neles.
 
 ## Por que existe
 
@@ -574,6 +582,11 @@ no espírito do `mypy --strict`.
 - `tempestweb build --mode transpile` gera um diretório servível por qualquer CDN;
   `run --mode transpile` serve localmente.
 - O mesmo `view()` dos Modos A/B roda aqui — estado, handlers, `Button`/`Input`
-  estilizados, binding reativo.
-- É **experimental**: subset restrito e API sujeita a mudança. Detalhes de design
-  em [`docs/modo-c-transpile.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/modo-c-transpile.md).
+  estilizados, binding reativo, navegação, i18n, tema, animação.
+- É um modo **maduro e de primeira classe**: 100% dos widgets do core, subset
+  amplo de Python tipado e PWA turnkey. Detalhes de design em
+  [`docs/modo-c-transpile.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/modo-c-transpile.md).
+
+Continue para [PWA e offline](pwa.md) para o fluxo completo de instalação e
+WebPush, ou volte ao [Tutorial](tutorial/index.md) para revisar o counter nos
+outros modos. 🚀

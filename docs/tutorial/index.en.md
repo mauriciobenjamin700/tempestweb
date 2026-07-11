@@ -3,7 +3,7 @@
 Welcome! 👋 In this tutorial you build the **counter**, tempestweb's canonical
 app, from scratch. It is a `+` button, a `-` button and a text showing the
 count. Simple — but it exercises the **entire wire contract**: the view tree,
-state, handlers, patches and the two execution modes.
+state, handlers, patches and the three execution modes.
 
 We go one concept per page, in order:
 
@@ -29,12 +29,12 @@ We go one concept per page, in order:
     What the reconciler emits when the count changes — and how the client applies
     it.
 
--   __[4. Running both modes](modes.md)__
+-   __[4. Running the modes](modes.md)__
 
     ---
 
-    The same `app.py` under `--mode wasm` and `--mode server`, without changing a
-    line.
+    The same `app.py` under `--mode wasm`, `--mode server` and `--mode transpile`,
+    without changing a line.
 
 </div>
 

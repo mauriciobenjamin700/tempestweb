@@ -20,7 +20,10 @@ JavaScript, no framework, no build step, no TypeScript) and two patch transports
 
 ## Status
 
-🚧 Early construction. See the design docs:
+Published on PyPI and functional across all three modes — a working counter runs
+live under WASM, server, and transpile; the full test gate is green and every
+example builds. The transpile mode (C) is still marked **experimental** (its
+typed-Python subset is deliberately bounded and its API may shift). Design docs:
 
 - [`docs/plan.md`](docs/plan.md) — full design and phase plan.
 - [`docs/roadmap.md`](docs/roadmap.md) — phase checklist.
@@ -29,10 +32,11 @@ JavaScript, no framework, no build step, no TypeScript) and two patch transports
 - [`docs/agents/MANIFEST.md`](docs/agents/MANIFEST.md) — parallel agent task plan.
 
 Want runnable apps? Browse the **[Example Gallery](https://mauriciobenjamin700.github.io/tempestweb/en/examples/)**
-([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 41 single-concept
-demos (stopwatch, forms, data table/grid, kanban, chat, theming, i18n, canvas
-charts, app shells, native capabilities, observability, PWA/WebPush, and a
-server-mode walkthrough), each running unchanged in both modes.
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 50+
+single-concept demos (stopwatch, forms, data table/grid, kanban, chat, theming,
+i18n, canvas charts, app shells, native capabilities, observability, PWA/WebPush,
+a Mode C tour, and a server-mode walkthrough), each running unchanged across the
+execution modes.
 
 Building something real? Read the **[App architecture & best practices](https://mauriciobenjamin700.github.io/tempestweb/best-practices/)**
 guide ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/best-practices/)) —
@@ -43,29 +47,28 @@ your app doesn't rot into garbage code.
 ## How it works
 
 ```text
-   view(app) ──build──▶ Node tree (IR)        ← shared core (vendored from tempestroid)
-                            │
-                          diff
-                            ▼
-                        [ Patch ]              insert / remove / update / reorder / replace
-                       ╱          ╲
-              Mode A transport   Mode B transport
-              (pyodide.ffi)       (WebSocket | SSE)
-                       ╲          ╱
+   view(app) ──build──▶ Node tree (IR) ──diff──▶ [ Patch ]   ← shared core (tempest-core)
+                                                    │          insert/remove/update/reorder/replace
+              ╭─────────────────┬───────────────────┤
+       Mode A transport   Mode B transport     Mode C: transpile view() → native JS;
+       (pyodide.ffi)      (WebSocket | SSE)     the core runs IN JS, patches in-process
+              ╰─────────────────┴───────────────────╯
                   client/ (pure JS): apply patches to the DOM
-                  + Style→CSS + event capture                  ← same code in both modes
+                  + Style→CSS + event capture          ← same client code in every mode
 ```
 
-The application's `view()` never names a transport — the same `examples/counter/app.py`
-runs under `--mode wasm` and `--mode server` unchanged. Capabilities (`native/`:
-http, audio, share, geolocation, clipboard, storage, camera) are typed awaitables
-with the same Python API in both modes — Mode A calls the Web API in-process, Mode
-B proxies it over a round-trip (see [`docs/contract.md`](docs/contract.md)).
+The application's `view()` never names a transport — the same
+`examples/counter/app.py` runs under `--mode wasm`, `--mode server` and
+`--mode transpile` unchanged. Capabilities (`native/`: http, audio, share,
+geolocation, clipboard, storage, camera, install, offline, notifications) are
+typed awaitables with the same Python API in every mode — Mode A calls the Web
+API in-process, Mode B proxies it over a round-trip, Mode C routes to the same JS
+glue via an in-process facade (see [`docs/contract.md`](docs/contract.md)).
 
 ## Static SSR — `render_to_html`
 
-A third render target, alongside the two interactive modes: the **same** typed
-tree renders to a **static HTML string** on the server — no JavaScript, no DOM, no
+Another render target, alongside the interactive modes: the **same** typed tree
+renders to a **static HTML string** on the server — no JavaScript, no DOM, no
 runtime. HTML is just another leaf renderer.
 
 ```python

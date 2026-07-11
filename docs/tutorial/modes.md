@@ -1,9 +1,13 @@
-# 4. Rodando os dois modos
+# 4. Rodando os modos
+
+!!! abstract "O que você vai aprender"
+    Como rodar o **mesmo** `app.py` — sem mudar uma linha — nos três modos de
+    execução, e como escolher o modo certo para cada requisito.
 
 Você construiu o counter inteiro: [árvore](view.md), [estado](state.md) e
 [patches](patches.md). Agora o pagamento da promessa central do tempestweb: o
-**mesmo** `examples/counter/app.py` roda em **Modo A (WASM)** e **Modo B
-(servidor)** — sem mudar uma linha. 🎯
+**mesmo** `examples/counter/app.py` roda em **Modo A (WASM)**, **Modo B
+(servidor)** e **Modo C (transpile)** — sem mudar uma linha. 🎯
 
 ## O app não nomeia transporte
 
@@ -111,31 +115,59 @@ WebSocket (ou SSE). Análogo ao Phoenix LiveView:
     `transport-ws.js` / `transport-sse.js` (Modo B). O renderizador
     (`client/dom.js`, `client/style.js`) é **um só**.
 
+## Modo C — Python transcrito para JavaScript (transpile)
+
+No Modo C, não há Python vivo em lugar nenhum. Um compilador transcreve a **camada
+de app** (o seu `view`/`state`/handlers) para **JavaScript nativo** no build, e o
+resultado é um bundle 100% estático:
+
+=== "Comando"
+
+    ```bash
+    tempestweb build --mode transpile examples/counter   # gera dist/transpile/
+    tempestweb dev   --mode transpile examples/counter    # com livereload
+    ```
+
+=== "O que acontece"
+
+    1. O compilador lê o `app.py` e emite `app.gen.js` — JS nativo.
+    2. No browser, o runtime segura o estado e roda `view()` **em JavaScript**.
+    3. O `diff` roda nativo no browser; não há transporte nem servidor.
+    4. O **mesmo** `client/dom.js` aplica os patches no DOM.
+
+!!! tip "Modo C é o alvo perfeito para PWA e SEO"
+    Como o bundle é estático e sem Python, o first-paint é imediato e o `build`
+    já emite a camada **PWA instalável + offline** de fábrica. É a página
+    [Modo C — transpile](../transpile.md) que aprofunda o fluxo completo. 🚀
+
 ## Lado a lado
 
-| | Modo A — WASM | Modo B — Servidor |
-|---|---|---|
-| Onde o Python roda | No browser (Pyodide) | No servidor (FastAPI) |
-| Transporte de patches | `pyodide.ffi` (em-processo) | WebSocket / SSE (rede) |
-| Estado | No browser | No servidor, isolado por conexão |
-| Offline | Pleno após o load | Parcial (cache read-only + fila) |
-| Latência por interação | Zero round-trip | Um round-trip de rede |
-| SEO / first-paint | Fraco (bundle WASM) | Forte (HTML do servidor) |
+| | Modo A — WASM | Modo B — Servidor | Modo C — transpile |
+|---|---|---|---|
+| Onde o Python roda | No browser (Pyodide) | No servidor (FastAPI) | **Em lugar nenhum** (vira JS) |
+| Como os patches chegam | `pyodide.ffi` (em-processo) | WebSocket / SSE (rede) | `diff` em JS, em-processo |
+| Estado | No browser | No servidor, isolado por conexão | No browser (JS) |
+| Offline | Pleno após o load | Parcial (cache read-only + fila) | Pleno (bundle estático) |
+| Latência por interação | Zero round-trip | Um round-trip de rede | Zero round-trip |
+| SEO / first-paint | Fraco (bundle WASM) | Forte (HTML do servidor) | **Ótimo** (bundle estático) |
 
 !!! warning "Escolha o modo pelo requisito, não pelo gosto"
-    Precisa de SEO, first-paint rápido, ou rodar lógica sensível no servidor? →
-    **Modo B**. Precisa de offline pleno, zero infra de servidor, ou app
-    instalável puro-cliente? → **Modo A**. O app é o mesmo; só o `--mode` muda.
+    Precisa de SEO, first-paint rápido e um site/PWA estático sem servidor? →
+    **Modo C**. Precisa rodar lógica sensível ou estado central no servidor? →
+    **Modo B**. Quer Python vivo no browser para prototipar? → **Modo A**. O app é
+    o mesmo; só o `--mode` muda.
 
 ## Recap
 
 - O `app.py` **nunca nomeia um transporte** — `view`/`state`/handlers são
-  portáveis.
+  portáveis nos três modos.
 - **Modo A** roda Python no browser via Pyodide; patches via `pyodide.ffi`.
 - **Modo B** roda Python no servidor (FastAPI); patches via WebSocket/SSE.
-- O **cliente JS e o renderizador são os mesmos**; só a impl de transporte muda.
+- **Modo C** transcreve o app para JS nativo; `diff` em-processo, bundle estático.
+- O **cliente JS e o renderizador são os mesmos**; só o modo muda.
 
 🎉 Você terminou o tutorial! Você construiu o counter e entende o contrato de
-fronteira de ponta a ponta. Para ir além, explore as
-[capacidades nativas](../capabilities.md), a camada [PWA e offline](../pwa.md) e
-a [observabilidade](../observability.md).
+fronteira de ponta a ponta. Para ir além, mergulhe no
+[Modo C — transpile](../transpile.md), na camada [PWA e offline](../pwa.md), nas
+[capacidades nativas](../capabilities.md) e na
+[observabilidade](../observability.md).

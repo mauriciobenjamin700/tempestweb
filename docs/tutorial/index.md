@@ -3,7 +3,7 @@
 Bem-vindo! 👋 Neste tutorial você constrói o **counter**, o app canônico do
 tempestweb, do zero. É um botão `+`, um botão `-` e um texto que mostra a
 contagem. Simples — mas ele exercita **todo o contrato de fronteira**: árvore de
-view, estado, handlers, patches e os dois modos de execução.
+view, estado, handlers, patches e os três modos de execução.
 
 Vamos um conceito por página, na ordem:
 
@@ -28,11 +28,12 @@ Vamos um conceito por página, na ordem:
 
     O que o reconciliador emite quando a contagem muda — e como o cliente aplica.
 
--   __[4. Rodando os dois modos](modes.md)__
+-   __[4. Rodando os modos](modes.md)__
 
     ---
 
-    O mesmo `app.py` sob `--mode wasm` e `--mode server`, sem mudar uma linha.
+    O mesmo `app.py` sob `--mode wasm`, `--mode server` e `--mode transpile`, sem
+    mudar uma linha.
 
 </div>
 

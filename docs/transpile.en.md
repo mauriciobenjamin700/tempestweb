@@ -1,4 +1,9 @@
-# Mode C — transpile (Python → native JavaScript) 🧪
+# Mode C — transpile (Python → native JavaScript) 🚀
+
+!!! abstract "What you'll learn"
+    How to turn your Python `app.py` into a **static bundle of native
+    JavaScript** — no Python runtime in the browser — and serve it from any CDN,
+    with an **installable, offline PWA** out of the box.
 
 Modes A (WASM) and B (server) keep **Python alive** at runtime — in the browser
 (Pyodide) or on the server. **Mode C** is different: a compiler transcribes the
@@ -6,11 +11,14 @@ Modes A (WASM) and B (server) keep **Python alive** at runtime — in the browse
 runtime, static hosting, great first paint and SEO. It's the "TypeScript story"
 for Python. 🚀
 
-!!! warning "Experimental (spike)"
-    Mode C is under construction. It already runs counter-style apps — state,
-    `view()`, handlers, styled Button/Input — but the API may change and the
-    accepted Python subset is still narrow. For rich screens today, use Modes
-    A/B; come back to Mode C as it matures.
+!!! success "A first-class mode"
+    Mode C is **mature and first-class** — it covers **100% of `tempest_core`
+    widgets**, a wide subset of typed Python (see
+    [The supported subset](#the-supported-subset)) and a **complete PWA story**
+    (installable, offline, mutation queue, end-to-end WebPush). It's the
+    recommended choice for public sites and PWAs. Only a handful of advanced
+    constructs sit outside the subset — the compiler fails early, with
+    `file:line`, when you hit one.
 
 ## Why it exists
 
@@ -575,6 +583,10 @@ spirit of `mypy --strict`.
 - `tempestweb build --mode transpile` produces a directory servable by any CDN;
   `run --mode transpile` serves it locally.
 - The same `view()` from Modes A/B runs here — state, handlers, styled
-  `Button`/`Input`, reactive binding.
-- It's **experimental**: narrow subset, API subject to change. Design details in
+  `Button`/`Input`, reactive binding, navigation, i18n, theming, animation.
+- It's a **mature, first-class mode**: 100% of core widgets, a wide typed-Python
+  subset, and a turnkey PWA. Design details in
   [`docs/modo-c-transpile.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/modo-c-transpile.md).
+
+Head to [PWA & offline](pwa.md) for the full install and WebPush flow, or return
+to the [Tutorial](tutorial/index.md) to review the counter in the other modes. 🚀

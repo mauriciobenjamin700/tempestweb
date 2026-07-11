@@ -1,9 +1,13 @@
-# 4. Running both modes
+# 4. Running the modes
+
+!!! abstract "What you'll learn"
+    How to run the **same** `app.py` — without changing a line — in all three
+    execution modes, and how to pick the right mode for each requirement.
 
 You built the whole counter: [tree](view.md), [state](state.md) and
 [patches](patches.md). Now the payoff of tempestweb's central promise: the
-**same** `examples/counter/app.py` runs in **Mode A (WASM)** and **Mode B
-(server)** — without changing a line. 🎯
+**same** `examples/counter/app.py` runs in **Mode A (WASM)**, **Mode B (server)**
+and **Mode C (transpile)** — without changing a line. 🎯
 
 ## The app does not name a transport
 
@@ -112,30 +116,58 @@ WebSocket (or SSE). Like Phoenix LiveView:
     `transport-ws.js` / `transport-sse.js` (Mode B). The renderer (`client/dom.js`,
     `client/style.js`) is **a single one**.
 
+## Mode C — Python transcribed to JavaScript (transpile)
+
+In Mode C there is no live Python anywhere. A compiler transcribes the **app
+layer** (your `view`/`state`/handlers) to **native JavaScript** at build time, and
+the result is a 100% static bundle:
+
+=== "Command"
+
+    ```bash
+    tempestweb build --mode transpile examples/counter   # writes dist/transpile/
+    tempestweb dev   --mode transpile examples/counter    # with livereload
+    ```
+
+=== "What happens"
+
+    1. The compiler reads `app.py` and emits `app.gen.js` — native JS.
+    2. In the browser, the runtime holds the state and runs `view()` **in JS**.
+    3. The `diff` runs natively in the browser; no transport, no server.
+    4. The **same** `client/dom.js` applies the patches to the DOM.
+
+!!! tip "Mode C is the perfect target for PWA and SEO"
+    Because the bundle is static and Python-free, first-paint is immediate and the
+    `build` already emits the **installable + offline PWA** layer out of the box.
+    The [Mode C — transpile](../transpile.md) page dives into the full flow. 🚀
+
 ## Side by side
 
-| | Mode A — WASM | Mode B — Server |
-|---|---|---|
-| Where Python runs | In the browser (Pyodide) | On the server (FastAPI) |
-| Patch transport | `pyodide.ffi` (in-process) | WebSocket / SSE (network) |
-| State | In the browser | On the server, isolated per connection |
-| Offline | Full after load | Partial (read-only cache + queue) |
-| Latency per interaction | Zero round-trip | One network round-trip |
-| SEO / first-paint | Weak (WASM bundle) | Strong (server HTML) |
+| | Mode A — WASM | Mode B — Server | Mode C — transpile |
+|---|---|---|---|
+| Where Python runs | In the browser (Pyodide) | On the server (FastAPI) | **Nowhere** (becomes JS) |
+| How patches arrive | `pyodide.ffi` (in-process) | WebSocket / SSE (network) | `diff` in JS, in-process |
+| State | In the browser | On the server, isolated per connection | In the browser (JS) |
+| Offline | Full after load | Partial (read-only cache + queue) | Full (static bundle) |
+| Latency per interaction | Zero round-trip | One network round-trip | Zero round-trip |
+| SEO / first-paint | Weak (WASM bundle) | Strong (server HTML) | **Great** (static bundle) |
 
 !!! warning "Choose the mode by requirement, not taste"
-    Need SEO, fast first-paint, or to run sensitive logic on the server? →
-    **Mode B**. Need full offline, zero server infra, or a pure-client installable
-    app? → **Mode A**. The app is the same; only `--mode` changes.
+    Need SEO, fast first-paint, and a static server-free site/PWA? → **Mode C**.
+    Need to run sensitive logic or central state on the server? → **Mode B**. Want
+    live Python in the browser to prototype? → **Mode A**. The app is the same;
+    only `--mode` changes.
 
 ## Recap
 
-- The `app.py` **never names a transport** — `view`/`state`/handlers are portable.
+- The `app.py` **never names a transport** — `view`/`state`/handlers are portable
+  across all three modes.
 - **Mode A** runs Python in the browser via Pyodide; patches via `pyodide.ffi`.
 - **Mode B** runs Python on the server (FastAPI); patches via WebSocket/SSE.
-- The **JS client and renderer are the same**; only the transport impl changes.
+- **Mode C** transcribes the app to native JS; `diff` in-process, static bundle.
+- The **JS client and renderer are the same**; only the mode changes.
 
 🎉 You finished the tutorial! You built the counter and understand the wire
-contract end to end. To go further, explore the
-[native capabilities](../capabilities.md), the [PWA & offline](../pwa.md) layer
+contract end to end. To go further, dive into [Mode C — transpile](../transpile.md),
+the [PWA & offline](../pwa.md) layer, the [native capabilities](../capabilities.md)
 and [observability](../observability.md).

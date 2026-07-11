@@ -120,8 +120,8 @@ only the **transport** that delivers them differs.
 - The diff emits a **list of 5 patch types**, addressed by `path`.
 - Changing the count produces **a single Update** on the `Text` anchored by its
   `key`.
-- The client walks the `path` and applies the operation — **same code** in both
-  modes.
+- The client walks the `path` and applies the operation — **same code** in all
+  three modes.
 
-Now the final question: how does the **same** `app.py` run in both modes without
-changing a line? Let's [run both modes](modes.md). 🚀
+Now the final question: how does the **same** `app.py` run in all three modes
+without changing a line? Let's [run the modes](modes.md). 🚀

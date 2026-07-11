@@ -228,8 +228,8 @@ def view(app: App[DataState]) -> Widget:
     `set_state` runs (after the `await`), so the UI reflects the result as soon as
     the capability resolves. Capabilities available in Mode C: `http`, `storage`
     (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`, `share`,
-    `audio`, `file`, `notifications`, `install` (PWA install prompt), `offline`
-    (durable mutation queue).
+    `audio`, `file`, `notifications` (incl. WebPush `subscribe`/`unsubscribe`),
+    `install` (PWA install prompt), `offline` (durable mutation queue).
 
 !!! tip "Install the PWA (`native.install`)"
     `await native.install.state()` reports `{can_install, installed}`; after a
@@ -237,6 +237,14 @@ def view(app: App[DataState]) -> Widget:
     and resolves with `"accepted"`, `"dismissed"` or `"unavailable"`. The
     controller already suppresses the browser's cold mini-infobar, so you show an
     "Install" button at the right moment.
+
+!!! tip "Push (`native.notifications`)"
+    `await native.notifications.request_permission()` asks for permission; `await
+    native.notifications.subscribe(vapid_public_key)` runs the browser WebPush
+    flow and returns the **subscription JSON** — you send it to your own backend
+    (via `native.http`, or queued with `native.offline`). `unsubscribe()`
+    cancels. The framework decides neither your endpoint schema nor the push
+    server: it just hands you the raw subscription.
 
 !!! tip "Offline queue (`native.offline`)"
     Writes made offline survive: `await native.offline.enqueue("POST", url,

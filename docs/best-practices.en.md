@@ -13,7 +13,7 @@ rot into garbage code. 🚀
 
 ## Two truths: the cycle and the layers
 
-**The cycle is the runtime contract** — immutable, holds in both modes:
+**The cycle is the runtime contract** — immutable, holds in all three modes:
 
 > **state → view → handlers → state**
 

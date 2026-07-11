@@ -4,12 +4,13 @@ Welcome to the **tempestweb** gallery! 🚀 Here you'll find complete, ready-to-
 apps, each focused on **one concept** — state, forms, lists, navigation, theming,
 i18n, canvas, and much more.
 
-!!! tip "Two modes, one codebase"
+!!! tip "Three modes, one codebase"
     Every example is a typed-Python `view(app) -> Widget` module. The **same**
-    `app.py` runs in both modes without changing a single line:
+    `app.py` runs in all three modes without changing a single line:
 
     - **Mode A (WASM/Pyodide)** — Python straight in the browser.
     - **Mode B (server)** — Python on a FastAPI server + a thin WebSocket client.
+    - **Mode C (transpile)** — the app transcribed to native JS, a static bundle.
 
     The view tree never names a transport. You write the logic once and pick the
     mode at serve time.
@@ -140,5 +141,5 @@ The same `view` running on the server, without changing a line.
 
 !!! check "Ready to start?"
     Pick the example closest to what you want to build, copy its `app.py`, and
-    run it in both modes. They all pass the green gate (build, ruff, mypy
+    run it in all three modes. They all pass the green gate (build, ruff, mypy
     `--strict`). Happy coding! 💡

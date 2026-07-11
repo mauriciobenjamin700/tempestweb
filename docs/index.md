@@ -1,7 +1,7 @@
 # tempestweb 🌩️
 
 <p align="center"><em>Construa web apps em <strong>Python tipado</strong>. Uma árvore
-declarativa de widgets, um renderizador <strong>DOM</strong>, e <strong>dois modos de
+declarativa de widgets, um renderizador <strong>DOM</strong>, e <strong>três modos de
 execução</strong> que compartilham 100% do código de aplicação.</em></p>
 
 ---
@@ -9,7 +9,7 @@ execução</strong> que compartilham 100% do código de aplicação.</em></p>
 **tempestweb** é o irmão web do
 [tempestroid](https://github.com/mauriciobenjamin700) — a mesma ideia de **uma
 árvore, múltiplos renderizadores**. Você escreve uma função `view()` em Python e
-ela roda, sem alteração, em dois modos:
+ela roda, sem alteração, em **três modos**:
 
 <div class="grid cards" markdown>
 
@@ -20,6 +20,8 @@ ela roda, sem alteração, em dois modos:
     Seu Python roda **no browser** via Pyodide. Análogo a PyScript. Offline pleno
     depois do load.
 
+    **Quando usar:** offline pleno, zero infra de servidor, prototipagem rápida.
+
 -   :material-server: __Modo B — Servidor__
 
     ---
@@ -27,11 +29,34 @@ ela roda, sem alteração, em dois modos:
     Seu Python roda **no servidor** (FastAPI) e fala com um cliente JS fino por
     WebSocket ou SSE. Análogo a Phoenix LiveView.
 
+    **Quando usar:** lógica sensível no servidor, estado central, dados ao vivo.
+
+-   :material-language-javascript: __Modo C — transpile__
+
+    ---
+
+    A camada de app é **transcrita para JavaScript nativo** no build. Zero Python
+    no browser — um bundle estático servível por qualquer CDN.
+
+    **Quando usar:** PWA instalável, SEO e first-paint ótimos, custo de servidor
+    zero.
+
 </div>
 
 O segredo: o app **nunca nomeia um transporte**. O mesmo
-`examples/counter/app.py` roda sob `--mode wasm` e `--mode server` sem mudar uma
-linha. 🚀
+`examples/counter/app.py` roda sob `--mode wasm`, `--mode server` e
+`--mode transpile` sem mudar uma linha. 🚀
+
+!!! question "Qual modo escolher?"
+    - Precisa de **SEO, first-paint rápido e um bundle estático sem servidor**? →
+      **Modo C (transpile)** — a escolha padrão para sites/PWAs públicos.
+    - Precisa manter **lógica ou estado no servidor** (dados ao vivo, segredos)? →
+      **Modo B (servidor)**.
+    - Quer **Python vivo no browser** para prototipar ou rodar libs Python
+      client-side? → **Modo A (WASM)**.
+
+    Você não decide isso no código — só na hora do `build --mode`. Comece pelo
+    [Tutorial](tutorial/index.md), que roda o counter nos três modos.
 
 ## Como funciona
 
@@ -41,18 +66,21 @@ linha. 🚀
                           diff
                             ▼
                         [ Patch ]              insert / remove / update / reorder / replace
-                       ╱          ╲
-              Transporte Modo A   Transporte Modo B
-              (pyodide.ffi)       (WebSocket / SSE)
-                       ╲          ╱
+                    ╱        │        ╲
+          Modo A          Modo B          Modo C
+       (pyodide.ffi)   (WebSocket/SSE)  (app → JS nativo, diff em JS)
+                    ╲        │        ╱
                   client/ (JS puro): aplica patches no DOM
-                  + Style→CSS + captura de eventos   ← MESMO código nos dois modos
+                  + Style→CSS + captura de eventos   ← MESMO código nos três modos
 ```
 
 A função `view()` produz uma **árvore de widgets** (IR). O reconciliador faz
 `diff` entre a árvore antiga e a nova e emite **patches** — dados puros
-serializados. O cliente JS só sabe consumir patch e mutar o DOM; não liga de
-onde o patch veio. Por isso o renderizador é **um só** nos dois modos.
+serializados. Nos Modos A e B o `diff` roda em Python e os patches viajam por um
+transporte; no **Modo C** a camada de app é transcrita para JS, então o `diff`
+roda nativo no browser. Em todos, o cliente JS só sabe consumir patch e mutar o
+DOM — não liga de onde o patch veio. Por isso o renderizador é **um só** nos três
+modos.
 
 !!! tip "Por onde começar"
     Vá direto para a [Instalação](installation.md) e depois siga o
@@ -64,11 +92,14 @@ onde o patch veio. Por isso o renderizador é **um só** nos dois modos.
 - **[Instalação](installation.md)** — prepare o ambiente em um minuto.
 - **[Arquitetura](architecture.md)** — as quatro camadas e por que o renderizador
   é compartilhado.
-- **[Tutorial](tutorial/index.md)** — construa o counter, um conceito por página.
-- **[Contrato de fronteira](wire-contract.md)** — o wire format Python↔cliente.
+- **[Tutorial](tutorial/index.md)** — construa o counter, um conceito por página,
+  e rode-o nos três modos.
+- **[Modo C — transpile](transpile.md)** — Python → JavaScript nativo: bundle
+  estático, SEO e PWA turnkey.
+- **[PWA e offline](pwa.md)** — app instalável, service worker, IndexedDB, WebPush.
 - **[Capacidades](capabilities.md)** — Web APIs tipadas (geolocation, clipboard,
   camera) como awaitables Python.
-- **[PWA e offline](pwa.md)** — app instalável, service worker, IndexedDB, WebPush.
+- **[Contrato de fronteira](wire-contract.md)** — o wire format Python↔cliente.
 - **[Observabilidade](observability.md)** — telemetry, logger, feature flags, auth.
 - **[Roadmap e docs de design](design-docs.md)** — o que vem por aí e os planos
   vivos do projeto.
@@ -84,7 +115,8 @@ inglês, async-first. Cliente: **JavaScript puro** — sem TypeScript, sem
 framework, sem passo de build.
 
 !!! note "Estado do projeto"
-    🚧 tempestweb está em **construção inicial**. Os planos de design vivos estão
+    Os três modos estão **funcionais hoje** — o counter e os 50 exemplos rodam e
+    passam no gate completo. Os planos de design vivos continuam
     versionados no repositório: [plan.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/plan.md),
     [roadmap.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md)
     e [contract.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md).

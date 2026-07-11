@@ -4,15 +4,16 @@
 awaitables**. You write `await geolocation.get()` and receive a typed `Position`
 — without touching JavaScript. 📡
 
-!!! info "Under construction (Track N)"
-    This layer is the roadmap's **Track N**. Phases N0–N4 are detailed in the
-    [design plan](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/plan.md).
-    This page describes the **planned surface** and the two-backend model.
+!!! info "Track N — the native surface"
+    This layer is the roadmap's **Track N** (phases N0–N4, detailed in the
+    [design plan](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/plan.md)).
+    The capabilities work across the **three** execution modes — each resolves its
+    backend based on the `--mode`.
 
-## Two backends, one Python API
+## One Python API, three paths
 
-The central principle: **each capability has two backends, but the Python API is
-the same**. The `--mode` chooses the path, not your code.
+The central principle: **the Python API is always the same**; the `--mode` chooses
+how the call reaches the Web API, not your code.
 
 === "Mode A — direct"
 
@@ -33,13 +34,22 @@ the same**. The `--mode` chooses the path, not your code.
     pos = await geolocation.get()   # SAME line; triggers native_call/native_result
     ```
 
-!!! check "The contract is the same"
-    The `native_call`/`native_result` envelope is in the
-    [wire contract](wire-contract.md#the-native-call-mode-b-proxy). Only the
-    transport differs — the typed signature lives in the contract, not the
-    transport.
+=== "Mode C — transcribed"
 
-## The planned capabilities
+    The `async` call is **transcribed to JS** and runs in-process against the same
+    browser glue — no Python, no network.
+
+    ```python
+    pos = await geolocation.get()   # SAME line; becomes a native JS call
+    ```
+
+!!! check "The contract is the same"
+    In Modes A and B the `native_call`/`native_result` envelope is in the
+    [wire contract](wire-contract.md#the-native-call-mode-b-proxy). In Mode C there
+    is no envelope — the call is transcribed — but the **typed signature is
+    identical**. You write one line; the mode decides the mechanism.
+
+## The capabilities
 
 | Capability | Python API | Mirrors (React SDK) |
 |---|---|---|
@@ -241,9 +251,9 @@ scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injected before the b
 ## Recap
 
 - Capabilities are Web APIs exposed as **typed Python awaitables**.
-- **Two backends, one API:** Mode A calls directly; Mode B proxies via a
-  round-trip.
-- The envelope is the `native_call`/`native_result` of the
+- **One API, three paths:** Mode A calls directly, Mode B proxies via a
+  round-trip, Mode C transcribes to JS — the typed signature is the same.
+- In Modes A/B the envelope is the `native_call`/`native_result` of the
   [wire contract](wire-contract.md).
 - Denied permissions are a **normal flow**, handled as a typed exception.
 

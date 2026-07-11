@@ -40,9 +40,11 @@ The **extras** decide which capabilities you install:
 | `cli` | watchfiles + tomlkit — the dev loop (`tempestweb dev`) and `tempestweb sync`. |
 | `docs` | mkdocs-material + i18n — **this documentation**. |
 
-!!! note "Mode A (WASM) has no Python extra"
-    Mode A runs Python in the browser via Pyodide; the static bundling is done
-    by the CLI. You do not need a Python extra for it.
+!!! note "Modes A (WASM) and C (transpile) have no Python extra"
+    **Mode A** runs Python in the browser via Pyodide; **Mode C** transcribes the
+    app to native JavaScript at build time. Neither needs a runtime Python extra —
+    the static bundling is done by the CLI (the `cli` extra). Only **Mode B**
+    (server) needs the `server` extra.
 
 ## Run the gate
 

@@ -4,6 +4,20 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.40.0] — 2026-07-11
+
+### Changed
+
+- **Docs: three execution modes, front and center.** The landing page, the
+  "running modes" tutorial and the transpile guide were reframed from two modes
+  to three (A WASM · B server · C transpile/native-JS) in the tiangolo style —
+  a three-card grid with a "which mode?" decision note, an updated
+  "how it works" diagram including the Mode C transpile path, and Mode C
+  positioned as a first-class guide in the nav. The README (PyPI front page) now
+  presents all three modes consistently (diagram + capabilities + a Mode C
+  scaffold pointer) and an accurate, non-stale status. No code changes — the
+  package is unchanged; this release ships the corrected README/docs.
+
 ## [0.39.0] — 2026-07-11
 
 ### Added

@@ -40,9 +40,11 @@ Os **extras** dizem quais capacidades você instala:
 | `cli` | watchfiles + tomlkit — o dev-loop (`tempestweb dev`) e o `tempestweb sync`. |
 | `docs` | mkdocs-material + i18n — **esta documentação**. |
 
-!!! note "Modo A (WASM) não tem extra Python"
-    O Modo A roda Python no browser via Pyodide; o empacotamento estático é
-    feito pela CLI. Você não precisa de um extra Python para ele.
+!!! note "Modos A (WASM) e C (transpile) não têm extra Python"
+    O **Modo A** roda Python no browser via Pyodide; o **Modo C** transcreve o app
+    para JavaScript nativo no build. Nenhum dos dois precisa de um extra Python de
+    runtime — o empacotamento estático é feito pela CLI (extra `cli`). Só o
+    **Modo B** (servidor) precisa do extra `server`.
 
 ## Rodar o gate
 

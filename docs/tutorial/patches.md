@@ -119,8 +119,8 @@ só o **meio de transporte** que o entrega difere.
 - A árvore vira **dados JSON-able**: `{type, key, props, children}`.
 - O diff emite uma **lista de 5 tipos de patch**, endereçados por `path`.
 - Mudar a contagem gera **um único Update** no `Text` ancorado pela `key`.
-- O cliente percorre o `path` e aplica a operação — **mesmo código** nos dois
+- O cliente percorre o `path` e aplica a operação — **mesmo código** nos três
   modos.
 
-Agora a pergunta final: como o **mesmo** `app.py` roda nos dois modos sem mudar
-uma linha? Vamos [rodar os dois modos](modes.md). 🚀
+Agora a pergunta final: como o **mesmo** `app.py` roda nos três modos sem mudar
+uma linha? Vamos [rodar os modos](modes.md). 🚀

@@ -8,7 +8,7 @@ docs site (PT-BR default + EN-US), deployed to GitHub Pages.
 > renderer, and **three execution modes** that share 100% of the application code:
 > **Mode A (WASM)** runs your Python in the browser via Pyodide; **Mode B
 > (server)** runs it on the server (FastAPI) and talks to a thin JS client over
-> **WebSocket or SSE**; **Mode C (transpile, experimental)** transcribes your
+> **WebSocket or SSE**; **Mode C (transpile)** transcribes your
 > Python to **native JavaScript** — zero Python runtime, static hosting, great
 > first-paint/SEO. Installable **PWA**, **offline-first** (service worker +
 > IndexedDB), and **WebPush** are first-class — parity with `tempest-react-sdk`.
@@ -20,7 +20,13 @@ JavaScript, no framework, no build step, no TypeScript) and two patch transports
 
 ## Status
 
-🚧 Early construction. See the design docs:
+Published on PyPI and functional across all three modes — a working counter runs
+live under WASM, server, and transpile; the full test gate is green and every
+example builds. The transpile mode (C) is now a **mature, first-class mode** —
+100% of `tempest_core` widgets, a wide typed-Python subset, and a full PWA story
+(installable, offline, WebPush). Only a handful of advanced constructs sit outside
+its subset, and the compiler fails early with `file:line` when you hit one. Design
+docs:
 
 - [`docs/plan.md`](docs/plan.md) — full design and phase plan.
 - [`docs/roadmap.md`](docs/roadmap.md) — phase checklist.
@@ -29,10 +35,11 @@ JavaScript, no framework, no build step, no TypeScript) and two patch transports
 - [`docs/agents/MANIFEST.md`](docs/agents/MANIFEST.md) — parallel agent task plan.
 
 Want runnable apps? Browse the **[Example Gallery](https://mauriciobenjamin700.github.io/tempestweb/en/examples/)**
-([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 41 single-concept
-demos (stopwatch, forms, data table/grid, kanban, chat, theming, i18n, canvas
-charts, app shells, native capabilities, observability, PWA/WebPush, and a
-server-mode walkthrough), each running unchanged in both modes.
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 50+
+single-concept demos (stopwatch, forms, data table/grid, kanban, chat, theming,
+i18n, canvas charts, app shells, native capabilities, observability, PWA/WebPush,
+a Mode C tour, and a server-mode walkthrough), each running unchanged across the
+execution modes.
 
 Building something real? Read the **[App architecture & best practices](https://mauriciobenjamin700.github.io/tempestweb/best-practices/)**
 guide ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/best-practices/)) —
@@ -43,29 +50,28 @@ your app doesn't rot into garbage code.
 ## How it works
 
 ```text
-   view(app) ──build──▶ Node tree (IR)        ← shared core (vendored from tempestroid)
-                            │
-                          diff
-                            ▼
-                        [ Patch ]              insert / remove / update / reorder / replace
-                       ╱          ╲
-              Mode A transport   Mode B transport
-              (pyodide.ffi)       (WebSocket | SSE)
-                       ╲          ╱
+   view(app) ──build──▶ Node tree (IR) ──diff──▶ [ Patch ]   ← shared core (tempest-core)
+                                                    │          insert/remove/update/reorder/replace
+              ╭─────────────────┬───────────────────┤
+       Mode A transport   Mode B transport     Mode C: transpile view() → native JS;
+       (pyodide.ffi)      (WebSocket | SSE)     the core runs IN JS, patches in-process
+              ╰─────────────────┴───────────────────╯
                   client/ (pure JS): apply patches to the DOM
-                  + Style→CSS + event capture                  ← same code in both modes
+                  + Style→CSS + event capture          ← same client code in every mode
 ```
 
-The application's `view()` never names a transport — the same `examples/counter/app.py`
-runs under `--mode wasm` and `--mode server` unchanged. Capabilities (`native/`:
-http, audio, share, geolocation, clipboard, storage, camera) are typed awaitables
-with the same Python API in both modes — Mode A calls the Web API in-process, Mode
-B proxies it over a round-trip (see [`docs/contract.md`](docs/contract.md)).
+The application's `view()` never names a transport — the same
+`examples/counter/app.py` runs under `--mode wasm`, `--mode server` and
+`--mode transpile` unchanged. Capabilities (`native/`: http, audio, share,
+geolocation, clipboard, storage, camera, install, offline, notifications) are
+typed awaitables with the same Python API in every mode — Mode A calls the Web
+API in-process, Mode B proxies it over a round-trip, Mode C routes to the same JS
+glue via an in-process facade (see [`docs/contract.md`](docs/contract.md)).
 
 ## Static SSR — `render_to_html`
 
-A third render target, alongside the two interactive modes: the **same** typed
-tree renders to a **static HTML string** on the server — no JavaScript, no DOM, no
+Another render target, alongside the interactive modes: the **same** typed tree
+renders to a **static HTML string** on the server — no JavaScript, no DOM, no
 runtime. HTML is just another leaf renderer.
 
 ```python
@@ -89,7 +95,7 @@ port mirrors `client/style.js`), and the new `tempest-core` 0.9.0 `Widget.tag` /
 See the [Static SSR guide](https://mauriciobenjamin700.github.io/tempestweb/ssr/)
 ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/ssr/)).
 
-## Mode C — transpile to native JS (experimental) 🧪
+## Mode C — transpile to native JS 🚀
 
 The "TypeScript story" for Python: you write the typed-Python app; a compiler
 transcribes the **app layer** (state, `view()`, handlers) to **native
@@ -130,9 +136,9 @@ that is a **first-class PWA — installable and offline out of the box** (manife
 See the canonical [`examples/transpile-tour`](examples/transpile-tour/app.py) —
 one app exercising the whole surface — and the guide
 ([PT](https://mauriciobenjamin700.github.io/tempestweb/transpile/) ·
-[EN](https://mauriciobenjamin700.github.io/tempestweb/en/transpile/)). Still
-**experimental**: the typed subset is deliberately restricted (out-of-subset
-constructs fail loud with `file:line`) and the API may change.
+[EN](https://mauriciobenjamin700.github.io/tempestweb/en/transpile/)). It is a
+**first-class mode**: only a handful of advanced constructs sit outside the typed
+subset (out-of-subset constructs fail loud with `file:line`).
 
 ## Scaffold a PWA
 
@@ -142,8 +148,8 @@ tempestweb build --mode transpile --path myapp
 ```
 
 The `pwa` template pre-configures `mode = "transpile"` + a `[pwa]` manifest block
-and ships a counter with an **Install** button. Omit `--template` for the
-two-mode counter starter.
+and ships a counter with an **Install** button. Omit `--template` for the plain
+counter starter that runs unchanged in all three modes.
 
 ## WebPush (end-to-end)
 
@@ -182,7 +188,7 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | `tempestweb/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — 54 Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
 | `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`, `sse.py`). |
 | `tempestweb/html/` | Static SSR leaf renderer — `render_to_html` / `render_document` / `style_to_css` (Python port of `client/style.js`). |
-| `tempestweb/transpile/` | **Mode C (experimental):** `ast`-based Python→JS compiler for the app layer. Paired with the native runtime in `client/transpile/` (`diff.js` · `widgets.js` · `runtime.js`). |
+| `tempestweb/transpile/` | **Mode C:** `ast`-based Python→JS compiler for the app layer. Paired with the native runtime in `client/transpile/` (`diff.js` · `widgets.js` · `runtime.js`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
 | `tempestweb/native/` | Web API capability adapters — http, audio, share, geo, clipboard, storage, camera (Track N). |
 | `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |

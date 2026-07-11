@@ -4,12 +4,13 @@ Bem-vindo à galeria do **tempestweb**! 🚀 Aqui você encontra apps completos 
 prontos para rodar, cada um focado em **um conceito** — estado, formulários,
 listas, navegação, tema, i18n, canvas e muito mais.
 
-!!! tip "Os dois modos, o mesmo código"
+!!! tip "Os três modos, o mesmo código"
     Cada exemplo é um módulo `view(app) -> Widget` em Python tipado. O **mesmo**
-    `app.py` roda nos dois modos sem mudar uma linha:
+    `app.py` roda nos três modos sem mudar uma linha:
 
     - **Modo A (WASM/Pyodide)** — Python direto no browser.
     - **Modo B (servidor)** — Python no servidor FastAPI + cliente fino por WebSocket.
+    - **Modo C (transpile)** — o app transcrito para JS nativo, bundle estático.
 
     A árvore de view nunca nomeia um transporte. Você escreve a lógica uma vez e
     escolhe o modo na hora de servir.
@@ -140,5 +141,5 @@ O mesmo `view` rodando no servidor, sem mudar uma linha.
 
 !!! check "Pronto para começar?"
     Escolha um exemplo que se pareça com o que você quer construir, copie o
-    `app.py`, e rode nos dois modos. Todos passam no _gate_ verde (build, ruff,
+    `app.py`, e rode nos três modos. Todos passam no _gate_ verde (build, ruff,
     mypy `--strict`). Bom código! 💡

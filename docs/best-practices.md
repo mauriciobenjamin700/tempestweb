@@ -12,7 +12,7 @@ as camadas te dão **onde colocar cada coisa** para o app não virar código lix
 
 ## Duas verdades: o ciclo e as camadas
 
-**O ciclo é o contrato do runtime** — imutável, vale nos dois modos:
+**O ciclo é o contrato do runtime** — imutável, vale nos três modos:
 
 > **estado → view → handlers → estado**
 

@@ -1,7 +1,8 @@
 site_name: tempestweb
 site_description: >-
   Construa web apps em Python tipado — uma árvore declarativa, um renderizador
-  DOM, e dois modos de execução (WASM no browser + servidor FastAPI).
+  DOM, e três modos de execução (WASM no browser, servidor FastAPI, ou transpile
+  para JavaScript nativo).
 site_author: Mauricio Benjamin
 site_url: https://mauriciobenjamin700.github.io/tempestweb/
 repo_url: https://github.com/mauriciobenjamin700/tempestweb
@@ -77,7 +78,7 @@ plugins:
             "1. The view tree": "1. A árvore de view"
             "2. State and handlers": "2. Estado e handlers"
             "3. Patches on the wire": "3. Patches na rede"
-            "4. Running both modes": "4. Rodando os dois modos"
+            "4. Running the modes": "4. Rodando os modos"
             "Ready-made components": "Componentes prontos"
             "Theming (Material 3)": "Tema (Material 3)"
             "Icons (Material + Lucide)": "Ícones (Material + Lucide)"
@@ -177,7 +178,10 @@ nav:
       - "1. The view tree": tutorial/view.md
       - "2. State and handlers": tutorial/state.md
       - "3. Patches on the wire": tutorial/patches.md
-      - "4. Running both modes": tutorial/modes.md
+      - "4. Running the modes": tutorial/modes.md
+  - Mode C — transpile: transpile.md
+  - PWA & offline: pwa.md
+  - Capabilities: capabilities.md
   - Ready-made components: components.md
   - Theming (Material 3): theming.md
   - Icons (Material + Lucide): icons.md
@@ -227,9 +231,6 @@ nav:
       - "Execution modes":
           - "Running Mode B (server)": examples/server-mode.md
   - Static SSR: ssr.md
-  - Mode C — transpile: transpile.md
   - Wire contract: wire-contract.md
-  - Capabilities: capabilities.md
-  - PWA & offline: pwa.md
   - Observability: observability.md
   - Roadmap & design docs: design-docs.md

@@ -45,11 +45,12 @@ def view(app: App[State]) -> Widget:
     )
 ```
 
-Run it in both modes — the drawing is identical:
+Run it in all three modes — the drawing is identical:
 
 ```bash
-tempestweb run --mode wasm     # Python in the browser (Pyodide)
-tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
+tempestweb run --mode wasm       # Python in the browser (Pyodide)
+tempestweb run --mode server     # Python on the server (FastAPI + WebSocket)
+tempestweb run --mode transpile  # app transcribed to native JS (static bundle)
 ```
 
 !!! info "Why two sets?"

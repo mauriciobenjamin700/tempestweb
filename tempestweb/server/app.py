@@ -105,9 +105,29 @@ class TempestWebServer(Generic[S]):
         self._view: Callable[[App[S]], Widget] = view
         self._sse_sessions: dict[str, _SSESession[S]] = {}
         self._security: SecurityConfig = security or SecurityConfig()
+        self._live: int = 0  # concurrent live sessions (S2 cap)
         self.api: FastAPI = FastAPI(title=title)
         self._install_cors()
+        self._install_security_headers()
         self._register_routes()
+
+    def _install_security_headers(self) -> None:
+        """Add hardening response headers to every HTTP response (S6)."""
+        if not self._security.wants_headers:
+            return
+        headers = self._security.header_values()
+
+        @self.api.middleware("http")
+        async def _headers(request: Request, call_next: Any) -> Response:  # noqa: ANN401
+            response: Response = await call_next(request)
+            for name, value in headers.items():
+                response.headers.setdefault(name, value)
+            return response
+
+    def _at_capacity(self) -> bool:
+        """Whether the concurrent-session cap is reached (S2)."""
+        cap = self._security.max_connections
+        return cap is not None and self._live >= cap
 
     def _install_cors(self) -> None:
         """Install CORS for the HTTP/SSE surface when an allowlist is set (S1)."""
@@ -152,16 +172,25 @@ class TempestWebServer(Generic[S]):
             if not await _authorize(self._security, credentials):
                 await websocket.close(code=1008)
                 return
+            if self._at_capacity():
+                await websocket.close(code=1013)  # try again later
+                return
             await websocket.accept()
+            self._live += 1
             transport = WebSocketTransport(websocket)
             session = self._new_session(transport)
-            await session.run()
+            try:
+                await session.run()
+            finally:
+                self._live -= 1
 
         @self.api.get("/sse")
         async def sse_endpoint(request: Request, session: str) -> Response:
             """Open (or resume) the SSE patch stream for ``session``."""
             if not await self._authorize_request(request):
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
+            if session not in self._sse_sessions and self._at_capacity():
+                return JSONResponse({"error": "at capacity"}, status_code=503)
             return await self._open_sse(request, session)
 
         @self.api.post("/sse/{session_id}")
@@ -169,7 +198,20 @@ class TempestWebServer(Generic[S]):
             """Receive one client envelope (event / native_result) for a session."""
             if not await self._authorize_request(request):
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
+            if self._payload_too_large(request):
+                return JSONResponse({"error": "payload too large"}, status_code=413)
             return await self._handle_sse_post(session_id, request)
+
+    def _payload_too_large(self, request: Request) -> bool:
+        """Whether the request body exceeds ``max_message_bytes`` (S2)."""
+        limit = self._security.max_message_bytes
+        if limit is None:
+            return False
+        raw = request.headers.get("content-length")
+        try:
+            return raw is not None and int(raw) > limit
+        except ValueError:
+            return False
 
     async def _authorize_request(self, request: Request) -> bool:
         """Run the Track-S gate for an HTTP (SSE) request."""
@@ -192,6 +234,7 @@ class TempestWebServer(Generic[S]):
             app_session = self._new_session(transport)
             sse = _SSESession(transport=transport, session=app_session)
             self._sse_sessions[session_id] = sse
+            self._live += 1
             sse.task = asyncio.ensure_future(self._run_sse(session_id, app_session))
 
         last_event_id = _parse_last_event_id(request.headers.get("last-event-id"))
@@ -220,7 +263,7 @@ class TempestWebServer(Generic[S]):
         try:
             await session.run()
         finally:
-            self._sse_sessions.pop(session_id, None)
+            await self._drop_sse(session_id)
 
     async def _handle_sse_post(self, session_id: str, request: Request) -> Response:
         """Route one POSTed client envelope into its SSE session.
@@ -247,6 +290,7 @@ class TempestWebServer(Generic[S]):
         """
         sse = self._sse_sessions.pop(session_id, None)
         if sse is not None:
+            self._live -= 1
             await sse.transport.close()
             await sse.session.close()
 

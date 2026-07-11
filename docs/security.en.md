@@ -87,11 +87,54 @@ app = create_app(make_state, view, security=SecurityConfig(
     Without it, `verify_jwt` raises `RuntimeError` and `jwt_authenticator` rejects
     the connection — it never silently accepts.
 
+## S2 — limits / anti-DoS
+
+```python
+SecurityConfig(
+    max_connections=500,      # cap on concurrent WS+SSE sessions
+    max_message_bytes=65536,  # reject an SSE POST larger than this (413)
+)
+```
+
+- **`max_connections`** — a connection over the cap is refused (WS close `1013`;
+  SSE `503`). The counter decrements when the session ends.
+- **`max_message_bytes`** — a `POST /sse/{id}` with a larger body returns `413`.
+
+!!! note "Partial (🔶)"
+    Idle-session timeout, a WS message cap and per-IP rate limiting are still
+    Track-S follow-ups (S2). For aggressive rate limiting today, use a reverse
+    proxy (nginx `limit_req`).
+
+## S6 — security headers
+
+```python
+SecurityConfig(
+    security_headers=True,                        # nosniff + Referrer-Policy + X-Frame-Options: DENY
+    hsts=True,                                    # Strict-Transport-Security (HTTPS only)
+    content_security_policy="default-src 'self'",  # optional, app-specific
+)
+```
+
+A middleware adds the headers to **every** HTTP response.
+
+!!! info "CSP and the shell"
+    The static-mode `index.html` uses inline `<script type="module">`, so a strict
+    CSP needs a nonce/hash **you** supply in `content_security_policy`. That's why
+    CSP is an explicit opt-in, not a default.
+
+!!! check "XSS: safe by construction"
+    The JS client **never** injects HTML — the patcher uses `textContent` and
+    `setAttribute` (never `innerHTML`). Dynamic content with `<`/`>`/`&` renders
+    as text, not markup. Audit: zero HTML sinks anywhere in `client/`.
+
 ## Recap
 
 - Mode B is **open by default**; production needs a `SecurityConfig`.
 - **S0** `authenticate` rejects unauthorized connections before mounting a session.
 - **S1** `allowed_origins` enables CORS **and** locks the WS origin.
+- **S2** `max_connections` / `max_message_bytes` bound load (partial).
 - **S3** `verify_jwt` / `jwt_authenticator` authenticate with a signed JWT.
-- Limits/anti-DoS (S2), security headers (S6) and deploy (S5) are on the
+- **S6** `security_headers` / `hsts` / `content_security_policy` harden responses;
+  the client is XSS-safe by construction.
+- Deploy (S5), scale (S4) and server observability (S8) remain on the
   [roadmap](roadmap.md) — Track S.

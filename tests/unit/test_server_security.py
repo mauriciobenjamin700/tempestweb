@@ -147,3 +147,47 @@ def test_jwt_authenticator_rejects_without_valid_token() -> None:
     garbage = Credentials(token="garbage", origin=None, headers={}, query={})
     assert gate(empty) is False
     assert gate(garbage) is False
+
+
+# -- S2: limits / anti-DoS ----------------------------------------------------
+
+
+def test_max_connections_caps_websockets() -> None:
+    """A WS over the concurrent-session cap is refused; freeing a slot re-allows."""
+    client = _client(max_connections=1)
+    with client.websocket_connect("/ws"):  # slot 1
+        assert _ws_ok(client, "/ws") is False  # over cap -> refused
+    # First closed -> slot free again.
+    assert _ws_ok(client, "/ws") is True
+
+
+def test_max_message_bytes_rejects_large_sse_post() -> None:
+    client = _client(max_message_bytes=50)
+    small = client.post("/sse/s1", content=b"x" * 10)
+    assert small.status_code in (204, 404)  # past the size gate (routing decides)
+    big = client.post("/sse/s1", content=b"x" * 200)
+    assert big.status_code == 413
+
+
+# -- S6: security headers -----------------------------------------------------
+
+
+def test_security_headers_on_responses() -> None:
+    client = _client(security_headers=True, hsts=True)
+    # The SSE POST returns a normal (non-streaming) response the middleware wraps.
+    resp = client.post("/sse/unknown", json={"type": "x"})
+    assert resp.headers["x-content-type-options"] == "nosniff"
+    assert resp.headers["x-frame-options"] == "DENY"
+    assert "max-age=" in resp.headers["strict-transport-security"]
+
+
+def test_csp_header_when_set() -> None:
+    client = _client(content_security_policy="default-src 'self'")
+    resp = client.post("/sse/unknown", json={"type": "x"})
+    assert resp.headers["content-security-policy"] == "default-src 'self'"
+
+
+def test_no_headers_by_default() -> None:
+    client = TestClient(create_app(lambda: _State(), _view))
+    resp = client.post("/sse/unknown", json={"type": "x"})
+    assert "x-frame-options" not in resp.headers

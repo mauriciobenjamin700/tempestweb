@@ -4,6 +4,24 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.42.0] — 2026-07-11
+
+### Added
+
+- **Mode B limits & security headers (Track S — S2 partial, S6).** `SecurityConfig`
+  gains:
+  - **S2** `max_connections` — cap on concurrent WS+SSE sessions (a connection
+    over the cap is refused: WS `1013` / SSE `503`), and `max_message_bytes` —
+    an SSE `POST` body over the limit returns `413`. (Idle-session timeout, a WS
+    message cap and per-IP rate limiting remain follow-ups.)
+  - **S6** `security_headers` (adds `X-Content-Type-Options: nosniff`,
+    `Referrer-Policy`, `X-Frame-Options: DENY`), `hsts`
+    (`Strict-Transport-Security`), and `content_security_policy` — applied to
+    every HTTP response by a middleware.
+- **XSS audit (S6):** confirmed the JS client is safe by construction — zero
+  `innerHTML`/HTML-injection sinks anywhere in `client/`; the DOM patcher only
+  uses `textContent` + `setAttribute`. Documented in `docs/security.md`.
+
 ## [0.41.0] — 2026-07-11
 
 ### Added

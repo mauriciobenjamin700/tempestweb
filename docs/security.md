@@ -87,11 +87,55 @@ app = create_app(make_state, view, security=SecurityConfig(
     ele, `verify_jwt` levanta `RuntimeError` e `jwt_authenticator` recusa a
     conexão — nunca aceita silenciosamente.
 
+## S2 — limites / anti-DoS
+
+```python
+SecurityConfig(
+    max_connections=500,      # teto de sessões WS+SSE simultâneas
+    max_message_bytes=65536,  # rejeita POST SSE maior que isso (413)
+)
+```
+
+- **`max_connections`** — conexão acima do teto é recusada (WS fecha `1013`; SSE
+  `503`). O contador decrementa quando a sessão encerra.
+- **`max_message_bytes`** — um `POST /sse/{id}` com corpo maior responde `413`.
+
+!!! note "Parcial (🔶)"
+    Timeout de sessão ociosa, teto de mensagem no WS e rate limiting por IP ainda
+    são follow-ups do Trilho S (S2). Para rate limiting agressivo hoje, use um
+    reverse-proxy (nginx `limit_req`).
+
+## S6 — headers de segurança
+
+```python
+SecurityConfig(
+    security_headers=True,                       # nosniff + Referrer-Policy + X-Frame-Options: DENY
+    hsts=True,                                   # Strict-Transport-Security (só atrás de HTTPS)
+    content_security_policy="default-src 'self'",  # opcional, app-specific
+)
+```
+
+Um middleware adiciona os headers a **toda** resposta HTTP.
+
+!!! info "CSP e o shell"
+    O `index.html` dos modos estáticos usa `<script type="module">` inline, então
+    uma CSP estrita precisa de nonce/hash que **você** fornece em
+    `content_security_policy`. Por isso a CSP é opt-in explícita, não um default.
+
+!!! check "XSS: seguro por construção"
+    O cliente JS **nunca** injeta HTML — o patcher usa `textContent` e
+    `setAttribute` (nunca `innerHTML`). Conteúdo dinâmico com `<`/`>`/`&` é
+    renderizado como texto, não interpretado. Auditoria: zero sinks de HTML em
+    todo `client/`.
+
 ## Recap
 
 - O Modo B é **aberto por padrão**; produção pede um `SecurityConfig`.
 - **S0** `authenticate` recusa conexões não-autorizadas antes de montar a sessão.
 - **S1** `allowed_origins` liga CORS **e** trava a origem no WS.
+- **S2** `max_connections` / `max_message_bytes` limitam carga (parcial).
 - **S3** `verify_jwt` / `jwt_authenticator` autenticam por JWT assinado.
-- Limites/anti-DoS (S2), headers de segurança (S6) e deploy (S5) estão no
+- **S6** `security_headers` / `hsts` / `content_security_policy` endurecem as
+  respostas; o cliente é XSS-safe por construção.
+- Deploy (S5), escala (S4) e observabilidade de servidor (S8) seguem no
   [roadmap](roadmap.md) — Trilho S.

@@ -97,6 +97,9 @@ def test_transpile_ships_pwa_layer(tmp_path: Path) -> None:
     assert './manifest.webmanifest"' in html
     assert 'name="theme-color"' in html
     assert "registerServiceWorker" in html
+    # An "update available" banner is wired to the SW update lifecycle.
+    assert "showUpdatePrompt" in html
+    assert (out / "client" / "pwa" / "update-prompt.js").is_file()
 
 
 def test_transpile_service_worker_precaches_the_shell(tmp_path: Path) -> None:

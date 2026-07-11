@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.30.0] — 2026-07-10
+
+### Added
+
+- **"New version available" update prompt (Mode C PWA).** When a new service
+  worker is deployed, the shell now surfaces an unobtrusive banner ("new version
+  available → Reload"); confirming activates the waiting worker (skipWaiting) and
+  reloads the page once. New pure-JS `client/pwa/update-prompt.js`
+  (`createUpdateBanner` / `showUpdatePrompt`, idempotent, injectable document +
+  skipWaiting) wired into the transpile shell via `registerServiceWorker`'s
+  `onUpdate`. Lives in the shell (not the app view), so it needs no core App
+  change and works without the app cooperating. Verified live (Playwright): in
+  the built app the banner renders and its button invokes skipWaiting on the
+  waiting registration. jsdom-tested (5 cases).
+
 ## [0.29.0] — 2026-07-10
 
 ### Added

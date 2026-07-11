@@ -483,6 +483,12 @@ display = "standalone"
     the install metadata — offline behavior comes for free because the bundle is
     static.
 
+!!! tip "Update prompt"
+    When you ship a new version the old service worker keeps serving until the tab
+    closes. The shell detects the waiting worker and shows an unobtrusive **"new
+    version available → Reload"** banner; on confirm the new worker takes over and
+    the page reloads once. Automatic — nothing to write in the app.
+
 ## The supported subset
 
 Mode C accepts a **typed subset** of Python — enough for the app layer. A

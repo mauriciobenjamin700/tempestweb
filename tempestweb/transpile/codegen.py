@@ -178,9 +178,13 @@ def _hoisted_names(stmts: list[ast.stmt]) -> set[str]:
     def walk(block: list[ast.stmt], *, top: bool) -> None:
         for stmt in block:
             if isinstance(stmt, ast.Assign):
-                targets = [t for t in stmt.targets if isinstance(t, ast.Name)]
-                for target in targets:
-                    _note(target.id, top=top)
+                for target in stmt.targets:
+                    if isinstance(target, ast.Name):
+                        _note(target.id, top=top)
+                    elif isinstance(target, (ast.Tuple, ast.List)):
+                        for elt in target.elts:
+                            if isinstance(elt, ast.Name):
+                                _note(elt.id, top=top)
             elif (
                 isinstance(stmt, ast.AnnAssign)
                 and isinstance(stmt.target, ast.Name)
@@ -457,13 +461,22 @@ class _Generator:
         )
 
     def _binop(self, node: ast.BinOp, indent: int) -> str:
-        """Emit an arithmetic binary operation."""
+        """Emit an arithmetic binary operation.
+
+        ``**`` maps to JS ``**`` and ``//`` (floor division) to
+        ``Math.floor(a / b)``.
+        """
+        left = self.expr(node.left, indent)
+        right = self.expr(node.right, indent)
+        if isinstance(node.op, ast.FloorDiv):
+            return f"Math.floor({left} / {right})"
         ops: dict[type[ast.operator], str] = {
             ast.Add: "+",
             ast.Sub: "-",
             ast.Mult: "*",
             ast.Div: "/",
             ast.Mod: "%",
+            ast.Pow: "**",
         }
         op = ops.get(type(node.op))
         if op is None:
@@ -472,8 +485,6 @@ class _Generator:
                 node,
                 self.filename,
             )
-        left = self.expr(node.left, indent)
-        right = self.expr(node.right, indent)
         return f"({left} {op} {right})"
 
     def _compare(self, node: ast.Compare, indent: int) -> str:
@@ -550,11 +561,7 @@ class _Generator:
                 "only single-loop comprehensions are supported", node, self.filename
             )
         gen = node.generators[0]
-        if not isinstance(gen.target, ast.Name):
-            raise TranspileError(
-                "comprehension target must be a plain name", node, self.filename
-            )
-        var = gen.target.id
+        var = self._loop_target(gen.target)
         iterable = self.expr(gen.iter, indent)
         result = iterable
         for cond in gen.ifs:
@@ -563,10 +570,22 @@ class _Generator:
         return f"{result}.map(({var}) => {element})"
 
     def _subscript(self, node: ast.Subscript, indent: int) -> str:
-        """Emit an index/subscript access (``x[i]`` → ``x[i]``)."""
+        """Emit an index/subscript access or a slice.
+
+        ``x[i]`` → ``x[i]``; ``x[a:b]`` → ``x.slice(a, b)`` (bounds default to the
+        ends). A slice ``step`` is unsupported.
+        """
         value = self.expr(node.value, indent)
         if isinstance(node.slice, ast.Slice):
-            raise TranspileError("slices are not supported", node, self.filename)
+            if node.slice.step is not None:
+                raise TranspileError(
+                    "a slice step is not supported", node, self.filename
+                )
+            lower = self.expr(node.slice.lower, indent) if node.slice.lower else "0"
+            if node.slice.upper is not None:
+                upper = self.expr(node.slice.upper, indent)
+                return f"{value}.slice({lower}, {upper})"
+            return f"{value}.slice({lower})"
         return f"{value}[{self.expr(node.slice, indent)}]"
 
     def _array(self, elts: list[ast.expr], indent: int) -> str:
@@ -625,11 +644,7 @@ class _Generator:
                 "only single-loop comprehensions are supported", node, self.filename
             )
         gen = node.generators[0]
-        if not isinstance(gen.target, ast.Name):
-            raise TranspileError(
-                "comprehension target must be a plain name", node, self.filename
-            )
-        var = gen.target.id
+        var = self._loop_target(gen.target)
         result = self.expr(gen.iter, indent)
         for cond in gen.ifs:
             result = f"{result}.filter(({var}) => {self.expr(cond, indent)})"
@@ -702,6 +717,12 @@ class _Generator:
             return f"Number(({args[0]}).toFixed({args[1]}))"
         if name == "sum" and count == 1:
             return f"{args[0]}.reduce((a, b) => a + b, 0)"
+        if name == "enumerate" and count == 1:
+            # Python yields (index, value); pair as [index, value] so
+            # `for i, v in enumerate(xs)` destructures correctly.
+            return f"{args[0]}.map((_v, _i) => [_i, _v])"
+        if name == "zip" and count == 2:
+            return f"{args[0]}.map((_v, _i) => [_v, {args[1]}[_i]])"
         if name in ("min", "max"):
             js = "Math.min" if name == "min" else "Math.max"
             if count == 1:
@@ -823,6 +844,8 @@ class _Generator:
             return self._try(node, indent)
         if isinstance(node, ast.Raise):
             return self._raise(node, indent)
+        if isinstance(node, ast.Assert):
+            return self._assert(node, indent)
         if isinstance(node, ast.Break):
             return [f"{_INDENT * indent}break;"]
         if isinstance(node, ast.Continue):
@@ -855,17 +878,33 @@ class _Generator:
         lines.append(f"{pad}}}")
         return lines
 
+    def _loop_target(self, target: ast.expr) -> str:
+        """Return the JS binding for a for/comprehension target.
+
+        A plain name binds directly (``x``); a tuple/list unpacks with array
+        destructuring (``[k, v]``).
+        """
+        if isinstance(target, ast.Name):
+            return target.id
+        if isinstance(target, (ast.Tuple, ast.List)):
+            return f"[{', '.join(self._target_names(target))}]"
+        raise TranspileError(
+            "loop target must be a name or a tuple of names",
+            target,
+            self.filename,
+        )
+
     def _for(self, node: ast.For, indent: int) -> list[str]:
-        """Emit a ``for x in it:`` loop as ``for (const x of it) {...}``."""
+        """Emit a ``for x in it:`` as ``for (const x of it) {...}``.
+
+        A tuple target (``for k, v in items``) destructures each element.
+        """
         if node.orelse:
             raise TranspileError("for/else is not supported", node, self.filename)
-        if not isinstance(node.target, ast.Name):
-            raise TranspileError(
-                "for-loop target must be a plain name", node, self.filename
-            )
         pad = _INDENT * indent
+        binding = self._loop_target(node.target)
         iterable = self.expr(node.iter, indent)
-        lines = [f"{pad}for (const {node.target.id} of {iterable}) {{"]
+        lines = [f"{pad}for (const {binding} of {iterable}) {{"]
         lines.extend(self._body(node.body, indent + 1))
         lines.append(f"{pad}}}")
         return lines
@@ -914,6 +953,15 @@ class _Generator:
             )
         error = f'Object.assign(new Error({message}), {{ name: "{name}" }})'
         return [f"{pad}throw {error};"]
+
+    def _assert(self, node: ast.Assert, indent: int) -> list[str]:
+        """Emit ``assert cond[, msg]`` as ``if (!(cond)) throw AssertionError``."""
+        pad = _INDENT * indent
+        test = self.expr(node.test, indent)
+        message = self.expr(node.msg, indent) if node.msg is not None else '""'
+        error = f'Object.assign(new Error({message}), {{ name: "AssertionError" }})'
+        inner = _INDENT * (indent + 1)
+        return [f"{pad}if (!({test})) {{", f"{inner}throw {error};", f"{pad}}}"]
 
     def _while(self, node: ast.While, indent: int) -> list[str]:
         """Emit a ``while cond:`` loop as ``while (cond) {...}``.
@@ -1085,32 +1133,68 @@ class _Generator:
         lines.append(f"{pad}}}")
         return lines
 
+    def _target_names(self, target: ast.expr) -> list[str]:
+        """Return the plain names bound by a tuple/list unpacking target.
+
+        Args:
+            target: A ``Tuple``/``List`` of ``Name`` elements.
+
+        Returns:
+            The bound names, in order.
+
+        Raises:
+            TranspileError: If an element is not a plain name (nested/starred
+                unpacking is unsupported).
+        """
+        names: list[str] = []
+        for elt in target.elts:  # type: ignore[attr-defined]
+            if not isinstance(elt, ast.Name):
+                raise TranspileError(
+                    "only flat `a, b = ...` unpacking of plain names is supported",
+                    target,
+                    self.filename,
+                )
+            names.append(elt.id)
+        return names
+
     def _assign(self, node: ast.Assign, indent: int) -> list[str]:
         """Emit an assignment.
 
-        A single ``Name`` target is declared with ``const``; an attribute or
-        subscript target is a plain assignment (the object already exists).
-        Multiple/tuple targets are unsupported.
+        A single ``Name`` target is ``const`` (or a plain assign when hoisted);
+        an attribute/subscript target is a plain assignment. A tuple/list target
+        (``a, b = pair``) becomes array destructuring. Chained assignment
+        (``a = b = 1``) assigns each target to the same value.
         """
-        if len(node.targets) != 1:
-            raise TranspileError(
-                "multiple assignment targets are not supported", node, self.filename
-            )
-        target = node.targets[0]
         value = self.expr(node.value, indent)
         pad = _INDENT * indent
+        lines: list[str] = []
+        for target in node.targets:
+            lines.extend(self._assign_target(target, value, pad, indent))
+        return lines
+
+    def _assign_target(
+        self, target: ast.expr, value: str, pad: str, indent: int
+    ) -> list[str]:
+        """Emit one assignment of ``value`` to a single target."""
         if isinstance(target, ast.Name):
-            # If the name was hoisted to a function-top `let` (so it stays visible
-            # outside an if/for block — Python scoping), assign plainly; otherwise
-            # declare it with `const`.
+            # A hoisted name (function-top `let`) is assigned plainly; otherwise
+            # `const`.
             if self._scopes and target.id in self._scopes[-1]:
                 return [f"{pad}{target.id} = {value};"]
             return [f"{pad}const {target.id} = {value};"]
         if isinstance(target, (ast.Attribute, ast.Subscript)):
             return [f"{pad}{self.expr(target, indent)} = {value};"]
+        if isinstance(target, (ast.Tuple, ast.List)):
+            names = self._target_names(target)
+            pattern = f"[{', '.join(names)}]"
+            hoisted = self._scopes and all(n in self._scopes[-1] for n in names)
+            if hoisted:
+                # Destructuring assignment (no declaration) must be parenthesized.
+                return [f"{pad}({pattern} = {value});"]
+            return [f"{pad}const {pattern} = {value};"]
         raise TranspileError(
             f"assignment target {type(target).__name__} is not supported",
-            node,
+            target,
             self.filename,
         )
 

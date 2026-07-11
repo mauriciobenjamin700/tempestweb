@@ -173,6 +173,40 @@ backend sem tocar a app) herdado do `tempest-react-sdk`. Servidor reusa o
 | O3 | **feature flags:** provedor + adapters (InMemory p/ dev → GrowthBook / LaunchDarkly). `is_enabled(key)` / `get(key, default)` / `on_change` | ✅ |
 | O4 | **auth (cliente):** store de auth + guarda de rota, `decode_jwt` / `is_jwt_expired`, fila de refresh; OAuth. Servidor reusa `JWTUtils` do `tempest-fastapi-sdk` | ✅ |
 
+## Trilho S — segurança & produção (hardening rumo ao profissional)
+
+!!! danger "Estado (avaliação 2026-07-11) — o gap para produção profissional"
+    Os modos **estáticos** (A/WASM e C/transpile) já são **produção-ready**: são
+    bundles servíveis por qualquer CDN, superfície de servidor ~zero. O **Modo B
+    (servidor)** roda fim-a-fim, mas **não vem endurecido por padrão** — o
+    `create_app(state_factory, view, title)` não tem auth, CORS, limites nem
+    rate limiting embutidos, e `observability.auth.decode_jwt` **lê claims sem
+    verificar assinatura** (não é gate). Hoje o deployer precisa adicionar isso
+    por fora (middleware FastAPI). Este trilho fecha essa lacuna. Todos os itens
+    abaixo são **⬜ não iniciados**.
+
+| ID | Escopo | Status |
+|---|---|---|
+| S0 | **Auth gate no servidor (Modo B):** `create_app(..., authenticate=callable)` que valida credencial no handshake WS/SSE (assinatura JWT via `JWTUtils` do `tempest-fastapi-sdk`, ou `X-Token` via `hmac.compare_digest`); conexão não-autorizada é recusada antes de montar a sessão. Segredo vazio = auth desligada (dev) | ⬜ |
+| S1 | **CORS + allowlist de origem:** `create_app(..., allowed_origins=[...])` liga `CORSMiddleware`; checagem de `Origin` no upgrade do WebSocket (WS não respeita CORS por padrão) | ⬜ |
+| S2 | **Limites & anti-DoS:** teto de conexões/sessões concorrentes, eviction do registro SSE em memória (TTL + cap), tamanho máximo de mensagem/evento, timeout de sessão ociosa, rate limiting por cliente/IP | ⬜ |
+| S3 | **Verificação server-side de JWT:** `verify_jwt(token, key)` (assinatura + `exp`) reusando `JWTUtils`, ao lado do `decode_jwt` client-side (que segue só p/ ler claims) | ⬜ |
+| S4 | **Escala horizontal (Modo B):** sessões WS/SSE são estado em memória do processo → backend de sessão plugável (Redis) **ou** guia documentado de sticky-sessions; `graceful shutdown` fecha sessões; endpoint `/health` (liveness/readiness) | ⬜ |
+| S5 | **Deploy profissional:** `Dockerfile` (uvicorn multi-worker), `docker-compose`, exemplo de reverse-proxy (nginx/traefik: TLS + upgrade WS + timeouts), guia de produção nas docs (envs, workers, logs) | ⬜ |
+| S6 | **Headers de segurança:** CSP (compatível com o cliente JS — sem handlers inline), HSTS, `X-Content-Type-Options`, `Referrer-Policy` no host servidor e no SSR/`render_document`; auditoria de XSS no path de `update` de props do DOM (escape de conteúdo dinâmico) | ⬜ |
+| S7 | **Supply chain & política:** `SECURITY.md` (report de vulnerabilidade), pins de dependência, `pip-audit` + Dependabot no CI, `npm audit` p/ o peer `onnxruntime-web` quando aplicável | ⬜ |
+| S8 | **Observabilidade de servidor:** métricas (Prometheus) + tracing (OpenTelemetry) do host — conexões, latência de patch, throughput WS/SSE, erros; logging estruturado de request. Complementa o Trilho O (telemetry de cliente) | ⬜ |
+| S9 | **Perf & carga:** benchmarks (latência de reconciliação/patch, throughput WS, cold-start WASM, tamanho de bundle Modo C) + gate de regressão no CI | ⬜ |
+| S10 | **Rumo a 1.0:** contrato de estabilidade de API pública + política de depreciação; matriz de browsers/versões suportadas; baseline de a11y (axe-core no CI); congelar o wire-contract | ⬜ |
+| S11 | **Modo C — ampliar/fechar subset:** decidir o alcance final (`raise ... from`, `global`, `yield`, decorators arbitrários, unpacking com estrela) e documentar o subset como contrato estável; considerar port dos `components` (camada de resolvers de tema/variant em JS) se houver demanda | ⬜ |
+
+!!! note "Ordem sugerida"
+    Bloco de segurança primeiro (**S0 → S1 → S3 → S2 → S6**) — é o que separa
+    "roda" de "seguro em produção". Depois deploy/escala (**S5 → S4 → S8**), e por
+    fim maturidade (**S9 → S10 → S11**). Os modos estáticos (A/C) podem ir a
+    produção **antes** deste trilho; ele é pré-requisito só para o **Modo B**
+    exposto publicamente.
+
 ## Pós-convergência
 
 | Fase | Escopo | Status |

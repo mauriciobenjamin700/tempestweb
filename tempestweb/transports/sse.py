@@ -31,10 +31,13 @@ from tempestweb.core.constants import (
 from tempestweb.transports.base import (
     Envelope,
     Event,
+    NativeEvent,
     NativeResult,
     Patch,
     TransportClosedError,
     encode_native_call,
+    encode_native_subscribe,
+    encode_native_unsubscribe,
     encode_navigate,
     encode_patches,
 )
@@ -77,6 +80,7 @@ class SSETransport:
         self._history: list[tuple[int, Envelope]] = []
         self._events: asyncio.Queue[Event] = asyncio.Queue()
         self._native_result_handler: Callable[[NativeResult], None] | None = None
+        self._native_event_handler: Callable[[NativeEvent], None] | None = None
         self._next_id: int = 0
         self._closed: bool = False
 
@@ -119,6 +123,32 @@ class SSETransport:
         """
         self._enqueue(encode_native_call(call_id, capability, args))
 
+    async def send_native_subscribe(
+        self, sub_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Queue a ``native_subscribe`` envelope for the SSE stream (T-EV).
+
+        Args:
+            sub_id: Correlation id every ``native_event`` of this stream carries.
+            capability: Stable streaming capability name.
+            args: JSON-able subscription arguments.
+
+        Raises:
+            TransportClosedError: If the transport has been closed.
+        """
+        self._enqueue(encode_native_subscribe(sub_id, capability, args))
+
+    async def send_native_unsubscribe(self, sub_id: str) -> None:
+        """Queue a ``native_unsubscribe`` envelope for the SSE stream (T-EV).
+
+        Args:
+            sub_id: The id of the subscription to close.
+
+        Raises:
+            TransportClosedError: If the transport has been closed.
+        """
+        self._enqueue(encode_native_unsubscribe(sub_id))
+
     def _enqueue(self, envelope: Envelope) -> None:
         """Assign a tick id, buffer for replay, and queue an envelope.
 
@@ -155,6 +185,9 @@ class SSETransport:
         elif kind == "native_result":
             if self._native_result_handler is not None:
                 self._native_result_handler(envelope)
+        elif kind == "native_event":
+            if self._native_event_handler is not None:
+                self._native_event_handler(envelope)
         elif kind is None and "type" in envelope:
             self._events.put_nowait(envelope)
 
@@ -179,6 +212,14 @@ class SSETransport:
             handler: Callback receiving each JSON-able ``native_result`` payload.
         """
         self._native_result_handler = handler
+
+    def on_native_event(self, handler: Callable[[NativeEvent], None]) -> None:
+        """Register the sink for inbound ``native_event`` envelopes (T-EV).
+
+        Args:
+            handler: Callback receiving each JSON-able ``native_event`` payload.
+        """
+        self._native_event_handler = handler
 
     async def stream(self, last_event_id: int | None = None) -> AsyncIterator[str]:
         """Yield SSE-framed text for the ``text/event-stream`` response.

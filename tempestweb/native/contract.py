@@ -27,9 +27,12 @@ from dataclasses import dataclass
 __all__ = [
     "CAPABILITIES",
     "MODE_C_CAPABILITIES",
+    "STREAMING_CAPABILITIES",
     "Capability",
     "capability_names",
     "mode_c_capability_names",
+    "single_shot_capability_names",
+    "streaming_capability_names",
 ]
 
 
@@ -42,17 +45,24 @@ class Capability:
         group: The namespace it belongs to (``"http"``, ``"storage"``, …).
         mode_c: Whether the Mode C facade (``client/transpile/native.js``) exposes
             it — i.e. a transpiled, Python-free app can call it in-process.
+        streaming: Whether it is a **streaming** capability served over the native
+            event channel (T-EV) — many events per subscription — rather than a
+            single-shot request/response call. Streaming capabilities register in
+            the client's ``EVENT_HANDLERS`` (not ``HANDLERS``) and, in Python, are
+            consumed via :func:`~tempestweb.native.native_events` /
+            ``async for`` rather than ``await``.
     """
 
     name: str
     group: str
     mode_c: bool
+    streaming: bool
 
 
-def _cap(name: str, *, mode_c: bool = False) -> Capability:
+def _cap(name: str, *, mode_c: bool = False, streaming: bool = False) -> Capability:
     """Build a :class:`Capability`, deriving its group from the dotted name."""
     group, _, _verb = name.partition(".")
-    return Capability(name=name, group=group, mode_c=mode_c)
+    return Capability(name=name, group=group, mode_c=mode_c, streaming=streaming)
 
 
 #: Every native capability, in dispatch-name order. The ``mode_c`` capabilities
@@ -90,6 +100,7 @@ CAPABILITIES: tuple[Capability, ...] = (
     _cap("fullscreen.state", mode_c=True),
     _cap("gamepad.state", mode_c=True),
     _cap("geolocation.get", mode_c=True),
+    _cap("geolocation.watch", mode_c=True, streaming=True),
     _cap("hid.is_supported", mode_c=True),
     _cap("hid.request", mode_c=True),
     _cap("http.request", mode_c=True),
@@ -158,6 +169,11 @@ MODE_C_CAPABILITIES: tuple[Capability, ...] = tuple(
     cap for cap in CAPABILITIES if cap.mode_c
 )
 
+#: The streaming capabilities served over the native event channel (T-EV).
+STREAMING_CAPABILITIES: tuple[Capability, ...] = tuple(
+    cap for cap in CAPABILITIES if cap.streaming
+)
+
 
 def capability_names() -> frozenset[str]:
     """Return the full set of dotted capability names.
@@ -175,3 +191,23 @@ def mode_c_capability_names() -> frozenset[str]:
         The ``mode_c`` capabilities' names, as a set.
     """
     return frozenset(cap.name for cap in MODE_C_CAPABILITIES)
+
+
+def streaming_capability_names() -> frozenset[str]:
+    """Return the set of streaming (event-channel) capability names.
+
+    Returns:
+        The ``streaming`` capabilities' names, as a set. These register in the
+        client's ``EVENT_HANDLERS`` rather than ``HANDLERS``.
+    """
+    return frozenset(cap.name for cap in STREAMING_CAPABILITIES)
+
+
+def single_shot_capability_names() -> frozenset[str]:
+    """Return the set of single-shot (request/response) capability names.
+
+    Returns:
+        Every non-streaming capability's ``name`` — the ones the client serves
+        from its ``HANDLERS`` registry.
+    """
+    return frozenset(cap.name for cap in CAPABILITIES if not cap.streaming)

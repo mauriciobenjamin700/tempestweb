@@ -94,6 +94,31 @@ class MockTransportA:
             handler: Callback for ``native_result`` envelopes.
         """
 
+    async def send_native_subscribe(
+        self, sub_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Open a streaming subscription — unused by this harness.
+
+        Args:
+            sub_id: Correlation id for the stream.
+            capability: Stable streaming capability name.
+            args: JSON-able subscription arguments.
+        """
+
+    async def send_native_unsubscribe(self, sub_id: str) -> None:
+        """Cancel a streaming subscription — unused by this harness.
+
+        Args:
+            sub_id: The id of the subscription to close.
+        """
+
+    def on_native_event(self, handler: Callable[[dict[str, Any]], None]) -> None:
+        """Register a ``native_event`` sink — unused by this harness.
+
+        Args:
+            handler: Callback for ``native_event`` envelopes.
+        """
+
     async def close(self) -> None:
         """Mark the transport closed."""
         self._closed = True
@@ -175,6 +200,31 @@ class MockTransportB:
 
         Args:
             handler: Callback for ``native_result`` envelopes.
+        """
+
+    async def send_native_subscribe(
+        self, sub_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Open a streaming subscription — unused by this harness.
+
+        Args:
+            sub_id: Correlation id for the stream.
+            capability: Stable streaming capability name.
+            args: JSON-able subscription arguments.
+        """
+
+    async def send_native_unsubscribe(self, sub_id: str) -> None:
+        """Cancel a streaming subscription — unused by this harness.
+
+        Args:
+            sub_id: The id of the subscription to close.
+        """
+
+    def on_native_event(self, handler: Callable[[dict[str, Any]], None]) -> None:
+        """Register a ``native_event`` sink — unused by this harness.
+
+        Args:
+            handler: Callback for ``native_event`` envelopes.
         """
 
     async def close(self) -> None:

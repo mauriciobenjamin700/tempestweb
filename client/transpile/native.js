@@ -13,8 +13,17 @@
 //
 // See docs/native-modo-c.md and docs/contract.md.
 
-import { browserDeps, dispatch } from "../native/index.js";
+import {
+  browserDeps,
+  dispatch,
+  subscribeDispatch,
+  unsubscribeDispatch,
+} from "../native/index.js";
 import { createIdbKv } from "../native/idb-kv.js";
+
+// Monotonic local subscription counter (Mode C mints its own sub_id — no Python
+// side to do it). Deterministic on purpose: no Date/Math.random.
+let _subCounter = 0;
 
 // The `storage` capability persists over IndexedDB when available (injected as
 // `deps.store`), falling back to localStorage otherwise. Built once, lazily.
@@ -63,6 +72,36 @@ async function call(capability, args) {
     throw new NativeError(result.error, result.message);
   }
   return result.value;
+}
+
+/**
+ * Subscribe to a streaming capability in-process and forward its events (T-EV).
+ *
+ * The Mode C mirror of `await native.geolocation.watch(...)`. Mints a local
+ * `sub_id`, injects the same IndexedDB store `call()` does, and unwraps each
+ * `{ event: <value> }` payload into `onEvent(<value>)`. `{error}` / `{done}`
+ * frames are ignored here (the facade surfaces only positive updates).
+ *
+ * @param {string} capability  The dotted streaming capability (e.g. "geolocation.watch").
+ * @param {Object} args        The JSON-able capability arguments.
+ * @param {(value: *) => void} onEvent  Called with each unwrapped event value.
+ * @returns {() => void}        Unsubscribe: stops delivery.
+ */
+function stream(capability, args, onEvent) {
+  const deps = browserDeps();
+  const store = idbStore();
+  if (store !== null) {
+    deps.store = store;
+  }
+  const sub_id = "s" + _subCounter++;
+  subscribeDispatch(
+    { sub_id, capability, args },
+    (payload) => {
+      if (payload.event !== undefined) onEvent(payload.event);
+    },
+    deps,
+  );
+  return () => unsubscribeDispatch(sub_id);
 }
 
 /**
@@ -132,6 +171,15 @@ export const native = Object.freeze({
      */
     get_position: (high_accuracy = true) =>
       call("geolocation.get", { high_accuracy }),
+    /**
+     * Watch the device position, streaming each fix to `onEvent` (T-EV).
+     * @param {(value: {latitude:number, longitude:number, accuracy:number,
+     *                  altitude:number|null}) => void} onEvent
+     * @param {{high_accuracy?: boolean}} [opts]
+     * @returns {() => void}  Unsubscribe: stops the position watch.
+     */
+    watch: (onEvent, opts = {}) =>
+      stream("geolocation.watch", { high_accuracy: opts.high_accuracy ?? true }, onEvent),
   }),
   share: Object.freeze({
     /** Whether the OS share sheet is available. @returns {Promise<boolean>} */

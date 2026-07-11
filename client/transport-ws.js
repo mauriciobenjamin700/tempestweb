@@ -10,6 +10,8 @@
 // Implements the Transport interface from transport.js. The same DOM renderer
 // and Style->CSS translator run above it as in Mode A; only this file differs.
 
+import { subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
+
 /**
  * @typedef {import("./transport.js").Patch} Patch
  * @typedef {import("./transport.js").TWEvent} TWEvent
@@ -99,6 +101,12 @@ export function createWebSocketTransport(url, options = {}) {
       else pendingBatches.push(envelope.data);
     } else if (envelope.kind === "native_call") {
       void handleNativeCall(envelope);
+    } else if (envelope.kind === "native_subscribe") {
+      subscribeDispatch(envelope, (payload) =>
+        send({ kind: "native_event", sub_id: envelope.sub_id, ...payload }),
+      );
+    } else if (envelope.kind === "native_unsubscribe") {
+      unsubscribeDispatch(envelope.sub_id);
     } else if (envelope.kind === "navigate") {
       if (navigateHandler) navigateHandler(envelope.path);
     }

@@ -230,40 +230,40 @@ A/B/C); as só-Chromium expõem `is_supported()` + degradação graciosa.
 
 | Fase | Capacidades | Status |
 |---|---|---|
-| T1 | **vibration:** `vibrate(pattern)` (`navigator.vibrate`) | 🔴 |
-| T2 | **badge:** `set(count)` / `clear()` (`navigator.setAppBadge`/`clearAppBadge`) — contador no ícone do PWA | 🔴 |
-| T3 | **wakelock:** `request()` → id / `release(id)` (`navigator.wakeLock`) — tela acesa | 🔴 |
-| T4 | **fullscreen:** `enter()` / `exit()` / `state()` (`requestFullscreen`/`exitFullscreen`/`fullscreenElement`) | 🔴 |
-| T5 | **visibility:** `state()` (`document.visibilityState`) — leitura única | 🔴 |
-| T6 | **orientation:** `lock(kind)` / `unlock()` / `state()` (`screen.orientation`) | 🔴 |
-| T7 | **quota:** `estimate()` / `persist()` / `persisted()` (`navigator.storage.*`) — pareia com storage/offline | 🔴 |
-| T8 | **network:** `state()` (`navigator.connection`: `effectiveType`/`downlink`/`rtt`/`saveData` + `onLine`) — leitura única | 🔴 |
-| T9 | **clipboard rico:** `read_image()` / `write_image(data)` (`ClipboardItem`, base64) — estende o grupo clipboard | 🔴 |
+| T1 | **vibration:** `vibrate(pattern)` (`navigator.vibrate`) | ✅ (v0.50.0) |
+| T2 | **badge:** `set(count)` / `clear()` (`navigator.setAppBadge`/`clearAppBadge`) — contador no ícone do PWA | ✅ (v0.50.0) |
+| T3 | **wakelock:** `request()` → id / `release(id)` (`navigator.wakeLock`) — tela acesa | ✅ (v0.50.0) |
+| T4 | **fullscreen:** `enter()` / `exit()` / `state()` (`requestFullscreen`/`exitFullscreen`/`fullscreenElement`) | ✅ (v0.50.0) |
+| T5 | **visibility:** `state()` (`document.visibilityState`) — leitura única | ✅ (v0.50.0) |
+| T6 | **orientation:** `lock(kind)` / `unlock()` / `state()` (`screen.orientation`) | ✅ (v0.50.0) |
+| T7 | **quota:** `estimate()` / `persist()` / `persisted()` (`navigator.storage.*`) — pareia com storage/offline | ✅ (v0.50.0) |
+| T8 | **network:** `state()` (`navigator.connection`: `effectiveType`/`downlink`/`rtt`/`saveData` + `onLine`) — leitura única | ✅ (v0.50.0) |
+| T9 | **clipboard rico:** `read_image()` / `write_image(data)` (`ClipboardItem`, base64) — estende o grupo clipboard | ✅ (v0.50.0) |
 
 ### Tier 2 — média, muito usados
 
 | Fase | Capacidades | Status |
 |---|---|---|
-| T10 | **speech:** `speak(text, opts)` / `cancel()` (TTS, `SpeechSynthesis`) — single-shot; STT (`SpeechRecognition`) é *(stream)* → T-EV | 🔴 |
-| T11 | **recorder:** `start`/`stop` gravação de áudio/vídeo (`MediaRecorder`) + captura de tela (`getDisplayMedia`) — devolve blob base64 | 🔴 |
-| T12 | **filesystem:** `open_file`/`save_file`/`open_directory` com handles vivos (`showOpenFilePicker`/`showSaveFilePicker`) + OPFS | 🔴 |
-| T13 | **bgsync:** registra Background Sync + Periodic Sync (`SyncManager`) — replay real da offline queue pelo SW | 🔴 |
-| T14 | **webauthn:** `create`/`get` credencial + passkeys (`navigator.credentials`) + **Web OTP** (`OTPCredential`) | 🔴 |
-| T15 | **tabs:** Broadcast Channel + Web Locks — sincronizar entre abas | 🔴 |
-| T16 | **idle:** Idle Detection (`IdleDetector`) — single-shot state; contínuo *(stream)* → T-EV | 🔴 |
+| T10 | **speech:** `speak(text, opts)` / `cancel()` (TTS, `SpeechSynthesis`) — single-shot; STT (`SpeechRecognition`) é *(stream)* → T-EV | 🔶 (v0.50.0 — TTS `speak/cancel/voices`; STT → T-EV) |
+| T11 | **recorder:** `start`/`stop` gravação de áudio/vídeo (`MediaRecorder`) + captura de tela (`getDisplayMedia`) — devolve blob base64 | ✅ (v0.50.0) |
+| T12 | **filesystem:** `open_file`/`save_file`/`open_directory` com handles vivos (`showOpenFilePicker`/`showSaveFilePicker`) + OPFS | ✅ (v0.50.0) |
+| T13 | **bgsync:** registra Background Sync + Periodic Sync (`SyncManager`) — replay real da offline queue pelo SW | ✅ (v0.50.0) |
+| T14 | **webauthn:** `create`/`get` credencial + passkeys (`navigator.credentials`) + **Web OTP** (`OTPCredential`) | ✅ (v0.50.0) |
+| T15 | **tabs:** Broadcast Channel + Web Locks — sincronizar entre abas | 🔶 (v0.50.0 — broadcast send + Web Locks; receber broadcast → T-EV) |
+| T16 | **idle:** Idle Detection (`IdleDetector`) — single-shot state; contínuo *(stream)* → T-EV | 🔴 (IdleDetector é event-based → T-EV) |
 
 ### Tier 3 — nicho / secure-context / maioria só Chromium
 
 | Fase | Capacidades | Status |
 |---|---|---|
-| T17 | **bluetooth:** Web Bluetooth (`navigator.bluetooth`) | 🔴 |
-| T18 | **usb / serial / hid:** Web USB / Web Serial / Web HID | 🔴 |
-| T19 | **nfc:** Web NFC (`NDEFReader`) | 🔴 |
-| T20 | **contacts:** Contact Picker (`navigator.contacts`) | 🔴 |
-| T21 | **payment:** Payment Request API | 🔴 |
-| T22 | **misc UI:** Picture-in-Picture · EyeDropper · Pointer Lock | 🔴 |
-| T23 | **gamepad / midi:** Gamepad API (poll) · Web MIDI (`requestMIDIAccess`) | 🔴 |
-| T24 | **webaudio:** Web Audio API — síntese/análise (`AudioContext`), além do play/stop atual | 🔴 |
+| T17 | **bluetooth:** Web Bluetooth (`navigator.bluetooth`) | ✅ (v0.50.0) |
+| T18 | **usb / serial / hid:** Web USB / Web Serial / Web HID | ✅ (v0.50.0) |
+| T19 | **nfc:** Web NFC (`NDEFReader`) | 🔶 (v0.50.0 — `write` + `is_supported`; scan → T-EV) |
+| T20 | **contacts:** Contact Picker (`navigator.contacts`) | ✅ (v0.50.0) |
+| T21 | **payment:** Payment Request API | ✅ (v0.50.0) |
+| T22 | **misc UI:** Picture-in-Picture · EyeDropper · Pointer Lock | ✅ (v0.50.0) |
+| T23 | **gamepad / midi:** Gamepad API (poll) · Web MIDI (`requestMIDIAccess`) | 🔶 (v0.50.0 — gamepad poll + MIDI send; input contínuo → T-EV) |
+| T24 | **webaudio:** Web Audio API — síntese/análise (`AudioContext`), além do play/stop atual | 🔶 (v0.50.0 — `tone`; grafo síntese/análise futuro) |
 
 ### Canal de eventos (pré-requisito das *(stream)*)
 

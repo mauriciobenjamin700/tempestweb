@@ -107,26 +107,40 @@ class AppSession(Generic[S]):
         # once the app navigates somewhere else (view → URL).
         self._last_path: str = "/"
         transport.on_native_result(self._resolve_native_result)
+        transport.on_native_event(self._deliver_native_event)
 
     def _send_native_frame(self, envelope: dict[str, Any]) -> None:
-        """Ship a ``native_call`` envelope to the client over the transport.
+        """Ship a native envelope to the client over the transport (kind-routed).
 
         Wired into the :class:`ProxyBridge` as its synchronous ``send_frame``: the
-        bridge builds the envelope and registers its pending future, then calls
-        this to forward the frame. Sending is async, so the coroutine is spawned
-        as a tracked session task (cancelled on :meth:`close`).
+        bridge builds the envelope (``native_call`` for a single-shot call, or
+        ``native_subscribe`` / ``native_unsubscribe`` for the event channel) and
+        this forwards it to the matching transport send. Sending is async, so the
+        coroutine is spawned as a tracked session task (cancelled on :meth:`close`).
 
         Args:
-            envelope: The ``native_call`` envelope ``{"call_id", "capability",
-                "args", ...}`` produced by the bridge.
+            envelope: A ``native_call`` / ``native_subscribe`` / ``native_unsubscribe``
+                envelope produced by the bridge.
         """
-        self._spawn(
-            self.transport.send_native_call(
-                str(envelope["call_id"]),
-                str(envelope["capability"]),
-                dict(envelope.get("args", {})),
+        kind = envelope.get("kind")
+        if kind == "native_call":
+            self._spawn(
+                self.transport.send_native_call(
+                    str(envelope["call_id"]),
+                    str(envelope["capability"]),
+                    dict(envelope.get("args", {})),
+                )
             )
-        )
+        elif kind == "native_subscribe":
+            self._spawn(
+                self.transport.send_native_subscribe(
+                    str(envelope["sub_id"]),
+                    str(envelope["capability"]),
+                    dict(envelope.get("args", {})),
+                )
+            )
+        elif kind == "native_unsubscribe":
+            self._spawn(self.transport.send_native_unsubscribe(str(envelope["sub_id"])))
 
     def _apply_patches(self, patches: list[CorePatch]) -> None:
         """App ``apply_patches`` callback: forward a rebuilt batch to the client.
@@ -286,6 +300,25 @@ class AppSession(Generic[S]):
         if not isinstance(call_id, str):
             return
         self._bridge.resolve(call_id, result)
+
+    def _deliver_native_event(self, event: dict[str, Any]) -> None:
+        """Route an inbound ``native_event`` frame to its subscription (T-EV).
+
+        Registered as the transport's native-event sink. Delegates to the
+        :class:`ProxyBridge`, which matches ``sub_id`` to the subscription's ``emit``
+        and forwards the event/error/done payload. Unknown / stale ``sub_id`` values
+        are ignored. The awaiting ``async for`` (via ``native_events``) turns the
+        payload into a yielded value, a raised :class:`NativeError`, or loop end.
+
+        Args:
+            event: The JSON-able ``native_event`` payload
+                ``{"sub_id", "event"|"error"|"done"}``.
+        """
+        sub_id = event.get("sub_id")
+        if not isinstance(sub_id, str):
+            return
+        payload = {k: v for k, v in event.items() if k not in ("kind", "sub_id")}
+        self._bridge.deliver_event(sub_id, payload)
 
     async def run(self) -> None:
         """Serve the client until the transport closes.

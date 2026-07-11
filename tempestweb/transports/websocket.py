@@ -26,10 +26,13 @@ from starlette.websockets import WebSocket, WebSocketDisconnect, WebSocketState
 
 from tempestweb.transports.base import (
     Event,
+    NativeEvent,
     NativeResult,
     Patch,
     TransportClosedError,
     encode_native_call,
+    encode_native_subscribe,
+    encode_native_unsubscribe,
     encode_navigate,
     encode_patches,
 )
@@ -56,6 +59,7 @@ class WebSocketTransport:
         self.websocket: WebSocket = websocket
         self._events: asyncio.Queue[Event] = asyncio.Queue()
         self._native_result_handler: Callable[[NativeResult], None] | None = None
+        self._native_event_handler: Callable[[NativeEvent], None] | None = None
         self._closed: bool = False
         self._recv_task: asyncio.Task[None] | None = None
 
@@ -82,6 +86,9 @@ class WebSocketTransport:
                 elif kind == "native_result":
                     if self._native_result_handler is not None:
                         self._native_result_handler(envelope)
+                elif kind == "native_event":
+                    if self._native_event_handler is not None:
+                        self._native_event_handler(envelope)
         except (WebSocketDisconnect, RuntimeError):
             pass
         finally:
@@ -127,6 +134,32 @@ class WebSocketTransport:
         """
         await self._send(encode_native_call(call_id, capability, args))
 
+    async def send_native_subscribe(
+        self, sub_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Send a ``native_subscribe`` envelope to open a stream on the client.
+
+        Args:
+            sub_id: Correlation id every ``native_event`` of this stream carries.
+            capability: Stable streaming capability name.
+            args: JSON-able subscription arguments.
+
+        Raises:
+            TransportClosedError: If the socket is no longer connected.
+        """
+        await self._send(encode_native_subscribe(sub_id, capability, args))
+
+    async def send_native_unsubscribe(self, sub_id: str) -> None:
+        """Send a ``native_unsubscribe`` envelope to cancel a stream.
+
+        Args:
+            sub_id: The id of the subscription to close.
+
+        Raises:
+            TransportClosedError: If the socket is no longer connected.
+        """
+        await self._send(encode_native_unsubscribe(sub_id))
+
     async def _send(self, envelope: dict[str, Any]) -> None:
         """Serialize and send one envelope, mapping disconnects to closed errors.
 
@@ -169,6 +202,14 @@ class WebSocketTransport:
             handler: Callback receiving each JSON-able ``native_result`` payload.
         """
         self._native_result_handler = handler
+
+    def on_native_event(self, handler: Callable[[NativeEvent], None]) -> None:
+        """Register the sink for inbound ``native_event`` envelopes (T-EV).
+
+        Args:
+            handler: Callback receiving each JSON-able ``native_event`` payload.
+        """
+        self._native_event_handler = handler
 
     async def close(self) -> None:
         """Tear down the transport and close the WebSocket. Idempotent."""

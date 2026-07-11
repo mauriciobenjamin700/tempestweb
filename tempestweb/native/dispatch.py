@@ -47,16 +47,22 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import itertools
+from collections.abc import AsyncIterator, Callable
 from typing import Any, Protocol, cast, runtime_checkable
 
 __all__ = [
     "NATIVE_RESULT_PREFIX",
     "BrowserUnavailableError",
+    "EventBridge",
     "NativeBridge",
     "NativeError",
     "current_bridge",
     "install_bridge",
     "native_call",
+    "native_events",
+    "native_subscribe",
+    "native_unsubscribe",
+    "resolve_native_event",
     "resolve_native_result",
     "send_native_call",
     "uninstall_bridge",
@@ -71,6 +77,11 @@ NATIVE_RESULT_PREFIX = "__native_result__:"
 #: envelopes are reproducible in tests). Each id is prefixed with ``"c"`` to match
 #: the ``call_id`` convention in ``docs/contract.md`` (``"c1"``, ``"c2"``, ...).
 _call_ids: itertools.count[int] = itertools.count(1)
+
+#: Monotonic source of subscription ids for the native **event channel** (T-EV).
+#: Prefixed with ``"s"`` (``"s1"``, ``"s2"``, ...) to distinguish them from the
+#: request/response ``call_id``s in logs and wire frames.
+_sub_ids: itertools.count[int] = itertools.count(1)
 
 
 class NativeError(RuntimeError):
@@ -127,6 +138,51 @@ class NativeBridge(Protocol):
 
         Raises:
             BrowserUnavailableError: If the browser channel is gone.
+        """
+        ...
+
+
+@runtime_checkable
+class EventBridge(Protocol):
+    """A :class:`NativeBridge` that also serves the native **event channel** (T-EV).
+
+    The request/response :meth:`NativeBridge.call` seam is single-shot. Streaming
+    capabilities (``geolocation.watch``, sensors, network/visibility/orientation
+    change, media/idle, cross-tab broadcast receive, ...) need many events per
+    subscription over time, so a streaming bridge additionally implements
+    :meth:`subscribe`/:meth:`unsubscribe`.
+
+    A subscription delivers events through the injected ``emit`` callback. Each
+    emitted payload is one of ``{"event": <value>}`` (a data event),
+    ``{"error": <code>, "message": <detail>}`` (a terminal failure), or
+    ``{"done": true}`` (the stream ended normally). ``emit`` may be called from a
+    non-loop thread; implementations forward to the loop safely.
+    """
+
+    async def subscribe(
+        self,
+        capability: str,
+        args: dict[str, Any],
+        emit: Callable[[dict[str, Any]], None],
+    ) -> str:
+        """Open a subscription and stream its events through ``emit``.
+
+        Args:
+            capability: The dotted streaming capability name (``"geolocation.watch"``).
+            args: JSON-able subscription arguments.
+            emit: Callback invoked once per event with an ``{"event"|"error"|"done"}``
+                payload. Safe to call from any thread.
+
+        Returns:
+            The subscription id used to later :meth:`unsubscribe`.
+        """
+        ...
+
+    async def unsubscribe(self, sub_id: str) -> None:
+        """Close a subscription so the browser stops delivering its events.
+
+        Args:
+            sub_id: The id returned by :meth:`subscribe`. Unknown ids are ignored.
         """
         ...
 
@@ -263,3 +319,127 @@ def resolve_native_result(
         return False
     future.set_result(payload)
     return True
+
+
+def native_subscribe(
+    capability: str, args: dict[str, Any], sub_id: str
+) -> dict[str, Any]:
+    """Build a ``native_subscribe`` envelope for the event channel (T-EV).
+
+    Args:
+        capability: The dotted streaming capability name (``"geolocation.watch"``).
+        args: JSON-able subscription arguments.
+        sub_id: The correlation id the client tags every event of this stream with.
+
+    Returns:
+        The serializable ``native_subscribe`` envelope.
+    """
+    return {
+        "kind": "native_subscribe",
+        "sub_id": sub_id,
+        "capability": capability,
+        "args": args,
+    }
+
+
+def native_unsubscribe(sub_id: str) -> dict[str, Any]:
+    """Build a ``native_unsubscribe`` envelope for the event channel (T-EV).
+
+    Args:
+        sub_id: The id of the subscription to close.
+
+    Returns:
+        The serializable ``native_unsubscribe`` envelope.
+    """
+    return {"kind": "native_unsubscribe", "sub_id": sub_id}
+
+
+def resolve_native_event(
+    sub_id: str,
+    payload: dict[str, Any],
+    subscriptions: dict[str, Callable[[dict[str, Any]], None]],
+) -> bool:
+    """Deliver an inbound ``native_event`` to its subscription's ``emit`` (Mode B).
+
+    Called (on the loop thread) by a Mode-B transport bridge when a
+    ``native_event`` frame tagged with ``sub_id`` arrives. Mode A has no use for
+    this — its FFI bridge invokes ``emit`` inline from the JS callback.
+
+    Args:
+        sub_id: The subscription id parsed from the ``native_event`` frame.
+        payload: The event payload (``{"event"|"error"|"done": ...}``).
+        subscriptions: The bridge's ``sub_id -> emit`` registry.
+
+    Returns:
+        ``True`` if a matching subscription received the event, else ``False``.
+    """
+    emit = subscriptions.get(sub_id)
+    if emit is None:
+        return False
+    emit(payload)
+    return True
+
+
+async def native_events(
+    capability: str, args: dict[str, Any]
+) -> AsyncIterator[dict[str, Any]]:
+    """Subscribe to a streaming capability and yield its events (T-EV).
+
+    The plan-facing API for every streaming capability: it opens a subscription on
+    the installed bridge, yields one ``dict`` per browser event, and guarantees the
+    subscription is closed when the iterator is exhausted, broken out of, or its
+    consumer is cancelled. Backpressure-free: events are buffered in an unbounded
+    queue as the browser produces them.
+
+    Example::
+
+        async for pos in native_events("geolocation.watch", {"high_accuracy": True}):
+            app.set_state(lambda s: setattr(s, "here", pos))
+
+    Args:
+        capability: The dotted streaming capability name.
+        args: JSON-able subscription arguments.
+
+    Yields:
+        Each event's ``value`` payload, as a ``dict``.
+
+    Raises:
+        BrowserUnavailableError: If no bridge is installed, or the installed bridge
+            does not support streaming.
+        NativeError: If the browser reports the subscription failed.
+    """
+    bridge = current_bridge()
+    if not isinstance(bridge, EventBridge):
+        raise BrowserUnavailableError(
+            "the installed native bridge does not support the event channel"
+        )
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    def emit(payload: dict[str, Any]) -> None:
+        loop.call_soon_threadsafe(queue.put_nowait, payload)
+
+    sub_id = await bridge.subscribe(capability, args, emit)
+    try:
+        while True:
+            payload = await queue.get()
+            if payload.get("done", False):
+                return
+            if "error" in payload:
+                raise NativeError(
+                    str(payload.get("error", "unknown")),
+                    str(payload.get("message", "")),
+                )
+            event = payload.get("event", {})
+            yield cast("dict[str, Any]", event) if isinstance(event, dict) else {}
+    finally:
+        await bridge.unsubscribe(sub_id)
+
+
+def _next_sub_id() -> str:
+    """Return a fresh subscription id (``"s1"``, ``"s2"``, ...).
+
+    Returns:
+        The next monotonic subscription id.
+    """
+    return f"s{next(_sub_ids)}"

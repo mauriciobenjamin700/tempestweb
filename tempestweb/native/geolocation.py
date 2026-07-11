@@ -11,11 +11,13 @@ application code reads identically on Android and on the web.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 from pydantic import BaseModel, ConfigDict
 
-from tempestweb.native.dispatch import send_native_call
+from tempestweb.native.dispatch import native_events, send_native_call
 
-__all__ = ["Position", "get", "get_position"]
+__all__ = ["Position", "get", "get_position", "watch"]
 
 
 class Position(BaseModel):
@@ -56,6 +58,33 @@ async def get_position(high_accuracy: bool = True) -> Position:
     """
     value = await send_native_call("geolocation.get", {"high_accuracy": high_accuracy})
     return Position.model_validate(value)
+
+
+async def watch(high_accuracy: bool = True) -> AsyncIterator[Position]:
+    """Stream location fixes as the device moves (event channel / T-EV).
+
+    Opens a ``navigator.geolocation.watchPosition`` subscription and yields a fresh
+    :class:`Position` for every update until the ``async for`` loop is exited (which
+    cancels the watch). Consume it with::
+
+        async for pos in geolocation.watch():
+            app.set_state(lambda s: setattr(s, "here", pos))
+
+    Args:
+        high_accuracy: Set ``enableHighAccuracy`` (prefer GPS) when ``True``.
+
+    Yields:
+        Each updated :class:`Position`.
+
+    Raises:
+        NativeError: If the user denies permission (``permission_denied``), the page
+            is not a secure context (``insecure_context``), or the watch fails.
+        BrowserUnavailableError: If no bridge is installed, or the installed bridge
+            does not support the event channel.
+    """
+    args = {"high_accuracy": high_accuracy}
+    async for value in native_events("geolocation.watch", args):
+        yield Position.model_validate(value)
 
 
 #: Alias matching the tempestroid/plan API ``await geolocation.get()``.

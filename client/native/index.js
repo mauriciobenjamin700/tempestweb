@@ -13,7 +13,7 @@
 import { httpRequest, httpUpload } from "./http.js";
 import { audioPlay, audioStop } from "./audio.js";
 import { shareIsSupported, shareShare } from "./share.js";
-import { geolocationGet } from "./geolocation.js";
+import { geolocationGet, geolocationWatch } from "./geolocation.js";
 import {
   clipboardRead,
   clipboardReadImage,
@@ -215,6 +215,26 @@ export const HANDLERS = {
 };
 
 /**
+ * The streaming capability registry: dotted name -> streaming handler
+ * `(args, emit, deps) -> unsubscribeFn`.
+ *
+ * Unlike a single-shot {@link HANDLERS} handler, a streaming handler pushes zero
+ * or more **shaped** payloads through `emit` — `{ event: <value> }` per update,
+ * `{ error, message }` on failure, `{ done: true }` when the stream ends — and
+ * returns a function that tears down the underlying browser subscription.
+ * @type {Record<string, (args: Object, emit: (payload: Object) => void, deps: NativeDeps) => (() => void)>}
+ */
+export const EVENT_HANDLERS = {
+  "geolocation.watch": geolocationWatch,
+};
+
+/**
+ * Open event-channel subscriptions (T-EV): `sub_id -> unsubscribe function`.
+ * @type {Map<string, () => void>}
+ */
+const _subscriptions = new Map();
+
+/**
  * Resolve the live browser globals as the default dependency set.
  * @returns {NativeDeps}
  */
@@ -288,15 +308,84 @@ export async function dispatch(envelope, deps = defaultDeps()) {
 }
 
 /**
+ * @typedef {Object} NativeSubscribe
+ * @property {string} sub_id      The subscription id (minted by the Python side).
+ * @property {string} capability  The dotted streaming capability, e.g. "geolocation.watch".
+ * @property {Object} [args]      JSON-able arguments for the capability.
+ */
+
+/**
+ * Open one streaming subscription and pump its shaped payloads through `emit`.
+ *
+ * Never throws: a missing capability or a synchronous handler failure is
+ * reported through `emit({ error, message })` so the Python side always sees a
+ * terminal frame. The subscription registry is keyed by `envelope.sub_id` (the
+ * Python side mints the id and puts it in the envelope), so `unsubscribeDispatch`
+ * can tear it down later.
+ *
+ * @param {NativeSubscribe} envelope  The native_subscribe envelope from Python.
+ * @param {(payload: Object) => void} emit  Sink for `{event}` / `{error} / {done}` payloads.
+ * @param {NativeDeps} [deps]  Injected Web APIs (defaults to live globals).
+ * @returns {void}
+ */
+export function subscribeDispatch(envelope, emit, deps = defaultDeps()) {
+  const handler = EVENT_HANDLERS[envelope.capability];
+  if (!handler) {
+    emit({ error: "unknown_capability", message: envelope.capability });
+    return;
+  }
+  try {
+    const unsubscribe = handler(envelope.args || {}, emit, deps);
+    _subscriptions.set(envelope.sub_id, unsubscribe);
+  } catch (err) {
+    const code = err instanceof CapabilityError ? err.code : err && err.code ? err.code : "error";
+    const message = err && err.message ? String(err.message) : "";
+    emit({ error: code, message });
+  }
+}
+
+/**
+ * Close a streaming subscription by id and run its teardown (idempotent).
+ *
+ * Unknown ids are a no-op. A throw from the teardown function is swallowed so a
+ * misbehaving browser API cannot break the transport.
+ *
+ * @param {string} subId  The subscription id from `subscribeDispatch`.
+ * @returns {void}
+ */
+export function unsubscribeDispatch(subId) {
+  const unsubscribe = _subscriptions.get(subId);
+  if (!unsubscribe) return;
+  try {
+    unsubscribe();
+  } catch {
+    // A failing teardown must not propagate; the subscription is dropped anyway.
+  }
+  _subscriptions.delete(subId);
+}
+
+/**
  * Install the in-process dispatch entry point used by the Mode A FFIBridge.
  *
  * Pyodide proxies `window.__tempestweb_native__(envelope)` to the Python
  * FFIBridge; this exposes it. In Mode B the transport calls {@link dispatch}
  * directly on each incoming `native_call` frame and posts the result back.
  *
+ * The streaming counterparts `__tempestweb_native_subscribe__` /
+ * `__tempestweb_native_unsubscribe__` back the FFIBridge event channel (T-EV):
+ * Python passes a JSON envelope + a Python `emit` callable (marshalled as
+ * `emitStr`, receiving a JSON string) and later the `sub_id` to tear down.
+ *
  * @param {Object} [target]   The object to attach to (defaults to globalThis).
  * @param {NativeDeps} [deps] Injected Web APIs (defaults to live globals).
  */
 export function installNativeBridge(target = globalThis, deps = undefined) {
   target.__tempestweb_native__ = (envelope) => dispatch(envelope, deps);
+  target.__tempestweb_native_subscribe__ = (envelopeJson, emitStr) =>
+    subscribeDispatch(
+      JSON.parse(envelopeJson),
+      (payload) => emitStr(JSON.stringify(payload)),
+      deps,
+    );
+  target.__tempestweb_native_unsubscribe__ = (subId) => unsubscribeDispatch(subId);
 }

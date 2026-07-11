@@ -4,6 +4,19 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.38.0] — 2026-07-11
+
+### Added
+
+- **Stdlib method mapping in the transpiler.** Common Python methods now map to
+  their JS idioms: string/list renames (`.upper()` → `.toUpperCase()`,
+  `.lower`, `.strip`/`.lstrip`/`.rstrip`, `.startswith`/`.endswith`, `.append()`
+  → `.push()`), dict views (`.items()` → `Object.entries(d)`, `.keys()`,
+  `.values()`), and `sep.join(it)` → `it.join(sep)`. Methods on runtime/facade
+  objects (`app.replace(route)`, `native.storage.get(...)`, `ctrl.forward()`)
+  pass through unchanged — the map deliberately omits `.replace` and `.get` to
+  avoid clashing with them (use subscript `d[k]` for a dict lookup).
+
 ## [0.37.0] — 2026-07-11
 
 ### Added

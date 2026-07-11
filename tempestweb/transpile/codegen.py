@@ -81,6 +81,21 @@ _NAME_MAP: dict[str, str] = {
 }
 _INDENT: str = "  "
 
+# Python methods that map to a JS method with the SAME arguments. Kept to names
+# with no realistic collision with a runtime/facade method (e.g. `.replace` is
+# omitted — it clashes with `app.replace(route)`; `.get` clashes with
+# `native.storage.get(...)` — use subscript instead).
+_METHOD_RENAMES: dict[str, str] = {
+    "upper": "toUpperCase",
+    "lower": "toLowerCase",
+    "strip": "trim",
+    "lstrip": "trimStart",
+    "rstrip": "trimEnd",
+    "startswith": "startsWith",
+    "endswith": "endsWith",
+    "append": "push",
+}
+
 
 def _js_name(name: str) -> str:
     """Map a Python identifier to its JS spelling (API camelCase renames)."""
@@ -663,6 +678,9 @@ class _Generator:
         builtin = self._builtin_call(node, indent)
         if builtin is not None:
             return builtin
+        method = self._method_call(node, indent)
+        if method is not None:
+            return method
         func = self.expr(node.func, indent)
         if node.keywords and not node.args:
             return self._object_call(func, node, indent)
@@ -739,6 +757,31 @@ class _Generator:
             }
             if name in simple:
                 return f"{simple[name]}({args[0]})"
+        return None
+
+    def _method_call(self, node: ast.Call, indent: int) -> str | None:
+        """Map a Python stdlib method call to its JS idiom, or None to pass through.
+
+        Handles string/list methods that rename cleanly (``s.upper()`` →
+        ``s.toUpperCase()``, ``xs.append(x)`` → ``xs.push(x)``), dict views
+        (``d.items()`` → ``Object.entries(d)``, ``.keys``/``.values``) and
+        ``sep.join(it)`` → ``it.join(sep)`` (receiver/argument swap). Any other
+        method call returns ``None`` so it emits unchanged — runtime/facade
+        methods (``app.push``, ``native.storage.get``, ``ctrl.forward``) are left
+        alone.
+        """
+        if not isinstance(node.func, ast.Attribute) or node.keywords:
+            return None
+        method = node.func.attr
+        receiver = self.expr(node.func.value, indent)
+        args = [self.expr(a, indent) for a in node.args]
+        if method in _METHOD_RENAMES:
+            return f"{receiver}.{_METHOD_RENAMES[method]}({', '.join(args)})"
+        if not args and method in ("items", "keys", "values"):
+            js = "entries" if method == "items" else method
+            return f"Object.{js}({receiver})"
+        if method == "join" and len(args) == 1:
+            return f"{args[0]}.join({receiver})"
         return None
 
     @staticmethod

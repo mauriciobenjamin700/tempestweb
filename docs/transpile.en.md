@@ -516,6 +516,11 @@ spirit of `mypy --strict`.
     - **Builtins:** `len`, `str`/`int`/`float`/`bool`, `abs`, `round(x[, n])`,
       `min`/`max` (variadic or over one iterable), `sum(it)`, `range(...)`,
       `enumerate(it)`, `zip(a, b)`.
+    - **Stdlib methods:** string/list (`.upper`/`.lower`/`.strip`/`.startswith`/
+      `.endswith`/`.append`), dict views (`.items`/`.keys`/`.values` →
+      `Object.entries/keys/values`), `sep.join(it)`. Methods on runtime objects
+      (`app.replace`, `native.storage.get`, `ctrl.forward`) pass through
+      untouched — use subscript `d[k]` instead of `dict.get`.
     - **Statements:** `if`/`elif`/`else`, `for … in` (with a tuple target),
       `while`, `break`/`continue`, `try`/`except`/`finally` (a single `except`
       catches all; multiple dispatch by exception class name), `with … as x`

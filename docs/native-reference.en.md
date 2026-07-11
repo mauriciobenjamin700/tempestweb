@@ -397,10 +397,16 @@ async def write_tag(url: str) -> None:
         await native.nfc.write([{"recordType": "url", "data": url}])
 ```
 
-!!! info "NFC read (`scan`) not implemented yet"
-    **Writing** (`nfc.write`) and `is_supported()` are ready. Tag **scanning** is a
-    continuous stream and will be exposed over the event channel (T-EV) in a future
-    release — it is the one known gap in Track T.
+!!! tip "NFC read (`scan`) — streaming (T-EV)"
+    Beyond writing, tag **scanning** is a continuous stream over the event channel:
+
+    ```python
+    async for msg in native.nfc.scan():
+        print(msg.serial_number, msg.records)
+    ```
+
+    Each `NdefMessage` carries `serial_number` + decoded `records`; exiting the loop
+    aborts the scan. See [Native event channel](native-events.md).
 
 ### `contacts` — Contact Picker
 
@@ -527,9 +533,9 @@ async def beep() -> None:
   secure-context and always ships `is_supported()` + a fallback.
 - Streams (`geolocation.watch`, `sensors.*`, `network.watch`, `visibility.watch`,
   `orientation.watch`, `battery.watch`, `speech.listen`, `idle.watch`,
-  `tabs.receive`, `gamepad.watch`, `midi.messages`) close the subscription when the
-  loop exits.
-- **Known gap:** `nfc.scan` (streaming) is not implemented yet.
+  `tabs.receive`, `gamepad.watch`, `midi.messages`, `nfc.scan`) close the
+  subscription when the loop exits.
+- Track T is **complete**, with no known capability gaps.
 
 See the bridge in action in the [Device panel](examples/device-panel.md) and the
 call wire format in

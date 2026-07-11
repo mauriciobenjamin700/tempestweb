@@ -4,6 +4,18 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.51.0] — 2026-07-11
+
+### Added
+
+- **`nfc.scan` — streaming NFC reads (closes the Track T gap).** The Web NFC
+  `NDEFReader.scan()` is now exposed as a streaming capability on the event
+  channel: `async for msg in nfc.scan(): ...` yields an `NdefMessage`
+  (`serial_number` + decoded `records`) per tag read, and exiting the loop aborts
+  the scan. Wired across all three surfaces (Python facade + `EVENT_HANDLERS`
+  handler + Mode C `stream()` facade) with conformance + unit tests. Track T is
+  now complete with no known capability gaps.
+
 ## [0.50.0] — 2026-07-11
 
 ### Added

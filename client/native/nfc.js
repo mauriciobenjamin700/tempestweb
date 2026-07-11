@@ -39,3 +39,59 @@ export async function nfcWrite(args, deps) {
     throw new CapabilityError("failed", err && err.message);
   }
 }
+
+/**
+ * Convert an NDEF record's DataView payload to a base64 string.
+ * @param {?DataView} data
+ * @returns {string} The base64-encoded record bytes ("" when absent).
+ */
+function recordDataBase64(data) {
+  if (!data || typeof data.byteLength !== "number") {
+    return "";
+  }
+  let binary = "";
+  for (let i = 0; i < data.byteLength; i += 1) {
+    binary += String.fromCharCode(data.getUint8(i));
+  }
+  return btoa(binary);
+}
+
+/**
+ * Stream NDEF messages as tags are read (event channel / T-EV).
+ * @param {Object} _args
+ * @param {(payload: Object) => void} emit  Called with `{event}` / `{error}`.
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {() => void} Teardown that aborts the scan.
+ * @throws {CapabilityError} unavailable when the Web NFC API is absent.
+ */
+export function nfcScan(_args, emit, deps) {
+  const win = deps.window || /** @type {any} */ (globalThis);
+  const NDEFReaderCtor = win && win.NDEFReader;
+  if (typeof NDEFReaderCtor !== "function") {
+    throw new CapabilityError("unavailable", "the Web NFC API is not available");
+  }
+  const controller = new (deps.AbortController || globalThis.AbortController)();
+  const reader = new NDEFReaderCtor();
+  reader.onreading = (event) => {
+    const records = [];
+    const message = event && event.message;
+    if (message && message.records) {
+      for (const record of message.records) {
+        records.push({
+          record_type: record.recordType || "",
+          media_type: record.mediaType || "",
+          data_base64: recordDataBase64(record.data),
+        });
+      }
+    }
+    emit({ event: { serial_number: (event && event.serialNumber) || "", records } });
+  };
+  reader.onreadingerror = () => {
+    emit({ error: "read_error", message: "failed to read the NFC tag" });
+  };
+  Promise.resolve(reader.scan({ signal: controller.signal })).catch((err) => {
+    const code = err && err.name === "NotAllowedError" ? "permission_denied" : "failed";
+    emit({ error: code, message: (err && err.message) || "" });
+  });
+  return () => controller.abort();
+}

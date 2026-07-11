@@ -699,6 +699,12 @@ export const native = Object.freeze({
      * @returns {Promise<void>}
      */
     write: (records) => call("nfc.write", { records }),
+    /**
+     * Stream NDEF messages as tags are read (event channel).
+     * @param {(message: Object) => void} onEvent  Called per tag read.
+     * @returns {() => void}  Unsubscribe to stop scanning.
+     */
+    scan: (onEvent) => stream("nfc.scan", {}, onEvent),
   }),
   payment: Object.freeze({
     /** Whether the Payment Request API is available. @returns {Promise<boolean>} */

@@ -91,19 +91,23 @@ app = create_app(make_state, view, security=SecurityConfig(
 
 ```python
 SecurityConfig(
-    max_connections=500,      # teto de sessões WS+SSE simultâneas
-    max_message_bytes=65536,  # rejeita POST SSE maior que isso (413)
+    max_connections=500,             # teto de sessões WS+SSE simultâneas
+    max_message_bytes=65536,         # rejeita POST SSE maior que isso (413)
+    max_connections_per_minute=60,   # flood de conexões por IP (1013/429)
 )
 ```
 
 - **`max_connections`** — conexão acima do teto é recusada (WS fecha `1013`; SSE
   `503`). O contador decrementa quando a sessão encerra.
 - **`max_message_bytes`** — um `POST /sse/{id}` com corpo maior responde `413`.
+- **`max_connections_per_minute`** — janela deslizante de 60s por IP (do
+  `X-Forwarded-For` ou peer); flood é recusado (WS `1013` / SSE `429`).
 
-!!! note "Parcial (🔶)"
-    Timeout de sessão ociosa, teto de mensagem no WS e rate limiting por IP ainda
-    são follow-ups do Trilho S (S2). Para rate limiting agressivo hoje, use um
-    reverse-proxy (nginx `limit_req`).
+!!! note "Conexões mortas + ociosas"
+    Conexão WS **morta/meio-aberta** já é ceifada pelo ping do uvicorn (~20–40s),
+    não precisa de idle-timeout no app. Um idle-timeout ativo desconectaria também
+    usuários legítimos parados, então **não** é imposto — use `max_connections` +
+    rate limiting + o `limit_req` do reverse-proxy para defesa em profundidade.
 
 ## S6 — headers de segurança
 

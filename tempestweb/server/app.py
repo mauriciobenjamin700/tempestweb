@@ -27,7 +27,12 @@ from starlette.websockets import WebSocket
 
 from tempest_core import App, Widget
 from tempestweb.runtime.session import AppSession
-from tempestweb.server.security import Credentials, SecurityConfig, _bearer_token
+from tempestweb.server.security import (
+    Credentials,
+    RateLimiter,
+    SecurityConfig,
+    _bearer_token,
+)
 from tempestweb.transports.base import PatchTransport
 from tempestweb.transports.sse import SSETransport
 from tempestweb.transports.websocket import WebSocketTransport
@@ -62,15 +67,24 @@ async def _authorize(security: SecurityConfig, credentials: Credentials) -> bool
 
 
 def _credentials_from_headers(
-    headers: Mapping[str, str], query: Mapping[str, str]
+    headers: Mapping[str, str],
+    query: Mapping[str, str],
+    peer: str | None = None,
 ) -> Credentials:
-    """Build :class:`Credentials` from request headers + query params."""
+    """Build :class:`Credentials` from request headers + query params.
+
+    ``client_ip`` is the first ``X-Forwarded-For`` hop (set by the reverse proxy)
+    or the direct peer address.
+    """
     lowered = {k.lower(): v for k, v in headers.items()}
+    forwarded = lowered.get("x-forwarded-for")
+    client_ip = forwarded.split(",")[0].strip() if forwarded else peer
     return Credentials(
         token=_bearer_token(lowered, query),
         origin=lowered.get("origin"),
         headers=lowered,
         query=dict(query),
+        client_ip=client_ip,
     )
 
 
@@ -112,6 +126,8 @@ class TempestWebServer(Generic[S]):
         self._metrics_enabled: bool = metrics
         self._opened: int = 0  # total sessions ever accepted
         self._rejected: int = 0  # total connections refused (auth/origin/cap)
+        rpm = self._security.max_connections_per_minute
+        self._rate: RateLimiter | None = RateLimiter(rpm) if rpm else None
         self.api: FastAPI = FastAPI(title=title)
         self._install_cors()
         self._install_security_headers()
@@ -156,6 +172,12 @@ class TempestWebServer(Generic[S]):
         """Whether the concurrent-session cap is reached (S2)."""
         cap = self._security.max_connections
         return cap is not None and self._live >= cap
+
+    def _rate_ok(self, credentials: Credentials) -> bool:
+        """Whether the client IP is within the per-minute connection rate (S2)."""
+        if self._rate is None:
+            return True
+        return self._rate.allow(credentials.client_ip or "unknown")
 
     def _install_cors(self) -> None:
         """Install CORS for the HTTP/SSE surface when an allowlist is set (S1)."""
@@ -218,9 +240,14 @@ class TempestWebServer(Generic[S]):
             a session is created; a rejected connection is closed with ``1008``
             (policy violation) and never mounts.
             """
+            peer = websocket.client.host if websocket.client else None
             credentials = _credentials_from_headers(
-                websocket.headers, websocket.query_params
+                websocket.headers, websocket.query_params, peer
             )
+            if not self._rate_ok(credentials):
+                self._rejected += 1
+                await websocket.close(code=1013)  # rate limited
+                return
             if not await _authorize(self._security, credentials):
                 self._rejected += 1
                 await websocket.close(code=1008)
@@ -242,10 +269,15 @@ class TempestWebServer(Generic[S]):
         @self.api.get("/sse")
         async def sse_endpoint(request: Request, session: str) -> Response:
             """Open (or resume) the SSE patch stream for ``session``."""
-            if not await self._authorize_request(request):
+            credentials = self._request_credentials(request)
+            new_session = session not in self._sse_sessions
+            if new_session and not self._rate_ok(credentials):
+                self._rejected += 1
+                return JSONResponse({"error": "rate limited"}, status_code=429)
+            if not await _authorize(self._security, credentials):
                 self._rejected += 1
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
-            if session not in self._sse_sessions and self._at_capacity():
+            if new_session and self._at_capacity():
                 self._rejected += 1
                 return JSONResponse({"error": "at capacity"}, status_code=503)
             return await self._open_sse(request, session)
@@ -270,10 +302,14 @@ class TempestWebServer(Generic[S]):
         except ValueError:
             return False
 
+    def _request_credentials(self, request: Request) -> Credentials:
+        """Extract credentials (incl. client IP) from an HTTP request."""
+        peer = request.client.host if request.client else None
+        return _credentials_from_headers(request.headers, request.query_params, peer)
+
     async def _authorize_request(self, request: Request) -> bool:
-        """Run the Track-S gate for an HTTP (SSE) request."""
-        credentials = _credentials_from_headers(request.headers, request.query_params)
-        return await _authorize(self._security, credentials)
+        """Run the Track-S auth gate for an HTTP (SSE) request."""
+        return await _authorize(self._security, self._request_credentials(request))
 
     async def _open_sse(self, request: Request, session_id: str) -> Response:
         """Open or resume an SSE session and return the streaming response.

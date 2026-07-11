@@ -69,7 +69,7 @@ exercising the feedback component without the overlay API.
 Run in either mode unchanged::
 
     tempestweb dev --mode wasm    # Python in the browser (Pyodide)
-    tempestweb dev --mode server  # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server  # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -452,7 +452,7 @@ def view(app: App[ChatState]) -> Widget:
     Python runs **inside the browser** — no server needed.
 
     ```bash
-    tempestweb dev --mode wasm examples/chat-ui/app.py
+    tempestweb dev --mode wasm --path examples/chat-ui
     ```
 
 === "Server mode (FastAPI + WebSocket)"
@@ -460,7 +460,7 @@ def view(app: App[ChatState]) -> Widget:
     Python runs on the server; the client receives patches over WebSocket.
 
     ```bash
-    tempestweb dev --mode server examples/chat-ui/app.py
+    tempestweb run --mode server --path examples/chat-ui
     ```
 
 !!! tip "Tip — same code, two modes"

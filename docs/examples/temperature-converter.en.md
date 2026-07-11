@@ -51,7 +51,7 @@ driven entirely by :class:`~tempest_core.widgets.events.TextChangeEvent`.
 No transport is named — the same ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 Key patterns shown:
 
@@ -433,7 +433,7 @@ Save the file as `examples/temperature-converter/app.py` and pick a mode:
 === "WASM mode (Python in the browser)"
 
     ```bash
-    tempestweb dev --mode wasm examples/temperature-converter/app.py
+    tempestweb dev --mode wasm --path examples/temperature-converter
     ```
 
     Pyodide loads the full Python runtime in the browser. No server, no
@@ -442,7 +442,7 @@ Save the file as `examples/temperature-converter/app.py` and pick a mode:
 === "Server mode (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb dev --mode server examples/temperature-converter/app.py
+    tempestweb run --mode server --path examples/temperature-converter
     ```
 
     A FastAPI server starts locally. The JS client connects via WebSocket,

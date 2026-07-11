@@ -469,7 +469,7 @@ Like :mod:`examples.fetch.app`, this exact ``view`` runs unchanged in both
 modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 It demonstrates an async native-capability handler: pressing *Capture* runs an
 ``async`` handler that:
@@ -852,7 +852,7 @@ def _meta_badge(label: str, value: str, key: str) -> Widget:
 ### Modo A — Python no browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/photo-capture/app.py
+tempestweb dev --mode wasm --path examples/photo-capture
 ```
 
 Python roda **dentro do browser** via Pyodide. A câmera é acessada diretamente por `navigator.mediaDevices` via FFI, sem round-trip de rede.
@@ -860,7 +860,7 @@ Python roda **dentro do browser** via Pyodide. A câmera é acessada diretamente
 ### Modo B — Python no servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/photo-capture/app.py
+tempestweb run --mode server --path examples/photo-capture
 ```
 
 Python roda no servidor; o `ProxyBridge` serializa o `native_call` e o envia ao cliente pelo WebSocket. O cliente JS captura a foto e devolve o `native_result` com os bytes base64. O servidor desserializa, cria o `Photo` e continua o handler.

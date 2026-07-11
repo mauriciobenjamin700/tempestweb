@@ -68,7 +68,7 @@ banner for wrong credentials.
 Run in either mode — the ``view`` function is transport-agnostic::
 
     tempestweb dev --mode wasm    # Python in the browser (Pyodide)
-    tempestweb dev --mode server  # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server  # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -730,7 +730,7 @@ Save the file as `examples/login-form/app.py` and pick a mode:
 === "WASM mode (Python in the browser)"
 
     ```bash
-    tempestweb dev --mode wasm examples/login-form/app.py
+    tempestweb dev --mode wasm --path examples/login-form
     ```
 
     Pyodide loads the full Python runtime in the browser. All validators and
@@ -739,7 +739,7 @@ Save the file as `examples/login-form/app.py` and pick a mode:
 === "Server mode (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb dev --mode server examples/login-form/app.py
+    tempestweb run --mode server --path examples/login-form
     ```
 
     A FastAPI server starts locally. The JS client sends typing events and

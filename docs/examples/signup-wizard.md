@@ -477,7 +477,7 @@ Abra um terminal na raiz do projeto e escolha o modo:
 === "Modo A — WASM (Pyodide)"
 
     ```bash
-    tempestweb dev --mode wasm examples/signup-wizard/app.py
+    tempestweb dev --mode wasm --path examples/signup-wizard
     ```
 
     Python roda diretamente no browser via Pyodide. Nenhum servidor de backend é
@@ -486,7 +486,7 @@ Abra um terminal na raiz do projeto e escolha o modo:
 === "Modo B — Servidor (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb dev --mode server examples/signup-wizard/app.py
+    tempestweb run --mode server --path examples/signup-wizard
     ```
 
     Python roda no servidor; um cliente JS fino se conecta por WebSocket e aplica

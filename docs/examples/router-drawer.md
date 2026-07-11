@@ -808,13 +808,13 @@ widgets é construída sem erros antes de rodar no browser.
 **Modo A — Python no browser (Pyodide):**
 
 ```bash
-tempestweb dev --mode wasm examples/router-drawer/app.py
+tempestweb dev --mode wasm --path examples/router-drawer
 ```
 
 **Modo B — Python no servidor (FastAPI + WebSocket):**
 
 ```bash
-tempestweb dev --mode server examples/router-drawer/app.py
+tempestweb run --mode server --path examples/router-drawer
 ```
 
 Abra `http://localhost:8000` e:

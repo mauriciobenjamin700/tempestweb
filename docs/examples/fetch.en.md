@@ -26,8 +26,8 @@ I/O-bound fetch, then re-renders with the result. Without freezing the UI. 🚀
 ## Running ▶
 
 ```bash
-tempestweb run --mode wasm     examples/fetch   # Python in the browser (Pyodide)
-tempestweb run --mode server   examples/fetch   # Python on the server (FastAPI + WS)
+tempestweb run --mode wasm     --path examples/fetch   # Python in the browser (Pyodide)
+tempestweb run --mode server   --path examples/fetch   # Python on the server (FastAPI + WS)
 ```
 
 ---

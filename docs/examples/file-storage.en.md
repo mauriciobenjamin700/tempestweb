@@ -469,7 +469,7 @@ no bridge installed.
 The demo runs identically in both execution modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -819,7 +819,7 @@ def view(app: App[State]) -> Widget:
 ### Mode A — Python in the browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/file-storage/app.py
+tempestweb dev --mode wasm --path examples/file-storage
 ```
 
 Python runs **inside the browser** via Pyodide. The `FFIBridge` is installed automatically. Calls to `storage.put/get/list_keys/remove` go directly to `client/native/storage.js`, which uses the browser's IndexedDB.
@@ -827,7 +827,7 @@ Python runs **inside the browser** via Pyodide. The `FFIBridge` is installed aut
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/file-storage/app.py
+tempestweb run --mode server --path examples/file-storage
 ```
 
 Python runs on the server; the `ProxyBridge` is installed automatically. Each native call serializes a `native_call` envelope over the WebSocket, the browser executes IndexedDB, and returns a `native_result` envelope.

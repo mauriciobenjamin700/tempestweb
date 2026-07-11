@@ -225,7 +225,7 @@ This example showcases the feedback widgets shipped by the core, all wired
 into a single screen that runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 It demonstrates :class:`Alert` (info/success/warning/error variants), a
 :class:`Banner`, a row of :class:`Badge` chips, a :class:`ProgressStepper`
@@ -413,13 +413,13 @@ def view(app: App[State]) -> Widget:
 === "Mode A — WASM (Python in the browser)"
 
     ```bash
-    tempestweb dev --mode wasm examples/core-feedback/app.py
+    tempestweb dev --mode wasm --path examples/core-feedback
     ```
 
 === "Mode B — Server (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb dev --mode server examples/core-feedback/app.py
+    tempestweb run --mode server --path examples/core-feedback
     ```
 
 !!! check "Verification"

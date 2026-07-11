@@ -44,7 +44,7 @@ O tempestweb tem uma premissa central: **o código da aplicação não conhece o
 | Estado compartilhado | Impossível entre abas | Possível (sessões no mesmo processo) |
 
 !!! tip "Regra de ouro"
-    Escolha o modo no `tempestweb dev --mode <wasm|server>` — ou na hora de implantar. O `app.py` nunca muda.
+    Escolha o modo na CLI: `tempestweb dev --mode wasm` (estático) ou `tempestweb run --mode server` (servidor) — ou na hora de implantar. O `app.py` nunca muda.
 
 ---
 
@@ -76,7 +76,7 @@ Este é o `examples/counter/app.py`. Copie-o exatamente como está — ele roda 
 This exact ``view`` runs unchanged in both modes:
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport — that is the whole point.
 """
@@ -336,10 +336,10 @@ def _json_safe(value: Any) -> Any:
 
 ```bash
 # Modo A — Python no browser (Pyodide / WASM)
-tempestweb dev --mode wasm examples/counter/app.py
+tempestweb dev --mode wasm --path examples/counter
 
 # Modo B — Python no servidor (FastAPI + WebSocket)
-tempestweb dev --mode server examples/counter/app.py
+tempestweb run --mode server --path examples/counter
 ```
 
 !!! tip "Mesmo comando, modo diferente"

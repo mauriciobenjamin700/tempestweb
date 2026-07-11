@@ -163,7 +163,7 @@ node --test "tests/client/*.test.js"
 - **compilador:** teste Python que transpila `examples/counter/app.py` e compara
   byte-a-byte com o `counter.gen.js` commitado (golden regenerável, como as
   fixtures de conformância).
-- **Playwright (manual/E2E):** `tempestweb build --mode transpile examples/counter`
+- **Playwright (manual/E2E):** `tempestweb build --mode transpile --path examples/counter`
   → servir estático → montar → clicar +/- → `Count` atualiza, zero erro de console.
 
 ## Escopo do spike (C0) e o que fica adiante

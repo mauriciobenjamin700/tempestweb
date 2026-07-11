@@ -567,7 +567,7 @@ submit attempt.
 Run in either mode — the app never names the transport::
 
     tempestweb dev --mode wasm
-    tempestweb dev --mode server
+    tempestweb run --mode server
 """
 
 from __future__ import annotations
@@ -992,7 +992,7 @@ def view(app: App[CadastroState]) -> Widget:
 ### Modo WASM (Pyodide no browser)
 
 ```bash
-tempestweb dev --mode wasm examples/br-cadastro/app.py
+tempestweb dev --mode wasm --path examples/br-cadastro
 ```
 
 O CLI inicia um servidor local, abre o browser e carrega o Pyodide. Toda a lógica Python roda **dentro do browser** — nenhum roundtrip ao servidor.
@@ -1000,7 +1000,7 @@ O CLI inicia um servidor local, abre o browser e carrega o Pyodide. Toda a lógi
 ### Modo Servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/br-cadastro/app.py
+tempestweb run --mode server --path examples/br-cadastro
 ```
 
 O Python roda no servidor. O browser recebe patches de UI via WebSocket. A experiência para o usuário final é idêntica.

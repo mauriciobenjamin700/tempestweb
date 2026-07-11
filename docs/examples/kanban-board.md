@@ -633,13 +633,13 @@ Column (root)
 Execute no **Modo A** (Python no browser via Pyodide):
 
 ```bash
-tempestweb dev --mode wasm examples/kanban-board/app.py
+tempestweb dev --mode wasm --path examples/kanban-board
 ```
 
 Execute no **Modo B** (Python no servidor via FastAPI + WebSocket):
 
 ```bash
-tempestweb dev --mode server examples/kanban-board/app.py
+tempestweb run --mode server --path examples/kanban-board
 ```
 
 Abra `http://localhost:8000` no browser. Você deve ver:

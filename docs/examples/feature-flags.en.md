@@ -640,7 +640,7 @@ Key concepts shown
 Run unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport — that is the whole point.
 """
@@ -1124,7 +1124,7 @@ def view(app: App[FeatureFlagsState]) -> Widget:
 ### Mode A — Python in the browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/feature-flags/app.py
+tempestweb dev --mode wasm --path examples/feature-flags
 ```
 
 Python runs **inside the browser** via Pyodide. No server needed.
@@ -1132,7 +1132,7 @@ Python runs **inside the browser** via Pyodide. No server needed.
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/feature-flags/app.py
+tempestweb run --mode server --path examples/feature-flags
 ```
 
 Python runs on the server; the browser receives JSON patches over WebSocket and

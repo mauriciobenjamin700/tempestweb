@@ -187,7 +187,7 @@ return Column(
 This ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 It showcases the core's selection and navigation widgets — :class:`Tabs`,
 :class:`SegmentedControl`, :class:`RadioGroup`, :class:`Chip` and :class:`Card` —
@@ -337,13 +337,13 @@ def view(app: App[SettingsState]) -> Widget:
 === "Modo A — WASM (Python no browser)"
 
     ```bash
-    tempestweb dev --mode wasm examples/core-tabbed-settings/app.py
+    tempestweb dev --mode wasm --path examples/core-tabbed-settings
     ```
 
 === "Modo B — Servidor (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb dev --mode server examples/core-tabbed-settings/app.py
+    tempestweb run --mode server --path examples/core-tabbed-settings
     ```
 
 !!! check "Verificação"

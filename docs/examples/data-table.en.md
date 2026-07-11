@@ -410,7 +410,7 @@ Putting it all together, the final `app.py` looks like this:
 This exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -588,7 +588,7 @@ for the mode you want:
 === "Mode A — WASM (Python in the browser)"
 
     ```bash
-    tempestweb dev --mode wasm examples/data-table/app.py
+    tempestweb dev --mode wasm --path examples/data-table
     ```
 
     Pyodide loads Python directly in the browser. Search and sort execute
@@ -597,7 +597,7 @@ for the mode you want:
 === "Mode B — Server (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb dev --mode server examples/data-table/app.py
+    tempestweb run --mode server --path examples/data-table
     ```
 
     Python runs on the server. Each session gets its own isolated

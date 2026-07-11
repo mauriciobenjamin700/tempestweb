@@ -429,7 +429,7 @@ one broken subtree blanks the whole screen. This example shows how to:
 Run it in either mode::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -713,7 +713,7 @@ def view(app: App[BoundaryState]) -> Widget:
 ### Mode A — Python in the browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/error-boundary/app.py
+tempestweb dev --mode wasm --path examples/error-boundary
 ```
 
 Python runs **inside the browser** via Pyodide. No server required. Ideal for demos and prototypes.
@@ -721,7 +721,7 @@ Python runs **inside the browser** via Pyodide. No server required. Ideal for de
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/error-boundary/app.py
+tempestweb run --mode server --path examples/error-boundary
 ```
 
 Python runs on the server; the browser receives JSON patches over WebSocket and applies them to the DOM. Ideal for production with SEO and fast first-paint.

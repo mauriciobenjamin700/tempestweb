@@ -73,8 +73,8 @@ app + the JS client into a static bundle:
 === "Command"
 
     ```bash
-    tempestweb build --mode wasm examples/counter/app.py
-    tempestweb dev   --mode wasm examples/counter/app.py   # with hot-reload
+    tempestweb build --mode wasm --path examples/counter
+    tempestweb dev   --mode wasm --path examples/counter   # with hot-reload
     ```
 
 === "What happens"
@@ -98,7 +98,7 @@ WebSocket (or SSE). Like Phoenix LiveView:
 === "Command"
 
     ```bash
-    tempestweb dev --mode server examples/counter/app.py
+    tempestweb run --mode server --path examples/counter
     # serves at http://127.0.0.1:8000
     ```
 
@@ -125,8 +125,8 @@ the result is a 100% static bundle:
 === "Command"
 
     ```bash
-    tempestweb build --mode transpile examples/counter   # writes dist/transpile/
-    tempestweb dev   --mode transpile examples/counter    # with livereload
+    tempestweb build --mode transpile --path examples/counter   # writes dist/transpile/
+    tempestweb dev   --mode transpile --path examples/counter    # with livereload
     ```
 
 === "What happens"

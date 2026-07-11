@@ -27,8 +27,8 @@ list with a checkbox per item. 🚀
 ## Running ▶
 
 ```bash
-tempestweb run --mode wasm     examples/todo   # Python in the browser (Pyodide)
-tempestweb run --mode server   examples/todo   # Python on the server (FastAPI + WS)
+tempestweb run --mode wasm     --path examples/todo   # Python in the browser (Pyodide)
+tempestweb run --mode server   --path examples/todo   # Python on the server (FastAPI + WS)
 ```
 
 ---

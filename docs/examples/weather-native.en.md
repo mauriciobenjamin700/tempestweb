@@ -475,7 +475,7 @@ Here is the full file, ready to copy:
 Demonstrates two native capabilities wired together in a single async handler::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 The flow: tap **Get weather** → acquire GPS fix via ``geolocation.get_position`` →
 fetch weather data from the Open-Meteo API via ``native.http.request`` → display
@@ -839,7 +839,7 @@ def view(app: App[WeatherState]) -> Widget:
 ### Mode A — Python in the browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/weather-native/app.py
+tempestweb dev --mode wasm --path examples/weather-native
 ```
 
 Python runs **inside the browser** via Pyodide. The `FFIBridge` is installed automatically during bootstrap and calls `navigator.geolocation` and `fetch` directly — no Python-to-server network hop.
@@ -847,7 +847,7 @@ Python runs **inside the browser** via Pyodide. The `FFIBridge` is installed aut
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/weather-native/app.py
+tempestweb run --mode server --path examples/weather-native
 ```
 
 Python runs on the server; the `ProxyBridge` serialises each `native_call` as a JSON envelope, sends it to the browser over WebSocket, and awaits the `native_result` back. The browser executes `client/native/geolocation.js` and `client/native/http.js` as usual.

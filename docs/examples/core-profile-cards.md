@@ -247,7 +247,7 @@ detail sections, and :class:`ListTile` rows separated by :class:`Divider`.
 The same ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 Interaction is wired through state: tapping a star calls ``Rating.on_rate``
 to record a new score, and toggling a section header calls
@@ -498,13 +498,13 @@ def view(app: App[ProfileCardsState]) -> Widget:
 === "Modo A — WASM (Python no browser)"
 
     ```bash
-    tempestweb dev --mode wasm examples/core-profile-cards/app.py
+    tempestweb dev --mode wasm --path examples/core-profile-cards
     ```
 
 === "Modo B — Servidor (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb dev --mode server examples/core-profile-cards/app.py
+    tempestweb run --mode server --path examples/core-profile-cards
     ```
 
 !!! check "Verificação"

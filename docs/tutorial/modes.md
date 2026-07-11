@@ -73,8 +73,8 @@ o cliente JS num bundle estático:
 === "Comando"
 
     ```bash
-    tempestweb build --mode wasm examples/counter/app.py
-    tempestweb dev   --mode wasm examples/counter/app.py   # com hot-reload
+    tempestweb build --mode wasm --path examples/counter
+    tempestweb dev   --mode wasm --path examples/counter   # com hot-reload
     ```
 
 === "O que acontece"
@@ -98,7 +98,7 @@ WebSocket (ou SSE). Análogo ao Phoenix LiveView:
 === "Comando"
 
     ```bash
-    tempestweb dev --mode server examples/counter/app.py
+    tempestweb run --mode server --path examples/counter
     # serve em http://127.0.0.1:8000
     ```
 
@@ -124,8 +124,8 @@ resultado é um bundle 100% estático:
 === "Comando"
 
     ```bash
-    tempestweb build --mode transpile examples/counter   # gera dist/transpile/
-    tempestweb dev   --mode transpile examples/counter    # com livereload
+    tempestweb build --mode transpile --path examples/counter   # gera dist/transpile/
+    tempestweb dev   --mode transpile --path examples/counter    # com livereload
     ```
 
 === "O que acontece"

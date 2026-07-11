@@ -570,13 +570,13 @@ def view(app: App[ProfileState]) -> Widget:
 Execute no **Modo A** (Python no browser via Pyodide):
 
 ```bash
-tempestweb dev --mode wasm examples/tabs-profile/app.py
+tempestweb dev --mode wasm --path examples/tabs-profile
 ```
 
 Execute no **Modo B** (Python no servidor via FastAPI + WebSocket):
 
 ```bash
-tempestweb dev --mode server examples/tabs-profile/app.py
+tempestweb run --mode server --path examples/tabs-profile
 ```
 
 Abra `http://localhost:8000` no browser. Você deve ver:

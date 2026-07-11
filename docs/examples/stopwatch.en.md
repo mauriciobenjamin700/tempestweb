@@ -350,7 +350,7 @@ widget tree itself never changes.
 Both modes work unchanged::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 """
 
 from __future__ import annotations
@@ -624,7 +624,7 @@ def view(app: App[StopwatchState]) -> Widget:
 ### Mode A — Python in the browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/stopwatch/app.py
+tempestweb dev --mode wasm --path examples/stopwatch
 ```
 
 Python runs **inside the browser** via Pyodide. No server required.
@@ -632,7 +632,7 @@ Python runs **inside the browser** via Pyodide. No server required.
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/stopwatch/app.py
+tempestweb run --mode server --path examples/stopwatch
 ```
 
 Python runs on the server; the browser receives JSON patches over WebSocket and applies them to the DOM.

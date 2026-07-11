@@ -485,7 +485,7 @@ Aqui está o `app.py` completo, pronto para copiar:
 Like :mod:`examples.counter.app`, this exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 This example demonstrates the PWA/WebPush flow:
 
@@ -826,7 +826,7 @@ def view(app: App[State]) -> Widget:
 ### Modo A — Python no browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/pwa-webpush/app.py
+tempestweb dev --mode wasm --path examples/pwa-webpush
 ```
 
 O Python roda **dentro do browser** via Pyodide. A chamada `request_permission`
@@ -836,7 +836,7 @@ sem rede extra.
 ### Modo B — Python no servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/pwa-webpush/app.py
+tempestweb run --mode server --path examples/pwa-webpush
 ```
 
 O Python roda no servidor. Cada `await app.state.request_permission()` serializa

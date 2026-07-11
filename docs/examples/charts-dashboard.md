@@ -252,7 +252,7 @@ line chart) plus a row of metric cards, all driven entirely by typed Python stat
 Like every tempestweb example, the same ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 A "Next week" button mutates the state to advance the data window, demonstrating
 that the charts re-render reactively from the same source of truth.
@@ -459,7 +459,7 @@ def view(app: App[DashboardState]) -> Widget:
 === "Modo A — WASM (Python no browser)"
 
     ```bash
-    tempestweb dev --mode wasm examples/charts-dashboard/app.py
+    tempestweb dev --mode wasm --path examples/charts-dashboard
     ```
 
     O Pyodide carrega o Python no browser; o `<canvas>` é desenhado localmente.
@@ -467,7 +467,7 @@ def view(app: App[DashboardState]) -> Widget:
 === "Modo B — Servidor (FastAPI + WebSocket)"
 
     ```bash
-    tempestweb dev --mode server examples/charts-dashboard/app.py
+    tempestweb run --mode server --path examples/charts-dashboard
     ```
 
     O Python roda no servidor; o cliente recebe patches JSON e repinta o canvas.

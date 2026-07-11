@@ -650,7 +650,7 @@ def view(app: App[GreetingState]) -> Widget:
 ### Modo A — Python no browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/i18n-greeting/app.py
+tempestweb dev --mode wasm --path examples/i18n-greeting
 ```
 
 O Python roda **dentro do browser** via Pyodide. Sem servidor necessário.
@@ -658,7 +658,7 @@ O Python roda **dentro do browser** via Pyodide. Sem servidor necessário.
 ### Modo B — Python no servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/i18n-greeting/app.py
+tempestweb run --mode server --path examples/i18n-greeting
 ```
 
 O Python roda no servidor; o browser recebe patches JSON pelo WebSocket e aplica ao DOM.

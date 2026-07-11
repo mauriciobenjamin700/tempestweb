@@ -506,7 +506,7 @@ Aqui está o arquivo `app.py` completo, pronto para copiar e colar:
 This exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 The demo builds a complete product-review form:
 
@@ -859,13 +859,13 @@ def view(app: App[ReviewState]) -> Widget:
 Execute no **Modo A** (Python no browser via Pyodide):
 
 ```bash
-tempestweb dev --mode wasm examples/rating-review/app.py
+tempestweb dev --mode wasm --path examples/rating-review
 ```
 
 Execute no **Modo B** (Python no servidor via FastAPI + WebSocket):
 
 ```bash
-tempestweb dev --mode server examples/rating-review/app.py
+tempestweb run --mode server --path examples/rating-review
 ```
 
 Abra `http://localhost:8000` no browser. Você deve ver:

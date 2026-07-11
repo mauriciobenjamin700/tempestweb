@@ -492,7 +492,7 @@ After the final question a results screen shows the score, a grade label, and a
 This runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 The application never names a transport.
 """
@@ -867,7 +867,7 @@ def view(app: App[QuizState]) -> Widget:
 ### Mode A — Python in the browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/quiz-app/app.py
+tempestweb dev --mode wasm --path examples/quiz-app
 ```
 
 Python runs **inside the browser** via Pyodide. No server required.
@@ -875,7 +875,7 @@ Python runs **inside the browser** via Pyodide. No server required.
 ### Mode B — Python on the server (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/quiz-app/app.py
+tempestweb run --mode server --path examples/quiz-app
 ```
 
 Python runs on the server; the browser receives JSON patches over WebSocket and applies them to the DOM.

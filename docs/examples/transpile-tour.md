@@ -36,16 +36,16 @@ o app inteiro é transcrito para JavaScript nativo. 🚀
 
 ```bash
 # Build estático (Modo C) — gera o bundle JS nativo:
-tempestweb build --mode transpile examples/transpile-tour
+tempestweb build --mode transpile --path examples/transpile-tour
 
 # Dev com livereload (Modo C):
-tempestweb dev --mode transpile examples/transpile-tour
+tempestweb dev --mode transpile --path examples/transpile-tour
 ```
 
 !!! tip "Rode-o também nos Modos A/B"
     ```bash
-    tempestweb run --mode wasm   examples/transpile-tour   # Python no browser
-    tempestweb run --mode server examples/transpile-tour   # Python no servidor
+    tempestweb run --mode wasm   --path examples/transpile-tour   # Python no browser
+    tempestweb run --mode server --path examples/transpile-tour   # Python no servidor
     ```
     Nenhuma linha do `app.py` muda entre os modos.
 

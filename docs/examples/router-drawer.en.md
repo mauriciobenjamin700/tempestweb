@@ -808,13 +808,13 @@ builds without errors before launching in the browser.
 **Mode A — Python in the browser (Pyodide):**
 
 ```bash
-tempestweb dev --mode wasm examples/router-drawer/app.py
+tempestweb dev --mode wasm --path examples/router-drawer
 ```
 
 **Mode B — Python on the server (FastAPI + WebSocket):**
 
 ```bash
-tempestweb dev --mode server examples/router-drawer/app.py
+tempestweb run --mode server --path examples/router-drawer
 ```
 
 Open `http://localhost:8000` and:

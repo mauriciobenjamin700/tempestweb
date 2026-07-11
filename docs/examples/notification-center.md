@@ -377,7 +377,7 @@ Aqui está o arquivo completo, pronto para copiar:
 Like :mod:`examples.counter.app`, this exact ``view`` runs unchanged in both modes::
 
     tempestweb dev --mode wasm     # Python in the browser (Pyodide)
-    tempestweb dev --mode server   # Python on the server (FastAPI + WebSocket)
+    tempestweb run --mode server   # Python on the server (FastAPI + WebSocket)
 
 This demo shows how to compose ``Banner``, ``Badge`` and ``EmptyState`` to model a
 real-world notification inbox.  The panel header carries a red ``Badge`` with the
@@ -682,7 +682,7 @@ def view(app: App[NotificationState]) -> Widget:
 ### Modo A — Python no browser (Pyodide / WASM)
 
 ```bash
-tempestweb dev --mode wasm examples/notification-center/app.py
+tempestweb dev --mode wasm --path examples/notification-center
 ```
 
 O Python roda **dentro do browser** via Pyodide. Sem servidor necessário.
@@ -690,7 +690,7 @@ O Python roda **dentro do browser** via Pyodide. Sem servidor necessário.
 ### Modo B — Python no servidor (FastAPI + WebSocket)
 
 ```bash
-tempestweb dev --mode server examples/notification-center/app.py
+tempestweb run --mode server --path examples/notification-center
 ```
 
 O Python roda no servidor; o browser recebe patches JSON pelo WebSocket e aplica ao DOM.

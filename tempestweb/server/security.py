@@ -108,9 +108,7 @@ class SecurityConfig:
             headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
             headers["X-Frame-Options"] = "DENY"
         if self.hsts:
-            headers["Strict-Transport-Security"] = (
-                "max-age=63072000; includeSubDomains"
-            )
+            headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         if self.content_security_policy is not None:
             headers["Content-Security-Policy"] = self.content_security_policy
         return headers

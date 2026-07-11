@@ -183,6 +183,12 @@ export const native = Object.freeze({
     request_permission: () =>
       call("notifications.request_permission", {}).then((r) => r.permission),
     /**
+     * WebPush support + current permission, WITHOUT prompting — decide whether
+     * to show an "enable notifications" button before calling `subscribe`.
+     * @returns {Promise<{supported: boolean, permission: string}>}
+     */
+    push_state: () => call("notifications.push_state", {}),
+    /**
      * Subscribe to WebPush; returns the raw browser subscription JSON to POST to
      * your own backend (e.g. via `native.http` / `native.offline`).
      * @param {string} vapid_public_key  The base64url VAPID application server key.

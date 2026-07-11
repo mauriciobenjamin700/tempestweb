@@ -7,7 +7,11 @@
 // is the app's job — the framework does not own the endpoint schema).
 
 import { CapabilityError } from "./index.js";
-import { WebPushClient } from "../push/web-push-client.js";
+import {
+  WebPushClient,
+  getPermission,
+  isPushSupported,
+} from "../push/web-push-client.js";
 
 /**
  * Map the native router's deps to the WebPushClient deps shape.
@@ -59,6 +63,21 @@ export async function notificationsRequestPermission(_args, deps) {
   }
   const permission = await Ctor.requestPermission();
   return { permission: permission || "default" };
+}
+
+/**
+ * Report WebPush support + current permission WITHOUT prompting.  P3.
+ *
+ * Lets an app decide whether to show a "enable notifications" button before
+ * triggering the permission prompt (which must follow a user gesture).
+ *
+ * @param {Object} _args
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {Promise<{supported:boolean, permission:string}>}
+ */
+export async function notificationsPushState(_args, deps) {
+  const pd = pushDeps(deps);
+  return { supported: isPushSupported(pd), permission: getPermission(pd) };
 }
 
 /**

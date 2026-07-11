@@ -4,6 +4,20 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.32.0] — 2026-07-10
+
+### Added
+
+- **`native.notifications.push_state()`** — reports WebPush `{supported,
+  permission}` WITHOUT prompting, so an app can decide whether to show an
+  "enable notifications" button before the gesture-gated `subscribe`. New
+  dispatch handler + Python `PushState` model, marked `mode_c`; JS + Python
+  tested.
+- **Offline-queue demo in `examples/transpile-tour`** — a visible "queue" button
+  enqueues a mutation via `native.offline` and shows the live pending count.
+  Verified live (Playwright): three clicks drive `queued=3` through real
+  IndexedDB, entirely from the transpiled UI.
+
 ## [0.31.0] — 2026-07-10
 
 ### Added

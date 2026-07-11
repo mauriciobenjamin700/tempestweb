@@ -49,6 +49,7 @@ class TourState:
     email: str = ""
     email_error: str = ""
     install: str = ""
+    queued: int = 0
     box: object = field(default=None)
 
     def set_email(self, value: str) -> None:
@@ -93,6 +94,11 @@ def view(app: App[TourState]) -> Widget:
     async def do_install() -> None:
         outcome = await native.install.prompt()
         app.set_state(lambda s: setattr(s, "install", outcome))
+
+    async def queue_write() -> None:
+        await native.offline.enqueue("POST", "/api/log", {"n": app.state.queued})
+        count = await native.offline.size()
+        app.set_state(lambda s: setattr(s, "queued", count))
 
     header = Row(
         style=Style(gap=8.0),
@@ -148,6 +154,8 @@ def view(app: App[TourState]) -> Widget:
                 Button(label="grow", on_click=grow, key="grow"),
                 Button(label="install", on_click=do_install, key="install"),
                 Text(content=app.state.install, key="installout"),
+                Button(label="queue", on_click=queue_write, key="queue"),
+                Text(content=f"queued={app.state.queued}", key="queuedout"),
                 Button(
                     label=t("form", locale=loc, translations=MESSAGES),
                     on_click=go_form,

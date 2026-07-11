@@ -93,7 +93,9 @@ from tempestweb.native.install import prompt as install_prompt
 from tempestweb.native.install import state as install_state
 from tempestweb.native.notifications import (
     NotificationPermission,
+    PushState,
     notify,
+    push_state,
     request_permission,
     subscribe,
     unsubscribe,
@@ -201,7 +203,9 @@ __all__ = [
     "offline_size",
     # notifications
     "NotificationPermission",
+    "PushState",
     "notify",
+    "push_state",
     "request_permission",
     "subscribe",
     "unsubscribe",

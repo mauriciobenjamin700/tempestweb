@@ -232,6 +232,9 @@ class _Generator:
         # assignment inside an `if`/`for` block stays visible afterwards (Python
         # scoping) instead of being trapped in the JS block by `const`.
         self._scopes: list[set[str]] = []
+        # Stack of the caught-error variable names while emitting `except` bodies,
+        # so a bare `raise` (re-raise) can `throw` the current exception.
+        self._exc_vars: list[str] = []
 
     # -- expressions --------------------------------------------------------
 
@@ -818,6 +821,8 @@ class _Generator:
             return self._with(node, indent)
         if isinstance(node, ast.Try):
             return self._try(node, indent)
+        if isinstance(node, ast.Raise):
+            return self._raise(node, indent)
         if isinstance(node, ast.Break):
             return [f"{_INDENT * indent}break;"]
         if isinstance(node, ast.Continue):
@@ -864,6 +869,51 @@ class _Generator:
         lines.extend(self._body(node.body, indent + 1))
         lines.append(f"{pad}}}")
         return lines
+
+    @staticmethod
+    def _exc_class_name(node: ast.expr) -> str | None:
+        """Return the exception class name of a ``raise`` target, or None."""
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            return node.attr
+        return None
+
+    def _raise(self, node: ast.Raise, indent: int) -> list[str]:
+        """Emit a ``raise`` as a JS ``throw``.
+
+        ``raise Exc("msg")`` / ``raise Exc`` throw an ``Error`` whose ``message``
+        is the first argument (empty otherwise) and whose ``name`` is the
+        exception class name — so a matching ``except Exc`` (which dispatches on
+        ``err.name``) catches it. A bare ``raise`` re-throws the exception the
+        enclosing ``except`` caught. ``raise ... from ...`` is unsupported.
+        """
+        pad = _INDENT * indent
+        if node.exc is None:
+            if not self._exc_vars:
+                raise TranspileError(
+                    "bare `raise` is only valid inside an `except` block",
+                    node,
+                    self.filename,
+                )
+            return [f"{pad}throw {self._exc_vars[-1]};"]
+        if node.cause is not None:
+            raise TranspileError(
+                "`raise ... from ...` is not supported", node, self.filename
+            )
+        exc = node.exc
+        if isinstance(exc, ast.Call):
+            name = self._exc_class_name(exc.func)
+            message = self.expr(exc.args[0], indent) if exc.args else '""'
+        else:
+            name = self._exc_class_name(exc)
+            message = '""'
+        if name is None:
+            raise TranspileError(
+                "`raise` expects an exception class (name)", node, self.filename
+            )
+        error = f'Object.assign(new Error({message}), {{ name: "{name}" }})'
+        return [f"{pad}throw {error};"]
 
     def _while(self, node: ast.While, indent: int) -> list[str]:
         """Emit a ``while cond:`` loop as ``while (cond) {...}``.
@@ -966,8 +1016,9 @@ class _Generator:
         bpad = _INDENT * body_indent
         if len(handlers) == 1 and self._is_catch_all(handlers[0]):
             handler = handlers[0]
-            lines = [f"{pad}}} catch ({handler.name or '_err'}) {{"]
-            lines.extend(self._body(handler.body, body_indent))
+            var = handler.name or "_err"
+            lines = [f"{pad}}} catch ({var}) {{"]
+            lines.extend(self._handler_body(handler.body, body_indent, var))
             return lines
 
         alias_pad = _INDENT * (body_indent + 1)
@@ -982,17 +1033,37 @@ class _Generator:
             lines.append(f"{bpad}{keyword} ({cond}) {{")
             if handler.name:
                 lines.append(f"{alias_pad}const {handler.name} = _err;")
-            lines.extend(self._body(handler.body, body_indent + 1))
+            lines.extend(self._handler_body(handler.body, body_indent + 1, "_err"))
             keyword = "} else if"
         lines.append(f"{bpad}}} else {{")
         if catch_all is not None:
             if catch_all.name:
                 lines.append(f"{alias_pad}const {catch_all.name} = _err;")
-            lines.extend(self._body(catch_all.body, body_indent + 1))
+            lines.extend(self._handler_body(catch_all.body, body_indent + 1, "_err"))
         else:
             lines.append(f"{alias_pad}throw _err;")
         lines.append(f"{bpad}}}")
         return lines
+
+    def _handler_body(
+        self, body: list[ast.stmt], indent: int, exc_var: str
+    ) -> list[str]:
+        """Emit an ``except`` body with its caught-error var on the re-raise stack.
+
+        Args:
+            body: The handler statements.
+            indent: The body indentation depth.
+            exc_var: The JS variable bound to the caught error (for a bare
+                ``raise`` inside the handler).
+
+        Returns:
+            The emitted lines.
+        """
+        self._exc_vars.append(exc_var)
+        try:
+            return self._body(body, indent)
+        finally:
+            self._exc_vars.pop()
 
     def _try(self, node: ast.Try, indent: int) -> list[str]:
         """Emit a ``try/except/finally`` as JS ``try/catch/finally``.

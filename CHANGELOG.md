@@ -4,6 +4,17 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.36.0] — 2026-07-11
+
+### Added
+
+- **`raise` in the transpiler.** `raise Exc("msg")` / `raise Exc` throw an
+  `Error` whose `message` is the first argument and whose `name` is the
+  exception class — so it round-trips with the multiple-`except` dispatch
+  (`except Exc` matches on `err.name`). A bare `raise` inside an `except`
+  re-throws the caught error. `raise … from …` and a bare `raise` outside an
+  `except` fail loud. This completes the raise/try/except loop in Mode C.
+
 ## [0.35.0] — 2026-07-11
 
 ### Added

@@ -518,7 +518,8 @@ no espírito do `mypy --strict`.
     - **Statements:** `if`/`elif`/`else`, `for … in`, `while`, `break`/
       `continue`, `try`/`except`/`finally` (um `except` pega tudo; vários fazem
       dispatch por nome da classe de exceção), `with … as x` (protocolo
-      `__enter__`/`__exit__`), atribuição, `+=` e afins, `return`.
+      `__enter__`/`__exit__`), `raise Exc("msg")` / `raise` (re-raise dentro de
+      `except`), atribuição, `+=` e afins, `return`.
     - **Estruturas:** `@dataclass` de estado (campos + métodos), herança de
       dataclass (`class B(A)` → `extends`), `make_state()`, `view()` com closures
       de handler.

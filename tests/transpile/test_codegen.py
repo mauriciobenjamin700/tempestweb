@@ -404,6 +404,38 @@ def test_try_bare_except_binds_placeholder() -> None:
     assert "} catch (_err) {" in js
 
 
+def test_raise_throws_named_error() -> None:
+    """`raise Exc(msg)` throws an Error with .message and .name = the class."""
+    js = gen("def f(x):\n    raise ValueError('bad')\n")
+    assert 'throw Object.assign(new Error("bad"), { name: "ValueError" });' in js
+
+
+def test_raise_class_without_args() -> None:
+    """`raise Exc` (no call) throws a named Error with an empty message."""
+    js = gen("def f():\n    raise StopError\n")
+    assert 'throw Object.assign(new Error(""), { name: "StopError" });' in js
+
+
+def test_bare_raise_reraises_caught_error() -> None:
+    """A bare `raise` inside `except` re-throws the caught error."""
+    js = gen(
+        "def f():\n    try:\n        go()\n    except Exception:\n        cleanup()\n"
+        "        raise\n"
+    )
+    # The lone catch-all binds `_err`; bare raise re-throws it.
+    assert "throw _err;" in js
+
+
+def test_raise_then_except_matches_by_name() -> None:
+    """A raised exception's name is what a later `except` dispatches on."""
+    js = gen(
+        "def f():\n    try:\n        raise KeyError('k')\n"
+        "    except KeyError:\n        h()\n    except Exception:\n        other()\n"
+    )
+    assert '{ name: "KeyError" }' in js
+    assert 'if (_err.name === "KeyError") {' in js
+
+
 def test_multiple_except_dispatches_by_name() -> None:
     """Several `except` clauses dispatch by exception class name, else re-raise."""
     js = gen(
@@ -487,7 +519,8 @@ _UNSUPPORTED: dict[str, str] = {
     "global": "def f():\n    global g\n",
     "yield": "def f():\n    yield 1\n",
     "walrus": "def f(x):\n    return (y := x)\n",
-    "raise": "def f():\n    raise ValueError('x')\n",
+    "raise_from": "def f():\n    raise ValueError('x') from KeyError()\n",
+    "bare_raise_outside_except": "def f():\n    raise\n",
     "assert": "def f(x):\n    assert x\n",
     "del": "def f(x):\n    del x\n",
     "starargs": "def f(*args):\n    return args\n",

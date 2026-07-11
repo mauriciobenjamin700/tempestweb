@@ -1,0 +1,32 @@
+# Reference deployment: a tempestweb server-mode app behind nginx (TLS + WS).
+#
+#   docker compose up --build
+#
+# `app` runs the FastAPI host (one worker); scale with `--scale app=N` behind a
+# sticky-session proxy. `proxy` terminates TLS and upgrades WebSockets.
+services:
+  app:
+    build:
+      context: ../..            # your project root in a real deployment
+      dockerfile: examples/deploy/Dockerfile
+    expose:
+      - "8000"
+    environment:
+      # Secrets for the auth gate (read by your app into SecurityConfig).
+      - TEMPESTWEB_TOKEN=${TEMPESTWEB_TOKEN:-}
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+    restart: unless-stopped
+
+  proxy:
+    image: nginx:1.27-alpine
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mount your TLS certs here:
+      # - ./certs:/etc/nginx/certs:ro
+    restart: unless-stopped

@@ -1,0 +1,73 @@
+# Deploy to production
+
+!!! abstract "What you'll learn"
+    How to ship each mode. The **static modes** (A/WASM and C/transpile) are just
+    files — host them on any CDN. **Mode B (server)** is a FastAPI host that needs
+    a reverse proxy, TLS, and (to scale) sticky sessions.
+
+## Static modes (A / C) — CDN
+
+`tempestweb build --mode wasm` or `--mode transpile` produces a static
+directory. Serve it from any file host (Netlify, Vercel, S3+CloudFront, GitHub
+Pages, nginx). No server, no state — just CDN + cache. The service worker
+handles offline.
+
+```bash
+tempestweb build --mode transpile --path .
+# publish dist/transpile/ to your CDN
+```
+
+## Mode B (server) — FastAPI
+
+The host serves `/ws`, `/sse`, `/sse/{id}` and `/health`. Before exposing it
+publicly, **harden it** (see [Security](security.md)):
+
+```python
+create_app(make_state, view, security=SecurityConfig(
+    authenticate=jwt_authenticator(os.environ["JWT_KEY"]),
+    allowed_origins=["https://app.example.com"],
+    max_connections=1000,
+    security_headers=True,
+    hsts=True,
+))
+```
+
+### Docker + reverse proxy
+
+Reference files in
+[`examples/deploy/`](https://github.com/mauriciobenjamin700/tempestweb/tree/main/examples/deploy):
+
+- **`Dockerfile`** — `python:3.12-slim` + `tempestweb[server]`, runs `tempestweb
+  run --mode server --host 0.0.0.0`, with a `HEALTHCHECK` on `/health`.
+- **`nginx.conf`** — WebSocket upgrade, `Origin`/`X-Forwarded-*` preserved, long
+  timeouts + `proxy_buffering off` for WS/SSE, and `ip_hash` (sticky).
+- **`docker-compose.yml`** — app + nginx (TLS).
+
+```bash
+docker compose -f examples/deploy/docker-compose.yml up --build
+```
+
+### Horizontal scale (S4)
+
+WS/SSE session state lives **in process memory**. To run multiple replicas:
+
+- **Sticky sessions** — pin each client to one replica (`ip_hash` in nginx, or
+  your load balancer's affinity). This is the supported path today.
+- An **out-of-process session backend** (Redis) to drop stickiness is a Track-S
+  follow-up (S4).
+
+!!! warning "Don't use `--workers > 1` without stickiness"
+    Each uvicorn worker has its own in-memory session registry. Run **1 worker
+    per container** and scale with replicas behind a sticky proxy.
+
+### Health checks
+
+`GET /health` (no auth) returns `{"status":"ok","sessions":N,"ready":bool}`.
+`ready` flips to `false` when `max_connections` is reached — use it in your load
+balancer's readiness probe to drain a full instance.
+
+## Recap
+
+- **A/C**: `build` → publish the static directory to a CDN. Done.
+- **B**: harden with `SecurityConfig`, run behind nginx (TLS + WS upgrade), scale
+  with **sticky** replicas (1 worker each), watch `/health`.

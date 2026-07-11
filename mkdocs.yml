@@ -133,6 +133,7 @@ plugins:
             "PWA & offline": "PWA e offline"
             Observability: Observabilidade
             "Security (Mode B)": "Segurança (Modo B)"
+            "Deploy to production": "Deploy em produção"
             "Roadmap & design docs": "Roadmap e docs de design"
         - locale: en
           name: English (US)
@@ -235,4 +236,5 @@ nav:
   - Wire contract: wire-contract.md
   - Observability: observability.md
   - "Security (Mode B)": security.md
+  - "Deploy to production": deploy.md
   - Roadmap & design docs: design-docs.md

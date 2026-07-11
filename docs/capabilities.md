@@ -4,15 +4,16 @@ As **capacidades** (`native/`) são adaptadores de Web API expostos como
 **awaitables tipados em Python**. Você escreve `await geolocation.get()` e recebe
 um `Position` tipado — sem tocar em JavaScript. 📡
 
-!!! info "Em construção (Trilho N)"
-    Esta camada é o **Trilho N** do roadmap. As fases N0–N4 estão detalhadas no
-    [plano de design](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/plan.md).
-    Esta página descreve a **superfície planejada** e o modelo de dois backends.
+!!! info "Trilho N — a superfície nativa"
+    Esta camada é o **Trilho N** do roadmap (fases N0–N4, detalhadas no
+    [plano de design](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/plan.md)).
+    As capacidades funcionam nos **três modos** de execução — cada uma resolve o
+    seu backend conforme o `--mode`.
 
-## Dois backends, uma API Python
+## Uma API Python, três caminhos
 
-O princípio central: **cada capacidade tem dois backends, mas a API Python é a
-mesma**. O `--mode` escolhe o caminho, não o seu código.
+O princípio central: **a API Python é sempre a mesma**; o `--mode` escolhe como a
+chamada chega na Web API, não o seu código.
 
 === "Modo A — direto"
 
@@ -33,12 +34,22 @@ mesma**. O `--mode` escolhe o caminho, não o seu código.
     pos = await geolocation.get()   # MESMA linha; dispara native_call/native_result
     ```
 
-!!! check "O contrato é o mesmo"
-    O envelope `native_call`/`native_result` está no
-    [contrato de fronteira](wire-contract.md#a-chamada-nativa-modo-b-proxy). Só o
-    transporte difere — a assinatura tipada mora no contrato, não no transporte.
+=== "Modo C — transcrito"
 
-## As capacidades planejadas
+    A chamada `async` é **transcrita para JS** e roda em-processo contra a mesma
+    glue de browser — sem Python, sem rede.
+
+    ```python
+    pos = await geolocation.get()   # MESMA linha; vira uma chamada JS nativa
+    ```
+
+!!! check "O contrato é o mesmo"
+    Nos Modos A e B o envelope `native_call`/`native_result` está no
+    [contrato de fronteira](wire-contract.md#a-chamada-nativa-modo-b-proxy). No
+    Modo C não há envelope — a chamada é transcrita — mas a **assinatura tipada é
+    idêntica**. Você escreve uma linha; o modo decide o mecanismo.
+
+## As capacidades
 
 | Capacidade | API Python | Espelha (React SDK) |
 |---|---|---|
@@ -239,8 +250,9 @@ scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injetado antes do boo
 ## Recap
 
 - Capacidades são Web APIs expostas como **awaitables tipados em Python**.
-- **Dois backends, uma API:** Modo A chama direto; Modo B proxia por round-trip.
-- O envelope é o `native_call`/`native_result` do
+- **Uma API, três caminhos:** Modo A chama direto, Modo B proxia por round-trip,
+  Modo C transcreve para JS — a assinatura tipada é a mesma.
+- Nos Modos A/B o envelope é o `native_call`/`native_result` do
   [contrato de fronteira](wire-contract.md).
 - Permissões negadas são **fluxo normal**, tratadas como exceção tipada.
 

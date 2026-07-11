@@ -1,8 +1,8 @@
 # Roadmap & design docs
 
-tempestweb is in **early construction** 🚧, with a set of **living design
-documents** versioned next to the code. This page is their index — it links the
-originals on GitHub, which are the source of truth.
+tempestweb keeps a set of **living design documents** versioned next to the code.
+This page is their index — it links the originals on GitHub, which are the source
+of truth.
 
 !!! info "Why these docs live in the repository"
     They use relative links to the code and the fixtures, and change every phase.
@@ -17,7 +17,7 @@ originals on GitHub, which are the source of truth.
 
     ---
 
-    The complete design: the "one tree, multiple renderers" idea, the two modes,
+    The complete design: the "one tree, multiple renderers" idea, the three modes,
     and tracks N (capabilities), O (observability) and P (PWA).
 
 -   :material-map-outline: __[Phase-by-phase roadmap](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md)__
@@ -44,10 +44,11 @@ originals on GitHub, which are the source of truth.
 
 ## What's coming
 
-The big blocks of work, all shared by both modes:
+The big blocks of work, all shared by the three modes:
 
 | Track | Theme | Pages here |
 |---|---|---|
+| **C** | Mode C — transpile (Python → native JS) | [Mode C — transpile](transpile.md) |
 | **N** | `native/` capabilities (typed Web APIs) | [Capabilities](capabilities.md) |
 | **O** | Observability / production (adapter pattern) | [Observability](observability.md) |
 | **P** | PWA / offline-first / WebPush | [PWA & offline](pwa.md) |

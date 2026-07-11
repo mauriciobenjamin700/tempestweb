@@ -1,9 +1,10 @@
 # Architecture
 
 tempestweb is tempestroid's **renderer-agnostic** reconciler with a **third leaf
-renderer** (DOM) and **two patch transports** (Pyodide FFI and WebSocket/SSE).
-This page gives the didactic overview; the canonical document, kept next to the
-code, is
+renderer** (DOM) and **three execution strategies**: two patch transports
+(Pyodide FFI and WebSocket/SSE) plus a **compiler** that transcribes the app to
+native JavaScript (Mode C). This page gives the didactic overview; the canonical
+document, kept next to the code, is
 [`docs/arquitetura.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/arquitetura.md)
 (in PT-BR).
 
@@ -76,6 +77,15 @@ class PatchTransport(Protocol):
 `transports/wasm.py` implements this over `pyodide.ffi`;
 `transports/websocket.py` over a WebSocket connection. Switching modes is
 swapping the implementation — the user's `view()` does not change.
+
+!!! info "Where Mode C fits"
+    **Mode C (transpile)** uses no transport: a compiler transcribes the **app
+    layer** (`view`/`state`/handlers) to native JavaScript at build time, so the
+    `diff` runs **in JS, in the browser**. Even so, the
+    [leaf renderer](transpile.md) is the **same** `client/dom.js` / `style.js` as
+    Modes A/B — the boundary that changes is *where the `diff` runs*, not *how the
+    patch is applied*. That is why Mode C inherits the shared renderer without
+    rewriting anything.
 
 ## Style → CSS: the easy target
 

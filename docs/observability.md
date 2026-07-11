@@ -2,7 +2,8 @@
 
 A camada de **observabilidade / produção** (Trilho O) dá ao seu app telemetry,
 logs estruturados, error boundary, feature flags e auth de cliente — tudo em
-**Python tipado**, idêntico nos dois modos. 📊
+**Python tipado**, idêntico quer o Python rode no browser (Modo A) ou no servidor
+(Modo B). 📊
 
 !!! info "Em construção (Trilho O)"
     Esta camada é o **Trilho O** do roadmap. As fases O0–O4 estão detalhadas no
@@ -152,7 +153,7 @@ async def call_api(app: object) -> dict[str, object]:
 
 - A observabilidade usa o **padrão adapter**: troca o backend sem mudar o app.
 - **Telemetry** (O0), **Logger** (O1), **Error boundary** (O2), **Feature flags**
-  (O3) e **Auth** (O4) são todos Python tipado, idênticos nos dois modos.
+  (O3) e **Auth** (O4) são todos Python tipado, idênticos nos Modos A e B.
 - Defaults seguros e cuidado com PII/tokens são parte do contrato.
 
 Essa camada espelha os provedores do `tempest-react-sdk`. Para o detalhe

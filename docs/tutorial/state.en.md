@@ -68,7 +68,7 @@ def view(app: App[CounterState]) -> Widget:
 !!! warning "Never mutate the DOM in a handler"
     You do not write `document.getElementById(...)`. You change the **state**; the
     reconciler computes the diff and the client applies the patches. That is the
-    golden rule — and it holds identically in both modes.
+    golden rule — and it holds identically in all three modes.
 
 ## The cycle: event → state → rebuild → patches
 

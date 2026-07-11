@@ -1,8 +1,8 @@
 # Roadmap e docs de design
 
-O tempestweb está em **construção inicial** 🚧, com um conjunto de **documentos de
-design vivos** versionados junto ao código. Esta página é o índice deles — ela
-linka os originais no GitHub, que são a fonte da verdade.
+O tempestweb mantém um conjunto de **documentos de design vivos** versionados
+junto ao código. Esta página é o índice deles — ela linka os originais no GitHub,
+que são a fonte da verdade.
 
 !!! info "Por que estes docs vivem no repositório"
     Eles usam links relativos para o código e para as fixtures, e mudam a cada
@@ -17,7 +17,7 @@ linka os originais no GitHub, que são a fonte da verdade.
 
     ---
 
-    O design completo: a ideia de "uma árvore, múltiplos renderizadores", os dois
+    O design completo: a ideia de "uma árvore, múltiplos renderizadores", os três
     modos, e os trilhos N (capacidades), O (observabilidade) e P (PWA).
 
 -   :material-map-outline: __[Roadmap fase-a-fase](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md)__
@@ -44,10 +44,11 @@ linka os originais no GitHub, que são a fonte da verdade.
 
 ## O que vem por aí
 
-Os grandes blocos de trabalho, todos compartilhados pelos dois modos:
+Os grandes blocos de trabalho, todos compartilhados pelos três modos:
 
 | Trilho | Tema | Páginas aqui |
 |---|---|---|
+| **C** | Modo C — transpile (Python → JS nativo) | [Modo C — transpile](transpile.md) |
 | **N** | Capacidades `native/` (Web APIs tipadas) | [Capacidades](capabilities.md) |
 | **O** | Observabilidade / produção (adapter pattern) | [Observabilidade](observability.md) |
 | **P** | PWA / offline-first / WebPush | [PWA e offline](pwa.md) |

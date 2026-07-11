@@ -68,7 +68,7 @@ def view(app: App[CounterState]) -> Widget:
 !!! warning "Nunca mute o DOM no handler"
     Você não escreve `document.getElementById(...)`. Você muda o **estado**; o
     reconciliador descobre o diff e o cliente aplica os patches. Essa é a regra
-    de ouro — vale igualzinho nos dois modos.
+    de ouro — vale igualzinho nos três modos.
 
 ## O ciclo: evento → estado → rebuild → patches
 

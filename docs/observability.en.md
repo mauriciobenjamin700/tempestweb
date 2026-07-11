@@ -2,7 +2,8 @@
 
 The **observability / production** layer (Track O) gives your app telemetry,
 structured logs, an error boundary, feature flags and client auth — all in
-**typed Python**, identical in both modes. 📊
+**typed Python**, identical whether Python runs in the browser (Mode A) or on the
+server (Mode B). 📊
 
 !!! info "Under construction (Track O)"
     This layer is the roadmap's **Track O**. Phases O0–O4 are detailed in the
@@ -153,7 +154,7 @@ async def call_api(app: object) -> dict[str, object]:
 - Observability uses the **adapter pattern**: swap the backend without changing
   the app.
 - **Telemetry** (O0), **Logger** (O1), **Error boundary** (O2), **Feature flags**
-  (O3) and **Auth** (O4) are all typed Python, identical in both modes.
+  (O3) and **Auth** (O4) are all typed Python, identical in Modes A and B.
 - Safe defaults and care with PII/tokens are part of the contract.
 
 This layer mirrors the `tempest-react-sdk` providers. For phase-by-phase detail,

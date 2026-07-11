@@ -4,6 +4,32 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.27.0] — 2026-07-10
+
+### Added
+
+- **Mode C is a first-class PWA — installable and offline out of the box.**
+  `tempestweb build --mode transpile` now emits the full PWA layer alongside the
+  static bundle: `manifest.webmanifest`, a cache-first app-shell service worker
+  (`sw.js`) whose precache covers the *entire* bundle (index, shared client,
+  `client/transpile/*` incl. the generated `app.gen.js`, native tree, icons), its
+  registration (`register.js`), and the icon set. The generated `index.html`
+  links the manifest, sets `theme-color`/apple-touch-icon and registers the
+  worker. Because Mode C is a zero-Python static bundle, it is the ideal PWA
+  target. Verified live (Playwright): with the HTTP server killed, reloading the
+  built tour still renders and navigates — the app runs fully offline.
+- **`[pwa]` config section.** `tempestweb.toml` gains a `[pwa]` table to
+  customize the generated manifest — `name`, `short_name`, `description`,
+  `theme_color`, `background_color`, `display` (`standalone`/`fullscreen`/
+  `minimal-ui`), `orientation`, `lang`, `categories`. All optional; names fall
+  back to the project name. The `theme_color` is mirrored into the shell's
+  `theme-color` meta. `examples/transpile-tour` now ships a `[pwa]` block.
+
+### Changed
+
+- The wasm (Mode A) `theme-color` meta now follows the `[pwa].theme_color`
+  instead of a hard-coded value.
+
 ## [0.26.0] — 2026-07-10
 
 ### Added

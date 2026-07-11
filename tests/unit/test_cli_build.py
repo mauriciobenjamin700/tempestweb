@@ -83,6 +83,63 @@ def test_transpile_index_mounts_via_native_runtime(tmp_path: Path) -> None:
     assert "Pyodide" not in html and "transport" not in html
 
 
+def test_transpile_ships_pwa_layer(tmp_path: Path) -> None:
+    """A Mode C artifact is an installable PWA: manifest + SW + icons + links."""
+    root = _project(tmp_path)
+    result = build_artifact(root, mode="transpile")
+    out = result.out_dir
+    assert (out / "manifest.webmanifest").is_file()
+    assert (out / "sw.js").is_file()
+    assert (out / "register.js").is_file()
+    assert (out / "icons" / "icon-192.png").is_file()
+    assert (out / "icons" / "icon-512.png").is_file()
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert './manifest.webmanifest"' in html
+    assert 'name="theme-color"' in html
+    assert "registerServiceWorker" in html
+
+
+def test_transpile_service_worker_precaches_the_shell(tmp_path: Path) -> None:
+    """The service worker's precache list covers the whole static shell."""
+    root = _project(tmp_path)
+    out = build_artifact(root, mode="transpile").out_dir
+    sw = (out / "sw.js").read_text(encoding="utf-8")
+    # The quoted code placeholder is filled at build time with the JSON precache
+    # list (the bare names survive only in the file's header comment).
+    assert '"__PRECACHE_MANIFEST__"' not in sw
+    for needed in (
+        "/index.html",
+        "/client/transpile/runtime.js",
+        "/client/transpile/app.gen.js",
+        "/manifest.webmanifest",
+    ):
+        assert needed in sw, needed
+
+
+def test_transpile_manifest_reflects_pwa_config(tmp_path: Path) -> None:
+    """A project's ``[pwa]`` config feeds the emitted manifest + theme color."""
+    import json
+
+    root = _project(tmp_path)
+    (root / "tempestweb.toml").write_text(
+        '[project]\nname = "buildme"\n\n'
+        "[pwa]\n"
+        'name = "Weather Pro"\n'
+        'short_name = "WPro"\n'
+        'theme_color = "#0a84ff"\n'
+        'display = "fullscreen"\n',
+        encoding="utf-8",
+    )
+    out = build_artifact(root, mode="transpile").out_dir
+    manifest = json.loads((out / "manifest.webmanifest").read_text(encoding="utf-8"))
+    assert manifest["name"] == "Weather Pro"
+    assert manifest["short_name"] == "WPro"
+    assert manifest["theme_color"] == "#0a84ff"
+    assert manifest["display"] == "fullscreen"
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert 'content="#0a84ff"' in html
+
+
 def test_transpile_build_rejects_out_of_subset_app(tmp_path: Path) -> None:
     """A valid-but-out-of-subset app fails the build with a clear transpile error.
 

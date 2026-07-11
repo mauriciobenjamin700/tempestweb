@@ -33,6 +33,7 @@ from tempestweb.server.security import (
     SecurityConfig,
     _bearer_token,
 )
+from tempestweb.server.sessions import InProcessRouter, SessionRouter, Teardown
 from tempestweb.transports.base import PatchTransport
 from tempestweb.transports.sse import SSETransport
 from tempestweb.transports.websocket import WebSocketTransport
@@ -106,6 +107,7 @@ class TempestWebServer(Generic[S]):
         title: str = "tempestweb",
         security: SecurityConfig | None = None,
         metrics: bool = False,
+        sse_backend: SessionRouter | None = None,
     ) -> None:
         """Build the server and register the WebSocket and SSE routes.
 
@@ -117,7 +119,11 @@ class TempestWebServer(Generic[S]):
                 the host open (dev).
             metrics: When ``True``, mount ``GET /metrics`` (Prometheus text) with
                 connection counters (Track S — S8).
+            sse_backend: Router for SSE inbound events (Track S — S4). ``None``
+                uses the in-process router (needs sticky sessions across
+                instances); a :class:`RedisSessionRouter` drops that requirement.
         """
+        self._router: SessionRouter = sse_backend or InProcessRouter()
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
         self._sse_sessions: dict[str, _SSESession[S]] = {}
@@ -329,6 +335,9 @@ class TempestWebServer(Generic[S]):
             self._sse_sessions[session_id] = sse
             self._live += 1
             self._opened += 1
+            # Route cross-instance inbound events (S4): no-op in-process, Redis
+            # pub/sub when configured — so a POST on another instance is delivered.
+            sse.teardown = await self._router.bind(session_id, transport)
             sse.task = asyncio.ensure_future(self._run_sse(session_id, app_session))
 
         last_event_id = _parse_last_event_id(request.headers.get("last-event-id"))
@@ -369,11 +378,16 @@ class TempestWebServer(Generic[S]):
         Returns:
             ``204 No Content`` on success, ``404`` if the session is unknown.
         """
+        try:
+            envelope: dict[str, Any] = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            return JSONResponse({"error": "invalid JSON"}, status_code=400)
         sse = self._sse_sessions.get(session_id)
-        if sse is None:
+        local = sse.transport if sse is not None else None
+        # The router feeds a local transport directly, or hands off to the
+        # instance holding the stream (Redis). Unroutable -> 404.
+        if not await self._router.deliver(session_id, envelope, local):
             return JSONResponse({"error": "unknown session"}, status_code=404)
-        envelope: dict[str, Any] = await request.json()
-        sse.transport.feed_inbound(envelope)
         return Response(status_code=204)
 
     async def _drop_sse(self, session_id: str) -> None:
@@ -385,6 +399,8 @@ class TempestWebServer(Generic[S]):
         sse = self._sse_sessions.pop(session_id, None)
         if sse is not None:
             self._live -= 1
+            if sse.teardown is not None:
+                await sse.teardown()
             await sse.transport.close()
             await sse.session.close()
 
@@ -402,6 +418,7 @@ class _SSESession(Generic[S]):
         self.transport: SSETransport = transport
         self.session: AppSession[S] = session
         self.task: asyncio.Task[None] | None = None
+        self.teardown: Teardown | None = None
 
 
 def _parse_last_event_id(raw: str | None) -> int | None:
@@ -428,6 +445,7 @@ def create_app(
     title: str = "tempestweb",
     security: SecurityConfig | None = None,
     metrics: bool = False,
+    sse_backend: SessionRouter | None = None,
 ) -> FastAPI:
     """Build a Mode B FastAPI app for a ``view`` and state factory.
 
@@ -439,10 +457,17 @@ def create_app(
             leaves the host open (dev); pass a :class:`SecurityConfig` with an
             ``authenticate`` predicate and/or ``allowed_origins`` for production.
         metrics: When ``True``, mount ``GET /metrics`` (Prometheus text) — S8.
+        sse_backend: SSE inbound router (Track S — S4). ``None`` is in-process
+            (sticky sessions); a ``RedisSessionRouter`` scales SSE without sticky.
 
     Returns:
         The configured FastAPI application with WS and SSE routes mounted.
     """
     return TempestWebServer(
-        state_factory, view, title=title, security=security, metrics=metrics
+        state_factory,
+        view,
+        title=title,
+        security=security,
+        metrics=metrics,
+        sse_backend=sse_backend,
     ).api

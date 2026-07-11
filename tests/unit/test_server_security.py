@@ -183,10 +183,10 @@ def test_rate_limiter_windowing() -> None:
 
 def test_max_message_bytes_rejects_large_sse_post() -> None:
     client = _client(max_message_bytes=50)
-    small = client.post("/sse/s1", content=b"x" * 10)
-    assert small.status_code in (204, 404)  # past the size gate (routing decides)
+    small = client.post("/sse/s1", json={"type": "x"})  # valid JSON under the limit
+    assert small.status_code == 404  # past the size gate; unknown session
     big = client.post("/sse/s1", content=b"x" * 200)
-    assert big.status_code == 413
+    assert big.status_code == 413  # size gate fires before parsing
 
 
 # -- S6: security headers -----------------------------------------------------

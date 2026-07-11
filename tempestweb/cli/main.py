@@ -172,6 +172,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of app upstream replicas in nginx (default: 1).",
     )
     deploy.add_argument(
+        "--no-sticky",
+        dest="sticky",
+        action="store_false",
+        help="Drop ip_hash (use with a RedisSessionRouter for SSE scale-out).",
+    )
+    deploy.add_argument(
         "--force",
         action="store_true",
         help="Overwrite existing deploy files.",
@@ -355,6 +361,7 @@ def _cmd_deploy(args: argparse.Namespace) -> int:
             server_name=args.server_name,
             tls=args.tls,
             replicas=args.replicas,
+            sticky=args.sticky,
             force=args.force,
         )
     except DeployError as exc:

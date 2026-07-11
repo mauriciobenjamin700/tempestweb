@@ -1,11 +1,67 @@
 # Instalação
 
-Vamos preparar tudo para rodar o tempestweb localmente. O projeto usa
-[`uv`](https://docs.astral.sh/uv/) para o ambiente Python e `npm` apenas para o
-tooling de teste do cliente JS (jsdom). Nenhum passo de build de frontend — o
-cliente é JavaScript puro. ✅
+O tempestweb é publicado no [PyPI](https://pypi.org/project/tempestweb/) —
+para **usar** o framework basta um `pip install`. Nenhum passo de build de
+frontend: o cliente é JavaScript puro, empacotado pela própria CLI. ✅
+
+!!! tip "Usuário ou contribuidor?"
+    - **Só quer usar o tempestweb no seu app?** Fique na seção
+      [Instalar do PyPI](#instalar-do-pypi) — é tudo que você precisa.
+    - **Quer contribuir com o framework** (rodar o gate, os testes, esta doc)?
+      Vá para [Instalação para contribuir](#instalacao-para-contribuir).
 
 ## Pré-requisitos
+
+- **Python 3.11+** (o repositório roda em 3.13).
+
+Só isso para usar. O caminho de contribuidor pede também
+[uv](https://docs.astral.sh/uv/) e Node.js 18+ — veja
+[Instalação para contribuir](#instalacao-para-contribuir).
+
+## Instalar do PyPI
+
+```bash
+pip install tempestweb
+```
+
+Isso instala o núcleo. As **capacidades extras** são opcionais — instale só o que
+seu app usa:
+
+```bash
+pip install "tempestweb[server]"          # Modo B (servidor): FastAPI + websockets
+pip install "tempestweb[cli]"             # o dev-loop e o empacotador estático
+pip install "tempestweb[server,cli]"      # o combo mais comum
+pip install "tempestweb[webpush]"         # notificações push (Trilho P)
+```
+
+| Extra | Para quê |
+|---|---|
+| `server` | FastAPI, uvicorn, websockets — o **Modo B** (Python no servidor). |
+| `cli` | watchfiles + tomlkit — o dev-loop (`tempestweb dev`) e o `tempestweb sync`. |
+| `webpush` | pywebpush + cryptography — Web Push (Trilho P). |
+
+!!! note "Modos A (WASM) e C (transpile) não têm extra Python"
+    O **Modo A** roda Python no browser via Pyodide; o **Modo C** transcreve o app
+    para JavaScript nativo no build. Nenhum dos dois precisa de um extra Python de
+    runtime — o empacotamento estático é feito pela CLI (extra `cli`). Só o
+    **Modo B** (servidor) precisa do extra `server`.
+
+!!! tip "Usa `uv`?"
+    `uv add tempestweb` (ou `uv add "tempestweb[server,cli]"`) funciona igual e é
+    mais rápido, com lockfile reprodutível.
+
+Pronto — pule direto para o [Tutorial](tutorial/index.md). 🚀
+
+---
+
+## Instalação para contribuir
+
+O resto desta página é para quem vai **desenvolver o próprio tempestweb**: rodar o
+gate de qualidade, os testes e construir esta documentação. Para isso o projeto usa
+[`uv`](https://docs.astral.sh/uv/) para o ambiente Python e `npm` apenas para o
+tooling de teste do cliente JS (jsdom).
+
+### Pré-requisitos de contribuidor
 
 - **Python 3.11+** (o repositório roda em 3.13).
 - **[uv](https://docs.astral.sh/uv/)** — instalador e gerenciador de venv.
@@ -15,7 +71,7 @@ cliente é JavaScript puro. ✅
     `uv` cria o venv e instala dependências em segundos, com lockfile
     reprodutível (`uv.lock`). É o gerenciador padrão do projeto.
 
-## Clonar e instalar
+### Clonar e instalar
 
 ```bash
 git clone https://github.com/mauriciobenjamin700/tempestweb.git
@@ -31,22 +87,11 @@ uv pip install -e ".[dev,server,cli]"    # (2) instala o pacote + extras
 npm install                              # (3) tooling de teste JS
 ```
 
-Os **extras** dizem quais capacidades você instala:
+Aqui a instalação é **editável** (`-e`) e inclui os extras de desenvolvimento
+`dev` (ruff, mypy, pytest) e `docs` (mkdocs), além dos extras de runtime
+`server` e `cli` já descritos [acima](#instalar-do-pypi).
 
-| Extra | Para quê |
-|---|---|
-| `dev` | ruff, mypy, pytest — o gate de qualidade. |
-| `server` | FastAPI, uvicorn, websockets — o **Modo B**. |
-| `cli` | watchfiles + tomlkit — o dev-loop (`tempestweb dev`) e o `tempestweb sync`. |
-| `docs` | mkdocs-material + i18n — **esta documentação**. |
-
-!!! note "Modos A (WASM) e C (transpile) não têm extra Python"
-    O **Modo A** roda Python no browser via Pyodide; o **Modo C** transcreve o app
-    para JavaScript nativo no build. Nenhum dos dois precisa de um extra Python de
-    runtime — o empacotamento estático é feito pela CLI (extra `cli`). Só o
-    **Modo B** (servidor) precisa do extra `server`.
-
-## Rodar o gate
+### Rodar o gate
 
 Antes de qualquer commit, o projeto exige que o gate completo passe:
 
@@ -66,7 +111,7 @@ node --test "tests/client/**/*.test.js" # testes do cliente (jsdom)
 !!! check "Tudo verde?"
     Se `make check` termina sem erro, seu ambiente está pronto. 🎉
 
-## Construir esta documentação
+### Construir esta documentação
 
 A documentação é um site MkDocs bilíngue. Para instalar e construir localmente:
 
@@ -83,9 +128,11 @@ uv run mkdocs serve            # preview local em http://127.0.0.1:8000
     [a versão EN](https://mauriciobenjamin700.github.io/tempestweb/en/) — nunca
     `localhost`.
 
-## Recap
+### Recap
 
-- `make setup` cria o venv e instala tudo (Python + tooling JS).
+- **Usar:** `pip install tempestweb` (mais extras opcionais). Só precisa de Python.
+- **Contribuir:** `git clone` + `make setup` cria o venv e instala tudo
+  (Python + tooling JS); pede `uv` e Node.
 - Extras controlam quais modos/capacidades você habilita.
 - `make check` é o gate; `uv run mkdocs build --strict` é o gate da documentação.
 

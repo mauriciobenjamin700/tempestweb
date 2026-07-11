@@ -404,6 +404,37 @@ def test_try_bare_except_binds_placeholder() -> None:
     assert "} catch (_err) {" in js
 
 
+def test_string_and_list_method_renames() -> None:
+    """Common string/list methods map to their JS equivalents."""
+    assert "s.toUpperCase()" in gen("def f(s):\n    return s.upper()\n")
+    assert "s.toLowerCase()" in gen("def f(s):\n    return s.lower()\n")
+    assert "s.trim()" in gen("def f(s):\n    return s.strip()\n")
+    assert 's.startsWith("x")' in gen("def f(s):\n    return s.startswith('x')\n")
+    assert "xs.push(1)" in gen("def f(xs):\n    xs.append(1)\n")
+
+
+def test_dict_view_methods() -> None:
+    """`.items()`/`.keys()`/`.values()` become `Object.entries/keys/values`."""
+    entries = gen("def f(d):\n    return [k for k, v in d.items()]\n")
+    assert "Object.entries(d)" in entries
+    assert "Object.keys(d)" in gen("def f(d):\n    return d.keys()\n")
+    assert "Object.values(d)" in gen("def f(d):\n    return d.values()\n")
+
+
+def test_join_swaps_receiver_and_argument() -> None:
+    """`sep.join(it)` becomes `it.join(sep)`."""
+    assert 'xs.join(", ")' in gen("def f(xs):\n    return ', '.join(xs)\n")
+
+
+def test_runtime_methods_pass_through_unmapped() -> None:
+    """Runtime/facade methods are emitted unchanged (no false mapping)."""
+    # `app.replace` is the nav method, NOT string.replace.
+    assert "app.replace(" in gen("def view(app):\n    app.replace(r)\n")
+    # `native.storage.get` is the storage capability, NOT dict.get.
+    js = gen("def f():\n    return native.storage.get('k')\n")
+    assert "native.storage.get(" in js
+
+
 def test_tuple_unpacking_assignment() -> None:
     """`a, b = pair` becomes array destructuring."""
     assert "const [a, b] = p;" in gen("def f(p):\n    a, b = p\n    return a\n")

@@ -42,10 +42,12 @@ Capabilities:
 from tempestweb.native import (
     audio,
     badge,
+    bgsync,
     camera,
     clipboard,
     cookies,
     file,
+    filesystem,
     fullscreen,
     geolocation,
     http,
@@ -56,10 +58,14 @@ from tempestweb.native import (
     onnx,
     orientation,
     quota,
+    recorder,
+    speech,
     storage,
+    tabs,
     vibration,
     visibility,
     wakelock,
+    webauthn,
 )
 from tempestweb.native.audio import PlayResult
 from tempestweb.native.bridges import FFIBridge, ProxyBridge
@@ -87,6 +93,7 @@ from tempestweb.native.dispatch import (
 from tempestweb.native.file import PickedFile, SaveResult
 from tempestweb.native.file import pick as file_pick
 from tempestweb.native.file import save as file_save
+from tempestweb.native.filesystem import FileHandle
 from tempestweb.native.geolocation import Position, get_position
 from tempestweb.native.http import (
     HttpResponse,
@@ -117,12 +124,14 @@ from tempestweb.native.offline import size as offline_size
 from tempestweb.native.onnx import OnnxModel, Tensor
 from tempestweb.native.orientation import OrientationState
 from tempestweb.native.quota import StorageEstimate
+from tempestweb.native.recorder import Recording
 from tempestweb.native.share import (
     ShareOutcome,
     ShareResult,
     is_share_supported,
     share,
 )
+from tempestweb.native.speech import Voice
 from tempestweb.native.storage import (
     get as storage_get,
 )
@@ -136,10 +145,12 @@ __all__ = [
     # capability namespaces (plan-facing: native.http.request, native.audio.play, ...)
     "audio",
     "badge",
+    "bgsync",
     "camera",
     "clipboard",
     "cookies",
     "file",
+    "filesystem",
     "fullscreen",
     "geolocation",
     "http",
@@ -150,10 +161,14 @@ __all__ = [
     "onnx",
     "orientation",
     "quota",
+    "recorder",
+    "speech",
     "storage",
+    "tabs",
     "vibration",
     "visibility",
     "wakelock",
+    "webauthn",
     # capability contract (the single source of truth across surfaces)
     "CAPABILITIES",
     "MODE_C_CAPABILITIES",
@@ -198,6 +213,10 @@ __all__ = [
     "NetworkState",
     "OrientationState",
     "StorageEstimate",
+    # Tier-2 web capabilities (dataclass results)
+    "FileHandle",
+    "Recording",
+    "Voice",
     # storage (N3)
     "list_keys",
     "put",

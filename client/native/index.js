@@ -47,6 +47,16 @@ import {
   notificationsSubscribe,
   notificationsUnsubscribe,
 } from "./notifications.js";
+import { speechCancel, speechSpeak, speechVoices } from "./speech.js";
+import { recorderStart, recorderStop } from "./recorder.js";
+import {
+  filesystemOpenFile,
+  filesystemSaveFile,
+  filesystemWriteFile,
+} from "./filesystem.js";
+import { bgsyncRegister, bgsyncRegisterPeriodic } from "./bgsync.js";
+import { tabsBroadcast, tabsLock, tabsUnlock } from "./tabs.js";
+import { webauthnCreate, webauthnGet, webauthnGetOtp } from "./webauthn.js";
 
 /**
  * @typedef {Object} NativeCall
@@ -75,6 +85,11 @@ import {
  * @property {Storage} [localStorage]
  * @property {Document} [document]
  * @property {Screen} [screen]  Screen object (orientation), injected for testing.
+ * @property {Window} [window]  Window object (File System Access pickers).
+ * @property {Object} [speechSynthesis]  Speech synthesis controller.
+ * @property {Function} [SpeechSynthesisUtterance]  Utterance constructor.
+ * @property {Function} [MediaRecorder]  MediaRecorder constructor.
+ * @property {Function} [BroadcastChannel]  BroadcastChannel constructor.
  * @property {Object} [store]   Owner-scoped IndexedDB store (T9/P2), optional.
  */
 
@@ -136,6 +151,22 @@ export const HANDLERS = {
   "notifications.request_permission": notificationsRequestPermission,
   "notifications.subscribe": notificationsSubscribe,
   "notifications.unsubscribe": notificationsUnsubscribe,
+  "speech.speak": speechSpeak,
+  "speech.cancel": speechCancel,
+  "speech.voices": speechVoices,
+  "recorder.start": recorderStart,
+  "recorder.stop": recorderStop,
+  "filesystem.open_file": filesystemOpenFile,
+  "filesystem.write_file": filesystemWriteFile,
+  "filesystem.save_file": filesystemSaveFile,
+  "bgsync.register": bgsyncRegister,
+  "bgsync.register_periodic": bgsyncRegisterPeriodic,
+  "tabs.broadcast": tabsBroadcast,
+  "tabs.lock": tabsLock,
+  "tabs.unlock": tabsUnlock,
+  "webauthn.create": webauthnCreate,
+  "webauthn.get": webauthnGet,
+  "webauthn.get_otp": webauthnGetOtp,
 };
 
 /**
@@ -152,6 +183,11 @@ export function browserDeps() {
     localStorage: g.localStorage,
     document: g.document,
     screen: g.screen,
+    window: g.window || g,
+    speechSynthesis: g.speechSynthesis,
+    SpeechSynthesisUtterance: g.SpeechSynthesisUtterance,
+    MediaRecorder: g.MediaRecorder,
+    BroadcastChannel: g.BroadcastChannel,
   };
 }
 

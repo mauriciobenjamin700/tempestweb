@@ -339,4 +339,134 @@ export const native = Object.freeze({
      */
     state: () => call("network.state", {}),
   }),
+  speech: Object.freeze({
+    /**
+     * Speak a phrase via the platform synthesizer (fire-and-forget).
+     * @param {string} text  The text to speak.
+     * @param {{lang?:string, rate?:number, pitch?:number, volume?:number}} [opts]
+     * @returns {Promise<void>}
+     */
+    speak: (text, opts = {}) =>
+      call("speech.speak", {
+        text,
+        lang: opts.lang ?? "",
+        rate: opts.rate ?? 1.0,
+        pitch: opts.pitch ?? 1.0,
+        volume: opts.volume ?? 1.0,
+      }),
+    /** Cancel queued/ongoing speech. @returns {Promise<void>} */
+    cancel: () => call("speech.cancel", {}),
+    /**
+     * List the available synthesis voices.
+     * @returns {Promise<Array<{name:string, lang:string, default:boolean}>>}
+     */
+    voices: () => call("speech.voices", {}).then((r) => r.voices),
+  }),
+  recorder: Object.freeze({
+    /**
+     * Start a recording (microphone audio, or the screen).
+     * @param {string} [source]  "microphone" (default) or "screen".
+     * @param {{mime_type?:string}} [opts]
+     * @returns {Promise<string>}  The recording id.
+     */
+    start: (source = "microphone", opts = {}) =>
+      call("recorder.start", { source, mime_type: opts.mime_type ?? "" }).then((r) => r.id),
+    /**
+     * Stop a recording by id and read back its bytes.
+     * @param {string} id  The recording id.
+     * @returns {Promise<{data_base64:string, mime_type:string, size:number}>}
+     */
+    stop: (id) => call("recorder.stop", { id }),
+  }),
+  filesystem: Object.freeze({
+    /**
+     * Open one or more files via the native picker.
+     * @param {{accept?:Object, multiple?:boolean}} [opts]
+     * @returns {Promise<Array<{id:string, name:string, mime_type:string,
+     *                          data_base64:string}>>}
+     */
+    open_file: (opts = {}) =>
+      call("filesystem.open_file", {
+        accept: opts.accept ?? {},
+        multiple: opts.multiple ?? false,
+      }).then((r) => r.files),
+    /**
+     * Write base64 bytes back to a previously opened file handle.
+     * @param {string} id  The file handle id.
+     * @param {string} data_base64  The base64-encoded bytes.
+     * @returns {Promise<{written:boolean}>}
+     */
+    write_file: (id, data_base64) => call("filesystem.write_file", { id, data_base64 }),
+    /**
+     * Save bytes to a new file via the native save dialog.
+     * @param {string} filename  The suggested file name.
+     * @param {string} data_base64  The base64-encoded bytes.
+     * @param {{mime_type?:string}} [opts]
+     * @returns {Promise<{id:string, name:string}>}
+     */
+    save_file: (filename, data_base64, opts = {}) =>
+      call("filesystem.save_file", {
+        filename,
+        data_base64,
+        mime_type: opts.mime_type ?? "application/octet-stream",
+      }),
+  }),
+  bgsync: Object.freeze({
+    /**
+     * Register a one-off background-sync tag.
+     * @param {string} tag  The sync tag.
+     * @returns {Promise<boolean>}  Whether registration succeeded.
+     */
+    register: (tag) => call("bgsync.register", { tag }).then((r) => r.registered),
+    /**
+     * Register a periodic background-sync tag.
+     * @param {string} tag  The sync tag.
+     * @param {number} min_interval_ms  The minimum interval in milliseconds.
+     * @returns {Promise<boolean>}  Whether registration succeeded.
+     */
+    register_periodic: (tag, min_interval_ms) =>
+      call("bgsync.register_periodic", { tag, min_interval_ms }).then((r) => r.registered),
+  }),
+  tabs: Object.freeze({
+    /**
+     * Post a message to all tabs on a named BroadcastChannel.
+     * @param {string} channel  The channel name.
+     * @param {*} message  The JSON-able message.
+     * @returns {Promise<void>}
+     */
+    broadcast: (channel, message) => call("tabs.broadcast", { channel, message }),
+    /**
+     * Acquire a named Web Lock, held until `unlock` releases it.
+     * @param {string} name  The lock name.
+     * @param {{mode?:string}} [opts]
+     * @returns {Promise<boolean>}  Whether the lock was acquired.
+     */
+    lock: (name, opts = {}) =>
+      call("tabs.lock", { name, mode: opts.mode ?? "exclusive" }).then((r) => r.acquired),
+    /**
+     * Release a previously acquired named Web Lock (idempotent).
+     * @param {string} name  The lock name.
+     * @returns {Promise<void>}
+     */
+    unlock: (name) => call("tabs.unlock", { name }),
+  }),
+  webauthn: Object.freeze({
+    /**
+     * Create a WebAuthn credential (registration).
+     * @param {Object} options  The PublicKeyCredentialCreationOptions (base64url).
+     * @returns {Promise<Object>}  The serialized credential.
+     */
+    create: (options) => call("webauthn.create", { options }).then((r) => r.credential),
+    /**
+     * Get a WebAuthn assertion (authentication).
+     * @param {Object} options  The PublicKeyCredentialRequestOptions (base64url).
+     * @returns {Promise<Object>}  The serialized credential.
+     */
+    get: (options) => call("webauthn.get", { options }).then((r) => r.credential),
+    /**
+     * Read a one-time code delivered over SMS via the Web OTP API.
+     * @returns {Promise<string>}  The received code.
+     */
+    get_otp: () => call("webauthn.get_otp", {}).then((r) => r.code),
+  }),
 });

@@ -209,6 +209,73 @@ backend sem tocar a app) herdado do `tempest-react-sdk`. Servidor reusa o
     produção **antes** deste trilho; ele é pré-requisito só para o **Modo B**
     exposto publicamente.
 
+## Trilho T — paridade de capacidades com a plataforma web
+
+Expande o **Trilho N**: cobrir as Web APIs que o browser oferece e que a
+biblioteca ainda não embrulha. Mesmo padrão por capacidade — entrada no
+`contract.py` (com `mode_c`), facade Python tipada em `tempestweb/native/`,
+handler em `client/native/`, entrada no Mode C facade (`client/transpile/
+native.js`) quando `mode_c=True`, e testes (conformância `test_native_contract.py`
++ handler jsdom). Todas embrulháveis nos 3 modos (o handler JS roda no browser em
+A/B/C); as só-Chromium expõem `is_supported()` + degradação graciosa.
+
+!!! info "Pré-requisito de streaming (T-EV)"
+    O `NativeBridge` hoje é **request/response single-shot**. Capacidades de
+    **stream** (geolocation `watchPosition`, sensores contínuos, eventos de
+    mudança de rede/visibilidade/orientação/bateria) exigem um **canal de eventos
+    nativo** Python←cliente. **T-EV** é esse canal; as fases marcadas *(stream)*
+    dependem dele. As de leitura única (poll) não dependem e vêm primeiro.
+
+### Tier 1 — alto valor, barato, suporte universal (poll/single-shot)
+
+| Fase | Capacidades | Status |
+|---|---|---|
+| T1 | **vibration:** `vibrate(pattern)` (`navigator.vibrate`) | 🔴 |
+| T2 | **badge:** `set(count)` / `clear()` (`navigator.setAppBadge`/`clearAppBadge`) — contador no ícone do PWA | 🔴 |
+| T3 | **wakelock:** `request()` → id / `release(id)` (`navigator.wakeLock`) — tela acesa | 🔴 |
+| T4 | **fullscreen:** `enter()` / `exit()` / `state()` (`requestFullscreen`/`exitFullscreen`/`fullscreenElement`) | 🔴 |
+| T5 | **visibility:** `state()` (`document.visibilityState`) — leitura única | 🔴 |
+| T6 | **orientation:** `lock(kind)` / `unlock()` / `state()` (`screen.orientation`) | 🔴 |
+| T7 | **quota:** `estimate()` / `persist()` / `persisted()` (`navigator.storage.*`) — pareia com storage/offline | 🔴 |
+| T8 | **network:** `state()` (`navigator.connection`: `effectiveType`/`downlink`/`rtt`/`saveData` + `onLine`) — leitura única | 🔴 |
+| T9 | **clipboard rico:** `read_image()` / `write_image(data)` (`ClipboardItem`, base64) — estende o grupo clipboard | 🔴 |
+
+### Tier 2 — média, muito usados
+
+| Fase | Capacidades | Status |
+|---|---|---|
+| T10 | **speech:** `speak(text, opts)` / `cancel()` (TTS, `SpeechSynthesis`) — single-shot; STT (`SpeechRecognition`) é *(stream)* → T-EV | 🔴 |
+| T11 | **recorder:** `start`/`stop` gravação de áudio/vídeo (`MediaRecorder`) + captura de tela (`getDisplayMedia`) — devolve blob base64 | 🔴 |
+| T12 | **filesystem:** `open_file`/`save_file`/`open_directory` com handles vivos (`showOpenFilePicker`/`showSaveFilePicker`) + OPFS | 🔴 |
+| T13 | **bgsync:** registra Background Sync + Periodic Sync (`SyncManager`) — replay real da offline queue pelo SW | 🔴 |
+| T14 | **webauthn:** `create`/`get` credencial + passkeys (`navigator.credentials`) + **Web OTP** (`OTPCredential`) | 🔴 |
+| T15 | **tabs:** Broadcast Channel + Web Locks — sincronizar entre abas | 🔴 |
+| T16 | **idle:** Idle Detection (`IdleDetector`) — single-shot state; contínuo *(stream)* → T-EV | 🔴 |
+
+### Tier 3 — nicho / secure-context / maioria só Chromium
+
+| Fase | Capacidades | Status |
+|---|---|---|
+| T17 | **bluetooth:** Web Bluetooth (`navigator.bluetooth`) | 🔴 |
+| T18 | **usb / serial / hid:** Web USB / Web Serial / Web HID | 🔴 |
+| T19 | **nfc:** Web NFC (`NDEFReader`) | 🔴 |
+| T20 | **contacts:** Contact Picker (`navigator.contacts`) | 🔴 |
+| T21 | **payment:** Payment Request API | 🔴 |
+| T22 | **misc UI:** Picture-in-Picture · EyeDropper · Pointer Lock | 🔴 |
+| T23 | **gamepad / midi:** Gamepad API (poll) · Web MIDI (`requestMIDIAccess`) | 🔴 |
+| T24 | **webaudio:** Web Audio API — síntese/análise (`AudioContext`), além do play/stop atual | 🔴 |
+
+### Canal de eventos (pré-requisito das *(stream)*)
+
+| Fase | Escopo | Status |
+|---|---|---|
+| T-EV | **Canal de eventos nativo:** stream Python←cliente para subscrições contínuas (geolocation watch, sensores, mudanças de rede/visibilidade/orientação/bateria, STT, idle contínuo). Estende o `NativeBridge` com `subscribe`/`unsubscribe` + entrega de eventos (Modo A via callback FFI, Modo B via frame WS/SSE). Desbloqueia os *(stream)* dos Tiers 1–2 | 🔴 |
+
+!!! note "Ordem sugerida"
+    Tier 1 primeiro (barato, universal, fecha a paridade PWA), depois T-EV (destrava
+    os streams), depois Tier 2 e Tier 3 por demanda. As só-Chromium (Tier 3) sempre
+    entram com `is_supported()` + fallback.
+
 ## Pós-convergência
 
 | Fase | Escopo | Status |

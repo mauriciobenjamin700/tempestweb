@@ -1,0 +1,23 @@
+# Dependency update automation (Track S — S7).
+# Weekly PRs for Python deps, GitHub Actions, and the npm dev/peer toolchain.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["ci"]
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]

@@ -175,15 +175,17 @@ backend sem tocar a app) herdado do `tempest-react-sdk`. Servidor reusa o
 
 ## Trilho S — segurança & produção (hardening rumo ao profissional)
 
-!!! danger "Estado (avaliação 2026-07-11) — o gap para produção profissional"
-    Os modos **estáticos** (A/WASM e C/transpile) já são **produção-ready**: são
-    bundles servíveis por qualquer CDN, superfície de servidor ~zero. O **Modo B
-    (servidor)** roda fim-a-fim, mas **não vem endurecido por padrão** — o
-    `create_app(state_factory, view, title)` não tem auth, CORS, limites nem
-    rate limiting embutidos, e `observability.auth.decode_jwt` **lê claims sem
-    verificar assinatura** (não é gate). Hoje o deployer precisa adicionar isso
-    por fora (middleware FastAPI). Este trilho fecha essa lacuna. Todos os itens
-    abaixo são **⬜ não iniciados**.
+!!! success "Estado (atualizado 2026-07-11) — produção-ready"
+    Os modos **estáticos** (A/WASM e C/transpile) são **produção-ready** (bundles
+    de CDN, superfície de servidor ~zero). O **Modo B (servidor)** agora se
+    endurece via `create_app(..., security=SecurityConfig(...), metrics=...)`:
+    auth gate, CORS + `Origin` no WS, `max_connections`/`max_message_bytes`/
+    rate-limit por IP, headers de segurança, verificação de JWT, `/health` e
+    `/metrics` — com deploy de referência (Docker + nginx TLS/WS + sticky). O
+    núcleo (**S0/S1/S2/S3/S5/S6/S11 ✅**) está fechado; roda profissional.
+    Os 🔶 restantes são **enhancements, não bloqueadores**: S4 backend de sessão
+    Redis (sticky-sessions cobre multi-instância hoje), S8 tracing OTel
+    (`/metrics` cobre o básico), S9/S10 gates de CI (perf/axe).
 
 | ID | Escopo | Status |
 |---|---|---|
@@ -194,7 +196,7 @@ backend sem tocar a app) herdado do `tempest-react-sdk`. Servidor reusa o
 | S4 | **Escala horizontal (Modo B):** endpoint `/health` (liveness/readiness, com flag `ready` ligada ao cap) ✅ + guia de sticky-sessions (`ip_hash`) ✅. Pendente: backend de sessão fora do processo (Redis) p/ dispensar sticky; graceful shutdown explícito | 🔶 (v0.43.0 — `/health` + sticky documentado) |
 | S5 | **Deploy profissional:** `examples/deploy/` com `Dockerfile` (+ `HEALTHCHECK`), `docker-compose.yml` (app + nginx TLS) e `nginx.conf` (upgrade WS + timeouts + `ip_hash`); guia `docs/deploy.md` (PT+EN) | ✅ (v0.43.0) |
 | S6 | **Headers de segurança + auditoria XSS:** `SecurityConfig(security_headers/hsts/content_security_policy)` adiciona `X-Content-Type-Options`/`Referrer-Policy`/`X-Frame-Options`/HSTS/CSP via middleware. **Auditoria XSS: cliente é seguro por construção** — zero `innerHTML` em todo `client/`; patcher usa `textContent`+`setAttribute` | ✅ (v0.42.0; CSP é opt-in explícita por causa dos módulos inline do shell) |
-| S7 | **Supply chain & política:** `SECURITY.md` (report privado + modelo de segurança) ✅ + job `pip-audit` no CI ✅. Pendente: pins de dependência formais + Dependabot | 🔶 (v0.43.0 — SECURITY.md + pip-audit no CI) |
+| S7 | **Supply chain & política:** `SECURITY.md` (report privado + modelo de segurança) + job `pip-audit` no CI + `.github/dependabot.yml` (pip/actions/npm semanal). Pins formais de versão ficam a critério do app | ✅ (v0.43.0 + v0.47.0) |
 | S8 | **Observabilidade de servidor:** `create_app(..., metrics=True)` monta `GET /metrics` (Prometheus): `sessions_live`/`sessions_opened_total`/`connections_rejected_total`/`sessions_max`. Pendente: tracing OpenTelemetry + latência de patch/throughput + logging estruturado | 🔶 (v0.44.0 — endpoint de métricas de conexão) |
 | S9 | **Perf & carga:** `benchmarks/bench_reconcile.py` mede build + diff (ops/s, µs/op) e confirma patch mínimo (1 mudança → 2 patches). Pendente: gate de regressão no CI + throughput WS/cold-start WASM | 🔶 (v0.45.0 — benchmark runnable) |
 | S10 | **Rumo a 1.0:** `docs/stability.md` (PT+EN) — contrato de superfície pública + política de depreciação, matriz de browsers (A/B/C), baseline de a11y. Pendente: gate axe-core no CI + congelar wire-contract | 🔶 (v0.45.0 — política documentada) |

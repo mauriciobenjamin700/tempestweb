@@ -132,6 +132,7 @@ from tempestweb.native.install import prompt as install_prompt
 from tempestweb.native.install import state as install_state
 from tempestweb.native.midi import MidiMessage, MidiPorts
 from tempestweb.native.network import NetworkState
+from tempestweb.native.nfc import NdefMessage
 from tempestweb.native.notifications import (
     NotificationPermission,
     PushState,
@@ -275,6 +276,7 @@ __all__ = [
     "IdleState",
     "MidiMessage",
     "Motion",
+    "NdefMessage",
     "SpeechResult",
     # storage (N3)
     "list_keys",

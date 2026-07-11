@@ -260,7 +260,7 @@ A/B/C); as só-Chromium expõem `is_supported()` + degradação graciosa.
 |---|---|---|
 | T17 | **bluetooth:** Web Bluetooth (`navigator.bluetooth`) | ✅ (v0.50.0) |
 | T18 | **usb / serial / hid:** Web USB / Web Serial / Web HID | ✅ (v0.50.0) |
-| T19 | **nfc:** Web NFC (`NDEFReader`) | 🔶 (v0.50.0 — `write` + `is_supported`; scan → T-EV) |
+| T19 | **nfc:** Web NFC (`NDEFReader`) | ✅ (v0.51.0 — write + scan via T-EV) |
 | T20 | **contacts:** Contact Picker (`navigator.contacts`) | ✅ (v0.50.0) |
 | T21 | **payment:** Payment Request API | ✅ (v0.50.0) |
 | T22 | **misc UI:** Picture-in-Picture · EyeDropper · Pointer Lock | ✅ (v0.50.0) |

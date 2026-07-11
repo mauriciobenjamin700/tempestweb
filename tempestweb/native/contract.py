@@ -117,6 +117,7 @@ CAPABILITIES: tuple[Capability, ...] = (
     _cap("network.state", mode_c=True),
     _cap("network.watch", mode_c=True, streaming=True),
     _cap("nfc.is_supported", mode_c=True),
+    _cap("nfc.scan", mode_c=True, streaming=True),
     _cap("nfc.write", mode_c=True),
     _cap("offline.enqueue", mode_c=True),
     _cap("offline.pending", mode_c=True),

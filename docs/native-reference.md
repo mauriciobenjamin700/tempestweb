@@ -397,10 +397,16 @@ async def write_tag(url: str) -> None:
         await native.nfc.write([{"recordType": "url", "data": url}])
 ```
 
-!!! info "Leitura de NFC (`scan`) ainda não implementada"
-    A **escrita** (`nfc.write`) e `is_supported()` estão prontas. O **scan** de tags
-    é um stream contínuo e será exposto pelo canal de eventos (T-EV) em uma versão
-    futura — é a única lacuna conhecida do Trilho T.
+!!! tip "Leitura de NFC (`scan`) — streaming (T-EV)"
+    Além da escrita, o **scan** de tags é um stream contínuo pelo canal de eventos:
+
+    ```python
+    async for msg in native.nfc.scan():
+        print(msg.serial_number, msg.records)
+    ```
+
+    Cada `NdefMessage` traz `serial_number` + `records` decodificados; sair do laço
+    aborta o scan. Ver [Canal de eventos nativo](native-events.md).
 
 ### `contacts` — Contact Picker
 
@@ -527,9 +533,9 @@ async def beep() -> None:
   secure-context e sempre traz `is_supported()` + fallback.
 - Streams (`geolocation.watch`, `sensors.*`, `network.watch`, `visibility.watch`,
   `orientation.watch`, `battery.watch`, `speech.listen`, `idle.watch`,
-  `tabs.receive`, `gamepad.watch`, `midi.messages`) fecham a assinatura ao sair do
-  laço.
-- **Lacuna conhecida:** `nfc.scan` (streaming) ainda não implementado.
+  `tabs.receive`, `gamepad.watch`, `midi.messages`, `nfc.scan`) fecham a assinatura
+  ao sair do laço.
+- O Trilho T está **completo**, sem lacunas de capacidade conhecidas.
 
 Veja a ponte em ação no [Painel do dispositivo](examples/device-panel.md) e o
 formato de wire das chamadas em

@@ -76,7 +76,7 @@ import { eyedropperOpen } from "./eyedropper.js";
 import { gamepadState, gamepadWatch } from "./gamepad.js";
 import { hidIsSupported, hidRequest } from "./hid.js";
 import { midiIsSupported, midiMessages, midiRequestAccess, midiSend } from "./midi.js";
-import { nfcIsSupported, nfcWrite } from "./nfc.js";
+import { nfcIsSupported, nfcScan, nfcWrite } from "./nfc.js";
 import { paymentIsSupported, paymentRequest } from "./payment.js";
 import { pipExit, pipRequest } from "./pip.js";
 import { pointerlockExit, pointerlockRequest } from "./pointerlock.js";
@@ -241,6 +241,7 @@ export const EVENT_HANDLERS = {
   "gamepad.watch": gamepadWatch,
   "idle.watch": idleWatch,
   "midi.messages": midiMessages,
+  "nfc.scan": nfcScan,
   "network.watch": networkWatch,
   "orientation.watch": orientationWatch,
   "sensors.motion": sensorsMotion,

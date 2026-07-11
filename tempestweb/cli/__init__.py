@@ -10,11 +10,14 @@ reaching into submodules.
 """
 
 from tempestweb.cli.commands import (
+    DEPLOY_FILES,
     SERVER_ARTIFACT_FILES,
     TRANSPILE_ARTIFACT_FILES,
     WASM_ARTIFACT_FILES,
     BuildError,
     BuildResult,
+    DeployError,
+    DeployResult,
     DevError,
     DevSession,
     NewError,
@@ -27,6 +30,8 @@ from tempestweb.cli.commands import (
     create_dev_session,
     create_project,
     prepare_run,
+    render_deploy_files,
+    scaffold_deploy,
     serve_run,
     sync_modules,
 )
@@ -78,7 +83,12 @@ __all__ = [
     "build_artifact",
     "build_parser",
     "create_dev_session",
+    "DEPLOY_FILES",
+    "DeployError",
+    "DeployResult",
     "create_project",
+    "render_deploy_files",
+    "scaffold_deploy",
     "load_app",
     "load_config",
     "main",

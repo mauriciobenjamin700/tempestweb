@@ -173,6 +173,20 @@ The client subscribes with `native.notifications.subscribe(public_key)` and POST
 the subscription to `/webpush/subscribe`; `POST /webpush/send` pushes to it. See
 the runnable [`examples/webpush-server`](examples/webpush-server/server.py).
 
+## Deploy (server mode)
+
+```bash
+tempestweb deploy --server-name app.example.com --tls    # -> deploy/
+cd deploy && docker compose up --build
+```
+
+Generates a tailored `nginx.conf` (WebSocket upgrade, streaming timeouts, sticky
+`ip_hash`, optional TLS), a `Dockerfile`, `docker-compose.yml` and a `DEPLOY.md`.
+Harden the app with a `SecurityConfig` (auth, CORS, limits, rate limiting,
+headers) — see the [Security](https://mauriciobenjamin700.github.io/tempestweb/en/security/)
+and [Deploy](https://mauriciobenjamin700.github.io/tempestweb/en/deploy/) guides.
+Static modes (A/C) need no server — publish the build to any CDN.
+
 ## Develop
 
 ```bash

@@ -4,6 +4,19 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.48.0] — 2026-07-11
+
+### Added
+
+- **`tempestweb deploy` — generate deploy files (Track S — S5).** Scaffolds a
+  tailored `nginx.conf` (upstream port from `tempestweb.toml`; WebSocket upgrade,
+  `X-Forwarded-*`, long streaming timeouts, `ip_hash` stickiness; `--tls` adds a
+  443 server block + HTTP→HTTPS redirect; `--replicas N` expands the upstream), a
+  `Dockerfile` (with `HEALTHCHECK`), a `docker-compose.yml`, and a `DEPLOY.md`
+  guide — into `deploy/` (or `--out`). Flags: `--path`, `--out`, `--server-name`,
+  `--tls`, `--replicas`, `--force`. Public API: `render_deploy_files` /
+  `scaffold_deploy` from `tempestweb.cli`. 10 tests.
+
 ## [0.47.0] — 2026-07-11
 
 ### Added

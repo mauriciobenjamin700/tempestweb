@@ -4,6 +4,17 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.44.0] — 2026-07-11
+
+### Added
+
+- **Server metrics (Track S — S8, partial).** `create_app(..., metrics=True)`
+  mounts `GET /metrics` in Prometheus text format: `tempestweb_sessions_live`
+  (gauge), `tempestweb_sessions_opened_total` /
+  `tempestweb_connections_rejected_total` (counters), and
+  `tempestweb_sessions_max` when a cap is configured. Disabled by default.
+  (OpenTelemetry tracing + patch-latency/throughput remain follow-ups.)
+
 ## [0.43.0] — 2026-07-11
 
 ### Added

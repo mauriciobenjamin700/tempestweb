@@ -212,3 +212,30 @@ def test_health_ready_flag_follows_capacity() -> None:
     with client.websocket_connect("/ws"):
         assert client.get("/health").json()["ready"] is False  # full
     assert client.get("/health").json()["ready"] is True  # slot freed
+
+
+# -- S8: metrics --------------------------------------------------------------
+
+
+def test_metrics_disabled_by_default() -> None:
+    client = TestClient(create_app(lambda: _State(), _view))
+    assert client.get("/metrics").status_code == 404
+
+
+def test_metrics_counters() -> None:
+    app = create_app(
+        lambda: _State(),
+        _view,
+        security=SecurityConfig(authenticate=token_authenticator("sesame")),
+        metrics=True,
+    )
+    client = TestClient(app)
+    # One accepted WS, one rejected (no token).
+    with client.websocket_connect("/ws?token=sesame"):
+        body = client.get("/metrics").text
+        assert "tempestweb_sessions_live 1" in body
+    _ws_ok(client, "/ws")  # rejected
+    body = client.get("/metrics").text
+    assert "tempestweb_sessions_opened_total 1" in body
+    assert "tempestweb_connections_rejected_total 1" in body
+    assert "tempestweb_sessions_live 0" in body

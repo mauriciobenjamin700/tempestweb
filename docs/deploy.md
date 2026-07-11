@@ -68,6 +68,13 @@ réplicas:
 `ready` vira `false` quando `max_connections` é atingido — use no *readiness* do
 balanceador para drenar uma instância cheia.
 
+### Métricas (S8)
+
+`create_app(..., metrics=True)` monta `GET /metrics` no formato **Prometheus**:
+`tempestweb_sessions_live` (gauge), `tempestweb_sessions_opened_total` e
+`tempestweb_connections_rejected_total` (counters), e `tempestweb_sessions_max`
+quando há cap. Aponte seu scraper pra lá.
+
 ## Recap
 
 - **A/C**: `build` → publique o diretório estático num CDN. Fim.

@@ -8,6 +8,13 @@ carried over both transports.
 from __future__ import annotations
 
 from tempestweb.server.app import TempestWebServer, create_app
+from tempestweb.server.security import (
+    Credentials,
+    SecurityConfig,
+    jwt_authenticator,
+    token_authenticator,
+    verify_jwt,
+)
 from tempestweb.server.webpush import (
     InMemorySubscriptionStore,
     SendOutcome,
@@ -21,7 +28,9 @@ from tempestweb.server.webpush import (
 )
 
 __all__ = [
+    "Credentials",
     "InMemorySubscriptionStore",
+    "SecurityConfig",
     "SendOutcome",
     "SubscriptionStore",
     "TempestWebServer",
@@ -31,5 +40,8 @@ __all__ = [
     "WebPushService",
     "create_app",
     "generate_vapid_keys",
+    "jwt_authenticator",
+    "token_authenticator",
+    "verify_jwt",
     "webpush_router",
 ]

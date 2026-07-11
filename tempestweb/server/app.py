@@ -18,7 +18,7 @@ inbound envelopes and a dropped stream can reconnect with ``Last-Event-ID``.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from typing import Any, Generic, TypeVar
 
 from fastapi import FastAPI, Request, Response
@@ -27,6 +27,7 @@ from starlette.websockets import WebSocket
 
 from tempest_core import App, Widget
 from tempestweb.runtime.session import AppSession
+from tempestweb.server.security import Credentials, SecurityConfig, _bearer_token
 from tempestweb.transports.base import PatchTransport
 from tempestweb.transports.sse import SSETransport
 from tempestweb.transports.websocket import WebSocketTransport
@@ -34,6 +35,43 @@ from tempestweb.transports.websocket import WebSocketTransport
 __all__ = ["TempestWebServer", "create_app"]
 
 S = TypeVar("S")
+
+
+async def _authorize(security: SecurityConfig, credentials: Credentials) -> bool:
+    """Run the origin allowlist + auth predicate for a connection.
+
+    Args:
+        security: The active security config.
+        credentials: The connection's extracted credentials.
+
+    Returns:
+        ``True`` when the connection is allowed, ``False`` otherwise. A raised
+        error from a custom ``authenticate`` is treated as a rejection.
+    """
+    if not security.origin_allowed(credentials.origin):
+        return False
+    if security.authenticate is None:
+        return True
+    try:
+        result = security.authenticate(credentials)
+        if isinstance(result, bool):
+            return result
+        return bool(await result)
+    except Exception:  # noqa: BLE001 - any auth error is a rejection, not a 500
+        return False
+
+
+def _credentials_from_headers(
+    headers: Mapping[str, str], query: Mapping[str, str]
+) -> Credentials:
+    """Build :class:`Credentials` from request headers + query params."""
+    lowered = {k.lower(): v for k, v in headers.items()}
+    return Credentials(
+        token=_bearer_token(lowered, query),
+        origin=lowered.get("origin"),
+        headers=lowered,
+        query=dict(query),
+    )
 
 
 class TempestWebServer(Generic[S]):
@@ -52,6 +90,7 @@ class TempestWebServer(Generic[S]):
         view: Callable[[App[S]], Widget],
         *,
         title: str = "tempestweb",
+        security: SecurityConfig | None = None,
     ) -> None:
         """Build the server and register the WebSocket and SSE routes.
 
@@ -59,12 +98,31 @@ class TempestWebServer(Generic[S]):
             state_factory: Builds a fresh state per connection (isolation).
             view: The shared ``view`` function rendered for each session.
             title: OpenAPI title for the FastAPI app.
+            security: Opt-in auth + origin controls (Track S). ``None`` leaves
+                the host open (dev).
         """
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
         self._sse_sessions: dict[str, _SSESession[S]] = {}
+        self._security: SecurityConfig = security or SecurityConfig()
         self.api: FastAPI = FastAPI(title=title)
+        self._install_cors()
         self._register_routes()
+
+    def _install_cors(self) -> None:
+        """Install CORS for the HTTP/SSE surface when an allowlist is set (S1)."""
+        origins = self._security.allowed_origins
+        if origins is None:
+            return
+        from starlette.middleware.cors import CORSMiddleware
+
+        self.api.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_methods=["GET", "POST"],
+            allow_headers=["*"],
+            allow_credentials=not self._security.origins_wildcard,
+        )
 
     def _new_session(self, transport: PatchTransport) -> AppSession[S]:
         """Create an isolated session bound to a transport.
@@ -82,7 +140,18 @@ class TempestWebServer(Generic[S]):
 
         @self.api.websocket("/ws")
         async def ws_endpoint(websocket: WebSocket) -> None:
-            """Serve one client over a WebSocket until it disconnects."""
+            """Serve one client over a WebSocket until it disconnects.
+
+            The auth gate + origin allowlist (Track S) run on the upgrade before
+            a session is created; a rejected connection is closed with ``1008``
+            (policy violation) and never mounts.
+            """
+            credentials = _credentials_from_headers(
+                websocket.headers, websocket.query_params
+            )
+            if not await _authorize(self._security, credentials):
+                await websocket.close(code=1008)
+                return
             await websocket.accept()
             transport = WebSocketTransport(websocket)
             session = self._new_session(transport)
@@ -91,12 +160,21 @@ class TempestWebServer(Generic[S]):
         @self.api.get("/sse")
         async def sse_endpoint(request: Request, session: str) -> Response:
             """Open (or resume) the SSE patch stream for ``session``."""
+            if not await self._authorize_request(request):
+                return JSONResponse({"error": "unauthorized"}, status_code=401)
             return await self._open_sse(request, session)
 
         @self.api.post("/sse/{session_id}")
         async def sse_post(session_id: str, request: Request) -> Response:
             """Receive one client envelope (event / native_result) for a session."""
+            if not await self._authorize_request(request):
+                return JSONResponse({"error": "unauthorized"}, status_code=401)
             return await self._handle_sse_post(session_id, request)
+
+    async def _authorize_request(self, request: Request) -> bool:
+        """Run the Track-S gate for an HTTP (SSE) request."""
+        credentials = _credentials_from_headers(request.headers, request.query_params)
+        return await _authorize(self._security, credentials)
 
     async def _open_sse(self, request: Request, session_id: str) -> Response:
         """Open or resume an SSE session and return the streaming response.
@@ -210,6 +288,7 @@ def create_app(
     view: Callable[[App[S]], Widget],
     *,
     title: str = "tempestweb",
+    security: SecurityConfig | None = None,
 ) -> FastAPI:
     """Build a Mode B FastAPI app for a ``view`` and state factory.
 
@@ -217,8 +296,11 @@ def create_app(
         state_factory: Builds a fresh state per connection (isolation).
         view: The shared ``view`` function rendered for each session.
         title: OpenAPI title for the FastAPI app.
+        security: Opt-in auth + origin controls (Track S — S0/S1/S3). ``None``
+            leaves the host open (dev); pass a :class:`SecurityConfig` with an
+            ``authenticate`` predicate and/or ``allowed_origins`` for production.
 
     Returns:
         The configured FastAPI application with WS and SSE routes mounted.
     """
-    return TempestWebServer(state_factory, view, title=title).api
+    return TempestWebServer(state_factory, view, title=title, security=security).api

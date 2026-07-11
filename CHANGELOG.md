@@ -4,6 +4,18 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.46.0] — 2026-07-11
+
+### Added
+
+- **Per-IP connection rate limiting (Track S — S2 complete).**
+  `SecurityConfig.max_connections_per_minute` refuses a connection flood from one
+  client IP (rolling 60s window; WS `1013` / SSE `429`), taking the IP from
+  `X-Forwarded-For` (first hop) or the peer. New `RateLimiter` helper. This
+  closes S2 (cap + payload + rate limit); a dead/half-open WS is already reaped
+  by uvicorn's ping, and an app-level idle-timeout is intentionally not enforced
+  (it would disconnect legitimately-idle users).
+
 ## [0.45.0] — 2026-07-11
 
 ### Added

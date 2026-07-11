@@ -22,12 +22,15 @@ touched when :func:`verify_jwt` runs.
 from __future__ import annotations
 
 import hmac
+import time
+from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 __all__ = [
     "Credentials",
+    "RateLimiter",
     "SecurityConfig",
     "jwt_authenticator",
     "token_authenticator",
@@ -55,6 +58,7 @@ class Credentials:
     origin: str | None
     headers: Mapping[str, str]
     query: Mapping[str, str]
+    client_ip: str | None = None
 
 
 @dataclass(slots=True)
@@ -73,6 +77,11 @@ class SecurityConfig:
             ``None`` = unbounded (S2).
         max_message_bytes: Reject an SSE ``POST`` body larger than this many
             bytes with ``413`` (S2). ``None`` = unbounded.
+        max_connections_per_minute: Per-client-IP cap on new connections in a
+            rolling 60s window; a flood is refused (WS ``1013`` / SSE ``429``).
+            The IP is taken from ``X-Forwarded-For`` (first hop) or the peer
+            address. ``None`` = no per-IP limit (S2). Pair with a reverse-proxy
+            limiter for defense in depth.
         security_headers: When ``True``, add hardening response headers
             (``X-Content-Type-Options``, ``Referrer-Policy``, ``X-Frame-Options``)
             to every HTTP response (S6).
@@ -87,6 +96,7 @@ class SecurityConfig:
     allowed_origins: list[str] | None = field(default=None)
     max_connections: int | None = None
     max_message_bytes: int | None = None
+    max_connections_per_minute: int | None = None
     security_headers: bool = False
     hsts: bool = False
     content_security_policy: str | None = None
@@ -249,3 +259,45 @@ def token_authenticator(secret: str) -> Authenticate:
         return hmac.compare_digest(token, secret)
 
     return _authenticate
+
+
+class RateLimiter:
+    """A per-key rolling-window rate limiter (S2 — per-IP connection flood).
+
+    Allows at most ``limit`` events per ``window`` seconds per key. Timestamps
+    are pruned on access; empty buckets are dropped so the map does not grow
+    unboundedly. Uses a monotonic clock; not shared across processes (per-worker).
+    """
+
+    def __init__(self, limit: int, *, window: float = 60.0) -> None:
+        """Initialize the limiter.
+
+        Args:
+            limit: Max events allowed per key within ``window``.
+            window: The rolling window in seconds.
+        """
+        self._limit: int = limit
+        self._window: float = window
+        self._hits: dict[str, deque[float]] = defaultdict(deque)
+
+    def allow(self, key: str, *, now: float | None = None) -> bool:
+        """Record an event for ``key`` and report whether it is within the limit.
+
+        Args:
+            key: The client key (e.g. an IP address).
+            now: Override the current monotonic time (tests).
+
+        Returns:
+            ``True`` if the event is allowed, ``False`` if it exceeds the limit.
+        """
+        current = time.monotonic() if now is None else now
+        cutoff = current - self._window
+        bucket = self._hits[key]
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+        if len(bucket) >= self._limit:
+            if not bucket:
+                del self._hits[key]
+            return False
+        bucket.append(current)
+        return True

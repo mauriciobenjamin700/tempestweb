@@ -161,6 +161,26 @@ def test_max_connections_caps_websockets() -> None:
     assert _ws_ok(client, "/ws") is True
 
 
+def test_per_ip_rate_limit_refuses_flood() -> None:
+    """More than max_connections_per_minute from one IP is refused; slot frees."""
+    client = _client(max_connections_per_minute=2)
+    assert _ws_ok(client, "/ws") is True
+    assert _ws_ok(client, "/ws") is True
+    assert _ws_ok(client, "/ws") is False  # 3rd within the window -> rate limited
+
+
+def test_rate_limiter_windowing() -> None:
+    """The RateLimiter allows up to `limit` per window and prunes old hits."""
+    from tempestweb.server.security import RateLimiter
+
+    limiter = RateLimiter(2, window=60.0)
+    assert limiter.allow("ip", now=100.0) is True
+    assert limiter.allow("ip", now=100.0) is True
+    assert limiter.allow("ip", now=100.0) is False
+    assert limiter.allow("ip", now=161.0) is True  # window elapsed
+    assert limiter.allow("other", now=100.0) is True  # per-key
+
+
 def test_max_message_bytes_rejects_large_sse_post() -> None:
     client = _client(max_message_bytes=50)
     small = client.post("/sse/s1", content=b"x" * 10)

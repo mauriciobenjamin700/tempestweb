@@ -4,6 +4,23 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.37.0] — 2026-07-11
+
+### Added
+
+- **Wider expression + statement subset in the transpiler:**
+  - **Sequence unpacking** — `a, b = pair` (array destructuring), `for k, v in
+    items:` and comprehension tuple targets (`[f(k, v) for k, v in items]`).
+  - **`enumerate(it)`** → `it.map((v, i) => [i, v])` and **`zip(a, b)`** → paired
+    arrays, so tuple-target iteration works idiomatically.
+  - **Operators `**` (power) and `//` (floor division → `Math.floor(a / b)`).**
+  - **Slices** — `x[a:b]` / `x[a:]` / `x[:b]` → `x.slice(...)` (a step is
+    rejected).
+  - **`assert cond[, msg]`** → `if (!(cond)) throw` an `AssertionError`.
+  - **Chained assignment** `a = b = x`.
+
+  (Chained comparison `a < b < c` was already supported.)
+
 ## [0.36.0] — 2026-07-11
 
 ### Added

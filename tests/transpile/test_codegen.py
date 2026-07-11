@@ -404,6 +404,46 @@ def test_try_bare_except_binds_placeholder() -> None:
     assert "} catch (_err) {" in js
 
 
+def test_tuple_unpacking_assignment() -> None:
+    """`a, b = pair` becomes array destructuring."""
+    assert "const [a, b] = p;" in gen("def f(p):\n    a, b = p\n    return a\n")
+
+
+def test_for_tuple_target() -> None:
+    """`for k, v in items:` destructures each element."""
+    js = gen("def f(items):\n    for k, v in items:\n        use(k, v)\n")
+    assert "for (const [k, v] of items) {" in js
+
+
+def test_enumerate_and_zip() -> None:
+    """`enumerate`/`zip` pair elements for tuple-target iteration."""
+    en = gen("def f(xs):\n    return [i for i, x in enumerate(xs)]\n")
+    assert "map((_v, _i) => [_i, _v])" in en
+    assert "map(([i, x]) =>" in en
+    zp = gen("def f(a, b):\n    return [x for x, y in zip(a, b)]\n")
+    assert "map((_v, _i) => [_v, b[_i]])" in zp
+
+
+def test_power_and_floor_division() -> None:
+    """`**` maps to JS `**`; `//` to `Math.floor(a / b)`."""
+    assert "(n ** 2)" in gen("def f(n):\n    return n ** 2\n")
+    assert "Math.floor(n / 2)" in gen("def f(n):\n    return n // 2\n")
+
+
+def test_slices() -> None:
+    """`x[a:b]`/`x[a:]` map to `.slice(...)`; a step is rejected."""
+    assert "x.slice(1, 3)" in gen("def f(x):\n    return x[1:3]\n")
+    assert "x.slice(2)" in gen("def f(x):\n    return x[2:]\n")
+    assert "x.slice(0, 3)" in gen("def f(x):\n    return x[:3]\n")
+
+
+def test_assert_throws_assertion_error() -> None:
+    """`assert cond, msg` throws an AssertionError when the condition is false."""
+    js = gen("def f(x):\n    assert x > 0, 'must be positive'\n")
+    assert "if (!(x > 0)) {" in js
+    assert '{ name: "AssertionError" }' in js
+
+
 def test_raise_throws_named_error() -> None:
     """`raise Exc(msg)` throws an Error with .message and .name = the class."""
     js = gen("def f(x):\n    raise ValueError('bad')\n")
@@ -521,7 +561,8 @@ _UNSUPPORTED: dict[str, str] = {
     "walrus": "def f(x):\n    return (y := x)\n",
     "raise_from": "def f():\n    raise ValueError('x') from KeyError()\n",
     "bare_raise_outside_except": "def f():\n    raise\n",
-    "assert": "def f(x):\n    assert x\n",
+    "slice_step": "def f(x):\n    return x[::2]\n",
+    "starred_unpack": "def f(p):\n    a, *rest = p\n    return a\n",
     "del": "def f(x):\n    del x\n",
     "starargs": "def f(*args):\n    return args\n",
     "kwargs": "def f(**kw):\n    return kw\n",
@@ -533,7 +574,6 @@ _UNSUPPORTED: dict[str, str] = {
     "fstring_precision_no_type": "def f(x):\n    return f'{x:.3}'\n",
     "fstring_dynamic_spec": "def f(x, n):\n    return f'{x:.{n}f}'\n",
     "fstring_ascii_conv": "def f(x):\n    return f'{x!a}'\n",
-    "dict_comp_tuple_target": "def f(a):\n    return {k: v for k, v in a}\n",
     "multiloop_comp": "def f(a, b):\n    return [x for x in a for y in b]\n",
     "plain_import": "import os\n",
 }

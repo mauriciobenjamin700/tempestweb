@@ -506,20 +506,23 @@ construct outside it becomes a clear **compile error** (`file:line`), in the
 spirit of `mypy --strict`.
 
 !!! info "In the subset today"
-    - **Expressions:** arithmetic (`+ - * / %`), comparison (`== != < <= > >=`),
-      boolean (`and`/`or`), unary (`not`/`-`), ternary (`a if c else b`), list
-      and dict comprehensions (`[e for x in it if c]`, `{k: v for x in it}`),
-      `list`/`tuple`/`set`/`dict` literals, `in`/`not in`, indexing, f-strings
+    - **Expressions:** arithmetic (`+ - * / % ** //`), comparison
+      (`== != < <= > >=`, chained `a < b < c`), boolean (`and`/`or`), unary
+      (`not`/`-`), ternary (`a if c else b`), list and dict comprehensions
+      (including a tuple target `for k, v in …`), `list`/`tuple`/`set`/`dict`
+      literals, `in`/`not in`, indexing and **slices** (`x[a:b]`), f-strings
       (formats `{x:.2f}`, `{x:,}`, `{x:,.2f}`, `{x:.1%}`, `{x:d}`; conversions
       `{x!s}`, `{x!r}`), expression lambdas.
     - **Builtins:** `len`, `str`/`int`/`float`/`bool`, `abs`, `round(x[, n])`,
-      `min`/`max` (variadic or over one iterable), `sum(it)`, `range(...)`
-      (materialized to an array).
-    - **Statements:** `if`/`elif`/`else`, `for … in`, `while`, `break`/
-      `continue`, `try`/`except`/`finally` (a single `except` catches all;
-      multiple dispatch by exception class name), `with … as x` (the
-      `__enter__`/`__exit__` protocol), `raise Exc("msg")` / `raise` (re-raise
-      inside `except`), assignment, `+=` and friends, `return`.
+      `min`/`max` (variadic or over one iterable), `sum(it)`, `range(...)`,
+      `enumerate(it)`, `zip(a, b)`.
+    - **Statements:** `if`/`elif`/`else`, `for … in` (with a tuple target),
+      `while`, `break`/`continue`, `try`/`except`/`finally` (a single `except`
+      catches all; multiple dispatch by exception class name), `with … as x`
+      (the `__enter__`/`__exit__` protocol), `raise Exc("msg")` / `raise`
+      (re-raise inside `except`), `assert cond[, msg]`, assignment (including
+      unpacking `a, b = pair` and chained `a = b = x`), `+=` and friends,
+      `return`.
     - **Structures:** a state `@dataclass` (fields + methods), dataclass
       inheritance (`class B(A)` → `extends`), `make_state()`, `view()` with
       handler closures.

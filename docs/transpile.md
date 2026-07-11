@@ -506,20 +506,22 @@ app. Um construto fora dele vira **erro de compilação** claro (`arquivo:linha`
 no espírito do `mypy --strict`.
 
 !!! info "Dentro do subset hoje"
-    - **Expressões:** aritmética (`+ - * / %`), comparação (`== != < <= > >=`),
-      booleanos (`and`/`or`), unários (`not`/`-`), ternário (`a if c else b`),
-      comprehensions de lista e de dict (`[e for x in it if c]`,
-      `{k: v for x in it}`), literais `list`/`tuple`/`set`/`dict`, `in`/`not in`,
-      indexação, f-strings (formatos `{x:.2f}`, `{x:,}`, `{x:,.2f}`, `{x:.1%}`,
+    - **Expressões:** aritmética (`+ - * / % ** //`), comparação
+      (`== != < <= > >=`, encadeada `a < b < c`), booleanos (`and`/`or`), unários
+      (`not`/`-`), ternário (`a if c else b`), comprehensions de lista e de dict
+      (inclusive alvo em tupla `for k, v in …`), literais
+      `list`/`tuple`/`set`/`dict`, `in`/`not in`, indexação e **slices**
+      (`x[a:b]`), f-strings (formatos `{x:.2f}`, `{x:,}`, `{x:,.2f}`, `{x:.1%}`,
       `{x:d}`; conversões `{x!s}`, `{x!r}`), lambdas de expressão.
     - **Builtins:** `len`, `str`/`int`/`float`/`bool`, `abs`, `round(x[, n])`,
-      `min`/`max` (variádico ou sobre um iterável), `sum(it)`, `range(...)`
-      (materializado em array).
-    - **Statements:** `if`/`elif`/`else`, `for … in`, `while`, `break`/
-      `continue`, `try`/`except`/`finally` (um `except` pega tudo; vários fazem
-      dispatch por nome da classe de exceção), `with … as x` (protocolo
-      `__enter__`/`__exit__`), `raise Exc("msg")` / `raise` (re-raise dentro de
-      `except`), atribuição, `+=` e afins, `return`.
+      `min`/`max` (variádico ou sobre um iterável), `sum(it)`, `range(...)`,
+      `enumerate(it)`, `zip(a, b)`.
+    - **Statements:** `if`/`elif`/`else`, `for … in` (com alvo em tupla),
+      `while`, `break`/`continue`, `try`/`except`/`finally` (um `except` pega
+      tudo; vários fazem dispatch por nome da classe de exceção), `with … as x`
+      (protocolo `__enter__`/`__exit__`), `raise Exc("msg")` / `raise` (re-raise
+      dentro de `except`), `assert cond[, msg]`, atribuição (inclusive unpacking
+      `a, b = par` e encadeada `a = b = x`), `+=` e afins, `return`.
     - **Estruturas:** `@dataclass` de estado (campos + métodos), herança de
       dataclass (`class B(A)` → `extends`), `make_state()`, `view()` com closures
       de handler.

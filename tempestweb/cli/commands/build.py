@@ -190,6 +190,7 @@ TRANSPILE_ARTIFACT_FILES: tuple[str, ...] = (
     *(f"client/offline/{asset}" for asset in _OFFLINE_ASSETS),
     "client/push/web-push-client.js",
     "client/pwa/install-prompt.js",
+    "client/pwa/update-prompt.js",
     # PWA layer: manifest, service worker + registration, icons. Mode C is a
     # first-class installable, offline-capable PWA (static bundle).
     *_PWA_FILES,
@@ -1142,8 +1143,12 @@ def _index_html_transpile(name: str, theme_color: str = "#111111") -> str:
     </script>
     <script type="module">
       import {{ registerServiceWorker }} from "./register.js";
+      import {{ showUpdatePrompt }} from "./client/pwa/update-prompt.js";
       if ("serviceWorker" in navigator) {{
-        registerServiceWorker({{ url: "./sw.js" }});
+        registerServiceWorker({{
+          url: "./sw.js",
+          onUpdate: (registration) => showUpdatePrompt(registration),
+        }});
       }}
     </script>
   </body>
@@ -1221,7 +1226,11 @@ def _build_transpile(
         if not source.is_file():
             raise BuildError(f"missing native asset: {source}")
         shutil.copyfile(source, native_dest / asset)
-    for rel in ("push/web-push-client.js", "pwa/install-prompt.js"):
+    for rel in (
+        "push/web-push-client.js",
+        "pwa/install-prompt.js",
+        "pwa/update-prompt.js",
+    ):
         source = client / rel
         if not source.is_file():
             raise BuildError(f"missing native dependency: {source}")
@@ -1247,6 +1256,7 @@ def _build_transpile(
         *(f"/client/offline/{asset}" for asset in _OFFLINE_ASSETS),
         "/client/push/web-push-client.js",
         "/client/pwa/install-prompt.js",
+        "/client/pwa/update-prompt.js",
         *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
     )
     manifest_options = manifest or ManifestOptions(name=name)

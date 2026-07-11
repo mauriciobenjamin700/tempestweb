@@ -483,6 +483,12 @@ display = "standalone"
     metadados de instalação — o comportamento offline vem de graça porque o bundle
     é estático.
 
+!!! tip "Prompt de atualização"
+    Quando você publica uma versão nova, o service worker antigo continua no ar
+    até a aba fechar. O shell detecta o worker em espera e mostra um banner
+    discreto **"nova versão disponível → Atualizar"**; ao confirmar, o worker novo
+    assume e a página recarrega uma vez. Automático — nada a escrever no app.
+
 ## O subset suportado
 
 O Modo C aceita um **subset tipado** de Python — o suficiente para a camada de

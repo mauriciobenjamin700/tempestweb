@@ -127,58 +127,79 @@ def _reject_fn_decorators(
         raise TranspileError("function decorators are not supported", node, filename)
 
 
-def _assigned_names(stmts: list[ast.stmt]) -> set[str]:
-    """Collect plain ``Name`` targets assigned in a function body.
-
-    Descends into ``if``/``for`` blocks (their assignments share the function
-    scope in Python) but not into nested ``def``/``class`` scopes. Used to hoist
-    those names to a single function-top ``let`` (see
-    :meth:`_Generator._emit_fn_body`).
+def _child_blocks(stmt: ast.stmt) -> list[list[ast.stmt]]:
+    """Return the nested statement blocks of a compound statement.
 
     Args:
-        stmts: The statements to scan.
+        stmt: The statement to inspect.
 
     Returns:
-        The set of assigned local names.
+        Each nested block (empty for a simple statement). Nested ``def``/``class``
+        scopes are excluded — they own their own bindings.
     """
-    names: set[str] = set()
-    for stmt in stmts:
-        if isinstance(stmt, ast.Assign):
-            for target in stmt.targets:
-                if isinstance(target, ast.Name):
-                    names.add(target.id)
-        elif (
-            isinstance(stmt, ast.AnnAssign)
-            and isinstance(stmt.target, ast.Name)
-            and stmt.value is not None
-        ):
-            names.add(stmt.target.id)
-        elif isinstance(stmt, (ast.If, ast.For)):
-            names |= _assigned_names(stmt.body)
-            names |= _assigned_names(stmt.orelse)
-    return names
+    if isinstance(stmt, (ast.If, ast.For, ast.While)):
+        return [stmt.body, stmt.orelse]
+    if isinstance(stmt, ast.Try):
+        return [
+            stmt.body,
+            stmt.orelse,
+            stmt.finalbody,
+            *(handler.body for handler in stmt.handlers),
+        ]
+    return []
 
 
 def _hoisted_names(stmts: list[ast.stmt]) -> set[str]:
-    """Collect names assigned *inside* a function's ``if``/``for`` blocks.
+    """Collect the names that must be a function-top ``let`` rather than ``const``.
 
-    Only these need hoisting to a function-top ``let`` — a JS ``const`` inside a
-    block would trap them there, but Python keeps them visible for the rest of
-    the function. Names assigned only at the top level stay ``const`` (cleaner
-    output, and immutable-by-default).
+    A name may stay ``const`` only when it is bound **exactly once, at the top
+    level, by a plain assignment**. Every other assigned name is hoisted to a
+    single ``let`` at the function top so the emitted JS stays valid:
+
+    - assigned inside an ``if``/``for``/``while``/``try`` block (a ``const`` there
+      would be trapped in the JS block, but Python keeps it function-scoped);
+    - the target of an augmented assignment (``+=`` etc.) — it mutates a binding,
+      so both the binding and the mutation need ``let``;
+    - assigned more than once (a re-binding — ``const`` would throw).
+
+    Nested ``def``/``class`` scopes are not descended into.
 
     Args:
         stmts: The function's top-level statements.
 
     Returns:
-        The set of block-assigned names to hoist.
+        The names to declare with a hoisted ``let``.
     """
-    names: set[str] = set()
-    for stmt in stmts:
-        if isinstance(stmt, (ast.If, ast.For)):
-            names |= _assigned_names(stmt.body)
-            names |= _assigned_names(stmt.orelse)
-    return names
+    hoisted: set[str] = set()
+    seen_top: set[str] = set()
+
+    def walk(block: list[ast.stmt], *, top: bool) -> None:
+        for stmt in block:
+            if isinstance(stmt, ast.Assign):
+                targets = [t for t in stmt.targets if isinstance(t, ast.Name)]
+                for target in targets:
+                    _note(target.id, top=top)
+            elif (
+                isinstance(stmt, ast.AnnAssign)
+                and isinstance(stmt.target, ast.Name)
+                and stmt.value is not None
+            ):
+                _note(stmt.target.id, top=top)
+            elif isinstance(stmt, ast.AugAssign) and isinstance(stmt.target, ast.Name):
+                hoisted.add(stmt.target.id)
+            elif not isinstance(
+                stmt, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            ):
+                for child in _child_blocks(stmt):
+                    walk(child, top=False)
+
+    def _note(name: str, *, top: bool) -> None:
+        if not top or name in seen_top:
+            hoisted.add(name)
+        seen_top.add(name)
+
+    walk(stmts, top=True)
+    return hoisted
 
 
 class _Generator:
@@ -783,6 +804,14 @@ class _Generator:
             return self._if(node, indent)
         if isinstance(node, ast.For):
             return self._for(node, indent)
+        if isinstance(node, ast.While):
+            return self._while(node, indent)
+        if isinstance(node, ast.Try):
+            return self._try(node, indent)
+        if isinstance(node, ast.Break):
+            return [f"{_INDENT * indent}break;"]
+        if isinstance(node, ast.Continue):
+            return [f"{_INDENT * indent}continue;"]
         if isinstance(node, ast.Assign):
             return self._assign(node, indent)
         if isinstance(node, ast.AugAssign):
@@ -823,6 +852,48 @@ class _Generator:
         iterable = self.expr(node.iter, indent)
         lines = [f"{pad}for (const {node.target.id} of {iterable}) {{"]
         lines.extend(self._body(node.body, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+
+    def _while(self, node: ast.While, indent: int) -> list[str]:
+        """Emit a ``while cond:`` loop as ``while (cond) {...}``.
+
+        ``while/else`` is unsupported (the ``else`` runs only when the loop is not
+        broken — a rare form with no clean JS equivalent).
+        """
+        if node.orelse:
+            raise TranspileError("while/else is not supported", node, self.filename)
+        pad = _INDENT * indent
+        lines = [f"{pad}while ({self.expr(node.test, indent)}) {{"]
+        lines.extend(self._body(node.body, indent + 1))
+        lines.append(f"{pad}}}")
+        return lines
+
+    def _try(self, node: ast.Try, indent: int) -> list[str]:
+        """Emit a ``try/except/finally`` as JS ``try/catch/finally``.
+
+        JS has a single catch binding, so only one ``except`` clause is
+        supported; its exception type is informational (JS catches everything).
+        ``try/else`` (the ``else`` runs when no exception fired) is unsupported.
+        The caught error binds to the handler's name, or ``_err`` when anonymous.
+        """
+        if node.orelse:
+            raise TranspileError("try/else is not supported", node, self.filename)
+        if len(node.handlers) > 1:
+            raise TranspileError(
+                "only a single except clause is supported", node, self.filename
+            )
+        pad = _INDENT * indent
+        lines = [f"{pad}try {{"]
+        lines.extend(self._body(node.body, indent + 1))
+        if node.handlers:
+            handler = node.handlers[0]
+            name = handler.name or "_err"
+            lines.append(f"{pad}}} catch ({name}) {{")
+            lines.extend(self._body(handler.body, indent + 1))
+        if node.finalbody:
+            lines.append(f"{pad}}} finally {{")
+            lines.extend(self._body(node.finalbody, indent + 1))
         lines.append(f"{pad}}}")
         return lines
 

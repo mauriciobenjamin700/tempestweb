@@ -515,8 +515,9 @@ spirit of `mypy --strict`.
     - **Builtins:** `len`, `str`/`int`/`float`/`bool`, `abs`, `round(x[, n])`,
       `min`/`max` (variadic or over one iterable), `sum(it)`, `range(...)`
       (materialized to an array).
-    - **Statements:** `if`/`elif`/`else`, `for … in`, assignment, `+=` and
-      friends, `return`.
+    - **Statements:** `if`/`elif`/`else`, `for … in`, `while`, `break`/
+      `continue`, `try`/`except`/`finally` (single `except`), assignment, `+=`
+      and friends, `return`.
     - **Structures:** a state `@dataclass` (fields + methods), `make_state()`,
       `view()` with handler closures.
     - **Layout components:** `HStack` / `VStack` (SwiftUI-style ergonomic

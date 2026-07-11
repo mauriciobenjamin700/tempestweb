@@ -4,6 +4,24 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.34.0] — 2026-07-11
+
+### Added
+
+- **Control-flow statements in the transpiler:** `while` loops, `break` /
+  `continue`, and `try` / `except` / `finally` (a single `except`, binding the
+  error to its name or `_err`). `while/else`, `try/else` and multiple `except`
+  clauses still fail loud with a located `TranspileError`.
+
+### Fixed
+
+- **`const` vs `let` correctness.** The hoisting analysis now emits `let` for any
+  name that is augmented (`+=`), re-bound, or assigned inside a block — only a
+  name bound exactly once at the top level stays `const`. This fixes a latent JS
+  bug where a `for`/`while` counter (`total = 0; total += x`) emitted
+  `const total = 0` followed by `total += x` (assignment to a constant → a
+  runtime `TypeError`).
+
 ## [0.33.0] — 2026-07-11
 
 ### Added

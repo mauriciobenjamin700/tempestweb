@@ -41,22 +41,30 @@ Capabilities:
 
 from tempestweb.native import (
     audio,
+    badge,
     camera,
     clipboard,
     cookies,
     file,
+    fullscreen,
     geolocation,
     http,
     install,
+    network,
     notifications,
     offline,
     onnx,
+    orientation,
+    quota,
     storage,
+    vibration,
+    visibility,
+    wakelock,
 )
 from tempestweb.native.audio import PlayResult
 from tempestweb.native.bridges import FFIBridge, ProxyBridge
 from tempestweb.native.camera import Photo, capture
-from tempestweb.native.clipboard import read, write
+from tempestweb.native.clipboard import ClipboardImage, read, write
 from tempestweb.native.contract import (
     CAPABILITIES,
     MODE_C_CAPABILITIES,
@@ -91,6 +99,7 @@ from tempestweb.native.http import (
 from tempestweb.native.install import InstallState
 from tempestweb.native.install import prompt as install_prompt
 from tempestweb.native.install import state as install_state
+from tempestweb.native.network import NetworkState
 from tempestweb.native.notifications import (
     NotificationPermission,
     PushState,
@@ -106,6 +115,8 @@ from tempestweb.native.offline import pending as offline_pending
 from tempestweb.native.offline import replay as offline_replay
 from tempestweb.native.offline import size as offline_size
 from tempestweb.native.onnx import OnnxModel, Tensor
+from tempestweb.native.orientation import OrientationState
+from tempestweb.native.quota import StorageEstimate
 from tempestweb.native.share import (
     ShareOutcome,
     ShareResult,
@@ -124,17 +135,25 @@ from tempestweb.native.storage import (
 __all__ = [
     # capability namespaces (plan-facing: native.http.request, native.audio.play, ...)
     "audio",
+    "badge",
     "camera",
     "clipboard",
     "cookies",
     "file",
+    "fullscreen",
     "geolocation",
     "http",
     "install",
+    "network",
     "notifications",
     "offline",
     "onnx",
+    "orientation",
+    "quota",
     "storage",
+    "vibration",
+    "visibility",
+    "wakelock",
     # capability contract (the single source of truth across surfaces)
     "CAPABILITIES",
     "MODE_C_CAPABILITIES",
@@ -172,8 +191,13 @@ __all__ = [
     "Position",
     "get_position",
     # clipboard (N3)
+    "ClipboardImage",
     "read",
     "write",
+    # Tier-1 web capabilities (dataclass results)
+    "NetworkState",
+    "OrientationState",
+    "StorageEstimate",
     # storage (N3)
     "list_keys",
     "put",

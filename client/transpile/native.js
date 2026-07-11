@@ -110,6 +110,19 @@ export const native = Object.freeze({
     read: () => call("clipboard.read", {}).then((r) => r.text),
     /** Write text to the clipboard. @returns {Promise<void>} */
     write: (text) => call("clipboard.write", { text }),
+    /**
+     * Read the first image on the clipboard as base64.
+     * @returns {Promise<{data_base64:string, mime_type:string}>}
+     */
+    read_image: () => call("clipboard.read_image", {}),
+    /**
+     * Write an image (base64) to the clipboard.
+     * @param {string} data_base64  The base64-encoded image bytes.
+     * @param {string} mime_type  The image MIME type (e.g. "image/png").
+     * @returns {Promise<void>}
+     */
+    write_image: (data_base64, mime_type) =>
+      call("clipboard.write_image", { data_base64, mime_type }),
   }),
   geolocation: Object.freeze({
     /**
@@ -255,5 +268,75 @@ export const native = Object.freeze({
     size: (owner = null) => call("offline.size", { owner }).then((r) => r.size),
     /** Replay the queue now. @returns {Promise<{sent:number, remaining:number}>} */
     replay: (owner = null) => call("offline.replay", { owner }),
+  }),
+  vibration: Object.freeze({
+    /**
+     * Vibrate the device with a duration or pattern.
+     * @param {number|number[]} pattern  Milliseconds, or an on/off pattern array.
+     * @returns {Promise<void>}
+     */
+    vibrate: (pattern) => call("vibration.vibrate", { pattern }),
+  }),
+  badge: Object.freeze({
+    /**
+     * Set the app icon badge (a flag dot when count is null).
+     * @param {?number} [count]  The badge count.
+     * @returns {Promise<void>}
+     */
+    set: (count = null) => call("badge.set", { count }),
+    /** Clear the app icon badge. @returns {Promise<void>} */
+    clear: () => call("badge.clear", {}),
+  }),
+  wakelock: Object.freeze({
+    /** Request a screen wake lock. @returns {Promise<string>}  The lock id. */
+    request: () => call("wakelock.request", {}).then((r) => r.id),
+    /** Release a wake lock by id. @returns {Promise<void>} */
+    release: (id) => call("wakelock.release", { id }),
+  }),
+  fullscreen: Object.freeze({
+    /** Enter fullscreen. @returns {Promise<boolean>}  Whether it is now active. */
+    enter: () => call("fullscreen.enter", {}).then((r) => r.active),
+    /** Exit fullscreen. @returns {Promise<boolean>}  Whether it is still active. */
+    exit: () => call("fullscreen.exit", {}).then((r) => r.active),
+    /** Whether an element is currently fullscreen. @returns {Promise<boolean>} */
+    state: () => call("fullscreen.state", {}).then((r) => r.active),
+  }),
+  visibility: Object.freeze({
+    /** The current page visibility state. @returns {Promise<string>} */
+    state: () => call("visibility.state", {}).then((r) => r.state),
+  }),
+  orientation: Object.freeze({
+    /**
+     * Lock the screen orientation.
+     * @param {string} kind  The orientation lock (e.g. "portrait", "landscape").
+     * @returns {Promise<boolean>}  Whether the lock succeeded.
+     */
+    lock: (kind) => call("orientation.lock", { kind }).then((r) => r.locked),
+    /** Release the orientation lock. @returns {Promise<void>} */
+    unlock: () => call("orientation.unlock", {}),
+    /**
+     * The current orientation type and angle.
+     * @returns {Promise<{type:string, angle:number}>}
+     */
+    state: () => call("orientation.state", {}),
+  }),
+  quota: Object.freeze({
+    /**
+     * Estimate storage usage and quota (bytes).
+     * @returns {Promise<{usage:number, quota:number}>}
+     */
+    estimate: () => call("quota.estimate", {}),
+    /** Request durable (persistent) storage. @returns {Promise<boolean>} */
+    persist: () => call("quota.persist", {}).then((r) => r.persisted),
+    /** Whether storage is already persistent. @returns {Promise<boolean>} */
+    persisted: () => call("quota.persisted", {}).then((r) => r.persisted),
+  }),
+  network: Object.freeze({
+    /**
+     * Report connectivity + best-effort connection details.
+     * @returns {Promise<{online:boolean, effective_type:string,
+     *                    downlink:number, rtt:number, save_data:boolean}>}
+     */
+    state: () => call("network.state", {}),
   }),
 });

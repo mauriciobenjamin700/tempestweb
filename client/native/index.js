@@ -14,7 +14,20 @@ import { httpRequest, httpUpload } from "./http.js";
 import { audioPlay, audioStop } from "./audio.js";
 import { shareIsSupported, shareShare } from "./share.js";
 import { geolocationGet } from "./geolocation.js";
-import { clipboardRead, clipboardWrite } from "./clipboard.js";
+import {
+  clipboardRead,
+  clipboardReadImage,
+  clipboardWrite,
+  clipboardWriteImage,
+} from "./clipboard.js";
+import { vibrationVibrate } from "./vibration.js";
+import { badgeClear, badgeSet } from "./badge.js";
+import { wakelockRelease, wakelockRequest } from "./wakelock.js";
+import { fullscreenEnter, fullscreenExit, fullscreenState } from "./fullscreen.js";
+import { visibilityState } from "./visibility.js";
+import { orientationLock, orientationState, orientationUnlock } from "./orientation.js";
+import { quotaEstimate, quotaPersist, quotaPersisted } from "./quota.js";
+import { networkState } from "./network.js";
 import { storageGet, storageList, storagePut, storageRemove } from "./storage.js";
 import { cookiesAll, cookiesGet, cookiesRemove, cookiesSet } from "./cookies.js";
 import { cameraCapture } from "./camera.js";
@@ -61,6 +74,7 @@ import {
  * @property {typeof Audio} [Audio]
  * @property {Storage} [localStorage]
  * @property {Document} [document]
+ * @property {Screen} [screen]  Screen object (orientation), injected for testing.
  * @property {Object} [store]   Owner-scoped IndexedDB store (T9/P2), optional.
  */
 
@@ -79,7 +93,25 @@ export const HANDLERS = {
   "share.share": shareShare,
   "geolocation.get": geolocationGet,
   "clipboard.read": clipboardRead,
+  "clipboard.read_image": clipboardReadImage,
   "clipboard.write": clipboardWrite,
+  "clipboard.write_image": clipboardWriteImage,
+  "vibration.vibrate": vibrationVibrate,
+  "badge.set": badgeSet,
+  "badge.clear": badgeClear,
+  "wakelock.request": wakelockRequest,
+  "wakelock.release": wakelockRelease,
+  "fullscreen.enter": fullscreenEnter,
+  "fullscreen.exit": fullscreenExit,
+  "fullscreen.state": fullscreenState,
+  "visibility.state": visibilityState,
+  "orientation.lock": orientationLock,
+  "orientation.unlock": orientationUnlock,
+  "orientation.state": orientationState,
+  "quota.estimate": quotaEstimate,
+  "quota.persist": quotaPersist,
+  "quota.persisted": quotaPersisted,
+  "network.state": networkState,
   "storage.put": storagePut,
   "storage.get": storageGet,
   "storage.list": storageList,
@@ -119,6 +151,7 @@ export function browserDeps() {
     Audio: g.Audio,
     localStorage: g.localStorage,
     document: g.document,
+    screen: g.screen,
   };
 }
 

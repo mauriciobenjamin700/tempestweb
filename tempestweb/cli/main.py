@@ -136,6 +136,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Show what would be added without writing tempestweb.toml.",
     )
 
+    vapid = sub.add_parser(
+        "vapid",
+        help="Generate a VAPID keypair for WebPush.",
+    )
+    vapid.add_argument(
+        "--env",
+        action="store_true",
+        help="Print as VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env lines.",
+    )
+
     return parser
 
 
@@ -279,6 +289,38 @@ def _cmd_sync(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_vapid(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb vapid``.
+
+    Generates a fresh VAPID keypair for WebPush. Prints a human-readable pair by
+    default, or ``--env`` lines ready to export as secrets.
+
+    Args:
+        args: Parsed arguments for the ``vapid`` subcommand.
+
+    Returns:
+        Process exit code.
+    """
+    from tempestweb.server.webpush import generate_vapid_keys
+
+    try:
+        keys = generate_vapid_keys()
+    except RuntimeError as exc:
+        print(f"tempestweb vapid: {exc}", file=sys.stderr)
+        return 1
+    if args.env:
+        print(f"VAPID_PUBLIC_KEY={keys.public_key}")
+        print(f"VAPID_PRIVATE_KEY={keys.private_key}")
+    else:
+        print(f"public_key:  {keys.public_key}")
+        print(f"private_key: {keys.private_key}")
+        print(
+            "\nKeep the private key secret (export as VAPID_PRIVATE_KEY); "
+            "share the public key with the browser client."
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entrypoint for the ``tempestweb`` console script.
 
@@ -301,6 +343,7 @@ def main(argv: list[str] | None = None) -> int:
         "build": _cmd_build,
         "run": _cmd_run,
         "sync": _cmd_sync,
+        "vapid": _cmd_vapid,
     }
     handler = handlers[args.command]
     return handler(args)

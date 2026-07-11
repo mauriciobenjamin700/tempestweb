@@ -122,6 +122,7 @@ plugins:
             "JWT auth gate": "Gate de autenticação JWT"
             "PWA & offline examples": "PWA e offline"
             "PWA install + WebPush": "Instalação PWA + WebPush"
+            "WebPush end-to-end (server)": "WebPush ponta a ponta (servidor)"
             "Execution modes": "Modos de execução"
             "Running Mode B (server)": "Rodando o Modo B (servidor)"
             "Static SSR": "SSR estático"
@@ -222,6 +223,7 @@ nav:
           - "JWT auth gate": examples/auth-jwt.md
       - "PWA & offline examples":
           - "PWA install + WebPush": examples/pwa-webpush.md
+          - "WebPush end-to-end (server)": examples/webpush-server.md
       - "Execution modes":
           - "Running Mode B (server)": examples/server-mode.md
   - Static SSR: ssr.md

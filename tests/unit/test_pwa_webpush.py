@@ -7,6 +7,7 @@ without the (lazy) dependency installed.
 
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any
 
@@ -16,6 +17,8 @@ from tempestweb.server.webpush import (
     VapidConfig,
     WebPushError,
     WebPushService,
+    generate_vapid_keys,
+    webpush_router,
 )
 
 VAPID = VapidConfig(
@@ -163,3 +166,52 @@ def test_subscribe_unsubscribe_endpoints() -> None:
     assert len(svc.store.list_for("u1")) == 1
     assert svc.remove_subscription("https://push/e1") is True
     assert svc.store.list_for("u1") == []
+
+
+def _b64url_len(value: str) -> int:
+    """Decode an unpadded base64url string and return its byte length."""
+    return len(base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)))
+
+
+def test_generate_vapid_keys_shape() -> None:
+    """A generated keypair is a 65-byte uncompressed point + 32-byte scalar."""
+    keys = generate_vapid_keys()
+    assert _b64url_len(keys.public_key) == 65
+    assert base64.urlsafe_b64decode(keys.public_key + "==")[0] == 0x04
+    assert _b64url_len(keys.private_key) == 32
+    # Two calls produce distinct keys (not a constant).
+    assert generate_vapid_keys().private_key != keys.private_key
+
+
+def test_webpush_router_end_to_end() -> None:
+    """The router wires subscribe -> send -> unsubscribe over HTTP."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    sent: list[str] = []
+
+    def sender(**kwargs: Any) -> Any:
+        sent.append(kwargs["subscription_info"]["endpoint"])
+        return type("R", (), {"status_code": 201})()
+
+    svc = WebPushService(VAPID, store=InMemorySubscriptionStore(), sender=sender)
+    app = FastAPI()
+    app.include_router(webpush_router(svc))
+    client = TestClient(app)
+
+    assert client.get("/webpush/vapid-public-key").json() == {"public_key": "pub-key"}
+    assert client.post("/webpush/subscribe", json=_sub("https://push/e1")).json() == {
+        "ok": True
+    }
+    assert client.post("/webpush/send", json={"title": "Hi"}).json() == {
+        "sent": 1,
+        "total": 1,
+    }
+    assert sent == ["https://push/e1"]
+    assert client.post(
+        "/webpush/unsubscribe", json={"endpoint": "https://push/e1"}
+    ).json() == {"removed": True}
+    assert client.post("/webpush/send", json={"title": "Hi"}).json() == {
+        "sent": 0,
+        "total": 0,
+    }

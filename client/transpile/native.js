@@ -182,6 +182,17 @@ export const native = Object.freeze({
     /** Request notification permission. @returns {Promise<string>} */
     request_permission: () =>
       call("notifications.request_permission", {}).then((r) => r.permission),
+    /**
+     * Subscribe to WebPush; returns the raw browser subscription JSON to POST to
+     * your own backend (e.g. via `native.http` / `native.offline`).
+     * @param {string} vapid_public_key  The base64url VAPID application server key.
+     * @returns {Promise<Object>}  The PushSubscription JSON.
+     */
+    subscribe: (vapid_public_key) =>
+      call("notifications.subscribe", { vapid_public_key }),
+    /** Cancel the push subscription. @returns {Promise<boolean>} */
+    unsubscribe: () =>
+      call("notifications.unsubscribe", {}).then((r) => r.unsubscribed),
   }),
   cookies: Object.freeze({
     /** Read a cookie by name. @returns {Promise<?string>} */

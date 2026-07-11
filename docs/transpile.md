@@ -228,8 +228,8 @@ def view(app: App[DataState]) -> Widget:
     `set_state` roda (depois do `await`), então a UI reflete o resultado assim que
     a capacidade resolve. Capacidades disponíveis no Modo C: `http`, `storage`
     (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`, `share`,
-    `audio`, `file`, `notifications`, `install` (prompt de instalação PWA),
-    `offline` (fila de mutações durável).
+    `audio`, `file`, `notifications` (incl. WebPush `subscribe`/`unsubscribe`),
+    `install` (prompt de instalação PWA), `offline` (fila de mutações durável).
 
 !!! tip "Instalar o PWA (`native.install`)"
     `await native.install.state()` informa `{can_install, installed}`; após um
@@ -237,6 +237,14 @@ def view(app: App[DataState]) -> Widget:
     instalação e resolve com `"accepted"`, `"dismissed"` ou `"unavailable"`. O
     controller já suprime o mini-infobar frio do browser, então você mostra um
     botão "Instalar" no momento certo.
+
+!!! tip "Push (`native.notifications`)"
+    `await native.notifications.request_permission()` pede permissão; `await
+    native.notifications.subscribe(vapid_public_key)` roda o fluxo WebPush do
+    browser e devolve o **JSON da assinatura** — você o envia ao seu backend
+    (via `native.http` ou enfileirado com `native.offline`). `unsubscribe()`
+    cancela. O framework não decide seu schema de endpoint nem o servidor de
+    push: só entrega a assinatura crua.
 
 !!! tip "Fila offline (`native.offline`)"
     Escritas feitas offline sobrevivem: `await native.offline.enqueue("POST",

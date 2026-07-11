@@ -4,6 +4,25 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.31.0] — 2026-07-10
+
+### Added
+
+- **WebPush subscribe/unsubscribe in Mode C (`native.notifications`).** The push
+  subscription flow (already in the dispatch registry and Python surface) is now
+  exposed on the Mode C facade and marked `mode_c`:
+  `await native.notifications.subscribe(vapid_public_key)` runs the browser
+  WebPush flow (permission + `pushManager.subscribe`) and returns the raw
+  subscription JSON to POST to your own backend (e.g. via `native.http` or queued
+  with `native.offline`); `unsubscribe()` cancels it. The framework owns neither
+  the endpoint schema nor the push server — it hands back the raw subscription.
+  The dispatch handler is already unit-tested; the contract conformance test
+  enforces the facade coupling. Verified live (Playwright): in the built app the
+  flow reaches `pushManager` (support detected, permission readable) — the
+  grant/subscribe step is gesture + push-service dependent and left to manual
+  verification. This closes the Mode C PWA capability set (install, offline
+  queue, update prompt, push).
+
 ## [0.30.0] — 2026-07-10
 
 ### Added

@@ -202,4 +202,16 @@ export const native = Object.freeze({
     /** Read every cookie as a name→value map. @returns {Promise<Object>} */
     all: () => call("cookies.all", {}),
   }),
+  install: Object.freeze({
+    /**
+     * Report the PWA install state.
+     * @returns {Promise<{can_install: boolean, installed: boolean}>}
+     */
+    state: () => call("install.state", {}),
+    /**
+     * Fire the stashed native install prompt (call after a user gesture).
+     * @returns {Promise<"accepted"|"dismissed"|"unavailable">}  The outcome.
+     */
+    prompt: () => call("install.prompt", {}).then((r) => r.outcome),
+  }),
 });

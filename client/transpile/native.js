@@ -214,4 +214,29 @@ export const native = Object.freeze({
      */
     prompt: () => call("install.prompt", {}).then((r) => r.outcome),
   }),
+  offline: Object.freeze({
+    /**
+     * Enqueue a mutation for durable, replay-on-reconnect delivery.
+     * @param {string} method  HTTP method ("POST"/"PUT"/"PATCH"/"DELETE").
+     * @param {string} url  Target URL.
+     * @param {*} [body]  JSON-able request body.
+     * @param {{idempotency_key?: string, owner?: string}} [opts]
+     * @returns {Promise<Object>}  The enqueued mutation.
+     */
+    enqueue: (method, url, body = null, opts = {}) =>
+      call("offline.enqueue", {
+        method,
+        url,
+        body,
+        idempotency_key: opts.idempotency_key ?? null,
+        owner: opts.owner ?? null,
+      }),
+    /** Pending mutations (oldest first). @returns {Promise<Object[]>} */
+    pending: (owner = null) =>
+      call("offline.pending", { owner }).then((r) => r.mutations),
+    /** Pending-mutation count. @returns {Promise<number>} */
+    size: (owner = null) => call("offline.size", { owner }).then((r) => r.size),
+    /** Replay the queue now. @returns {Promise<{sent:number, remaining:number}>} */
+    replay: (owner = null) => call("offline.replay", { owner }),
+  }),
 });

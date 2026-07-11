@@ -22,6 +22,12 @@ import { onnxLoad, onnxRun } from "./onnx.js";
 import { fileSave, filePick } from "./file.js";
 import { installState, installPrompt } from "./install.js";
 import {
+  offlineEnqueue,
+  offlinePending,
+  offlineReplay,
+  offlineSize,
+} from "./offline.js";
+import {
   notificationsNotify,
   notificationsRequestPermission,
   notificationsSubscribe,
@@ -88,6 +94,10 @@ export const HANDLERS = {
   "file.pick": filePick,
   "install.state": installState,
   "install.prompt": installPrompt,
+  "offline.enqueue": offlineEnqueue,
+  "offline.pending": offlinePending,
+  "offline.replay": offlineReplay,
+  "offline.size": offlineSize,
   "notifications.notify": notificationsNotify,
   "notifications.request_permission": notificationsRequestPermission,
   "notifications.subscribe": notificationsSubscribe,

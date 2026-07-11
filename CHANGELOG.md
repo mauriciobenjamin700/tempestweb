@@ -4,6 +4,24 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.29.0] — 2026-07-10
+
+### Added
+
+- **Offline mutation queue in Mode C (`native.offline`).** A new native
+  capability exposing the durable, replay-on-reconnect queue (the tested
+  `client/offline/{store,sync}.js` over IndexedDB) end to end:
+  `await native.offline.enqueue(method, url, body)` records a mutation with an
+  idempotency key; `pending()` / `size()` inspect it; `replay()` drains it in
+  FIFO order (also wired to the `online` event and Background Sync). The Python
+  awaitable surface (`tempestweb.native.offline` — `enqueue`/`pending`/`size`/
+  `replay`, `Mutation`/`ReplayResult` models) and the JS dispatch handlers
+  (`offline.*`) are marked `mode_c`, and the offline client modules now ship in
+  the wasm and transpile artifacts (and join the service-worker precache).
+  Verified live (Playwright): in the built app, `enqueue` writes to real
+  IndexedDB (FIFO, idempotency key), `size`/`pending` reflect the queue, and
+  `replay` performs real `fetch` round-trips, preserving the queue on failure.
+
 ## [0.28.0] — 2026-07-10
 
 ### Added

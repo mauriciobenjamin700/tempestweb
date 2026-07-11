@@ -228,7 +228,8 @@ def view(app: App[DataState]) -> Widget:
     `set_state` runs (after the `await`), so the UI reflects the result as soon as
     the capability resolves. Capabilities available in Mode C: `http`, `storage`
     (IndexedDB/localStorage), `clipboard`, `geolocation`, `cookies`, `share`,
-    `audio`, `file`, `notifications`, `install` (PWA install prompt).
+    `audio`, `file`, `notifications`, `install` (PWA install prompt), `offline`
+    (durable mutation queue).
 
 !!! tip "Install the PWA (`native.install`)"
     `await native.install.state()` reports `{can_install, installed}`; after a
@@ -236,6 +237,15 @@ def view(app: App[DataState]) -> Widget:
     and resolves with `"accepted"`, `"dismissed"` or `"unavailable"`. The
     controller already suppresses the browser's cold mini-infobar, so you show an
     "Install" button at the right moment.
+
+!!! tip "Offline queue (`native.offline`)"
+    Writes made offline survive: `await native.offline.enqueue("POST", url,
+    body)` records a durable mutation in IndexedDB (with an idempotency key) and
+    replay happens in FIFO order when connectivity returns — via the `online`
+    event, via Background Sync (tab closed) or explicitly with `await
+    native.offline.replay()`. Inspect with `native.offline.size()` and
+    `native.offline.pending()`. The server dedups on the idempotency key, so a
+    replay never double-applies.
 
 !!! tip "Field validators"
     `from tempest_core.validators import validate_email, validate_cpf,

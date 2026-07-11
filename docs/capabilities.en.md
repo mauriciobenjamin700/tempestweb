@@ -61,6 +61,15 @@ how the call reaches the Web API, not your code.
 | `storage` (N3) | `put`/`get`/`list` (over IndexedDB) | `createOfflineStore` |
 | `camera` (N4) | `await camera.capture()` → bytes/`Blob` | — |
 
+!!! tip "The full surface — Track T"
+    The table above is the historical core (Track N). **Track T** expanded the
+    bridge to dozens of groups — vibration, badge, wake lock, fullscreen, network,
+    sensors, bluetooth, USB, MIDI, and many more, grouped by tier (universal /
+    widely used / Chromium-only). The full catalog, with a runnable snippet per
+    group, is in the [Native capability reference](native-reference.md). The
+    **streaming** capabilities (consumed with `async for`) have their own tutorial:
+    the [Native event channel](native-events.md). 🚀
+
 ## Example: typed HTTP with retry
 
 `native.http` (N0) is the foundation of offline replay. A request with retry and

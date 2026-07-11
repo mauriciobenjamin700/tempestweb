@@ -41,22 +41,54 @@ Capabilities:
 
 from tempestweb.native import (
     audio,
+    badge,
+    battery,
+    bgsync,
+    bluetooth,
     camera,
     clipboard,
+    contacts,
     cookies,
+    eyedropper,
     file,
+    filesystem,
+    fullscreen,
+    gamepad,
     geolocation,
+    hid,
     http,
+    idle,
     install,
+    midi,
+    network,
+    nfc,
     notifications,
     offline,
     onnx,
+    orientation,
+    payment,
+    pip,
+    pointerlock,
+    quota,
+    recorder,
+    sensors,
+    serial,
+    speech,
     storage,
+    tabs,
+    usb,
+    vibration,
+    visibility,
+    wakelock,
+    webaudio,
+    webauthn,
 )
 from tempestweb.native.audio import PlayResult
+from tempestweb.native.battery import BatteryStatus
+from tempestweb.native.bluetooth import BluetoothDevice
 from tempestweb.native.bridges import FFIBridge, ProxyBridge
 from tempestweb.native.camera import Photo, capture
-from tempestweb.native.clipboard import read, write
+from tempestweb.native.clipboard import ClipboardImage, read, write
 from tempestweb.native.contract import (
     CAPABILITIES,
     MODE_C_CAPABILITIES,
@@ -67,11 +99,16 @@ from tempestweb.native.contract import (
 from tempestweb.native.dispatch import (
     NATIVE_RESULT_PREFIX,
     BrowserUnavailableError,
+    EventBridge,
     NativeBridge,
     NativeError,
     current_bridge,
     install_bridge,
     native_call,
+    native_events,
+    native_subscribe,
+    native_unsubscribe,
+    resolve_native_event,
     resolve_native_result,
     send_native_call,
     uninstall_bridge,
@@ -79,6 +116,7 @@ from tempestweb.native.dispatch import (
 from tempestweb.native.file import PickedFile, SaveResult
 from tempestweb.native.file import pick as file_pick
 from tempestweb.native.file import save as file_save
+from tempestweb.native.filesystem import FileHandle
 from tempestweb.native.geolocation import Position, get_position
 from tempestweb.native.http import (
     HttpResponse,
@@ -88,9 +126,12 @@ from tempestweb.native.http import (
     request,
     upload,
 )
+from tempestweb.native.idle import IdleState
 from tempestweb.native.install import InstallState
 from tempestweb.native.install import prompt as install_prompt
 from tempestweb.native.install import state as install_state
+from tempestweb.native.midi import MidiMessage, MidiPorts
+from tempestweb.native.network import NetworkState
 from tempestweb.native.notifications import (
     NotificationPermission,
     PushState,
@@ -106,12 +147,17 @@ from tempestweb.native.offline import pending as offline_pending
 from tempestweb.native.offline import replay as offline_replay
 from tempestweb.native.offline import size as offline_size
 from tempestweb.native.onnx import OnnxModel, Tensor
+from tempestweb.native.orientation import OrientationState
+from tempestweb.native.quota import StorageEstimate
+from tempestweb.native.recorder import Recording
+from tempestweb.native.sensors import DeviceOrientation, Motion
 from tempestweb.native.share import (
     ShareOutcome,
     ShareResult,
     is_share_supported,
     share,
 )
+from tempestweb.native.speech import SpeechResult, Voice
 from tempestweb.native.storage import (
     get as storage_get,
 )
@@ -120,21 +166,52 @@ from tempestweb.native.storage import (
     put,
     remove,
 )
+from tempestweb.native.usb import UsbDevice
 
 __all__ = [
     # capability namespaces (plan-facing: native.http.request, native.audio.play, ...)
     "audio",
+    "badge",
+    "battery",
+    "bgsync",
+    "bluetooth",
     "camera",
     "clipboard",
+    "contacts",
     "cookies",
+    "eyedropper",
     "file",
+    "filesystem",
+    "fullscreen",
+    "gamepad",
     "geolocation",
+    "hid",
     "http",
+    "idle",
     "install",
+    "midi",
+    "network",
+    "nfc",
     "notifications",
     "offline",
     "onnx",
+    "orientation",
+    "payment",
+    "pip",
+    "pointerlock",
+    "quota",
+    "recorder",
+    "sensors",
+    "serial",
+    "speech",
     "storage",
+    "tabs",
+    "usb",
+    "vibration",
+    "visibility",
+    "wakelock",
+    "webaudio",
+    "webauthn",
     # capability contract (the single source of truth across surfaces)
     "CAPABILITIES",
     "MODE_C_CAPABILITIES",
@@ -144,6 +221,7 @@ __all__ = [
     # dispatch core + bridges (the Mode-A vs Mode-B seam)
     "NATIVE_RESULT_PREFIX",
     "BrowserUnavailableError",
+    "EventBridge",
     "FFIBridge",
     "NativeBridge",
     "NativeError",
@@ -151,6 +229,10 @@ __all__ = [
     "current_bridge",
     "install_bridge",
     "native_call",
+    "native_events",
+    "native_subscribe",
+    "native_unsubscribe",
+    "resolve_native_event",
     "resolve_native_result",
     "send_native_call",
     "uninstall_bridge",
@@ -172,8 +254,28 @@ __all__ = [
     "Position",
     "get_position",
     # clipboard (N3)
+    "ClipboardImage",
     "read",
     "write",
+    # Tier-1 web capabilities (dataclass results)
+    "NetworkState",
+    "OrientationState",
+    "StorageEstimate",
+    # Tier-2 web capabilities (dataclass results)
+    "FileHandle",
+    "Recording",
+    "Voice",
+    # Tier-3 web capabilities (dataclass results)
+    "BluetoothDevice",
+    "MidiPorts",
+    "UsbDevice",
+    # streaming event models (native event channel / T-EV)
+    "BatteryStatus",
+    "DeviceOrientation",
+    "IdleState",
+    "MidiMessage",
+    "Motion",
+    "SpeechResult",
     # storage (N3)
     "list_keys",
     "put",

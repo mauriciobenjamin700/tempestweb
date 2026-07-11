@@ -61,6 +61,15 @@ chamada chega na Web API, não o seu código.
 | `storage` (N3) | `put`/`get`/`list` (sobre IndexedDB) | `createOfflineStore` |
 | `camera` (N4) | `await camera.capture()` → bytes/`Blob` | — |
 
+!!! tip "A superfície completa — Trilho T"
+    A tabela acima é o núcleo histórico (Trilho N). O **Trilho T** expandiu a ponte
+    para dezenas de grupos — vibração, badge, wake lock, tela cheia, rede,
+    sensores, bluetooth, USB, MIDI e muito mais, agrupados por tier (universal /
+    muito usado / só-Chromium). O catálogo completo, com um trecho executável por
+    grupo, está na [Referência de capacidades nativas](native-reference.md). As
+    capacidades de **stream** (consumidas com `async for`) têm um tutorial próprio:
+    o [Canal de eventos nativo](native-events.md). 🚀
+
 ## Exemplo: HTTP tipado com retry
 
 O `native.http` (N0) é a base do replay offline. Uma requisição com retry e

@@ -47,8 +47,21 @@ NativeCall = dict[str, Any]
 # Shape: {"call_id": str, "ok": bool, "value"|"error": ...}.
 NativeResult = dict[str, Any]
 
+# A native event is one item of a streaming subscription (T-EV), client → server.
+# Shape: {"sub_id": str, "event"|"error"|"done": ...}.
+NativeEvent = dict[str, Any]
+
 #: The discriminator values a Mode B wire envelope may carry.
-EnvelopeKind = Literal["patches", "event", "native_call", "native_result", "navigate"]
+EnvelopeKind = Literal[
+    "patches",
+    "event",
+    "native_call",
+    "native_result",
+    "native_subscribe",
+    "native_unsubscribe",
+    "native_event",
+    "navigate",
+]
 
 #: A wire envelope: a JSON-able dict tagged by ``kind`` (see module docstring).
 Envelope = dict[str, Any]
@@ -140,6 +153,53 @@ def encode_native_result(
     return envelope
 
 
+def encode_native_subscribe(
+    sub_id: str, capability: str, args: dict[str, Any]
+) -> Envelope:
+    """Wrap a streaming subscription request in a ``native_subscribe`` envelope.
+
+    Args:
+        sub_id: Correlation id every event of this stream is tagged with.
+        capability: Stable streaming capability name (e.g. ``"geolocation.watch"``).
+        args: JSON-able arguments for the subscription.
+
+    Returns:
+        The ``native_subscribe`` envelope (server → client).
+    """
+    return {
+        "kind": "native_subscribe",
+        "sub_id": sub_id,
+        "capability": capability,
+        "args": args,
+    }
+
+
+def encode_native_unsubscribe(sub_id: str) -> Envelope:
+    """Wrap a subscription cancellation in a ``native_unsubscribe`` envelope.
+
+    Args:
+        sub_id: The id of the subscription to close.
+
+    Returns:
+        The ``native_unsubscribe`` envelope (server → client).
+    """
+    return {"kind": "native_unsubscribe", "sub_id": sub_id}
+
+
+def encode_native_event(sub_id: str, payload: dict[str, Any]) -> Envelope:
+    """Wrap one streaming event in a ``native_event`` envelope (client → server).
+
+    Args:
+        sub_id: The subscription id this event belongs to.
+        payload: One of ``{"event": <value>}``, ``{"error", "message"}`` or
+            ``{"done": true}``.
+
+    Returns:
+        The ``native_event`` envelope.
+    """
+    return {"kind": "native_event", "sub_id": sub_id, **payload}
+
+
 @runtime_checkable
 class PatchTransport(Protocol):
     """Carries patches Python→client and events client→Python.
@@ -192,19 +252,59 @@ class PatchTransport(Protocol):
         """
         ...
 
+    async def send_native_subscribe(
+        self, sub_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Open a streaming subscription on the client (Mode B event channel).
+
+        Args:
+            sub_id: Correlation id every ``native_event`` of this stream carries.
+            capability: Stable streaming capability name (e.g. ``"geolocation.watch"``).
+            args: JSON-able subscription arguments.
+
+        Raises:
+            TransportClosedError: If the underlying channel is gone.
+        """
+        ...
+
+    async def send_native_unsubscribe(self, sub_id: str) -> None:
+        """Cancel a streaming subscription on the client (Mode B event channel).
+
+        Args:
+            sub_id: The id of the subscription to close.
+
+        Raises:
+            TransportClosedError: If the underlying channel is gone.
+        """
+        ...
+
     async def recv_event(self) -> Event:
         """Await the next user event from the client.
 
-        Inbound ``native_result`` envelopes are *not* returned here; the transport
-        routes them to the handler registered with :meth:`on_native_result`. This
-        method yields only user events (``{"type", "key", "payload"}``), so the
-        session loop stays a clean event pump.
+        Inbound ``native_result`` and ``native_event`` envelopes are *not* returned
+        here; the transport routes them to the handlers registered with
+        :meth:`on_native_result` / :meth:`on_native_event`. This method yields only
+        user events (``{"type", "key", "payload"}``), so the session loop stays a
+        clean event pump.
 
         Returns:
             A JSON-able user event dict. Blocks until one is available.
 
         Raises:
             TransportClosedError: If the underlying channel is gone.
+        """
+        ...
+
+    def on_native_event(self, handler: Callable[[NativeEvent], None]) -> None:
+        """Register the sink for inbound ``native_event`` envelopes (T-EV).
+
+        The transport invokes ``handler`` synchronously for each ``native_event``
+        it receives, letting the session route it to the subscription keyed by
+        ``sub_id``. A transport that never streams may ignore this.
+
+        Args:
+            handler: Callback receiving the JSON-able ``native_event`` payload
+                ``{"sub_id", "event"|"error"|"done"}``.
         """
         ...
 

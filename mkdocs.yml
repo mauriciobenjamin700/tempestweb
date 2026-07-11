@@ -135,6 +135,9 @@ plugins:
             "Mode C — transpile": "Modo C — transpile"
             "Wire contract": "Contrato de fronteira"
             Capabilities: Capacidades
+            "Native capability reference": "Referência de capacidades nativas"
+            "Native event channel": "Canal de eventos nativo"
+            "Device panel": "Painel do dispositivo"
             "PWA & offline": "PWA e offline"
             Observability: Observabilidade
             "Security (Mode B)": "Segurança (Modo B)"
@@ -190,6 +193,8 @@ nav:
   - Mode C — transpile: transpile.md
   - PWA & offline: pwa.md
   - Capabilities: capabilities.md
+  - Native capability reference: native-reference.md
+  - Native event channel: native-events.md
   - Ready-made components: components.md
   - Theming (Material 3): theming.md
   - Icons (Material + Lucide): icons.md
@@ -228,6 +233,7 @@ nav:
       - "Internationalized greeting": examples/i18n-greeting.md
       - "Sketch pad (canvas)": examples/sketch-canvas.md
       - "Native capabilities":
+          - "Device panel": examples/device-panel.md
           - "Weather (HTTP + geolocation)": examples/weather-native.md
           - "Copy & share": examples/clipboard-share.md
           - "Camera capture": examples/photo-capture.md

@@ -1,9 +1,11 @@
 # Roadmap e fases
 
-!!! info "Estado atual — atualizado em 2026-06-13"
-    Tracks **T1–T10 + Trilhos 0/W/A/B/P/N/O/E mesclados na `main`** com gate verde
-    (ruff/format/mypy ✓ · pytest 459 pass/1 skip · jsdom 205 pass). Publicado no
-    PyPI: **tempestweb 0.5.1**. Legenda de status: **✅** mesclado e com gate verde ·
+!!! info "Estado atual — atualizado em 2026-07-11"
+    Tracks **Trilhos 0/W/A/B/P/N/O/E/S + Trilho T mesclados na `main`** com gate
+    verde (ruff/format/mypy ✓ · pytest 831 pass/1 skip · jsdom 439 pass). Última
+    versão publicada no PyPI: **tempestweb 0.49.0**; o **Trilho T** (paridade de
+    capacidades com a plataforma web — Tiers 1–3 + canal de eventos nativo T-EV com
+    12 capacidades de stream) chega na **0.50.0**. Legenda de status: **✅** mesclado e com gate verde ·
     **🔶** implementado mas pendente de **verificação real** (browser/device — ver
     `docs/agents/reports/NOTES-T*.md`) · **⬜** não iniciado. Os dois modos rodam um
     app fim-a-fim ao vivo (counter por WS e Pyodide no browser), Trilho E está ✅ ao
@@ -208,6 +210,73 @@ backend sem tocar a app) herdado do `tempest-react-sdk`. Servidor reusa o
     fim maturidade (**S9 → S10 → S11**). Os modos estáticos (A/C) podem ir a
     produção **antes** deste trilho; ele é pré-requisito só para o **Modo B**
     exposto publicamente.
+
+## Trilho T — paridade de capacidades com a plataforma web
+
+Expande o **Trilho N**: cobrir as Web APIs que o browser oferece e que a
+biblioteca ainda não embrulha. Mesmo padrão por capacidade — entrada no
+`contract.py` (com `mode_c`), facade Python tipada em `tempestweb/native/`,
+handler em `client/native/`, entrada no Mode C facade (`client/transpile/
+native.js`) quando `mode_c=True`, e testes (conformância `test_native_contract.py`
++ handler jsdom). Todas embrulháveis nos 3 modos (o handler JS roda no browser em
+A/B/C); as só-Chromium expõem `is_supported()` + degradação graciosa.
+
+!!! info "Pré-requisito de streaming (T-EV)"
+    O `NativeBridge` hoje é **request/response single-shot**. Capacidades de
+    **stream** (geolocation `watchPosition`, sensores contínuos, eventos de
+    mudança de rede/visibilidade/orientação/bateria) exigem um **canal de eventos
+    nativo** Python←cliente. **T-EV** é esse canal; as fases marcadas *(stream)*
+    dependem dele. As de leitura única (poll) não dependem e vêm primeiro.
+
+### Tier 1 — alto valor, barato, suporte universal (poll/single-shot)
+
+| Fase | Capacidades | Status |
+|---|---|---|
+| T1 | **vibration:** `vibrate(pattern)` (`navigator.vibrate`) | ✅ (v0.50.0) |
+| T2 | **badge:** `set(count)` / `clear()` (`navigator.setAppBadge`/`clearAppBadge`) — contador no ícone do PWA | ✅ (v0.50.0) |
+| T3 | **wakelock:** `request()` → id / `release(id)` (`navigator.wakeLock`) — tela acesa | ✅ (v0.50.0) |
+| T4 | **fullscreen:** `enter()` / `exit()` / `state()` (`requestFullscreen`/`exitFullscreen`/`fullscreenElement`) | ✅ (v0.50.0) |
+| T5 | **visibility:** `state()` (`document.visibilityState`) — leitura única | ✅ (v0.50.0) |
+| T6 | **orientation:** `lock(kind)` / `unlock()` / `state()` (`screen.orientation`) | ✅ (v0.50.0) |
+| T7 | **quota:** `estimate()` / `persist()` / `persisted()` (`navigator.storage.*`) — pareia com storage/offline | ✅ (v0.50.0) |
+| T8 | **network:** `state()` (`navigator.connection`: `effectiveType`/`downlink`/`rtt`/`saveData` + `onLine`) — leitura única | ✅ (v0.50.0) |
+| T9 | **clipboard rico:** `read_image()` / `write_image(data)` (`ClipboardItem`, base64) — estende o grupo clipboard | ✅ (v0.50.0) |
+
+### Tier 2 — média, muito usados
+
+| Fase | Capacidades | Status |
+|---|---|---|
+| T10 | **speech:** `speak(text, opts)` / `cancel()` (TTS, `SpeechSynthesis`) — single-shot; STT (`SpeechRecognition`) é *(stream)* → T-EV | ✅ (v0.50.0 — TTS + STT `listen`) |
+| T11 | **recorder:** `start`/`stop` gravação de áudio/vídeo (`MediaRecorder`) + captura de tela (`getDisplayMedia`) — devolve blob base64 | ✅ (v0.50.0) |
+| T12 | **filesystem:** `open_file`/`save_file`/`open_directory` com handles vivos (`showOpenFilePicker`/`showSaveFilePicker`) + OPFS | ✅ (v0.50.0) |
+| T13 | **bgsync:** registra Background Sync + Periodic Sync (`SyncManager`) — replay real da offline queue pelo SW | ✅ (v0.50.0) |
+| T14 | **webauthn:** `create`/`get` credencial + passkeys (`navigator.credentials`) + **Web OTP** (`OTPCredential`) | ✅ (v0.50.0) |
+| T15 | **tabs:** Broadcast Channel + Web Locks — sincronizar entre abas | ✅ (v0.50.0 — broadcast send/receive + Web Locks) |
+| T16 | **idle:** Idle Detection (`IdleDetector`) — single-shot state; contínuo *(stream)* → T-EV | ✅ (v0.50.0 — `idle.watch` via T-EV) |
+
+### Tier 3 — nicho / secure-context / maioria só Chromium
+
+| Fase | Capacidades | Status |
+|---|---|---|
+| T17 | **bluetooth:** Web Bluetooth (`navigator.bluetooth`) | ✅ (v0.50.0) |
+| T18 | **usb / serial / hid:** Web USB / Web Serial / Web HID | ✅ (v0.50.0) |
+| T19 | **nfc:** Web NFC (`NDEFReader`) | 🔶 (v0.50.0 — `write` + `is_supported`; scan → T-EV) |
+| T20 | **contacts:** Contact Picker (`navigator.contacts`) | ✅ (v0.50.0) |
+| T21 | **payment:** Payment Request API | ✅ (v0.50.0) |
+| T22 | **misc UI:** Picture-in-Picture · EyeDropper · Pointer Lock | ✅ (v0.50.0) |
+| T23 | **gamepad / midi:** Gamepad API (poll) · Web MIDI (`requestMIDIAccess`) | ✅ (v0.50.0 — gamepad poll+watch, MIDI send+messages) |
+| T24 | **webaudio:** Web Audio API — síntese/análise (`AudioContext`), além do play/stop atual | 🔶 (v0.50.0 — `tone`; grafo síntese/análise futuro) |
+
+### Canal de eventos (pré-requisito das *(stream)*)
+
+| Fase | Escopo | Status |
+|---|---|---|
+| T-EV | **Canal de eventos nativo:** stream Python←cliente para subscrições contínuas (geolocation watch, sensores, mudanças de rede/visibilidade/orientação/bateria, STT, idle contínuo). Estende o `NativeBridge` com `subscribe`/`unsubscribe` + entrega de eventos (Modo A via callback FFI, Modo B via frame WS/SSE). Desbloqueia os *(stream)* dos Tiers 1–2 | ✅ (v0.50.0) |
+
+!!! note "Ordem sugerida"
+    Tier 1 primeiro (barato, universal, fecha a paridade PWA), depois T-EV (destrava
+    os streams), depois Tier 2 e Tier 3 por demanda. As só-Chromium (Tier 3) sempre
+    entram com `is_supported()` + fallback.
 
 ## Pós-convergência
 

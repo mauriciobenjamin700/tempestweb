@@ -12,6 +12,8 @@
 // id via the Last-Event-ID header); the server replays the missed ticks. The
 // same DOM renderer runs above this transport as in every other mode.
 
+import { subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
+
 /**
  * @typedef {import("./transport.js").Patch} Patch
  * @typedef {import("./transport.js").TWEvent} TWEvent
@@ -108,6 +110,12 @@ export function createSSETransport(config) {
       else pendingBatches.push(envelope.data);
     } else if (envelope.kind === "native_call") {
       void handleNativeCall(envelope);
+    } else if (envelope.kind === "native_subscribe") {
+      subscribeDispatch(envelope, (payload) =>
+        void post({ kind: "native_event", sub_id: envelope.sub_id, ...payload }),
+      );
+    } else if (envelope.kind === "native_unsubscribe") {
+      unsubscribeDispatch(envelope.sub_id);
     } else if (envelope.kind === "navigate") {
       if (navigateHandler) navigateHandler(envelope.path);
     }

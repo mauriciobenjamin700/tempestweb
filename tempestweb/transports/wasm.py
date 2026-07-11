@@ -31,6 +31,7 @@ from typing import Any
 
 from tempestweb.transports.base import (
     Event,
+    NativeEvent,
     NativeResult,
     Patch,
     TransportClosedError,
@@ -67,6 +68,7 @@ class WasmTransport:
         self._deliver: DeliverPatches = deliver
         self._events: asyncio.Queue[Event] = asyncio.Queue()
         self._native_result_handler: Callable[[NativeResult], None] | None = None
+        self._native_event_handler: Callable[[NativeEvent], None] | None = None
         self.closed: bool = False
 
     async def send_patches(self, patches: list[Patch]) -> None:
@@ -162,6 +164,43 @@ class WasmTransport:
             "transport does not proxy them (see docs/contract.md)."
         )
 
+    async def send_native_subscribe(
+        self, sub_id: str, capability: str, args: dict[str, Any]
+    ) -> None:
+        """Open a streaming subscription — not used in Mode A.
+
+        In Mode A the event channel (T-EV) is served in-process by the
+        :class:`~tempestweb.native.bridges.FFIBridge` calling
+        ``client/native/index.js`` directly, so subscriptions never travel through
+        the transport. Exists to satisfy the ``PatchTransport`` Protocol.
+
+        Args:
+            sub_id: Correlation id for the stream.
+            capability: Stable streaming capability name.
+            args: JSON-able subscription arguments.
+
+        Raises:
+            NotImplementedError: Always — Mode A streams in-process via the FFI bridge.
+        """
+        raise NotImplementedError(
+            "Mode A serves the native event channel in-process via pyodide.ffi; the "
+            "WASM transport does not proxy subscriptions (see docs/contract.md)."
+        )
+
+    async def send_native_unsubscribe(self, sub_id: str) -> None:
+        """Cancel a streaming subscription — not used in Mode A.
+
+        Args:
+            sub_id: The id of the subscription to close.
+
+        Raises:
+            NotImplementedError: Always — Mode A streams in-process via the FFI bridge.
+        """
+        raise NotImplementedError(
+            "Mode A serves the native event channel in-process via pyodide.ffi; the "
+            "WASM transport does not proxy subscriptions (see docs/contract.md)."
+        )
+
     def on_native_result(self, handler: Callable[[NativeResult], None]) -> None:
         """Register the sink for inbound ``native_result`` envelopes.
 
@@ -173,6 +212,18 @@ class WasmTransport:
             handler: Callback receiving each JSON-able ``native_result`` payload.
         """
         self._native_result_handler = handler
+
+    def on_native_event(self, handler: Callable[[NativeEvent], None]) -> None:
+        """Register the sink for inbound ``native_event`` envelopes.
+
+        Stored for Protocol conformance; in Mode A no ``native_event`` is ever
+        routed through the transport (the event channel resolves in-process), so
+        the handler is not invoked.
+
+        Args:
+            handler: Callback receiving each JSON-able ``native_event`` payload.
+        """
+        self._native_event_handler = handler
 
     async def close(self) -> None:
         """Tear down the transport, unblocking any pending :meth:`recv_event`.

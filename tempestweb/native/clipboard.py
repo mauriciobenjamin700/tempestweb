@@ -14,9 +14,32 @@ codes (``insecure_context``, ``permission_denied``).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from tempestweb.native.dispatch import send_native_call
 
-__all__ = ["get_text", "read", "set_text", "write"]
+__all__ = [
+    "ClipboardImage",
+    "get_text",
+    "read",
+    "read_image",
+    "set_text",
+    "write",
+    "write_image",
+]
+
+
+@dataclass(frozen=True)
+class ClipboardImage:
+    """An image read from the system clipboard.
+
+    Attributes:
+        data_base64: The image bytes, base64-encoded (JSON-safe over the wire).
+        mime_type: The image MIME type (e.g. ``"image/png"``).
+    """
+
+    data_base64: str
+    mime_type: str
 
 
 async def write(text: str) -> None:
@@ -46,6 +69,44 @@ async def read() -> str:
     """
     value = await send_native_call("clipboard.read", {})
     return str(value.get("text", ""))
+
+
+async def read_image() -> ClipboardImage:
+    """Read an image from the system clipboard.
+
+    Returns:
+        The clipboard image as a :class:`ClipboardImage` carrying base64 bytes and
+        its MIME type.
+
+    Raises:
+        NativeError: If the read is blocked (``permission_denied``), the page is
+            not a secure context (``insecure_context``), or the clipboard holds no
+            image (``not_found``).
+        BrowserUnavailableError: If called with no native bridge installed.
+    """
+    value = await send_native_call("clipboard.read_image", {})
+    return ClipboardImage(
+        data_base64=str(value.get("data_base64", "")),
+        mime_type=str(value.get("mime_type", "")),
+    )
+
+
+async def write_image(data_base64: str, mime_type: str = "image/png") -> None:
+    """Write an image to the system clipboard.
+
+    Args:
+        data_base64: The image bytes, base64-encoded.
+        mime_type: The image MIME type (defaults to ``"image/png"``).
+
+    Raises:
+        NativeError: If the write is blocked (``permission_denied``) or the page is
+            not a secure context (``insecure_context``).
+        BrowserUnavailableError: If called with no native bridge installed.
+    """
+    await send_native_call(
+        "clipboard.write_image",
+        {"data_base64": data_base64, "mime_type": mime_type},
+    )
 
 
 #: Alias matching the tempestroid API ``await clipboard.set_text(...)``.

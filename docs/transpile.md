@@ -392,6 +392,80 @@ tempestweb dev   --mode transpile --path examples/transpile-tour   # livereload
     isso renderizando pelo core real — uma API que só existisse no Modo C
     quebraria o build, então o tour é prova viva de portabilidade.
 
+## PWA: instalável e offline
+
+Você já tem um bundle 100% estático e sem Python — o alvo **perfeito** para uma
+PWA. Por isso o `build --mode transpile` já emite a camada PWA inteira **sozinho**:
+o usuário pode **instalar** seu app na tela inicial e, depois da primeira visita,
+abri-lo **offline**. Sem passo extra, sem configurar nada. 🚀
+
+Basta o build de sempre:
+
+```bash
+tempestweb build --mode transpile --path examples/transpile-tour
+```
+
+Além do bundle do app, o Modo C agora escreve a camada PWA junto:
+
+```text
+dist/transpile/
+├── index.html               # linka o manifest, theme-color, apple-touch-icon
+│                            #   e registra o service worker
+├── manifest.webmanifest     # metadados de instalação (nome, ícones, cores)
+├── sw.js                    # service worker cache-first (app shell)
+├── register.js              # registra o sw.js no carregamento
+├── icons/                   # o conjunto de ícones (maskable + apple-touch)
+└── client/ …                # o cliente compartilhado + o seu app.gen.js
+```
+
+O `sw.js` **pré-cacheia o bundle estático inteiro** — `index.html`, o cliente
+compartilhado, `client/transpile/*` (incl. o seu `app.gen.js`), a árvore nativa,
+os ícones e o manifest. Depois da primeira carga, o app abre e roda **sem rede**.
+
+!!! tip "Offline de verdade ✅"
+    Isso não é offline "meia-boca": com o servidor HTTP **desligado**, recarregar
+    a página ainda **renderiza o tour** e a navegação continua funcionando —
+    verificado ao vivo no Playwright (servidor morto, reload, tour intacto). Como
+    o Modo C é um bundle estático sem Python, não há nada que dependa do servidor
+    depois do primeiro fetch.
+
+### Configurando o manifest com `[pwa]`
+
+Os metadados de instalação vêm de uma seção opcional `[pwa]` no seu
+`tempestweb.toml`. Todos os campos são opcionais — sem a seção, o build usa
+padrões sensatos derivados do nome do projeto:
+
+```toml
+[pwa]
+name = "Weather Pro"
+short_name = "WPro"
+theme_color = "#0a84ff"
+display = "standalone"
+```
+
+| Campo | Tipo | Padrão | O que faz |
+|---|---|---|---|
+| `name` | string | nome do projeto | Nome completo exibido na instalação/splash. |
+| `short_name` | string | — | Nome curto para o ícone da tela inicial. |
+| `description` | string | — | Descrição do app no prompt de instalação. |
+| `theme_color` | string | `"#111111"` | Cor do tema (barra do navegador + `<meta name="theme-color">`). |
+| `background_color` | string | `"#ffffff"` | Cor de fundo da splash de abertura. |
+| `display` | string | `"standalone"` | Modo de exibição: `standalone`, `fullscreen` ou `minimal-ui`. |
+| `orientation` | string | — | Orientação preferida (ex.: `portrait`, `landscape`). |
+| `lang` | string | `"pt-BR"` | Idioma primário do app. |
+| `categories` | lista de string | — | Categorias da app store (ex.: `["productivity"]`). |
+
+!!! warning "Valor de `display` válido"
+    `display` aceita apenas `"standalone"`, `"fullscreen"` ou `"minimal-ui"`. Um
+    valor fora dessa lista é **erro de build** — falha cedo, no espírito do resto
+    do compilador do Modo C.
+
+!!! note "Automático no Modo C"
+    Você não precisa escrever service worker, manifest nem código de registro à
+    mão: o `build --mode transpile` gera tudo. A seção `[pwa]` só **ajusta** os
+    metadados de instalação — o comportamento offline vem de graça porque o bundle
+    é estático.
+
 ## O subset suportado
 
 O Modo C aceita um **subset tipado** de Python — o suficiente para a camada de

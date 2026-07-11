@@ -184,6 +184,9 @@ TRANSPILE_ARTIFACT_FILES: tuple[str, ...] = (
     *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
     "client/push/web-push-client.js",
     "client/pwa/install-prompt.js",
+    # PWA layer: manifest, service worker + registration, icons. Mode C is a
+    # first-class installable, offline-capable PWA (static bundle).
+    *_PWA_FILES,
 )
 
 
@@ -406,7 +409,37 @@ def _zip_package(
             _zip_tree(archive, root, top, None)
 
 
-def _build_pwa(out: Path, client: Path, name: str, precache: tuple[str, ...]) -> None:
+def _manifest_options(config: ProjectConfig) -> ManifestOptions:
+    """Build the manifest options from a project's ``[pwa]`` config.
+
+    Unset ``[pwa]`` names fall back to the project name (full and trimmed), so a
+    project with no ``[pwa]`` section still gets a sensibly-named installable
+    manifest.
+
+    Args:
+        config: The resolved project config.
+
+    Returns:
+        The :class:`ManifestOptions` to emit for this project.
+    """
+    pwa = config.pwa
+    name = pwa.name or config.name
+    return ManifestOptions(
+        name=name,
+        short_name=pwa.short_name or name[:12],
+        description=pwa.description or f"{name} — a tempestweb app.",
+        theme_color=pwa.theme_color,
+        background_color=pwa.background_color,
+        display=pwa.display,
+        orientation=pwa.orientation,
+        lang=pwa.lang,
+        categories=list(pwa.categories),
+    )
+
+
+def _build_pwa(
+    out: Path, client: Path, manifest: ManifestOptions, precache: tuple[str, ...]
+) -> None:
     """Emit the PWA layer (manifest + icons + service worker) into ``out``.
 
     Writes ``manifest.webmanifest`` and the icon set, then copies the shared
@@ -418,16 +451,13 @@ def _build_pwa(out: Path, client: Path, name: str, precache: tuple[str, ...]) ->
     Args:
         out: The artifact root.
         client: The shared ``client/`` directory.
-        name: The project name (manifest ``name``/``short_name``).
+        manifest: The manifest options (name, colors, display) to emit.
         precache: The app-shell URLs the service worker precaches (cache-first).
 
     Raises:
         BuildError: If the service worker source is missing.
     """
-    write_manifest(
-        out / "manifest.webmanifest",
-        ManifestOptions(name=name, short_name=name[:12]),
-    )
+    write_manifest(out / "manifest.webmanifest", manifest)
     emit_icons(out / "icons")
 
     sw_source = client / "sw" / "sw.js"
@@ -516,7 +546,9 @@ def _copy_client_no_transport(client: Path, dest: Path) -> list[str]:
     return written
 
 
-def _index_html(name: str, scripts: tuple[str, ...] = ()) -> str:
+def _index_html(
+    name: str, scripts: tuple[str, ...] = (), theme_color: str = "#111111"
+) -> str:
     """Render the static ``index.html`` shell for a wasm artifact.
 
     Args:
@@ -524,6 +556,8 @@ def _index_html(name: str, scripts: tuple[str, ...] = ()) -> str:
         scripts: URLs/paths injected as classic ``<script>`` tags in ``<head>``
             before the bootstrap module, so a global library (e.g. ``window.ort``
             from onnxruntime-web) is loaded and ready when Python boots.
+        theme_color: The manifest theme color, mirrored into the ``theme-color``
+            meta so the browser chrome matches the installed app.
 
     Returns:
         The HTML document that boots the app in the browser.
@@ -537,7 +571,7 @@ def _index_html(name: str, scripts: tuple[str, ...] = ()) -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
     <link rel="manifest" href="./manifest.webmanifest" />
-    <meta name="theme-color" content="#111111" />
+    <meta name="theme-color" content="{theme_color}" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />{script_tags}
   </head>
   <body>
@@ -837,6 +871,7 @@ def build_artifact(
 
     client = _client_dir()
     app_source = config.entrypoint_path.read_text(encoding="utf-8")
+    manifest = _manifest_options(config)
 
     if resolved_mode == "wasm":
         files = _build_wasm(
@@ -847,10 +882,16 @@ def build_artifact(
             offline=offline,
             project_root=config.root,
             wasm=config.wasm,
+            manifest=manifest,
         )
     elif resolved_mode == "transpile":
         files = _build_transpile(
-            out, client, config.name, app_source, config.entrypoint_path.name
+            out,
+            client,
+            config.name,
+            app_source,
+            config.entrypoint_path.name,
+            manifest=manifest,
         )
     else:
         files = _build_server(out, client, config.name, app_source)
@@ -899,6 +940,7 @@ def _build_wasm(
     offline: bool = False,
     project_root: Path | None = None,
     wasm: WasmConfig | None = None,
+    manifest: ManifestOptions | None = None,
 ) -> tuple[str, ...]:
     """Write the wasm (static) artifact layout into ``out``.
 
@@ -912,6 +954,7 @@ def _build_wasm(
             it so the app boots offline after the first load.
         project_root: The project directory (source of ``[wasm]`` modules/assets).
         wasm: The project's ``[wasm]`` extras (packages, modules, assets, scripts).
+        manifest: The Web-App-Manifest options; defaults to a name-only manifest.
 
     Returns:
         The artifact-relative paths written, sorted.
@@ -935,7 +978,10 @@ def _build_wasm(
     else:
         pyodide_base = pyodide_cdn_base(WASM_PYODIDE_VERSION)
 
-    (out / "index.html").write_text(_index_html(name, scripts), encoding="utf-8")
+    theme_color = (manifest or ManifestOptions(name=name)).theme_color
+    (out / "index.html").write_text(
+        _index_html(name, scripts, theme_color), encoding="utf-8"
+    )
     (out / "bootstrap.js").write_text(
         _bootstrap_js(name, pyodide_base, extra_packages), encoding="utf-8"
     )
@@ -993,7 +1039,7 @@ def _build_wasm(
         *(s if s.startswith("/") else f"/{s}" for s in local_scripts),
         *(f"/pyodide/{file_name}" for file_name in vendored),
     )
-    _build_pwa(out, client, name, precache)
+    _build_pwa(out, client, manifest or ManifestOptions(name=name), precache)
     return tuple(
         sorted(
             [
@@ -1026,15 +1072,18 @@ def _build_server(
     return tuple(sorted(SERVER_ARTIFACT_FILES))
 
 
-def _index_html_transpile(name: str) -> str:
+def _index_html_transpile(name: str, theme_color: str = "#111111") -> str:
     """Render the ``index.html`` shell for a transpile artifact (Mode C).
 
     The shell imports the native runtime and the generated app module and mounts
-    the app with :func:`mountApp` — no transport, no Python, no network. The app
-    runs entirely as native JavaScript in the tab.
+    the app with :func:`mountApp` — no transport, no Python, no network. It also
+    links the Web App Manifest and registers the cache-first service worker, so
+    the static bundle is an installable, offline-capable PWA.
 
     Args:
         name: The project name (page title).
+        theme_color: The manifest theme color, mirrored into the ``theme-color``
+            meta so the browser chrome matches the installed app.
 
     Returns:
         The HTML document that boots the transpiled app in the browser.
@@ -1046,6 +1095,9 @@ def _index_html_transpile(name: str) -> str:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="{theme_color}" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   </head>
   <body>
     <div id="app"></div>
@@ -1055,20 +1107,34 @@ def _index_html_transpile(name: str) -> str:
 
       mountApp(document.getElementById("app"), {{ makeState, view }});
     </script>
+    <script type="module">
+      import {{ registerServiceWorker }} from "./register.js";
+      if ("serviceWorker" in navigator) {{
+        registerServiceWorker({{ url: "./sw.js" }});
+      }}
+    </script>
   </body>
 </html>
 """
 
 
 def _build_transpile(
-    out: Path, client: Path, name: str, app_source: str, entry_name: str
+    out: Path,
+    client: Path,
+    name: str,
+    app_source: str,
+    entry_name: str,
+    *,
+    manifest: ManifestOptions | None = None,
 ) -> tuple[str, ...]:
     """Write the transpile (native-JS static) artifact layout into ``out`` (Mode C).
 
     Transcribes the project's Python app layer to a native ES module and copies
     the shared client plus the native runtime (diff/widgets/runtime) into
     ``client/transpile/``. The result is a fully static bundle — zero Python at
-    runtime — servable by any host/CDN.
+    runtime — servable by any host/CDN, and a first-class **PWA**: the manifest,
+    icons and a cache-first service worker precaching the whole shell are emitted
+    so the app installs and opens offline after the first load.
 
     Args:
         out: The artifact root.
@@ -1076,6 +1142,7 @@ def _build_transpile(
         name: The project name.
         app_source: The project's entrypoint source to transpile.
         entry_name: The entrypoint file name (for the generated banner).
+        manifest: The Web-App-Manifest options; defaults to a name-only manifest.
 
     Returns:
         The artifact-relative paths written, sorted.
@@ -1129,5 +1196,27 @@ def _build_transpile(
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, dest)
 
-    (out / "index.html").write_text(_index_html_transpile(name), encoding="utf-8")
+    # App-shell precache: the whole static bundle. Absolute, root-relative URLs
+    # so the service worker's exact-path match (see chooseStrategy) is cache-first
+    # for every shell asset — the app opens with no network after the first load.
+    precache = (
+        "/",
+        "/index.html",
+        "/manifest.webmanifest",
+        "/register.js",
+        *(f"/client/{asset}" for asset in _CLIENT_ASSETS),
+        *(f"/client/icons/{asset}" for asset in _ICON_ASSETS),
+        *(f"/client/transpile/{asset}" for asset in _TRANSPILE_ASSETS),
+        f"/client/transpile/{_TRANSPILE_APP_MODULE}",
+        *(f"/client/native/{asset}" for asset in _NATIVE_ASSETS),
+        "/client/push/web-push-client.js",
+        "/client/pwa/install-prompt.js",
+        *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
+    )
+    manifest_options = manifest or ManifestOptions(name=name)
+    _build_pwa(out, client, manifest_options, precache)
+
+    (out / "index.html").write_text(
+        _index_html_transpile(name, manifest_options.theme_color), encoding="utf-8"
+    )
     return tuple(sorted(TRANSPILE_ARTIFACT_FILES))

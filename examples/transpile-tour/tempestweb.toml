@@ -3,3 +3,12 @@ name = "transpile-tour"
 
 [dev]
 mode = "transpile"
+
+# Mode C ships an installable, offline-capable PWA out of the box; [pwa]
+# customizes the generated Web App Manifest (all fields optional).
+[pwa]
+name = "Tour do Modo C"
+short_name = "Tour"
+description = "A guided tour of tempestweb Mode C, running as a native-JS PWA."
+theme_color = "#6750a4"
+display = "standalone"

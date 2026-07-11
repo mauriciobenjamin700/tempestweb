@@ -14,11 +14,51 @@ from typing import Any
 
 from tempestweb.core.constants import VALID_MODES
 
-__all__ = ["VALID_MODES", "ConfigError", "ProjectConfig", "WasmConfig", "load_config"]
+__all__ = [
+    "VALID_MODES",
+    "ConfigError",
+    "ProjectConfig",
+    "PwaConfig",
+    "WasmConfig",
+    "load_config",
+]
 
 
 class ConfigError(RuntimeError):
     """Raised when a ``tempestweb.toml`` is present but invalid."""
+
+
+@dataclass(slots=True)
+class PwaConfig:
+    """Web-App-Manifest overrides a project declares under ``[pwa]``.
+
+    Every field is optional: a project with no ``[pwa]`` section still ships an
+    installable-shaped manifest (the manifest emitter fills the defaults). These
+    feed :class:`tempestweb.pwa.ManifestOptions` at build time so the installed
+    app carries the project's own name, colors and display mode.
+
+    Attributes:
+        name: Full application name. Falls back to the project name when unset.
+        short_name: Home-screen label. Falls back to a trimmed project name.
+        description: Human-readable description shown in the install UI.
+        theme_color: Toolbar / status-bar color (any CSS color).
+        background_color: Splash-screen background (any CSS color).
+        display: Installable display mode
+            (``"standalone"`` | ``"fullscreen"`` | ``"minimal-ui"``).
+        orientation: Optional preferred orientation (e.g. ``"portrait"``).
+        lang: BCP-47 language tag for the manifest.
+        categories: App-store categories (e.g. ``["productivity"]``).
+    """
+
+    name: str | None = None
+    short_name: str | None = None
+    description: str | None = None
+    theme_color: str = "#111111"
+    background_color: str = "#ffffff"
+    display: str = "standalone"
+    orientation: str | None = None
+    lang: str = "pt-BR"
+    categories: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -65,6 +105,7 @@ class ProjectConfig:
         port: The default dev/run port.
         wasm: Mode A build extras (extra packages, bundled modules, static
             assets, injected scripts). Empty by default.
+        pwa: Web-App-Manifest overrides. Installable-shaped defaults otherwise.
     """
 
     root: Path
@@ -74,6 +115,7 @@ class ProjectConfig:
     host: str = "127.0.0.1"
     port: int = 8000
     wasm: WasmConfig = field(default_factory=WasmConfig)
+    pwa: PwaConfig = field(default_factory=PwaConfig)
 
     @property
     def entrypoint_path(self) -> Path:
@@ -127,6 +169,7 @@ def load_config(root: str | Path) -> ProjectConfig:
         host=str(dev.get("host", "127.0.0.1")),
         port=int(dev.get("port", 8000)),
         wasm=_parse_wasm(raw.get("wasm", {}), config_path),
+        pwa=_parse_pwa(raw.get("pwa", {}), config_path),
     )
 
 
@@ -175,4 +218,68 @@ def _parse_wasm(raw: Any, config_path: Path) -> WasmConfig:  # noqa: ANN401 - ra
         modules=_str_list(raw.get("modules"), "modules", config_path),
         assets=_str_list(raw.get("assets"), "assets", config_path),
         scripts=_str_list(raw.get("scripts"), "scripts", config_path),
+    )
+
+
+_INSTALLABLE_DISPLAYS: frozenset[str] = frozenset(
+    {"standalone", "fullscreen", "minimal-ui"}
+)
+
+
+def _opt_str(value: Any, key: str, config_path: Path) -> str | None:  # noqa: ANN401 - raw TOML value
+    """Coerce an optional ``[pwa]`` string field, or ``None`` when absent.
+
+    Args:
+        value: The raw TOML value (expected to be a string or absent).
+        key: The field name, for error messages.
+        config_path: The config file path, for error messages.
+
+    Returns:
+        The string, or ``None`` when the key is absent.
+
+    Raises:
+        ConfigError: If the value is present but not a string.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ConfigError(f"invalid pwa.{key} in {config_path}; expected a string")
+    return value
+
+
+def _parse_pwa(raw: Any, config_path: Path) -> PwaConfig:  # noqa: ANN401 - raw TOML table
+    """Parse the ``[pwa]`` table into a :class:`PwaConfig`.
+
+    Args:
+        raw: The raw ``[pwa]`` table (a dict), or an empty dict when absent.
+        config_path: The config file path, for error messages.
+
+    Returns:
+        The resolved :class:`PwaConfig`; all defaults when the table is absent.
+
+    Raises:
+        ConfigError: If the table or any field has the wrong type, or ``display``
+            is not an installable value.
+    """
+    if not raw:
+        return PwaConfig()
+    if not isinstance(raw, dict):
+        raise ConfigError(f"invalid [pwa] table in {config_path}")
+    display = str(raw.get("display", "standalone"))
+    if display not in _INSTALLABLE_DISPLAYS:
+        raise ConfigError(
+            f"invalid pwa.display {display!r} in {config_path}; "
+            f"expected one of {sorted(_INSTALLABLE_DISPLAYS)}"
+        )
+    defaults = PwaConfig()
+    return PwaConfig(
+        name=_opt_str(raw.get("name"), "name", config_path),
+        short_name=_opt_str(raw.get("short_name"), "short_name", config_path),
+        description=_opt_str(raw.get("description"), "description", config_path),
+        theme_color=str(raw.get("theme_color", defaults.theme_color)),
+        background_color=str(raw.get("background_color", defaults.background_color)),
+        display=display,
+        orientation=_opt_str(raw.get("orientation"), "orientation", config_path),
+        lang=str(raw.get("lang", defaults.lang)),
+        categories=_str_list(raw.get("categories"), "categories", config_path),
     )

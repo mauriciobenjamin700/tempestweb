@@ -59,3 +59,36 @@ def test_malformed_toml_raises(tmp_path: Path) -> None:
     (tmp_path / "tempestweb.toml").write_text("this = = broken", encoding="utf-8")
     with pytest.raises(ConfigError, match="invalid"):
         load_config(tmp_path)
+
+
+def test_pwa_defaults_when_absent(tmp_path: Path) -> None:
+    cfg = load_config(tmp_path)
+    assert cfg.pwa.name is None
+    assert cfg.pwa.theme_color == "#111111"
+    assert cfg.pwa.display == "standalone"
+
+
+def test_pwa_section_parsed(tmp_path: Path) -> None:
+    (tmp_path / "tempestweb.toml").write_text(
+        "[pwa]\n"
+        'name = "Weather Pro"\n'
+        'short_name = "WPro"\n'
+        'theme_color = "#0a84ff"\n'
+        'display = "fullscreen"\n'
+        'categories = ["weather", "utilities"]\n',
+        encoding="utf-8",
+    )
+    cfg = load_config(tmp_path)
+    assert cfg.pwa.name == "Weather Pro"
+    assert cfg.pwa.short_name == "WPro"
+    assert cfg.pwa.theme_color == "#0a84ff"
+    assert cfg.pwa.display == "fullscreen"
+    assert cfg.pwa.categories == ["weather", "utilities"]
+
+
+def test_pwa_invalid_display_raises(tmp_path: Path) -> None:
+    (tmp_path / "tempestweb.toml").write_text(
+        '[pwa]\ndisplay = "browser"\n', encoding="utf-8"
+    )
+    with pytest.raises(ConfigError, match="invalid pwa.display"):
+        load_config(tmp_path)

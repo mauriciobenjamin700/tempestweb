@@ -68,10 +68,50 @@ class SecurityConfig:
         allowed_origins: If set, the exact ``Origin`` values allowed to connect
             (installs CORS for HTTP/SSE and checks the WS upgrade). ``["*"]``
             allows any origin (CORS wildcard; the WS check is skipped).
+        max_connections: Cap on concurrent live sessions (WS + SSE combined). A
+            connection over the cap is refused (WS close ``1013``; SSE ``503``).
+            ``None`` = unbounded (S2).
+        max_message_bytes: Reject an SSE ``POST`` body larger than this many
+            bytes with ``413`` (S2). ``None`` = unbounded.
+        security_headers: When ``True``, add hardening response headers
+            (``X-Content-Type-Options``, ``Referrer-Policy``, ``X-Frame-Options``)
+            to every HTTP response (S6).
+        hsts: When ``True`` (implies ``security_headers``), also send
+            ``Strict-Transport-Security`` — enable only behind HTTPS.
+        content_security_policy: An explicit ``Content-Security-Policy`` value to
+            send when set (app-specific; the shell uses inline module scripts, so
+            a strict CSP needs a nonce/hash you supply here).
     """
 
     authenticate: Authenticate | None = None
     allowed_origins: list[str] | None = field(default=None)
+    max_connections: int | None = None
+    max_message_bytes: int | None = None
+    security_headers: bool = False
+    hsts: bool = False
+    content_security_policy: str | None = None
+
+    @property
+    def wants_headers(self) -> bool:
+        """Whether any response-header hardening is enabled (S6)."""
+        return (
+            self.security_headers
+            or self.hsts
+            or self.content_security_policy is not None
+        )
+
+    def header_values(self) -> dict[str, str]:
+        """The hardening response headers implied by this config (S6)."""
+        headers: dict[str, str] = {}
+        if self.security_headers or self.hsts:
+            headers["X-Content-Type-Options"] = "nosniff"
+            headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            headers["X-Frame-Options"] = "DENY"
+        if self.hsts:
+            headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        if self.content_security_policy is not None:
+            headers["Content-Security-Policy"] = self.content_security_policy
+        return headers
 
     @property
     def origins_wildcard(self) -> bool:

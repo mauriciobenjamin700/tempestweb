@@ -4,7 +4,7 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
-## [0.50.0] — YYYY-MM-DD
+## [0.50.0] — 2026-07-11
 
 ### Added
 

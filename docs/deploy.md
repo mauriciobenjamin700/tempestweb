@@ -33,9 +33,27 @@ create_app(make_state, view, security=SecurityConfig(
 ))
 ```
 
-### Docker + reverse-proxy
+### Gere os arquivos de deploy (`tempestweb deploy`)
 
-Arquivos de referência em
+Em vez de escrever a config do nginx à mão, gere-a pro seu projeto:
+
+```bash
+tempestweb deploy --server-name app.exemplo.com --tls --replicas 2
+```
+
+Escreve em `deploy/`: **`nginx.conf`** (parametrizado pela porta do
+`tempestweb.toml`, com upgrade WS, `X-Forwarded-*`, timeouts de streaming,
+`ip_hash` e — com `--tls` — bloco 443 + redirect HTTP→HTTPS), **`Dockerfile`**
+(+ `HEALTHCHECK`), **`docker-compose.yml`** e **`DEPLOY.md`** (guia). Flags:
+`--out`, `--server-name`, `--tls`, `--replicas`, `--force`.
+
+```bash
+cd deploy && docker compose up --build
+```
+
+### Docker + reverse-proxy (referência)
+
+Os mesmos arquivos, estáticos, também vivem em
 [`examples/deploy/`](https://github.com/mauriciobenjamin700/tempestweb/tree/main/examples/deploy):
 
 - **`Dockerfile`** — `python:3.12-slim` + `tempestweb[server]`, roda `tempestweb

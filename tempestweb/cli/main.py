@@ -15,6 +15,7 @@ import sys
 
 from tempestweb.cli.commands import (
     BuildError,
+    DeployError,
     DevError,
     NewError,
     RunError,
@@ -22,6 +23,7 @@ from tempestweb.cli.commands import (
     build_artifact,
     create_project,
     prepare_run,
+    scaffold_deploy,
     serve_dev,
     serve_run,
     sync_modules,
@@ -141,6 +143,38 @@ def build_parser() -> argparse.ArgumentParser:
         "--dry-run",
         action="store_true",
         help="Show what would be added without writing tempestweb.toml.",
+    )
+
+    deploy = sub.add_parser(
+        "deploy",
+        help="Scaffold production deploy files (nginx + Docker + guide).",
+    )
+    deploy.add_argument("--path", default=".", help="Project directory (default: cwd).")
+    deploy.add_argument(
+        "--out",
+        default=None,
+        help="Output directory for the deploy files (default: <project>/deploy).",
+    )
+    deploy.add_argument(
+        "--server-name",
+        default="_",
+        help="nginx server_name (your domain; default: _ = any host).",
+    )
+    deploy.add_argument(
+        "--tls",
+        action="store_true",
+        help="Emit a TLS (443) server block + HTTP->HTTPS redirect.",
+    )
+    deploy.add_argument(
+        "--replicas",
+        type=int,
+        default=1,
+        help="Number of app upstream replicas in nginx (default: 1).",
+    )
+    deploy.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing deploy files.",
     )
 
     vapid = sub.add_parser(
@@ -302,6 +336,37 @@ def _cmd_sync(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_deploy(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb deploy``.
+
+    Scaffolds an nginx config, Dockerfile, docker-compose and a DEPLOY.md guide
+    tailored to the project (upstream port, server name, TLS, replicas).
+
+    Args:
+        args: Parsed arguments for the ``deploy`` subcommand.
+
+    Returns:
+        Process exit code.
+    """
+    try:
+        result = scaffold_deploy(
+            args.path,
+            out=args.out,
+            server_name=args.server_name,
+            tls=args.tls,
+            replicas=args.replicas,
+            force=args.force,
+        )
+    except DeployError as exc:
+        print(f"tempestweb deploy: {exc}", file=sys.stderr)
+        return 1
+    print(f"Wrote deploy files to {result.out_dir}")
+    for rel in result.files:
+        print(f"  + {rel}")
+    print("\nNext:\n  read DEPLOY.md, then: docker compose up --build")
+    return 0
+
+
 def _cmd_vapid(args: argparse.Namespace) -> int:
     """Handle ``tempestweb vapid``.
 
@@ -356,6 +421,7 @@ def main(argv: list[str] | None = None) -> int:
         "build": _cmd_build,
         "run": _cmd_run,
         "sync": _cmd_sync,
+        "deploy": _cmd_deploy,
         "vapid": _cmd_vapid,
     }
     handler = handlers[args.command]

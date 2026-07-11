@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+from importlib.metadata import PackageNotFoundError, version
 
 from tempestweb.cli.commands import (
     BuildError,
@@ -32,6 +33,34 @@ from tempestweb.cli.commands import (
 __all__ = ["main", "build_parser"]
 
 
+def _package_version() -> str:
+    """Return the installed ``tempestweb`` version, or ``"unknown"``.
+
+    Returns:
+        The distribution version string, or ``"unknown"`` when the package is
+        not installed as a distribution (e.g. running from a source checkout).
+    """
+    try:
+        return version("tempestweb")
+    except PackageNotFoundError:  # pragma: no cover - only in odd source layouts
+        return "unknown"
+
+
+_TOP_EPILOG = """\
+examples:
+  tempestweb new myapp                    scaffold a runnable project
+  cd myapp && tempestweb dev              develop with hot-reload (Mode A)
+  tempestweb dev --mode server            develop in Mode B (FastAPI + reload)
+  tempestweb run --mode server            serve as built, no watcher (prod-like)
+  tempestweb build --mode transpile       build a static Mode C bundle
+  tempestweb deploy --tls                 scaffold production deploy files
+
+`dev` watches and reloads while you develop; `run` serves the built app as-is.
+Every command that builds/serves takes the project DIRECTORY via --path
+(default: current directory) — never a positional .py file.
+"""
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser.
 
@@ -41,6 +70,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="tempestweb",
         description="Build web apps in typed Python (WASM + server + transpile modes).",
+        epilog=_TOP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="version",
+        version=f"tempestweb {_package_version()}",
+        help="Show the tempestweb version and exit.",
     )
     sub = parser.add_subparsers(dest="command", required=False)
 
@@ -70,12 +108,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip rendering the scaffold to prove it is runnable.",
     )
 
-    dev = sub.add_parser("dev", help="Run the dev loop (watch + reload).")
+    dev = sub.add_parser(
+        "dev",
+        help="Run the app locally (build + serve; watch + reload).",
+        description="Build and serve the app locally in any mode. The static "
+        "modes (wasm, transpile) get browser livereload; server mode (Mode B) "
+        "runs the built FastAPI host under uvicorn and restarts on change.",
+    )
     dev.add_argument(
         "--mode",
-        choices=["wasm", "transpile"],
+        choices=["wasm", "server", "transpile"],
         default="wasm",
-        help="Static mode to serve with livereload (wasm or transpile).",
+        help="Execution mode to serve: wasm (Mode A), server (Mode B) or "
+        "transpile (Mode C). Default: wasm.",
     )
     dev.add_argument(
         "--path",
@@ -110,7 +155,13 @@ def build_parser() -> argparse.ArgumentParser:
         "(downloads them at build time).",
     )
 
-    run = sub.add_parser("run", help="Build and serve the app locally.")
+    run = sub.add_parser(
+        "run",
+        help="Serve the app as built — no file watching (production-like).",
+        description="Build the app once and serve it, without the dev watcher or "
+        "livereload. Use this for a production-like local run (and it is what the "
+        "generated deploy Dockerfile runs); use `dev` while developing.",
+    )
     run.add_argument("--mode", choices=["wasm", "server", "transpile"], default="wasm")
     run.add_argument(
         "--path",

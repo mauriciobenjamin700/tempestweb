@@ -16,6 +16,21 @@ def test_parser_builds() -> None:
     assert args.mode == "server"
 
 
+def test_dev_parser_accepts_server_mode() -> None:
+    parser = build_parser()
+    args = parser.parse_args(["dev", "--mode", "server"])
+    assert args.command == "dev"
+    assert args.mode == "server"
+
+
+def test_version_flag_prints_and_exits(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--version"])
+    assert excinfo.value.code == 0
+    out = capsys.readouterr().out
+    assert out.startswith("tempestweb ")
+
+
 def test_main_no_command_returns_zero() -> None:
     assert main([]) == 0
 
@@ -84,6 +99,25 @@ def test_run_dispatch_builds_and_plans(
     assert (project / "dist" / "wasm" / "index.html").is_file()
     assert served.get("plan") is not None
     assert getattr(served["plan"], "port", None) == 5555
+
+
+def test_run_dispatch_is_not_deprecated(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """`run` is the no-watcher serve command — it must not warn as deprecated."""
+    assert main(["new", "keep", "--into", str(tmp_path)]) == 0
+    project = tmp_path / "keep"
+
+    import sys
+
+    main_module = sys.modules["tempestweb.cli.main"]
+    monkeypatch.setattr(main_module, "serve_run", lambda plan: None)
+    rc = main(["run", "--mode", "wasm", "--path", str(project)])
+    assert rc == 0
+    combined = capsys.readouterr()
+    assert "deprecated" not in (combined.out + combined.err).lower()
 
 
 def test_dev_dispatch_runs_watch_loop(

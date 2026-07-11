@@ -106,6 +106,19 @@ def test_watcher_custom_suffixes(tmp_path: Path) -> None:
     assert event is not None
 
 
+def test_watcher_ignores_configured_dir(tmp_path: Path) -> None:
+    """Paths under an ignored dir (the build output) never trigger a reload."""
+    signal = ReloadSignal()
+    dist = tmp_path / "dist"
+    watcher = FileWatcher(tmp_path, signal, ignore=[dist])
+    # A rebuild writing into dist/ must not retrigger the watcher.
+    assert watcher.handle_batch([str(dist / "wasm" / "app.py")]) is None
+    assert watcher.handle_batch([str(dist / "wasm" / "client" / "dom.js")]) is None
+    # A real source edit outside dist/ still triggers.
+    event = watcher.handle_batch([str(tmp_path / "app.py")])
+    assert event is not None
+
+
 def test_default_suffixes_cover_web_assets() -> None:
     assert ".py" in DEFAULT_WATCH_SUFFIXES
     assert ".html" in DEFAULT_WATCH_SUFFIXES

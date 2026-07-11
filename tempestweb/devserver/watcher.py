@@ -47,6 +47,7 @@ class FileWatcher:
         *,
         suffixes: Iterable[str] = DEFAULT_WATCH_SUFFIXES,
         kind: ReloadKind = ReloadKind.RESTART,
+        ignore: Iterable[str | os.PathLike[str]] = (),
     ) -> None:
         """Initialize the watcher.
 
@@ -58,11 +59,15 @@ class FileWatcher:
                 :data:`DEFAULT_WATCH_SUFFIXES`.
             kind: The reload kind emitted for every change. Defaults to
                 :attr:`ReloadKind.RESTART` (clean state — the v1 behavior).
+            ignore: Directories whose contents never count as a change. Used to
+                exclude the build output dir (``dist/``) so a rebuild writing
+                into the watched tree does not retrigger itself in a loop.
         """
         self.root: Path = Path(root).resolve()
         self.signal: ReloadSignal = signal
         self.suffixes: tuple[str, ...] = tuple(suffixes)
         self.kind: ReloadKind = kind
+        self.ignore: tuple[Path, ...] = tuple(Path(p).resolve() for p in ignore)
 
     def _relevant(self, paths: ChangeBatch) -> tuple[str, ...]:
         """Filter a change batch to reload-worthy, project-relative paths.
@@ -80,8 +85,14 @@ class FileWatcher:
             path = Path(raw)
             if self.suffixes and path.suffix not in self.suffixes:
                 continue
+            resolved = path.resolve()
+            if any(
+                ignored == resolved or ignored in resolved.parents
+                for ignored in self.ignore
+            ):
+                continue
             try:
-                rel = path.resolve().relative_to(self.root)
+                rel = resolved.relative_to(self.root)
                 kept.add(str(rel))
             except ValueError:
                 kept.add(str(path))

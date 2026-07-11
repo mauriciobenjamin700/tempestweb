@@ -335,6 +335,26 @@ test("notifications.subscribe: runs the push flow and returns the subscription",
   assert.deepEqual(res.value.keys, { p256dh: "p", auth: "a" });
 });
 
+test("notifications.push_state: reports support + permission without prompting", async () => {
+  let prompted = false;
+  const deps = {
+    navigator: { serviceWorker: {} },
+    Notification: {
+      permission: "granted",
+      requestPermission: async () => {
+        prompted = true;
+        return "granted";
+      },
+    },
+    registration: { pushManager: {} },
+  };
+  const res = await dispatch(call("notifications.push_state"), deps);
+  assert.equal(res.ok, true);
+  assert.equal(res.value.supported, true);
+  assert.equal(res.value.permission, "granted");
+  assert.equal(prompted, false, "push_state must not trigger the permission prompt");
+});
+
 test("notifications.subscribe: missing vapid_public_key is invalid_argument", async () => {
   const res = await dispatch(call("notifications.subscribe", {}), {
     navigator: { serviceWorker: {} },

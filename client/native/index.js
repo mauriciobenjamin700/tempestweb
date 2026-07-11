@@ -29,6 +29,7 @@ import {
 } from "./offline.js";
 import {
   notificationsNotify,
+  notificationsPushState,
   notificationsRequestPermission,
   notificationsSubscribe,
   notificationsUnsubscribe,
@@ -99,6 +100,7 @@ export const HANDLERS = {
   "offline.replay": offlineReplay,
   "offline.size": offlineSize,
   "notifications.notify": notificationsNotify,
+  "notifications.push_state": notificationsPushState,
   "notifications.request_permission": notificationsRequestPermission,
   "notifications.subscribe": notificationsSubscribe,
   "notifications.unsubscribe": notificationsUnsubscribe,

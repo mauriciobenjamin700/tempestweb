@@ -239,7 +239,9 @@ def view(app: App[DataState]) -> Widget:
     botão "Instalar" no momento certo.
 
 !!! tip "Push (`native.notifications`)"
-    `await native.notifications.request_permission()` pede permissão; `await
+    `await native.notifications.push_state()` informa `{supported, permission}`
+    **sem** disparar prompt — use pra decidir mostrar o botão. `await
+    native.notifications.request_permission()` pede permissão; `await
     native.notifications.subscribe(vapid_public_key)` roda o fluxo WebPush do
     browser e devolve o **JSON da assinatura** — você o envia ao seu backend
     (via `native.http` ou enfileirado com `native.offline`). `unsubscribe()`

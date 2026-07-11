@@ -79,6 +79,7 @@ CAPABILITIES: tuple[Capability, ...] = (
     _cap("offline.replay", mode_c=True),
     _cap("offline.size", mode_c=True),
     _cap("notifications.notify", mode_c=True),
+    _cap("notifications.push_state", mode_c=True),
     _cap("notifications.request_permission", mode_c=True),
     _cap("notifications.subscribe", mode_c=True),
     _cap("notifications.unsubscribe", mode_c=True),

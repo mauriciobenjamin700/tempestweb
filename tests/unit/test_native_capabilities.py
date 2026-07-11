@@ -223,3 +223,13 @@ async def test_notifications_unsubscribe_returns_bool() -> None:
     assert bridge.last is not None
     assert bridge.last["capability"] == "notifications.unsubscribe"
     assert ok is True
+
+
+async def test_notifications_push_state_reports_support() -> None:
+    bridge = RecordingBridge({"supported": True, "permission": "granted"})
+    install_bridge(bridge)
+    state = await notifications.push_state()
+    assert bridge.last is not None
+    assert bridge.last["capability"] == "notifications.push_state"
+    assert state.supported is True
+    assert state.permission == "granted"

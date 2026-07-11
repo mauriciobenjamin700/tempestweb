@@ -20,11 +20,15 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
 from tempestweb.native.dispatch import send_native_call
 
 __all__ = [
     "NotificationPermission",
+    "PushState",
     "notify",
+    "push_state",
     "request_permission",
     "subscribe",
     "unsubscribe",
@@ -45,6 +49,22 @@ class NotificationPermission(StrEnum):
     DEFAULT = "default"
     GRANTED = "granted"
     DENIED = "denied"
+
+
+class PushState(BaseModel):
+    """WebPush support and current permission, reported without prompting.
+
+    Attributes:
+        supported: Whether WebPush (service worker + PushManager + Notification)
+            is available in this context.
+        permission: The current notification permission
+            (``"granted"``/``"denied"``/``"default"``/``"unsupported"``).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    supported: bool = False
+    permission: str = "unsupported"
 
 
 async def notify(title: str, body: str = "") -> None:
@@ -77,6 +97,22 @@ async def request_permission() -> NotificationPermission:
     """
     value = await send_native_call("notifications.request_permission", {})
     return NotificationPermission(str(value.get("permission", "default")))
+
+
+async def push_state() -> PushState:
+    """Report WebPush support and current permission WITHOUT prompting.
+
+    Use this to decide whether to show an "enable notifications" button before
+    calling :func:`subscribe` (which must follow a user gesture).
+
+    Returns:
+        The :class:`PushState` (support flag + current permission).
+
+    Raises:
+        BrowserUnavailableError: If called with no native bridge installed.
+    """
+    value = await send_native_call("notifications.push_state", {})
+    return PushState.model_validate(value)
 
 
 async def subscribe(vapid_public_key: str) -> dict[str, Any]:

@@ -66,6 +66,13 @@ WS/SSE session state lives **in process memory**. To run multiple replicas:
 `ready` flips to `false` when `max_connections` is reached — use it in your load
 balancer's readiness probe to drain a full instance.
 
+### Metrics (S8)
+
+`create_app(..., metrics=True)` mounts `GET /metrics` in **Prometheus** format:
+`tempestweb_sessions_live` (gauge), `tempestweb_sessions_opened_total` and
+`tempestweb_connections_rejected_total` (counters), plus `tempestweb_sessions_max`
+when a cap is set. Point your scraper at it.
+
 ## Recap
 
 - **A/C**: `build` → publish the static directory to a CDN. Done.

@@ -91,6 +91,7 @@ class TempestWebServer(Generic[S]):
         *,
         title: str = "tempestweb",
         security: SecurityConfig | None = None,
+        metrics: bool = False,
     ) -> None:
         """Build the server and register the WebSocket and SSE routes.
 
@@ -100,16 +101,43 @@ class TempestWebServer(Generic[S]):
             title: OpenAPI title for the FastAPI app.
             security: Opt-in auth + origin controls (Track S). ``None`` leaves
                 the host open (dev).
+            metrics: When ``True``, mount ``GET /metrics`` (Prometheus text) with
+                connection counters (Track S — S8).
         """
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
         self._sse_sessions: dict[str, _SSESession[S]] = {}
         self._security: SecurityConfig = security or SecurityConfig()
         self._live: int = 0  # concurrent live sessions (S2 cap)
+        self._metrics_enabled: bool = metrics
+        self._opened: int = 0  # total sessions ever accepted
+        self._rejected: int = 0  # total connections refused (auth/origin/cap)
         self.api: FastAPI = FastAPI(title=title)
         self._install_cors()
         self._install_security_headers()
         self._register_routes()
+
+    def _prometheus(self) -> str:
+        """Render the connection counters as Prometheus text (S8)."""
+        cap = self._security.max_connections
+        lines = [
+            "# HELP tempestweb_sessions_live Currently connected sessions.",
+            "# TYPE tempestweb_sessions_live gauge",
+            f"tempestweb_sessions_live {self._live}",
+            "# HELP tempestweb_sessions_opened_total Sessions accepted since start.",
+            "# TYPE tempestweb_sessions_opened_total counter",
+            f"tempestweb_sessions_opened_total {self._opened}",
+            "# HELP tempestweb_connections_rejected_total Connections refused.",
+            "# TYPE tempestweb_connections_rejected_total counter",
+            f"tempestweb_connections_rejected_total {self._rejected}",
+        ]
+        if cap is not None:
+            lines += [
+                "# HELP tempestweb_sessions_max Configured max concurrent sessions.",
+                "# TYPE tempestweb_sessions_max gauge",
+                f"tempestweb_sessions_max {cap}",
+            ]
+        return "\n".join(lines) + "\n"
 
     def _install_security_headers(self) -> None:
         """Add hardening response headers to every HTTP response (S6)."""
@@ -172,6 +200,16 @@ class TempestWebServer(Generic[S]):
                 "ready": cap is None or self._live < cap,
             }
 
+        if self._metrics_enabled:
+
+            @self.api.get("/metrics")
+            async def metrics() -> Response:
+                """Prometheus-format connection counters (S8)."""
+                return Response(
+                    content=self._prometheus(),
+                    media_type="text/plain; version=0.0.4",
+                )
+
         @self.api.websocket("/ws")
         async def ws_endpoint(websocket: WebSocket) -> None:
             """Serve one client over a WebSocket until it disconnects.
@@ -184,13 +222,16 @@ class TempestWebServer(Generic[S]):
                 websocket.headers, websocket.query_params
             )
             if not await _authorize(self._security, credentials):
+                self._rejected += 1
                 await websocket.close(code=1008)
                 return
             if self._at_capacity():
+                self._rejected += 1
                 await websocket.close(code=1013)  # try again later
                 return
             await websocket.accept()
             self._live += 1
+            self._opened += 1
             transport = WebSocketTransport(websocket)
             session = self._new_session(transport)
             try:
@@ -202,8 +243,10 @@ class TempestWebServer(Generic[S]):
         async def sse_endpoint(request: Request, session: str) -> Response:
             """Open (or resume) the SSE patch stream for ``session``."""
             if not await self._authorize_request(request):
+                self._rejected += 1
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
             if session not in self._sse_sessions and self._at_capacity():
+                self._rejected += 1
                 return JSONResponse({"error": "at capacity"}, status_code=503)
             return await self._open_sse(request, session)
 
@@ -249,6 +292,7 @@ class TempestWebServer(Generic[S]):
             sse = _SSESession(transport=transport, session=app_session)
             self._sse_sessions[session_id] = sse
             self._live += 1
+            self._opened += 1
             sse.task = asyncio.ensure_future(self._run_sse(session_id, app_session))
 
         last_event_id = _parse_last_event_id(request.headers.get("last-event-id"))
@@ -347,6 +391,7 @@ def create_app(
     *,
     title: str = "tempestweb",
     security: SecurityConfig | None = None,
+    metrics: bool = False,
 ) -> FastAPI:
     """Build a Mode B FastAPI app for a ``view`` and state factory.
 
@@ -357,8 +402,11 @@ def create_app(
         security: Opt-in auth + origin controls (Track S — S0/S1/S3). ``None``
             leaves the host open (dev); pass a :class:`SecurityConfig` with an
             ``authenticate`` predicate and/or ``allowed_origins`` for production.
+        metrics: When ``True``, mount ``GET /metrics`` (Prometheus text) — S8.
 
     Returns:
         The configured FastAPI application with WS and SSE routes mounted.
     """
-    return TempestWebServer(state_factory, view, title=title, security=security).api
+    return TempestWebServer(
+        state_factory, view, title=title, security=security, metrics=metrics
+    ).api

@@ -4,6 +4,19 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.45.0] — 2026-07-11
+
+### Added
+
+- **Benchmarks (Track S — S9, partial).** `benchmarks/bench_reconcile.py` times
+  the `build → diff` hot path (ops/s, µs/op) and confirms minimal patching (a
+  single-row change yields 2 patches). A CI regression gate remains a follow-up.
+- **Stability & support docs (Track S — S10, S11).** New `docs/stability.md`
+  (PT+EN): the pre-1.0 public-surface + deprecation policy, a browser support
+  matrix (A/B/C), the accessibility baseline, and the **Mode C subset contract**
+  — the stable, fail-loud in/out list (S11), with components staying an open
+  decision.
+
 ## [0.44.0] — 2026-07-11
 
 ### Added

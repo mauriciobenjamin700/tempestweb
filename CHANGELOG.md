@@ -4,6 +4,27 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.41.0] — 2026-07-11
+
+### Added
+
+- **Mode B server security (Track S — S0/S1/S3).** `create_app(...)` gains an
+  opt-in `security=SecurityConfig(...)`:
+  - **S0 auth gate** — an `authenticate` predicate (sync or async) runs on every
+    WebSocket upgrade and SSE request *before* a session is created; a falsy
+    return or a raised error rejects the connection (WS close `1008` / HTTP
+    `401`). Builders: `token_authenticator(secret)` (shared secret, constant-time,
+    empty = disabled) and `jwt_authenticator(key, ...)`.
+  - **S1 origin allowlist** — `allowed_origins` installs `CORSMiddleware` for the
+    HTTP/SSE surface *and* hard-checks the `Origin` header on the WS upgrade
+    (which browser CORS does not guard); `["*"]` allows any origin.
+  - **S3 server-side JWT** — `verify_jwt(token, key, ...)` validates signature +
+    expiry (needs the `[auth]` extra / PyJWT; degrades to a clean rejection when
+    absent), distinct from the client-side `decode_jwt`.
+
+  The host stays fully open when no `SecurityConfig` is passed (dev). New
+  `docs/security.md` (PT+EN) documents the surface.
+
 ## [0.40.0] — 2026-07-11
 
 ### Changed

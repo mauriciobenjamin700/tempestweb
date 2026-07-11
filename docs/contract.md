@@ -159,6 +159,42 @@ transporte (WS ou SSE+POST):
 > `native_result`) — a **API Python é idêntica**, só o caminho muda. É a razão de a
 > assinatura tipada morar no contrato, não no transporte.
 
+## Canal de eventos nativo (streaming, T-EV)
+
+A chamada nativa acima é **single-shot** (um pedido → um resultado). Capacidades
+de **stream** — `geolocation.watch`, `sensors.orientation`/`motion`,
+`network.watch`, `visibility.watch`, `orientation.watch`, `battery.watch`,
+`speech.listen` (STT), `idle.watch`, `tabs.receive`, `gamepad.watch`,
+`midi.messages` — entregam **muitos eventos por assinatura ao longo do tempo**.
+Três mensagens novas (Modo B; no Modo A o `FFIBridge` resolve em-processo, igual):
+
+```json
+// servidor → cliente: abre uma assinatura
+{ "kind": "native_subscribe", "sub_id": "s1", "capability": "geolocation.watch", "args": {"high_accuracy": true} }
+
+// cliente → servidor: um evento da assinatura (repete)
+{ "kind": "native_event", "sub_id": "s1", "event": { "latitude": -23.5, "longitude": -46.6, "accuracy": 5.0 } }
+
+// cliente → servidor: falha terminal, ou fim normal
+{ "kind": "native_event", "sub_id": "s1", "error": "permission_denied", "message": "…" }
+{ "kind": "native_event", "sub_id": "s1", "done": true }
+
+// servidor → cliente: cancela a assinatura
+{ "kind": "native_unsubscribe", "sub_id": "s1" }
+```
+
+- `sub_id` correlaciona a assinatura e cada `native_event` dela (várias em voo).
+- Cada `native_event` carrega **exatamente um** de `event` (dado), `error`
+  (`+ message`, falha terminal) ou `done: true` (fim normal). `error`/`done`
+  encerram a assinatura.
+- O lado Python expõe isso como um **async iterator tipado**
+  (`async for pos in geolocation.watch(): ...`): `native_events()` abre a
+  assinatura, entrega cada `event`, levanta `NativeError` no `error`, e **garante
+  o `native_unsubscribe`** ao sair do laço (fim, `break` ou cancelamento).
+- Capacidades single-shot registram no `HANDLERS` do cliente; as de stream no
+  `EVENT_HANDLERS`. O `contract.py` marca cada uma com `streaming=True`, e os
+  testes de conformância acoplam as duas superfícies.
+
 ## Navegação ↔ URL (deep links + back/forward)
 
 O browser dona a **URL**; o app Python dona a **pilha de navegação**. As duas

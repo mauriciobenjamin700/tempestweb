@@ -4,6 +4,31 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.33.0] — 2026-07-11
+
+### Added
+
+- **WebPush end-to-end (server path).** The last piece to make push work end to
+  end:
+  - `tempestweb.server.generate_vapid_keys() -> VapidKeys` — a P-256 VAPID
+    keypair (base64url); requires the `[webpush]` extra.
+  - `tempestweb vapid` CLI — prints a fresh keypair (`--env` prints
+    `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` export lines).
+  - `tempestweb.server.webpush_router(service, *, owner, prefix)` — a mountable
+    FastAPI router exposing `GET /webpush/vapid-public-key`, `POST
+    /webpush/subscribe`, `POST /webpush/unsubscribe`, `POST /webpush/send`.
+  - `examples/webpush-server/server.py` — a runnable demo: VAPID (env or
+    ephemeral dev keypair) + the router + a page and minimal push service worker.
+    `uv run uvicorn server:app --app-dir examples/webpush-server`.
+
+  With the client already able to `native.notifications.subscribe(public_key)`
+  and POST the subscription, the full loop closes: subscribe → store → send →
+  notification. The server path (keygen, router, send with a mocked sender) is
+  unit-tested; the browser subscribe/permission + real push delivery are device/
+  gesture dependent (manual). Verified live (Playwright): the demo page loads,
+  the service worker registers + activates, `PushManager` is available and the
+  VAPID public key is served.
+
 ## [0.32.0] — 2026-07-10
 
 ### Added

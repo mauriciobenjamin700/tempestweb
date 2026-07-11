@@ -13,8 +13,11 @@ from tempestweb.server.webpush import (
     SendOutcome,
     SubscriptionStore,
     VapidConfig,
+    VapidKeys,
     WebPushError,
     WebPushService,
+    generate_vapid_keys,
+    webpush_router,
 )
 
 __all__ = [
@@ -23,7 +26,10 @@ __all__ = [
     "SubscriptionStore",
     "TempestWebServer",
     "VapidConfig",
+    "VapidKeys",
     "WebPushError",
     "WebPushService",
     "create_app",
+    "generate_vapid_keys",
+    "webpush_router",
 ]

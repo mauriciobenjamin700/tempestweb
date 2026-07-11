@@ -21,6 +21,7 @@ send.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 from collections.abc import Callable
@@ -29,6 +30,58 @@ from typing import Any, Protocol
 
 #: A subscription's primary key is its push endpoint URL (globally unique).
 SubscriptionInfo = dict[str, Any]
+
+
+def _b64url(raw: bytes) -> str:
+    """Base64url-encode bytes without padding (the WebPush/VAPID convention)."""
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+
+@dataclass(slots=True)
+class VapidKeys:
+    """A freshly generated VAPID keypair (base64url, unpadded).
+
+    Attributes:
+        public_key: The application server key the browser subscribes with
+            (65-byte uncompressed P-256 point).
+        private_key: The signing key the server keeps secret (32-byte scalar).
+    """
+
+    public_key: str
+    private_key: str
+
+
+def generate_vapid_keys() -> VapidKeys:
+    """Generate a P-256 VAPID keypair for WebPush.
+
+    The public key is the browser ``applicationServerKey`` and the private key
+    signs push requests server-side. Store the private key as a secret (env var)
+    — never commit it.
+
+    Returns:
+        The base64url-encoded :class:`VapidKeys`.
+
+    Raises:
+        RuntimeError: If ``cryptography`` is not installed.
+    """
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+    except ImportError as exc:  # pragma: no cover - exercised via the error path
+        raise RuntimeError(
+            "cryptography is required to generate VAPID keys; install "
+            'tempest-fastapi-sdk[webpush] or "cryptography".'
+        ) from exc
+    private = ec.generate_private_key(ec.SECP256R1())
+    public_point = private.public_key().public_bytes(
+        serialization.Encoding.X962,
+        serialization.PublicFormat.UncompressedPoint,
+    )
+    private_scalar = private.private_numbers().private_value.to_bytes(32, "big")
+    return VapidKeys(
+        public_key=_b64url(public_point),
+        private_key=_b64url(private_scalar),
+    )
 
 
 @dataclass(slots=True)
@@ -343,3 +396,79 @@ class WebPushService:
             One outcome per subscription ([] when the store is empty).
         """
         return [self.send(sub, payload) for sub in self.store.all()]
+
+
+def webpush_router(
+    service: WebPushService,
+    *,
+    owner: str = "default",
+    prefix: str = "/webpush",
+) -> Any:  # noqa: ANN401 - a FastAPI APIRouter (imported lazily)
+    """Build a FastAPI router exposing the WebPush subscribe/send endpoints.
+
+    Mount it on a host app with ``app.include_router(webpush_router(service))``.
+    Endpoints (all JSON):
+
+    - ``GET  {prefix}/vapid-public-key`` → ``{"public_key": ...}`` for the client
+      to subscribe with.
+    - ``POST {prefix}/subscribe`` (body: the browser subscription JSON) → stores
+      it under ``owner``.
+    - ``POST {prefix}/unsubscribe`` (body: ``{"endpoint": ...}``) → removes it.
+    - ``POST {prefix}/send`` (body: the notification payload) → pushes to every
+      subscription of ``owner``; returns ``{"sent", "total"}``.
+
+    A single fixed ``owner`` keeps the default multi-tenant-free; an app with
+    real users wires its own routes around the same :class:`WebPushService`,
+    resolving the owner from auth.
+
+    Args:
+        service: The WebPush service (store + sender).
+        owner: The owner every subscription is filed under (default ``"default"``).
+        prefix: The route prefix.
+
+    Returns:
+        A configured ``fastapi.APIRouter``.
+
+    Raises:
+        RuntimeError: If FastAPI is not installed.
+    """
+    try:
+        from fastapi import APIRouter, Body
+    except ImportError as exc:  # pragma: no cover - server extra always ships it
+        raise RuntimeError(
+            "FastAPI is required for webpush_router; install "
+            "tempest-fastapi-sdk or the server extra."
+        ) from exc
+
+    router = APIRouter(prefix=prefix, tags=["webpush"])
+
+    @router.get("/vapid-public-key")
+    async def vapid_public_key() -> dict[str, str]:
+        """Return the VAPID public key the browser subscribes with."""
+        return {"public_key": service.vapid.public_key}
+
+    @router.post("/subscribe")
+    async def subscribe(
+        subscription: SubscriptionInfo = Body(...),  # noqa: B008 - FastAPI param
+    ) -> dict[str, bool]:
+        """Persist a browser push subscription under the router's owner."""
+        service.add_subscription(owner, subscription)
+        return {"ok": True}
+
+    @router.post("/unsubscribe")
+    async def unsubscribe(
+        body: dict[str, Any] = Body(...),  # noqa: B008 - FastAPI param
+    ) -> dict[str, bool]:
+        """Remove a subscription by its endpoint."""
+        removed = service.remove_subscription(str(body.get("endpoint", "")))
+        return {"removed": removed}
+
+    @router.post("/send")
+    async def send(
+        payload: dict[str, Any] = Body(...),  # noqa: B008 - FastAPI param
+    ) -> dict[str, int]:
+        """Push a notification payload to every subscription of the owner."""
+        outcomes = service.send_to_owner(owner, payload)
+        return {"sent": sum(1 for o in outcomes if o.ok), "total": len(outcomes)}
+
+    return router

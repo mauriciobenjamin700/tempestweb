@@ -134,6 +134,28 @@ one app exercising the whole surface — and the guide
 **experimental**: the typed subset is deliberately restricted (out-of-subset
 constructs fail loud with `file:line`) and the API may change.
 
+## WebPush (end-to-end)
+
+Push works client-to-server out of the box. Generate VAPID keys, mount the
+router, subscribe from the client:
+
+```bash
+tempestweb vapid --env        # -> VAPID_PUBLIC_KEY=… / VAPID_PRIVATE_KEY=…
+```
+
+```python
+from fastapi import FastAPI
+from tempestweb.server import VapidConfig, WebPushService, webpush_router
+
+service = WebPushService(VapidConfig.from_env())
+app = FastAPI()
+app.include_router(webpush_router(service))   # /webpush/{subscribe,unsubscribe,send}
+```
+
+The client subscribes with `native.notifications.subscribe(public_key)` and POSTs
+the subscription to `/webpush/subscribe`; `POST /webpush/send` pushes to it. See
+the runnable [`examples/webpush-server`](examples/webpush-server/server.py).
+
 ## Develop
 
 ```bash

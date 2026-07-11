@@ -74,3 +74,26 @@ export async function tabsUnlock(args, _deps) {
   }
   return {};
 }
+
+/**
+ * Receive messages posted to a named BroadcastChannel, streaming each (T-EV).
+ *
+ * Each incoming message emits `{ event: {message} }`. The returned function
+ * closes the channel.
+ *
+ * @param {{channel:string}} args
+ * @param {(payload:Object) => void} emit  Sink for shaped stream payloads.
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {() => void}  Teardown that closes the BroadcastChannel.
+ * @throws {CapabilityError} unavailable — when BroadcastChannel is absent.
+ */
+export function tabsReceive(args, emit, deps) {
+  const BroadcastChannelCtor =
+    deps.BroadcastChannel || /** @type {any} */ (globalThis).BroadcastChannel;
+  if (!BroadcastChannelCtor) {
+    throw new CapabilityError("unavailable", "BroadcastChannel is not available");
+  }
+  const bc = new BroadcastChannelCtor(args.channel);
+  bc.onmessage = (ev) => emit({ event: { message: ev.data } });
+  return () => bc.close();
+}

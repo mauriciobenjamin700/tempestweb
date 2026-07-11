@@ -10,9 +10,12 @@ alive by the client on a registry keyed by its name.
 
 from __future__ import annotations
 
-from tempestweb.native.dispatch import send_native_call
+from collections.abc import AsyncIterator
+from typing import Any
 
-__all__ = ["broadcast", "lock", "unlock"]
+from tempestweb.native.dispatch import native_events, send_native_call
+
+__all__ = ["broadcast", "lock", "receive", "unlock"]
 
 
 async def broadcast(channel: str, message: object) -> None:
@@ -61,3 +64,30 @@ async def unlock(name: str) -> None:
         BrowserUnavailableError: If called with no native bridge installed.
     """
     await send_native_call("tabs.unlock", {"name": name})
+
+
+async def receive(channel: str) -> AsyncIterator[Any]:
+    """Stream messages broadcast by other tabs (event channel / T-EV).
+
+    Opens a ``BroadcastChannel`` subscription and yields each message posted by
+    another tab (via :func:`broadcast`) until the ``async for`` loop is exited
+    (which closes the channel). Consume it with::
+
+        async for message in native.tabs.receive("chat"):
+            app.set_state(lambda s: s.messages.append(message))
+
+    Args:
+        channel: The broadcast channel name to listen on.
+
+    Yields:
+        Each JSON-able message posted by another tab.
+
+    Raises:
+        NativeError: If the browser reports the subscription failed (e.g.
+            ``unavailable``).
+        BrowserUnavailableError: If no bridge is installed, or the installed bridge
+            does not support the event channel.
+    """
+    args = {"channel": channel}
+    async for value in native_events("tabs.receive", args):
+        yield value["message"]

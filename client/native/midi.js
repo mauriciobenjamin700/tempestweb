@@ -68,3 +68,51 @@ export async function midiSend(args, _deps) {
     throw new CapabilityError("failed", err && err.message);
   }
 }
+
+/**
+ * Stream incoming MIDI messages from every input port (T-EV).
+ *
+ * Requests MIDI access (async) and, for each input, emits
+ * `{ event: {input_id, data, timestamp} }` per incoming message. If access
+ * fails, emits `{ error: "unavailable" }`. The returned function clears every
+ * `onmidimessage` handler; it is synchronous even though setup is async.
+ *
+ * @param {Object} _args
+ * @param {(payload:Object) => void} emit  Sink for shaped stream payloads.
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {() => void}  Teardown that detaches the MIDI input handlers.
+ * @throws {CapabilityError} unavailable — when the Web MIDI API is absent.
+ */
+export function midiMessages(_args, emit, deps) {
+  const nav = deps.navigator || /** @type {any} */ (globalThis).navigator;
+  if (!nav || typeof nav.requestMIDIAccess !== "function") {
+    throw new CapabilityError("unavailable", "the Web MIDI API is not available");
+  }
+  let cancelled = false;
+  /** @type {Array<any>} */
+  let inputs = [];
+  Promise.resolve(nav.requestMIDIAccess())
+    .then((access) => {
+      if (cancelled) return;
+      inputs = [...access.inputs.values()];
+      inputs.forEach((input) => {
+        input.onmidimessage = (ev) =>
+          emit({
+            event: {
+              input_id: input.id,
+              data: Array.from(ev.data),
+              timestamp: ev.timeStamp || 0,
+            },
+          });
+      });
+    })
+    .catch((err) => {
+      if (!cancelled) emit({ error: "unavailable", message: (err && err.message) || "" });
+    });
+  return () => {
+    cancelled = true;
+    inputs.forEach((input) => {
+      input.onmidimessage = null;
+    });
+  };
+}

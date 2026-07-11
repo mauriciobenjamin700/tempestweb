@@ -19,8 +19,10 @@ import { native } from "../../client/transpile/native.js";
 
 // --- subscribeDispatch / unsubscribeDispatch -------------------------------
 
-test("EVENT_HANDLERS registers exactly the streaming capabilities", () => {
-  assert.deepEqual(Object.keys(EVENT_HANDLERS).sort(), ["geolocation.watch"]);
+test("EVENT_HANDLERS registers the geolocation.watch streaming capability", () => {
+  // The full streaming set is asserted in native-streams.test.js; here we only
+  // pin the capability this suite exercises.
+  assert.ok(Object.keys(EVENT_HANDLERS).includes("geolocation.watch"));
   assert.equal(typeof EVENT_HANDLERS["geolocation.watch"], "function");
 });
 

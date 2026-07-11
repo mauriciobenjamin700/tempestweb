@@ -59,3 +59,26 @@ export async function orientationState(_args, deps) {
     angle: screen.orientation.angle,
   };
 }
+
+/**
+ * Watch the screen orientation, streaming a shaped payload per change (T-EV).
+ *
+ * Each "change" emits `{ event: {type, angle} }`. The returned function removes
+ * the listener.
+ *
+ * @param {Object} _args
+ * @param {(payload:Object) => void} emit  Sink for shaped stream payloads.
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {() => void}  Teardown that removes the orientation listener.
+ * @throws {CapabilityError} unavailable — when the Screen Orientation API is absent.
+ */
+export function orientationWatch(_args, emit, deps) {
+  const screen = deps.screen || /** @type {any} */ (globalThis).screen;
+  const o = screen && screen.orientation;
+  if (!o || typeof o.addEventListener !== "function") {
+    throw new CapabilityError("unavailable", "the Screen Orientation API is not available");
+  }
+  const handler = () => emit({ event: { type: o.type, angle: o.angle } });
+  o.addEventListener("change", handler);
+  return () => o.removeEventListener("change", handler);
+}

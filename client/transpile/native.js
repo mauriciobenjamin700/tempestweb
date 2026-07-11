@@ -352,6 +352,12 @@ export const native = Object.freeze({
   visibility: Object.freeze({
     /** The current page visibility state. @returns {Promise<string>} */
     state: () => call("visibility.state", {}).then((r) => r.state),
+    /**
+     * Watch page visibility, streaming each change to `onEvent` (T-EV).
+     * @param {(value: {state:string, hidden:boolean}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: removes the visibility listener.
+     */
+    watch: (onEvent) => stream("visibility.watch", {}, onEvent),
   }),
   orientation: Object.freeze({
     /**
@@ -367,6 +373,12 @@ export const native = Object.freeze({
      * @returns {Promise<{type:string, angle:number}>}
      */
     state: () => call("orientation.state", {}),
+    /**
+     * Watch the screen orientation, streaming each change to `onEvent` (T-EV).
+     * @param {(value: {type:string, angle:number}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: removes the orientation listener.
+     */
+    watch: (onEvent) => stream("orientation.watch", {}, onEvent),
   }),
   quota: Object.freeze({
     /**
@@ -386,6 +398,48 @@ export const native = Object.freeze({
      *                    downlink:number, rtt:number, save_data:boolean}>}
      */
     state: () => call("network.state", {}),
+    /**
+     * Watch connectivity, streaming the current snapshot per change (T-EV).
+     * @param {(value: {online:boolean, effective_type:string, downlink:number,
+     *                  rtt:number, save_data:boolean}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: stops the connectivity watch.
+     */
+    watch: (onEvent) => stream("network.watch", {}, onEvent),
+  }),
+  battery: Object.freeze({
+    /**
+     * Watch the device battery, streaming each state change to `onEvent` (T-EV).
+     * @param {(value: {level:number, charging:boolean, charging_time:number,
+     *                  discharging_time:number}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: stops the battery watch.
+     */
+    watch: (onEvent) => stream("battery.watch", {}, onEvent),
+  }),
+  idle: Object.freeze({
+    /**
+     * Watch the user's idle state, streaming each transition (T-EV).
+     * @param {(value: {user:string, screen:string}) => void} onEvent
+     * @param {{threshold_seconds?: number}} [opts]
+     * @returns {() => void}  Unsubscribe: stops the idle detector.
+     */
+    watch: (onEvent, opts = {}) =>
+      stream("idle.watch", { threshold_seconds: opts.threshold_seconds ?? 60 }, onEvent),
+  }),
+  sensors: Object.freeze({
+    /**
+     * Stream device orientation (compass/tilt) readings (T-EV).
+     * @param {(value: {alpha:number, beta:number, gamma:number,
+     *                  absolute:boolean}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: removes the orientation listener.
+     */
+    orientation: (onEvent) => stream("sensors.orientation", {}, onEvent),
+    /**
+     * Stream device motion (accelerometer/gyroscope) readings (T-EV).
+     * @param {(value: {acceleration:Object, rotation_rate:Object,
+     *                  interval:number}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: removes the motion listener.
+     */
+    motion: (onEvent) => stream("sensors.motion", {}, onEvent),
   }),
   speech: Object.freeze({
     /**
@@ -409,6 +463,15 @@ export const native = Object.freeze({
      * @returns {Promise<Array<{name:string, lang:string, default:boolean}>>}
      */
     voices: () => call("speech.voices", {}).then((r) => r.voices),
+    /**
+     * Listen for recognition results, streaming each transcript (T-EV).
+     * @param {(value: {transcript:string, is_final:boolean,
+     *                  confidence:number}) => void} onEvent
+     * @param {{lang?: string, interim?: boolean}} [opts]
+     * @returns {() => void}  Unsubscribe: stops the recognizer.
+     */
+    listen: (onEvent, opts = {}) =>
+      stream("speech.listen", { lang: opts.lang ?? "", interim: opts.interim ?? true }, onEvent),
   }),
   recorder: Object.freeze({
     /**
@@ -497,6 +560,13 @@ export const native = Object.freeze({
      * @returns {Promise<void>}
      */
     unlock: (name) => call("tabs.unlock", { name }),
+    /**
+     * Receive messages posted to a named BroadcastChannel, streaming each (T-EV).
+     * @param {string} channel  The channel name.
+     * @param {(value: {message: *}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: closes the channel.
+     */
+    receive: (channel, onEvent) => stream("tabs.receive", { channel }, onEvent),
   }),
   webauthn: Object.freeze({
     /**
@@ -577,6 +647,12 @@ export const native = Object.freeze({
      * @returns {Promise<Array<Object>>}
      */
     state: () => call("gamepad.state", {}).then((r) => r.gamepads),
+    /**
+     * Watch gamepad connections, streaming a snapshot per (dis)connect (T-EV).
+     * @param {(value: {gamepads: Array<Object>}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: removes the gamepad listeners.
+     */
+    watch: (onEvent) => stream("gamepad.watch", {}, onEvent),
   }),
   hid: Object.freeze({
     /** Whether the WebHID API is available. @returns {Promise<boolean>} */
@@ -606,6 +682,13 @@ export const native = Object.freeze({
      * @returns {Promise<void>}
      */
     send: (output_id, data) => call("midi.send", { output_id, data }),
+    /**
+     * Stream incoming MIDI messages from every input port (T-EV).
+     * @param {(value: {input_id:string, data:Array<number>,
+     *                  timestamp:number}) => void} onEvent
+     * @returns {() => void}  Unsubscribe: detaches the MIDI input handlers.
+     */
+    messages: (onEvent) => stream("midi.messages", {}, onEvent),
   }),
   nfc: Object.freeze({
     /** Whether the Web NFC API is available. @returns {Promise<boolean>} */

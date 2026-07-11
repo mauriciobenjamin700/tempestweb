@@ -11,12 +11,38 @@ within the :class:`MidiPorts` result.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any, cast
 
-from tempestweb.native.dispatch import send_native_call
+from pydantic import BaseModel, ConfigDict
 
-__all__ = ["MidiPorts", "is_supported", "request_access", "send"]
+from tempestweb.native.dispatch import native_events, send_native_call
+
+__all__ = [
+    "MidiMessage",
+    "MidiPorts",
+    "is_supported",
+    "messages",
+    "request_access",
+    "send",
+]
+
+
+class MidiMessage(BaseModel):
+    """A MIDI message received from an input port (event channel / T-EV).
+
+    Attributes:
+        input_id: The id of the input port the message arrived on.
+        data: The MIDI message bytes (0-255 each).
+        timestamp: The high-resolution timestamp (ms) the message was received.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    input_id: str
+    data: list[int]
+    timestamp: float
 
 
 @dataclass(frozen=True)
@@ -81,3 +107,26 @@ async def send(output_id: str, data: list[int]) -> None:
         BrowserUnavailableError: If called with no native bridge installed.
     """
     await send_native_call("midi.send", {"output_id": output_id, "data": data})
+
+
+async def messages() -> AsyncIterator[MidiMessage]:
+    """Stream incoming MIDI messages from all input ports (event channel / T-EV).
+
+    Yields a fresh :class:`MidiMessage` for every ``midimessage`` event on any
+    input port until the ``async for`` loop is exited (which closes the
+    subscription). Consume it with::
+
+        async for message in native.midi.messages():
+            app.set_state(lambda s: s.notes.append(message.data))
+
+    Yields:
+        Each :class:`MidiMessage`.
+
+    Raises:
+        NativeError: If the browser reports the subscription failed (e.g.
+            ``permission_denied`` or ``unavailable``).
+        BrowserUnavailableError: If no bridge is installed, or the installed bridge
+            does not support the event channel.
+    """
+    async for value in native_events("midi.messages", {}):
+        yield MidiMessage.model_validate(value)

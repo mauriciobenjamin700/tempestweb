@@ -9,11 +9,31 @@ is deferred to the event channel rather than modeled as a request/response call.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
-from tempestweb.native.dispatch import send_native_call
+from pydantic import BaseModel, ConfigDict
 
-__all__ = ["Voice", "cancel", "speak", "voices"]
+from tempestweb.native.dispatch import native_events, send_native_call
+
+__all__ = ["SpeechResult", "Voice", "cancel", "listen", "speak", "voices"]
+
+
+class SpeechResult(BaseModel):
+    """A speech-recognition (STT) result from the Web Speech API.
+
+    Attributes:
+        transcript: The recognized text for this result.
+        is_final: Whether this is a finalized result (``True``) or an interim,
+            still-changing hypothesis (``False``).
+        confidence: The recognizer's confidence in the transcript, ``0.0``-``1.0``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    transcript: str
+    is_final: bool
+    confidence: float
 
 
 @dataclass(frozen=True)
@@ -93,3 +113,32 @@ async def voices() -> list[Voice]:
         )
         for v in value.get("voices", [])
     ]
+
+
+async def listen(lang: str = "", interim: bool = True) -> AsyncIterator[SpeechResult]:
+    """Stream speech-recognition results from the browser (event channel / T-EV).
+
+    Opens a ``SpeechRecognition`` session and yields a fresh :class:`SpeechResult`
+    for every interim and final result until the ``async for`` loop is exited
+    (which stops recognition). Consume it with::
+
+        async for result in native.speech.listen(lang="en-US"):
+            if result.is_final:
+                app.set_state(lambda s: setattr(s, "said", result.transcript))
+
+    Args:
+        lang: The BCP-47 language tag to recognize; the browser default when empty.
+        interim: Whether to emit interim (non-final) results as they change.
+
+    Yields:
+        Each :class:`SpeechResult`.
+
+    Raises:
+        NativeError: If the browser reports the subscription failed (e.g.
+            ``permission_denied`` or ``unavailable``).
+        BrowserUnavailableError: If no bridge is installed, or the installed bridge
+            does not support the event channel.
+    """
+    args = {"lang": lang, "interim": interim}
+    async for value in native_events("speech.listen", args):
+        yield SpeechResult.model_validate(value)

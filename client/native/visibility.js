@@ -17,3 +17,22 @@ export async function visibilityState(_args, deps) {
     hidden: !!(doc && doc.hidden),
   };
 }
+
+/**
+ * Watch page visibility, streaming a shaped payload per change (T-EV).
+ *
+ * Each "visibilitychange" emits `{ event: {state, hidden} }`. The returned
+ * function removes the document listener.
+ *
+ * @param {Object} _args
+ * @param {(payload:Object) => void} emit  Sink for shaped stream payloads.
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {() => void}  Teardown that removes the visibility listener.
+ */
+export function visibilityWatch(_args, emit, deps) {
+  const doc = deps.document || /** @type {any} */ (globalThis).document;
+  const handler = () =>
+    emit({ event: { state: doc.visibilityState, hidden: !!doc.hidden } });
+  doc.addEventListener("visibilitychange", handler);
+  return () => doc.removeEventListener("visibilitychange", handler);
+}

@@ -9,11 +9,12 @@ requires fullscreen on most browsers.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
-from tempestweb.native.dispatch import send_native_call
+from tempestweb.native.dispatch import native_events, send_native_call
 
-__all__ = ["OrientationState", "lock", "state", "unlock"]
+__all__ = ["OrientationState", "lock", "state", "unlock", "watch"]
 
 
 @dataclass(frozen=True)
@@ -73,3 +74,28 @@ async def state() -> OrientationState:
         type=str(value.get("type", "")),
         angle=int(value.get("angle", 0)),
     )
+
+
+async def watch() -> AsyncIterator[OrientationState]:
+    """Stream screen-orientation changes from the browser (event channel / T-EV).
+
+    Yields a fresh :class:`OrientationState` whenever the device is rotated, until
+    the ``async for`` loop is exited (which closes the subscription). Consume it
+    with::
+
+        async for orient in native.orientation.watch():
+            app.set_state(lambda s: setattr(s, "orientation", orient))
+
+    Yields:
+        Each updated :class:`OrientationState`.
+
+    Raises:
+        NativeError: If the browser reports the subscription failed.
+        BrowserUnavailableError: If no bridge is installed, or the installed bridge
+            does not support the event channel.
+    """
+    async for value in native_events("orientation.watch", {}):
+        yield OrientationState(
+            type=str(value.get("type", "")),
+            angle=int(value.get("angle", 0)),
+        )

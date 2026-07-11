@@ -14,6 +14,9 @@ import { httpRequest, httpUpload } from "./http.js";
 import { audioPlay, audioStop } from "./audio.js";
 import { shareIsSupported, shareShare } from "./share.js";
 import { geolocationGet, geolocationWatch } from "./geolocation.js";
+import { batteryWatch } from "./battery.js";
+import { idleWatch } from "./idle.js";
+import { sensorsMotion, sensorsOrientation } from "./sensors.js";
 import {
   clipboardRead,
   clipboardReadImage,
@@ -24,10 +27,15 @@ import { vibrationVibrate } from "./vibration.js";
 import { badgeClear, badgeSet } from "./badge.js";
 import { wakelockRelease, wakelockRequest } from "./wakelock.js";
 import { fullscreenEnter, fullscreenExit, fullscreenState } from "./fullscreen.js";
-import { visibilityState } from "./visibility.js";
-import { orientationLock, orientationState, orientationUnlock } from "./orientation.js";
+import { visibilityState, visibilityWatch } from "./visibility.js";
+import {
+  orientationLock,
+  orientationState,
+  orientationUnlock,
+  orientationWatch,
+} from "./orientation.js";
 import { quotaEstimate, quotaPersist, quotaPersisted } from "./quota.js";
-import { networkState } from "./network.js";
+import { networkState, networkWatch } from "./network.js";
 import { storageGet, storageList, storagePut, storageRemove } from "./storage.js";
 import { cookiesAll, cookiesGet, cookiesRemove, cookiesSet } from "./cookies.js";
 import { cameraCapture } from "./camera.js";
@@ -47,7 +55,7 @@ import {
   notificationsSubscribe,
   notificationsUnsubscribe,
 } from "./notifications.js";
-import { speechCancel, speechSpeak, speechVoices } from "./speech.js";
+import { speechCancel, speechListen, speechSpeak, speechVoices } from "./speech.js";
 import { recorderStart, recorderStop } from "./recorder.js";
 import {
   filesystemOpenFile,
@@ -55,7 +63,7 @@ import {
   filesystemWriteFile,
 } from "./filesystem.js";
 import { bgsyncRegister, bgsyncRegisterPeriodic } from "./bgsync.js";
-import { tabsBroadcast, tabsLock, tabsUnlock } from "./tabs.js";
+import { tabsBroadcast, tabsLock, tabsReceive, tabsUnlock } from "./tabs.js";
 import { webauthnCreate, webauthnGet, webauthnGetOtp } from "./webauthn.js";
 import {
   bluetoothIsSupported,
@@ -65,9 +73,9 @@ import {
 } from "./bluetooth.js";
 import { contactsIsSupported, contactsSelect } from "./contacts.js";
 import { eyedropperOpen } from "./eyedropper.js";
-import { gamepadState } from "./gamepad.js";
+import { gamepadState, gamepadWatch } from "./gamepad.js";
 import { hidIsSupported, hidRequest } from "./hid.js";
-import { midiIsSupported, midiRequestAccess, midiSend } from "./midi.js";
+import { midiIsSupported, midiMessages, midiRequestAccess, midiSend } from "./midi.js";
 import { nfcIsSupported, nfcWrite } from "./nfc.js";
 import { paymentIsSupported, paymentRequest } from "./payment.js";
 import { pipExit, pipRequest } from "./pip.js";
@@ -106,6 +114,9 @@ import { webaudioTone } from "./webaudio.js";
  * @property {Window} [window]  Window object (File System Access pickers).
  * @property {Object} [speechSynthesis]  Speech synthesis controller.
  * @property {Function} [SpeechSynthesisUtterance]  Utterance constructor.
+ * @property {Function} [SpeechRecognition]  Speech recognition constructor (speech.listen).
+ * @property {Function} [IdleDetector]  Idle Detection constructor (idle.watch).
+ * @property {Function} [AbortController]  AbortController constructor (idle.watch teardown).
  * @property {Function} [MediaRecorder]  MediaRecorder constructor.
  * @property {Function} [BroadcastChannel]  BroadcastChannel constructor.
  * @property {Function} [AudioContext]  AudioContext constructor (Web Audio tone).
@@ -226,6 +237,17 @@ export const HANDLERS = {
  */
 export const EVENT_HANDLERS = {
   "geolocation.watch": geolocationWatch,
+  "battery.watch": batteryWatch,
+  "gamepad.watch": gamepadWatch,
+  "idle.watch": idleWatch,
+  "midi.messages": midiMessages,
+  "network.watch": networkWatch,
+  "orientation.watch": orientationWatch,
+  "sensors.motion": sensorsMotion,
+  "sensors.orientation": sensorsOrientation,
+  "speech.listen": speechListen,
+  "tabs.receive": tabsReceive,
+  "visibility.watch": visibilityWatch,
 };
 
 /**
@@ -251,6 +273,9 @@ export function browserDeps() {
     window: g.window || g,
     speechSynthesis: g.speechSynthesis,
     SpeechSynthesisUtterance: g.SpeechSynthesisUtterance,
+    SpeechRecognition: g.SpeechRecognition || g.webkitSpeechRecognition,
+    IdleDetector: g.IdleDetector,
+    AbortController: g.AbortController,
     MediaRecorder: g.MediaRecorder,
     BroadcastChannel: g.BroadcastChannel,
     AudioContext: g.AudioContext || g.webkitAudioContext,

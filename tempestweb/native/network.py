@@ -9,11 +9,12 @@ defaults otherwise.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
-from tempestweb.native.dispatch import send_native_call
+from tempestweb.native.dispatch import native_events, send_native_call
 
-__all__ = ["NetworkState", "state"]
+__all__ = ["NetworkState", "state", "watch"]
 
 
 @dataclass(frozen=True)
@@ -53,3 +54,31 @@ async def state() -> NetworkState:
         rtt=int(value.get("rtt", 0)),
         save_data=bool(value.get("save_data", False)),
     )
+
+
+async def watch() -> AsyncIterator[NetworkState]:
+    """Stream network-condition changes from the browser (event channel / T-EV).
+
+    Yields a fresh :class:`NetworkState` whenever the browser goes online/offline
+    or its connection properties change, until the ``async for`` loop is exited
+    (which closes the subscription). Consume it with::
+
+        async for net in native.network.watch():
+            app.set_state(lambda s: setattr(s, "network", net))
+
+    Yields:
+        Each updated :class:`NetworkState`.
+
+    Raises:
+        NativeError: If the browser reports the subscription failed.
+        BrowserUnavailableError: If no bridge is installed, or the installed bridge
+            does not support the event channel.
+    """
+    async for value in native_events("network.watch", {}):
+        yield NetworkState(
+            online=bool(value.get("online", False)),
+            effective_type=str(value.get("effective_type", "")),
+            downlink=float(value.get("downlink", 0.0)),
+            rtt=int(value.get("rtt", 0)),
+            save_data=bool(value.get("save_data", False)),
+        )

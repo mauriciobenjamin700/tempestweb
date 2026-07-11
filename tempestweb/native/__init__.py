@@ -42,6 +42,7 @@ Capabilities:
 from tempestweb.native import (
     audio,
     badge,
+    battery,
     bgsync,
     bluetooth,
     camera,
@@ -56,6 +57,7 @@ from tempestweb.native import (
     geolocation,
     hid,
     http,
+    idle,
     install,
     midi,
     network,
@@ -69,6 +71,7 @@ from tempestweb.native import (
     pointerlock,
     quota,
     recorder,
+    sensors,
     serial,
     speech,
     storage,
@@ -81,6 +84,7 @@ from tempestweb.native import (
     webauthn,
 )
 from tempestweb.native.audio import PlayResult
+from tempestweb.native.battery import BatteryStatus
 from tempestweb.native.bluetooth import BluetoothDevice
 from tempestweb.native.bridges import FFIBridge, ProxyBridge
 from tempestweb.native.camera import Photo, capture
@@ -122,10 +126,11 @@ from tempestweb.native.http import (
     request,
     upload,
 )
+from tempestweb.native.idle import IdleState
 from tempestweb.native.install import InstallState
 from tempestweb.native.install import prompt as install_prompt
 from tempestweb.native.install import state as install_state
-from tempestweb.native.midi import MidiPorts
+from tempestweb.native.midi import MidiMessage, MidiPorts
 from tempestweb.native.network import NetworkState
 from tempestweb.native.notifications import (
     NotificationPermission,
@@ -145,13 +150,14 @@ from tempestweb.native.onnx import OnnxModel, Tensor
 from tempestweb.native.orientation import OrientationState
 from tempestweb.native.quota import StorageEstimate
 from tempestweb.native.recorder import Recording
+from tempestweb.native.sensors import DeviceOrientation, Motion
 from tempestweb.native.share import (
     ShareOutcome,
     ShareResult,
     is_share_supported,
     share,
 )
-from tempestweb.native.speech import Voice
+from tempestweb.native.speech import SpeechResult, Voice
 from tempestweb.native.storage import (
     get as storage_get,
 )
@@ -166,6 +172,7 @@ __all__ = [
     # capability namespaces (plan-facing: native.http.request, native.audio.play, ...)
     "audio",
     "badge",
+    "battery",
     "bgsync",
     "bluetooth",
     "camera",
@@ -180,6 +187,7 @@ __all__ = [
     "geolocation",
     "hid",
     "http",
+    "idle",
     "install",
     "midi",
     "network",
@@ -193,6 +201,7 @@ __all__ = [
     "pointerlock",
     "quota",
     "recorder",
+    "sensors",
     "serial",
     "speech",
     "storage",
@@ -260,6 +269,13 @@ __all__ = [
     "BluetoothDevice",
     "MidiPorts",
     "UsbDevice",
+    # streaming event models (native event channel / T-EV)
+    "BatteryStatus",
+    "DeviceOrientation",
+    "IdleState",
+    "MidiMessage",
+    "Motion",
+    "SpeechResult",
     # storage (N3)
     "list_keys",
     "put",

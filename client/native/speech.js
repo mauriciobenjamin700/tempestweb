@@ -65,3 +65,41 @@ export async function speechVoices(_args, deps) {
   }));
   return { voices };
 }
+
+/**
+ * Listen for speech recognition results, streaming each transcript (T-EV).
+ *
+ * Each result emits `{ event: {transcript, is_final, confidence} }`; a
+ * recognition error emits `{ error }`. Recognition runs continuously until the
+ * returned function stops it.
+ *
+ * @param {{lang?:string, interim?:boolean}} args
+ * @param {(payload:Object) => void} emit  Sink for shaped stream payloads.
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {() => void}  Teardown that stops the recognizer.
+ * @throws {CapabilityError} unavailable — when the Speech Recognition API is absent.
+ */
+export function speechListen(args, emit, deps) {
+  const g = /** @type {any} */ (globalThis);
+  const R = deps.SpeechRecognition || g.SpeechRecognition || g.webkitSpeechRecognition;
+  if (!R) {
+    throw new CapabilityError("unavailable", "the Speech Recognition API is not available");
+  }
+  const r = new R();
+  r.lang = args.lang || "";
+  r.interimResults = !!args.interim;
+  r.continuous = true;
+  r.onresult = (ev) => {
+    const res = ev.results[ev.results.length - 1];
+    emit({
+      event: {
+        transcript: res[0].transcript,
+        is_final: !!res.isFinal,
+        confidence: res[0].confidence || 0,
+      },
+    });
+  };
+  r.onerror = (e) => emit({ error: (e && e.error) || "error" });
+  r.start();
+  return () => r.stop();
+}

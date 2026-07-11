@@ -111,7 +111,11 @@ def test_for_loop_and_augmented_assignment() -> None:
     )
     assert "for (const item of items) {" in js
     assert "total += item;" in js
-    assert "const total = 0;" in js
+    # `total` is augmented, so it hoists to a `let` — a `const` would throw on
+    # the first `+=` (assignment to a constant).
+    assert "let total;" in js
+    assert "total = 0;" in js
+    assert "const total" not in js
 
 
 def test_subscript_index() -> None:
@@ -336,6 +340,42 @@ def test_fstring_grouped_and_percent_specs() -> None:
     assert '((x) * 100).toFixed(1) + "%"' in gen("def f(x):\n    return f'{x:.1%}'\n")
 
 
+def test_while_loop_with_counter() -> None:
+    """`while` transpiles; a re-bound / augmented counter hoists to `let`."""
+    js = gen("def f(n):\n    i = 0\n    while i < n:\n        i += 1\n    return i\n")
+    assert "let i;" in js
+    assert "i = 0;" in js  # plain (hoisted), not `const i = 0`
+    assert "while (i < n) {" in js
+    assert "i += 1;" in js
+
+
+def test_break_and_continue() -> None:
+    """`break` / `continue` map straight through."""
+    js = gen(
+        "def f(xs):\n    for x in xs:\n        if x:\n            continue\n"
+        "        break\n"
+    )
+    assert "continue;" in js
+    assert "break;" in js
+
+
+def test_try_except_finally() -> None:
+    """`try`/`except`/`finally` maps to JS try/catch/finally; error name binds."""
+    js = gen(
+        "def f():\n    try:\n        go()\n    except ValueError as e:\n"
+        "        log(e)\n    finally:\n        done()\n"
+    )
+    assert "try {" in js
+    assert "} catch (e) {" in js
+    assert "} finally {" in js
+
+
+def test_try_bare_except_binds_placeholder() -> None:
+    """A bare `except:` binds a `_err` placeholder (JS needs a binding)."""
+    js = gen("def f():\n    try:\n        go()\n    except Exception:\n        pass\n")
+    assert "} catch (_err) {" in js
+
+
 def test_range_materializes_to_array() -> None:
     """`range(...)` becomes an `Array.from(...)` (JS has no lazy range)."""
     assert "Array.from({ length: 3 }, (_, i) => i)" in gen(
@@ -357,9 +397,16 @@ def test_numeric_builtins() -> None:
 # Every out-of-subset construct must fail loud with a TranspileError (file:line),
 # never silently mis-transpile or crash — the graduation-quality guarantee.
 _UNSUPPORTED: dict[str, str] = {
-    "while": "def f(x):\n    while x:\n        pass\n",
-    "try": "def f():\n    try:\n        pass\n    except Exception:\n        pass\n",
     "with": "def f():\n    with x() as h:\n        pass\n",
+    "while_else": "def f(x):\n    while x:\n        pass\n    else:\n        pass\n",
+    "try_else": (
+        "def f():\n    try:\n        go()\n    except Exception:\n        pass\n"
+        "    else:\n        ok()\n"
+    ),
+    "multi_except": (
+        "def f():\n    try:\n        go()\n    except ValueError:\n        pass\n"
+        "    except KeyError:\n        pass\n"
+    ),
     "global": "def f():\n    global g\n",
     "yield": "def f():\n    yield 1\n",
     "walrus": "def f(x):\n    return (y := x)\n",

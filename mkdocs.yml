@@ -134,6 +134,7 @@ plugins:
             Observability: Observabilidade
             "Security (Mode B)": "Segurança (Modo B)"
             "Deploy to production": "Deploy em produção"
+            "Stability & support": "Estabilidade e suporte"
             "Roadmap & design docs": "Roadmap e docs de design"
         - locale: en
           name: English (US)
@@ -237,4 +238,5 @@ nav:
   - Observability: observability.md
   - "Security (Mode B)": security.md
   - "Deploy to production": deploy.md
+  - "Stability & support": stability.md
   - Roadmap & design docs: design-docs.md

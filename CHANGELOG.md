@@ -4,6 +4,36 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.35.0] — 2026-07-11
+
+### Added
+
+- **Dataclass inheritance in the transpiler.** `@dataclass class B(A):` emits
+  `class B extends A` (the base must be another `@dataclass` in the module);
+  `super()` chains the base constructor, then the subclass's field defaults are
+  assigned (overriding an inherited default when they clash). Multiple bases or
+  an unknown base fail loud.
+- **`with … as x`.** Transpiled via the context-manager protocol —
+  `x = cm.__enter__()` then a `try/finally` whose `finally` calls
+  `cm.__exit__(null, null, null)` (faithful for managers exposing those methods,
+  e.g. a transpiled dataclass; `async with` awaits both). The `as` target is
+  hoisted to a function-scoped `let`, mirroring Python's leak. A single context
+  manager; `as` must bind a plain name.
+- **Multiple `except` clauses.** A lone `except` still catches everything (type
+  informational); multiple clauses dispatch by exception class name
+  (`err.name === "ValueError"`, `["A","B"].includes(err.name)`), with a trailing
+  broad/`Exception` clause as the `else` — or `throw` to re-raise when none
+  matches (Python's selective semantics, preserved for A/B/C parity). Matching is
+  by class **name**; a JS/browser error only matches when the names coincide.
+
+### Fixed
+
+- **Dataclass construction with field arguments.** A transpiled dataclass
+  constructor now takes an options object and applies overrides
+  (`Doubler(n=5)` → `new Doubler({ n: 5 })` sets `n = 5`), falling back to the
+  field default when a key is absent — previously the constructor ignored all
+  arguments and always used the defaults (a silent divergence from Python).
+
 ## [0.34.0] — 2026-07-11
 
 ### Added

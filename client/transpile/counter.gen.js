@@ -4,9 +4,9 @@ import { State } from "./runtime.js";
 import { Button, Column, Edge, Row, Style, Text } from "./widgets.js";
 
 export class CounterState extends State {
-  constructor() {
-    super();
-    this.value = 0;
+  constructor(opts = {}) {
+    super(opts);
+    this.value = opts.value !== undefined ? opts.value : 0;
   }
 }
 

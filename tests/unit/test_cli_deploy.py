@@ -54,6 +54,12 @@ def test_nginx_tls_block(tmp_path: Path) -> None:
     assert "ssl_certificate_key /etc/nginx/certs/privkey.pem;" in conf
 
 
+def test_no_sticky_drops_ip_hash(tmp_path: Path) -> None:
+    conf = render_deploy_files(_project(tmp_path), sticky=False)["nginx.conf"]
+    assert "ip_hash;" not in conf
+    assert "RedisSessionRouter" in conf  # explains the round-robin choice
+
+
 def test_replicas_expand_upstream(tmp_path: Path) -> None:
     conf = render_deploy_files(_project(tmp_path), replicas=3)["nginx.conf"]
     assert "server app:8000;" in conf

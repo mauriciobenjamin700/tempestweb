@@ -15,6 +15,11 @@ from tempestweb.server.security import (
     token_authenticator,
     verify_jwt,
 )
+from tempestweb.server.sessions import (
+    InProcessRouter,
+    RedisSessionRouter,
+    SessionRouter,
+)
 from tempestweb.server.webpush import (
     InMemorySubscriptionStore,
     SendOutcome,
@@ -30,7 +35,10 @@ from tempestweb.server.webpush import (
 __all__ = [
     "Credentials",
     "InMemorySubscriptionStore",
+    "InProcessRouter",
+    "RedisSessionRouter",
     "SecurityConfig",
+    "SessionRouter",
     "SendOutcome",
     "SubscriptionStore",
     "TempestWebServer",

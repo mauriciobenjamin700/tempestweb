@@ -67,12 +67,23 @@ docker compose -f examples/deploy/docker-compose.yml up --build
 
 ### Horizontal scale (S4)
 
-WS/SSE session state lives **in process memory**. To run multiple replicas:
+**WebSocket is self-contained** (one duplex connection on one replica) → it
+scales **without** stickiness. **SSE** is the exception: its `GET` (stream) and
+`POST` (events) must hit the same replica. Two options:
 
-- **Sticky sessions** — pin each client to one replica (`ip_hash` in nginx, or
-  your load balancer's affinity). This is the supported path today.
-- An **out-of-process session backend** (Redis) to drop stickiness is a Track-S
-  follow-up (S4).
+- **Sticky sessions** (default) — `ip_hash` in nginx pins the client;
+  `tempestweb deploy` emits it.
+- **Redis backend (drops stickiness)** — route SSE inbound over Redis pub/sub:
+
+  ```python
+  from tempestweb.server import create_app, RedisSessionRouter
+
+  app = create_app(make_state, view,
+                   sse_backend=RedisSessionRouter.from_url("redis://redis:6379"))
+  ```
+
+  Then generate nginx **without** `ip_hash`: `tempestweb deploy --no-sticky`
+  (round-robin). Requires the `[cache]` extra (redis).
 
 !!! warning "Don't use `--workers > 1` without stickiness"
     Each uvicorn worker has its own in-memory session registry. Run **1 worker

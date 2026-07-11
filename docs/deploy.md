@@ -68,13 +68,23 @@ docker compose -f examples/deploy/docker-compose.yml up --build
 
 ### Escala horizontal (S4)
 
-O estado das sessões WS/SSE vive **na memória do processo**. Para rodar múltiplas
-réplicas:
+**WebSocket é auto-contido** (uma conexão duplex numa réplica) → escala **sem
+sticky**. O **SSE** é a exceção: o `GET` (stream) e o `POST` (eventos) precisam
+cair na mesma réplica. Duas opções:
 
-- **Sticky sessions** — fixe cada cliente a uma réplica (`ip_hash` no nginx, ou
-  affinity do seu balanceador). É o caminho suportado hoje.
-- Um **backend de sessão fora do processo** (Redis) para dispensar sticky é
-  follow-up do Trilho S (S4).
+- **Sticky sessions** (padrão) — `ip_hash` no nginx fixa o cliente. `tempestweb
+  deploy` já emite isso.
+- **Backend Redis (dispensa sticky)** — roteie o inbound do SSE por Redis pub/sub:
+
+  ```python
+  from tempestweb.server import create_app, RedisSessionRouter
+
+  app = create_app(make_state, view,
+                   sse_backend=RedisSessionRouter.from_url("redis://redis:6379"))
+  ```
+
+  Aí gere o nginx **sem** `ip_hash`: `tempestweb deploy --no-sticky` (round-robin).
+  Requer o extra `[cache]` (redis).
 
 !!! warning "Não use `--workers > 1` sem sticky"
     Cada worker uvicorn tem seu próprio registro de sessões em memória. Rode

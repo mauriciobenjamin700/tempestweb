@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.49.0] — 2026-07-11
+
+### Added
+
+- **Redis SSE session backend (Track S — S4 complete).** SSE can now scale
+  across instances **without** sticky sessions: `create_app(..., sse_backend=...)`
+  takes a `SessionRouter`. The default `InProcessRouter` keeps today's behavior;
+  `RedisSessionRouter.from_url("redis://…")` publishes SSE inbound events to a
+  per-session Redis channel, and the instance holding the stream (subscribed)
+  feeds its transport — so a `POST` landing on any instance is delivered.
+  WebSocket is self-contained and needs no backend. `tempestweb deploy
+  --no-sticky` generates a round-robin (no `ip_hash`) nginx for a Redis-backed
+  deploy. Requires the `[cache]` extra (redis) only when used; the SSE `POST`
+  handler now returns `400` on malformed JSON. This closes S4.
+
 ## [0.48.0] — 2026-07-11
 
 ### Added

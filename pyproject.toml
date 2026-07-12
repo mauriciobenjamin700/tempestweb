@@ -31,6 +31,15 @@ cli = [
 webpush = [
     "pywebpush>=1.14",
 ]
+# Computer-vision task classes (Classifier/Detector/Segmenter) over the
+# native.onnx bridge. Reuses ort-vision-sdk's preprocessing/postprocessing/result
+# types (NumPy, runs in Pyodide); only the model run crosses to onnxruntime-web.
+# The SDK imports onnxruntime lazily, so this stays importable in the browser
+# where no onnxruntime wheel exists.
+vision = [
+    "ort-vision-sdk>=0.1",
+    "numpy>=1.26",
+]
 dev = [
     "ruff>=0.6",
     "mypy>=1.10",
@@ -38,6 +47,9 @@ dev = [
     "pytest-asyncio>=0.23",
     # Test client for the FastAPI/Starlette app (WebSocket + HTTP/SSE).
     "httpx>=0.27",
+    # Vision extra deps, so the quality gate can import + test tempestweb.vision.
+    "ort-vision-sdk>=0.1",
+    "numpy>=1.26",
 ]
 # Bilingual MkDocs documentation site (PT-BR default + EN-US under /en/).
 docs = [
@@ -97,7 +109,10 @@ convention = "google"
 quote-style = "double"
 
 [tool.mypy]
-python_version = "3.11"
+# 3.12 so numpy 2.x's stubs (which use 3.12 `type` statements) type-check; the
+# package still runs on 3.11+ (requires-python) — the codebase uses no 3.12-only
+# syntax. Raise requires-python to match if that ever changes.
+python_version = "3.12"
 strict = true
 
 [[tool.mypy.overrides]]

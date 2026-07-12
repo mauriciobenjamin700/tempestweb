@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.55.0] — 2026-07-12
+
+### Added
+
+- **Query and route params round-trip through the URL, in all three modes.**
+  A `Route`'s `params` now serialize to the URL (`app.push(Route("/shop",
+  params={"ref": "home"}))` → `/shop?ref=home`) and survive a reload or deep
+  link; the query string arriving from the browser is parsed back into the top
+  route's `params`. New `tempestweb.runtime.routing` helpers: `route_to_path`,
+  `path_to_routes`, and `match_path("/users/:id", "/users/42")` for path-param
+  extraction. Wired through the Mode A/B Python runtimes and mirrored in the
+  Mode C transpile client (`nav.js`/`runtime.js`); `client/router.js` now reports
+  `pathname + search`. Query/path values are strings (richer typing is the app's
+  job). Closes the routing gaps flagged in the 0.54 audit.
+
 ## [0.54.0] — 2026-07-12
 
 ### Added

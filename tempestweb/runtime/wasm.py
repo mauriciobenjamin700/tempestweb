@@ -35,6 +35,7 @@ from typing import Any, Generic, TypeVar
 from tempest_core import App, Node, Scene, Widget
 from tempest_core.core.ir import Patch
 from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
+from tempestweb.runtime.routing import route_to_path
 from tempestweb.transports.base import (
     Event,
     PatchTransport,
@@ -310,7 +311,7 @@ class WasmRuntime(Generic[S]):
         # so it can push the new path onto history (the reverse of the navigate
         # event). No-op when the path is unchanged or no sink is wired.
         if self._on_navigate is not None:
-            path = self._app.nav.top.name
+            path = route_to_path(self._app.nav.top)
             if path != self._last_path:
                 self._last_path = path
                 self._on_navigate(path)

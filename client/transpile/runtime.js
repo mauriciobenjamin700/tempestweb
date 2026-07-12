@@ -22,7 +22,7 @@
 
 import { mount } from "../tempestweb.js";
 import { diff } from "./diff.js";
-import { NavStack, Route, routesFromPath } from "./nav.js";
+import { NavStack, Route, pathToRoutes, routeToPath } from "./nav.js";
 import { MediaQueryData, Theme } from "./theme.js";
 import { installMedia } from "./media.js";
 
@@ -294,7 +294,7 @@ export function mountApp(root, { makeState, view }) {
   let navSink = null;
   // The last top-route path the URL reflects, so an imperative push/pop that
   // changes it triggers a pushState (mirrors the server session's view→URL leg).
-  let lastPath = app.nav.top.name;
+  let lastPath = routeToPath(app.nav.top);
 
   /** @type {import("../transport.js").Transport} */
   const transport = {
@@ -312,7 +312,7 @@ export function mountApp(root, { makeState, view }) {
         const path = event.payload?.path;
         if (typeof path === "string" && path) {
           lastPath = path; // this change came FROM the URL; don't echo it back
-          app.reset(routesFromPath(path));
+          app.reset(pathToRoutes(path));
         }
         return;
       }
@@ -355,8 +355,8 @@ export function mountApp(root, { makeState, view }) {
       }
     }
     // view→URL: if the app navigated imperatively (push/pop/replace) the top
-    // path changed — tell the router to pushState the new URL.
-    const path = app.nav.top.name;
+    // path changed — tell the router to pushState the new URL (params included).
+    const path = routeToPath(app.nav.top);
     if (path !== lastPath) {
       lastPath = path;
       if (navSink !== null) {

@@ -10,10 +10,10 @@ function mockTransport() {
 }
 
 /** A minimal fake window with a settable location.pathname and popstate listener. */
-function fakeWindow(pathname) {
+function fakeWindow(pathname, search = "") {
   const listeners = {};
   const win = {
-    location: { pathname },
+    location: { pathname, search },
     pushed: [],
     addEventListener(type, fn) {
       (listeners[type] ??= []).push(fn);
@@ -93,4 +93,23 @@ test("navigateTo is a no-op when the URL already matches (post round-trip)", () 
   // The server confirms the path the URL already drove — no duplicate history.
   router.navigateTo("/about");
   assert.deepEqual(win.pushed, []);
+});
+
+test("report includes the query string so route params round-trip", () => {
+  const transport = mockTransport();
+  const win = fakeWindow("/shop/item", "?ref=home&page=2");
+  installRouter(transport, win);
+  assert.deepEqual(transport.events, [
+    { type: "navigate", key: "", payload: { path: "/shop/item?ref=home&page=2" } },
+  ]);
+});
+
+test("navigateTo compares path + query (no-op when full URL matches)", () => {
+  const transport = mockTransport();
+  const win = fakeWindow("/shop", "?ref=home");
+  const router = installRouter(transport, win);
+  router.navigateTo("/shop?ref=home"); // same path + query -> no push
+  assert.deepEqual(win.pushed, []);
+  router.navigateTo("/shop?ref=other"); // different query -> pushes
+  assert.deepEqual(win.pushed, ["/shop?ref=other"]);
 });

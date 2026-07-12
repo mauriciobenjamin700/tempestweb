@@ -73,3 +73,48 @@ export function routesFromPath(path) {
 // Python-name alias so a transpiled `from tempest_core import routes_from_path`
 // resolves without a rename.
 export { routesFromPath as routes_from_path };
+
+/**
+ * Resolve a URL (path + optional query) into a navigation stack.
+ *
+ * Mirrors `tempestweb.runtime.routing.path_to_routes` (Modes A/B): the path
+ * builds the cumulative back stack; a query string, when present, is parsed into
+ * the top route's `params` so the linked screen receives them (deep link /
+ * reload). Query values are strings.
+ *
+ * @param {string} url  The browser URL, e.g. `"/shop/item?ref=home"`.
+ * @returns {Route[]}  Routes from the root to the linked screen; the top route
+ *   carries the parsed query params.
+ */
+export function pathToRoutes(url) {
+  const [path, query = ""] = String(url).split("?");
+  const routes = routesFromPath(path);
+  if (query) {
+    const params = {};
+    for (const [key, value] of new URLSearchParams(query)) params[key] = value;
+    const top = routes[routes.length - 1];
+    routes[routes.length - 1] = new Route({
+      name: top.name,
+      params: { ...top.params, ...params },
+    });
+  }
+  return routes;
+}
+
+/**
+ * Serialize a route to a URL path, encoding `params` as the query string.
+ *
+ * Mirrors `tempestweb.runtime.routing.route_to_path`: `name` when it has no
+ * params, else `name?k=v&...` with the params URL-encoded (values as strings).
+ *
+ * @param {Route} route  The route to serialize (typically `app.nav.top`).
+ * @returns {string}  The URL path.
+ */
+export function routeToPath(route) {
+  const params = route.params ?? {};
+  const keys = Object.keys(params);
+  if (keys.length === 0) return route.name;
+  const query = new URLSearchParams();
+  for (const key of keys) query.set(key, String(params[key]));
+  return `${route.name}?${query.toString()}`;
+}

@@ -34,7 +34,10 @@ export function installRouter(transport, win) {
   }
 
   const report = () => {
-    const path = target.location?.pathname || "/";
+    // Report path + query string so the Python side can reconstruct the linked
+    // route's params (deep link / reload), not just its path.
+    const loc = target.location;
+    const path = (loc?.pathname || "/") + (loc?.search || "");
     transport.sendEvent({ type: "navigate", key: "", payload: { path } });
   };
 
@@ -59,7 +62,8 @@ export function installRouter(transport, win) {
      */
     navigateTo(path) {
       if (typeof path !== "string" || !path) return;
-      const current = target.location?.pathname || "/";
+      const loc = target.location;
+      const current = (loc?.pathname || "/") + (loc?.search || "");
       if (path === current) return;
       target.history?.pushState({}, "", path);
     },

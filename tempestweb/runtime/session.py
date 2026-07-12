@@ -37,6 +37,7 @@ from tempestweb.native.dispatch import (
     uninstall_bridge,
 )
 from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
+from tempestweb.runtime.routing import route_to_path
 from tempestweb.runtime.serialize import (
     find_node_type,
     patches_to_wire,
@@ -174,7 +175,7 @@ class AppSession(Generic[S]):
         nav = getattr(self.app, "nav", None)
         if nav is None:
             return
-        path = nav.top.name
+        path = route_to_path(nav.top)
         if path != self._last_path:
             self._last_path = path
             self._spawn(self.transport.send_navigate(path))

@@ -4,7 +4,8 @@
     Como um app tempestweb navega entre **telas**: a **pilha de navegação**
     (`NavStack`), como definir e renderizar rotas, como navegar
     (`push`/`pop`/`replace`/`reset`), como a URL do browser fica **em sincronia**
-    com a pilha (deep links + botão voltar) e como fazer **guardas/redirect**. 🚀
+    com a pilha (deep links + botão voltar), como **query e path params** fazem
+    round-trip pela URL, e como fazer **guardas/redirect**. 🚀
 
 A navegação no tempestweb não é um roteador separado com sua própria árvore: é a
 **mesma** `view(app)` produzindo uma árvore diferente conforme a rota no topo da
@@ -161,26 +162,31 @@ a pilha**, nos três modos (WASM, servidor e transpile). O browser é dono da UR
 app Python é dono da pilha; o tempestweb liga os dois:
 
 - **URL → view.** Ao carregar (um deep link / bookmark) e a cada `popstate`
-  (voltar/avançar), o cliente reporta o **caminho** do documento. O runtime
-  resolve o caminho para uma pilha (`routes_from_path`) e chama `app.reset` — então
-  a `view` re-renderiza a tela linkada, com a pilha de retorno já montada.
+  (voltar/avançar), o cliente reporta a **URL** do documento (caminho + query). O
+  runtime resolve para uma pilha (`path_to_routes`) e chama `app.reset` — então
+  a `view` re-renderiza a tela linkada, com a pilha de retorno já montada e os
+  query params no `params` do topo.
 - **view → URL.** Quando o seu app navega imperativamente (`push`/`pop`/`reset`), o
-  runtime emite o novo caminho e o cliente faz `history.pushState` — então
+  runtime serializa o route do topo (`route_to_path`, incluindo os `params` como
+  query string) e o cliente faz `history.pushState` — então
   voltar/avançar e bookmarks continuam corretos.
 
 ```text
-  URL "/shop/item"  ──(load / popstate)──►  routes_from_path  ──►  app.reset
-                                                                      │
-                                                          view(app) re-renderiza
-                                                                      │
-  app.push(Route(name="/checkout"))  ──►  runtime emite "/checkout"  ──►  pushState
+  URL "/shop/item?ref=home"  ──(load / popstate)──►  path_to_routes  ──►  app.reset
+                                                                            │
+                                                                view(app) re-renderiza
+                                                                            │
+  app.push(Route("/checkout", params={"cart":"42"}))  ──►  route_to_path
+                                                            "/checkout?cart=42"  ──►  pushState
 ```
 
-!!! info "`routes_from_path` monta a pilha de retorno"
+!!! info "A pilha de retorno é cumulativa"
     Um caminho `"/a/b"` abre a pilha `["/", "/a", "/a/b"]` — segmentos
     **cumulativos**. Assim, chegar por deep link em `/shop/item` ainda deixa o
     usuário voltar para `/shop` e depois para `/`. A raiz (`"/"`) vira a pilha só
-    com a rota raiz.
+    com a rota raiz. O mapeamento URL↔pilha vive em
+    `tempestweb.runtime.routing` (`path_to_routes` / `route_to_path`) e é
+    espelhado no cliente do Modo C — o comportamento é **idêntico nos três modos**.
 
 !!! check "Feito quando"
     Você abre `http://127.0.0.1:8000/about` direto e vê a tela "Sobre"; clica em
@@ -189,74 +195,81 @@ app Python é dono da pilha; o tempestweb liga os dois:
 
 ---
 
-## 4. Path params: identidade codificada no nome
+## 4. Query params: `Route.params` faz round-trip pela URL
 
-O tempestweb **não** tem padrões de rota com placeholders (nada de `/users/:id`
-com extração automática). A identidade vai **no próprio nome** da rota — é assim
-que o core modela, e é o que sobrevive na URL. Você navega com o caminho completo
-e faz o parse do segmento na `view`:
+Passe dados na rota via `params` e eles **aparecem na URL como query string** e
+**sobrevivem a reload/deep-link** — nos três modos. `app.push(Route("/shop",
+params={"ref": "home"}))` mostra `/shop?ref=home` na barra; ao voltar (deep link
+ou back/forward), `app.nav.top.params` traz de volta `{"ref": "home"}`.
+
+```python
+from __future__ import annotations
+
+from tempest_core import App, Column, Text, Widget
+
+
+def open_shop(app: App) -> None:
+    """Navega para a loja com um parâmetro de origem."""
+    app.push(Route(name="/shop", params={"ref": "home"}))  # (1)!
+
+
+def view(app: App) -> Widget:
+    """Lê os params do route no topo da pilha."""
+    top = app.nav.top
+    if top.name == "/shop":
+        ref = top.params.get("ref", "direto")               # (2)!
+        return Text(content=f"Loja (via: {ref})", key="shop")
+    return Text(content="Início", key="home")
+```
+
+1.  Isso vira a URL `/shop?ref=home` (`route_to_path` serializa `params` como query
+    string). Recarregar ou compartilhar o link reconstrói o mesmo route.
+2.  Ao chegar por URL, `path_to_routes` anexa a query parseada ao `params` do route
+    do topo. Você lê direto de `app.nav.top.params`.
+
+!!! info "Valores de query/path são **strings**"
+    A URL só carrega texto, então tudo em `app.nav.top.params` (e o que o
+    `match_path` extrai) chega como **`str`**. Tipagem rica é responsabilidade do
+    app: converta na `view` (`int(params["page"])`, etc.).
+
+---
+
+## 5. Path params: `:name` com `match_path`
+
+Para identidade no **caminho** (ex.: `/users/42`), navegue com o valor no `name` e
+extraia com o `match_path` — o casador de padrões `:name` embutido:
 
 ```python
 from __future__ import annotations
 
 from tempest_core import App, Route, Text, Widget
+from tempestweb.runtime.routing import match_path  # (1)!
 
 
 def open_user(app: App, user_id: int) -> None:
     """Navega para a página de um usuário específico."""
-    app.push(Route(name=f"/users/{user_id}"))  # (1)!
-
-
-def user_screen(route_name: str) -> Widget:
-    """Extrai o id do nome da rota e renderiza."""
-    user_id = route_name.removeprefix("/users/")  # (2)!
-    return Text(content=f"Usuário #{user_id}", key="user")
+    app.push(Route(name=f"/users/{user_id}"))       # /users/42
 
 
 def view(app: App) -> Widget:
-    """Despacha por prefixo de rota."""
-    name = app.nav.top.name
-    if name.startswith("/users/"):
-        return user_screen(name)
+    """Despacha por padrão de rota, extraindo o :id."""
+    params = match_path("/users/:id", app.nav.top.name)  # (2)!
+    if params is not None:
+        return Text(content=f"Usuário #{params['id']}", key="user")
     return Text(content="Início", key="home")
 ```
 
-1.  O id vira parte do caminho — e portanto da URL (`/users/42`) e do deep link.
-2.  Sem placeholder mágico: você fatia a string do nome. Um `startswith`/
-    `removeprefix` cobre o caso comum.
+1.  `match_path` vive em `tempestweb.runtime.routing`.
+2.  `match_path("/users/:id", "/users/42")` → `{"id": "42"}`; um caminho que não
+    casa (contagem de segmentos diferente ou literal diferente) → `None`. A query
+    string, se houver, é **ignorada** aqui — combine com `app.nav.top.params` para
+    lê-la.
 
-!!! warning "`Route.params` NÃO vai para a URL"
-    Você **pode** passar dados na rota via `Route(name="/users", params={"id": 42})`,
-    e ler em `app.nav.top.params["id"]`. Mas esses `params` vivem **só em memória**:
-    o runtime só serializa o **`name`** da rota no histórico do browser (a URL). Ao
-    recarregar a página ou entrar por deep link, `params` volta **vazio**. Por isso,
-    para identidade que precisa sobreviver a um reload, **codifique no `name`** (como
-    acima) — não no `params`.
-
----
-
-## 5. Query params
-
-!!! danger "Gap: query params não chegam ao Python"
-    O tempestweb **não** expõe os query params (`?q=...&page=2`) ao app hoje. A
-    ponte URL→navegação reporta apenas `location.pathname` — a query string
-    (`location.search`) é descartada antes de chegar ao Python. Não há API tipada
-    de query param; **não invente uma**.
-
-O contorno é o mesmo dos path params: se um valor precisa estar na URL e
-sobreviver a um reload, **coloque-o no caminho** (o `name` da rota) e faça o parse
-você mesmo. Para estado que **não** precisa estar na URL (um filtro efêmero, uma
-aba selecionada), guarde no seu `State` normal — não na rota.
-
-```python
-from tempest_core import App, Route
-
-
-def search(app: App, term: str, page: int) -> None:
-    """Coloca a busca no caminho para que ela sobreviva a um reload."""
-    app.push(Route(name=f"/search/{term}/{page}"))
-    # depois, na view: name.removeprefix("/search/").split("/") → [term, page]
-```
+!!! tip "Path params + query params juntos"
+    Os dois se complementam: o `match_path` extrai os segmentos do **caminho**
+    (`:id`), e `app.nav.top.params` traz a **query string**. Ex.: em
+    `/users/42?tab=posts`, `match_path("/users/:id", app.nav.top.name)` dá
+    `{"id": "42"}` e `app.nav.top.params` dá `{"tab": "posts"}`.
 
 ---
 
@@ -332,11 +345,13 @@ def view(app: App[GateState]) -> Widget:
 - Navegue com `app.push` / `app.pop` / `app.replace` / `app.reset`; leia
   `app.nav.top`, `app.nav.stack` e `app.nav.can_pop`.
 - A **URL fica em sincronia** com a pilha nos três modos: deep link e voltar/avançar
-  resolvem via `routes_from_path`; navegação imperativa faz `pushState`.
-- **Path params** vão no `name` da rota (você faz o parse). `Route.params` é só em
-  memória — **não** sobrevive a reload/URL.
-- **Query params não são expostos** hoje (gap conhecido); codifique no caminho ou
-  guarde no `State`.
+  resolvem via `path_to_routes`; navegação imperativa serializa com `route_to_path`
+  e faz `pushState`.
+- **Query params fazem round-trip:** `Route.params` vira query string na URL e
+  **sobrevive** a reload/deep-link; leia em `app.nav.top.params`.
+- **Path params** saem do padrão `:name` com
+  `match_path("/users/:id", app.nav.top.name)` → `{"id": "42"}` (ou `None`).
+- **Valores de query/path são sempre `str`** — tipagem rica é trabalho do app.
 - **Guardas/redirect** vêm do `route_guard` (`tempestweb.observability`): uma
   função pura `rota_pedida -> rota_efetiva` que você aplica na `view`.
 

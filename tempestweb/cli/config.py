@@ -10,8 +10,9 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
+from tempestweb.cli.quality import DEFAULT_STRICTNESS, VALID_STRICTNESS, Strictness
 from tempestweb.core.constants import VALID_MODES
 
 __all__ = [
@@ -106,6 +107,9 @@ class ProjectConfig:
         wasm: Mode A build extras (extra packages, bundled modules, static
             assets, injected scripts). Empty by default.
         pwa: Web-App-Manifest overrides. Installable-shaped defaults otherwise.
+        typing_strictness: How strictly the quality commands (``lint``/``type``/
+            ``check``) enforce typing — ``"lenient"`` | ``"standard"`` |
+            ``"strict"``. Read from ``[quality] typing_strictness``.
     """
 
     root: Path
@@ -116,6 +120,7 @@ class ProjectConfig:
     port: int = 8000
     wasm: WasmConfig = field(default_factory=WasmConfig)
     pwa: PwaConfig = field(default_factory=PwaConfig)
+    typing_strictness: Strictness = DEFAULT_STRICTNESS
 
     @property
     def entrypoint_path(self) -> Path:
@@ -161,6 +166,14 @@ def load_config(root: str | Path) -> ProjectConfig:
             f"invalid mode {mode!r} in {config_path}; expected one of {VALID_MODES}"
         )
 
+    quality = raw.get("quality", {})
+    strictness = str(quality.get("typing_strictness", DEFAULT_STRICTNESS))
+    if strictness not in VALID_STRICTNESS:
+        raise ConfigError(
+            f"invalid typing_strictness {strictness!r} in {config_path}; "
+            f"expected one of {sorted(VALID_STRICTNESS)}"
+        )
+
     return ProjectConfig(
         root=root_path,
         name=str(project.get("name", name)),
@@ -170,6 +183,7 @@ def load_config(root: str | Path) -> ProjectConfig:
         port=int(dev.get("port", 8000)),
         wasm=_parse_wasm(raw.get("wasm", {}), config_path),
         pwa=_parse_pwa(raw.get("pwa", {}), config_path),
+        typing_strictness=cast("Strictness", strictness),
     )
 
 

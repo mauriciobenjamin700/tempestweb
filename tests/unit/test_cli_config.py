@@ -17,6 +17,24 @@ def test_load_config_defaults_when_missing(tmp_path: Path) -> None:
     assert cfg.mode == "wasm"
     assert cfg.host == "127.0.0.1"
     assert cfg.port == 8000
+    assert cfg.typing_strictness == "standard"
+
+
+def test_load_config_reads_quality_strictness(tmp_path: Path) -> None:
+    (tmp_path / "tempestweb.toml").write_text(
+        '[project]\nname = "x"\n\n[quality]\ntyping_strictness = "strict"\n',
+        encoding="utf-8",
+    )
+    assert load_config(tmp_path).typing_strictness == "strict"
+
+
+def test_invalid_typing_strictness_raises(tmp_path: Path) -> None:
+    (tmp_path / "tempestweb.toml").write_text(
+        '[project]\nname = "x"\n\n[quality]\ntyping_strictness = "pedantic"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="invalid typing_strictness"):
+        load_config(tmp_path)
 
 
 def test_load_config_reads_fields(tmp_path: Path) -> None:

@@ -229,6 +229,11 @@ entrypoint = "app.py"
 mode = "{DEFAULT_MODE}"
 host = "127.0.0.1"
 port = 8000
+
+[quality]
+# How strictly `tempestweb lint` / `type` / `check` enforce typing:
+# lenient | standard | strict. Layered on top of your own ruff/mypy config.
+typing_strictness = "standard"
 """
 
 
@@ -252,6 +257,11 @@ entrypoint = "app.py"
 mode = "transpile"
 host = "127.0.0.1"
 port = 8000
+
+[quality]
+# How strictly `tempestweb lint` / `type` / `check` enforce typing:
+# lenient | standard | strict. Layered on top of your own ruff/mypy config.
+typing_strictness = "standard"
 
 # Web App Manifest — customize freely (all fields optional).
 [pwa]

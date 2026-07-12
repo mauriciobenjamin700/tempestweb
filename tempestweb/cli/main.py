@@ -13,7 +13,10 @@ import argparse
 import asyncio
 import sys
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
+from typing import cast
 
+from tempestweb.cli import quality
 from tempestweb.cli.commands import (
     BuildError,
     DeployError,
@@ -29,6 +32,8 @@ from tempestweb.cli.commands import (
     serve_run,
     sync_modules,
 )
+from tempestweb.cli.config import ConfigError, load_config
+from tempestweb.cli.quality import DEFAULT_STRICTNESS, Strictness
 
 __all__ = ["main", "build_parser"]
 
@@ -244,7 +249,82 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print as VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env lines.",
     )
 
+    _add_quality_parsers(sub)
+
     return parser
+
+
+def _add_quality_parsers(
+    sub: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    """Register the quality-gate subcommands (lint/fix/format/type/test/check).
+
+    Each runs a tool (ruff/mypy/pytest) against the project, layering
+    tempestweb's typing conventions per the project's ``[quality]`` level. The
+    ``--path`` default (cwd) is the target inspected; ``--strictness`` overrides
+    the configured level for a single invocation.
+
+    Args:
+        sub: The subparsers action to register the commands on.
+    """
+
+    def _target(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--path",
+            default=".",
+            help="File or directory to inspect (default: cwd).",
+        )
+
+    def _strictness(parser: argparse.ArgumentParser) -> None:
+        parser.add_argument(
+            "--strictness",
+            choices=["lenient", "standard", "strict"],
+            default=None,
+            help="Override the [quality] typing_strictness level for this run.",
+        )
+
+    lint = sub.add_parser("lint", help="Run `ruff check` on the project.")
+    _target(lint)
+    _strictness(lint)
+
+    fix = sub.add_parser(
+        "fix",
+        help="Apply every ruff autofix, then format (`ruff check --fix` + format).",
+    )
+    _target(fix)
+    _strictness(fix)
+    fix.add_argument(
+        "--unsafe",
+        action="store_true",
+        help="Also apply ruff's unsafe autofixes (review the diff afterwards).",
+    )
+
+    fmt = sub.add_parser(
+        "format", help="Run `ruff format` on the project (writes files)."
+    )
+    _target(fmt)
+
+    fmt_check = sub.add_parser(
+        "fmt-check", help="Run `ruff format --check` on the project (read-only)."
+    )
+    _target(fmt_check)
+
+    type_ = sub.add_parser("type", help="Run `mypy` against the project.")
+    _target(type_)
+    _strictness(type_)
+
+    test = sub.add_parser("test", help="Run `pytest` (optionally filtered by --path).")
+    test.add_argument(
+        "--path",
+        default=None,
+        help="Optional pytest path filter (default: the project's testpaths).",
+    )
+
+    check = sub.add_parser(
+        "check", help="Run the full gate: ruff check + format --check + mypy + pytest."
+    )
+    _target(check)
+    _strictness(check)
 
 
 def _cmd_new(args: argparse.Namespace) -> int:
@@ -457,6 +537,67 @@ def _cmd_vapid(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_level(args: argparse.Namespace) -> Strictness:
+    """Resolve the strictness level for a quality command.
+
+    A ``--strictness`` flag wins; otherwise the level is read from the project's
+    ``[quality] typing_strictness`` (resolved from the target directory, or the
+    cwd when the target is a file), falling back to the default.
+
+    Args:
+        args: The parsed arguments (may carry ``strictness`` and ``path``).
+
+    Returns:
+        The resolved strictness level.
+    """
+    override = getattr(args, "strictness", None)
+    if override is not None:
+        return cast("Strictness", override)
+    target = Path(getattr(args, "path", None) or ".")
+    root = target if target.is_dir() else Path.cwd()
+    try:
+        return load_config(root).typing_strictness
+    except ConfigError:
+        return DEFAULT_STRICTNESS
+
+
+def _cmd_lint(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb lint`` — ``ruff check`` on the target."""
+    return quality.run_ruff_check(args.path, level=_resolve_level(args))
+
+
+def _cmd_fix(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb fix`` — ruff autofix + format on the target."""
+    return quality.run_ruff_fix(
+        args.path, unsafe=args.unsafe, level=_resolve_level(args)
+    )
+
+
+def _cmd_format(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb format`` — ``ruff format`` (writes files)."""
+    return quality.run_ruff_format(args.path, check=False)
+
+
+def _cmd_fmt_check(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb fmt-check`` — ``ruff format --check`` (read-only)."""
+    return quality.run_ruff_format(args.path, check=True)
+
+
+def _cmd_type(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb type`` — ``mypy`` on the target."""
+    return quality.run_mypy(args.path, level=_resolve_level(args))
+
+
+def _cmd_test(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb test`` — ``pytest`` with an optional path filter."""
+    return quality.run_pytest(args.path)
+
+
+def _cmd_check(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb check`` — the full quality gate."""
+    return quality.run_full_check(args.path, level=_resolve_level(args))
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entrypoint for the ``tempestweb`` console script.
 
@@ -481,6 +622,13 @@ def main(argv: list[str] | None = None) -> int:
         "sync": _cmd_sync,
         "deploy": _cmd_deploy,
         "vapid": _cmd_vapid,
+        "lint": _cmd_lint,
+        "fix": _cmd_fix,
+        "format": _cmd_format,
+        "fmt-check": _cmd_fmt_check,
+        "type": _cmd_type,
+        "test": _cmd_test,
+        "check": _cmd_check,
     }
     handler = handlers[args.command]
     return handler(args)

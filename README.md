@@ -80,6 +80,25 @@ Full walkthrough: the [Using the CLI](https://mauriciobenjamin700.github.io/temp
 [Installation](https://mauriciobenjamin700.github.io/tempestweb/en/installation/)
 and [Tutorial](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/) guides.
 
+## Code quality
+
+You write typed Python, so the CLI polices that Python too. `tempestweb check` is
+the one-command gate — it runs `ruff check` → `ruff format --check` → `mypy` →
+`pytest` against your project and stops at the first error:
+
+```bash
+tempestweb check                       # the full gate
+tempestweb lint / fix / format / fmt-check / type / test   # individual steps
+```
+
+The gate layers opinion on top of your own ruff/mypy config via a strictness
+level — `[quality] typing_strictness` in `tempestweb.toml` (`lenient` |
+`standard` | `strict`, default `standard`, `tempestweb new` scaffolds it). It only
+**adds** rules, never loosens yours, and `ANN401` is never enabled — `Any` is a
+valid annotation. `--strictness` overrides per invocation. Full details in the
+[Code quality](https://mauriciobenjamin700.github.io/tempestweb/en/cli/#code-quality)
+guide.
+
 ## How it works
 
 ```text

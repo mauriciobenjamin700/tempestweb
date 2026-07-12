@@ -17,7 +17,7 @@ Confirm the install:
 
 ```bash
 tempestweb --version
-# tempestweb 0.52.0
+# tempestweb 0.53.0
 ```
 
 !!! tip "`-V` is short for `--version`"
@@ -228,6 +228,164 @@ tempestweb sync --dry-run  # just shows what would be added
 
 ---
 
+## 6. Code quality
+
+You write **typed Python** — so the CLI takes care of that Python's quality too.
+Seven commands run `ruff`, `mypy`, and `pytest` **against your project**, with a
+layer of opinion on top that you can loosen or tighten. 🚀
+
+!!! warning "Run from the project directory"
+    Like everything on the CLI, these commands take the project **directory** via
+    `--path` (default: the current directory). Run them from your app's root —
+    they scope ruff/mypy/pytest to that path.
+
+!!! info "Needs ruff, mypy, and pytest installed"
+    The commands **shell out** to those tools — they don't bundle a copy. The CLI
+    prefers the binary on your `PATH`; if it can't find it, it falls back to
+    `uv run <tool>`. Install them in your environment (`pip install ruff mypy
+    pytest`) or have [uv](https://docs.astral.sh/uv/) on your `PATH`.
+
+### Start with the gate — `check`
+
+`check` is the **full gate**: it runs the four steps in sequence and **stops at
+the first error**, all scoped to the project's `--path`.
+
+```bash
+tempestweb check
+```
+
+The order is always the same:
+
+```text
+1. ruff check           # lint
+2. ruff format --check  # formatting (read-only)
+3. mypy                 # typing
+4. pytest               # tests
+```
+
+Before each step `check` echoes the command (to stderr) and shows the tool's own
+output. On a clean project:
+
+```text
+$ ruff check .
+All checks passed!
+$ ruff format --check .
+1 file already formatted
+$ mypy .
+Success: no issues found in 1 source file
+$ pytest .
+no tests ran in 0.01s
+```
+
+When a step fails, `check` **stops right there** (returning that step's exit
+code) — the later steps do not run:
+
+```text
+$ ruff check .
+All checks passed!
+$ ruff format --check .
+Would reformat: app.py
+1 file would be reformatted
+```
+
+!!! note "No tests yet? That's fine"
+    `pytest` reports "no tests collected" (exit 5) on a brand-new project; `check`
+    treats that as **success**, so the gate passes before you write your first
+    test.
+
+!!! tip "It's the same gate as CI"
+    Run `tempestweb check` before every commit. It's the one-command version of
+    what the CI pipeline does — if it passes locally, it passes there.
+
+### The individual commands
+
+When you want just one step (or want to **fix**, not only report), use the
+individual commands:
+
+| Command | Runs | Writes files? |
+|---|---|---|
+| `tempestweb lint` | `ruff check` | No (report only) |
+| `tempestweb fix` | `ruff check --fix` + `ruff format` | **Yes** |
+| `tempestweb format` | `ruff format` | **Yes** |
+| `tempestweb fmt-check` | `ruff format --check` | No (read-only) |
+| `tempestweb type` | `mypy` | No |
+| `tempestweb test` | `pytest` | No |
+
+The most common flow: report with `lint`, fix with `fix`.
+
+```bash
+tempestweb lint            # what's wrong?
+tempestweb fix             # fix what can be fixed automatically
+```
+
+`fix` applies ruff's **safe** autofixes and reformats. To also apply the fixes
+ruff marks as *unsafe*, pass `--unsafe`:
+
+```bash
+tempestweb fix --unsafe    # includes ruff's unsafe autofixes
+```
+
+`test` filters tests by `--path`, and treats pytest's **exit code 5** ("no tests
+collected") as **success** — a project with no tests yet isn't a broken project:
+
+```bash
+tempestweb test                    # run the project's suite
+tempestweb test --path ./myapp     # scoped to a subdirectory
+```
+
+!!! note "pytest exit 5 = success"
+    If pytest finds no tests (exit 5), `tempestweb test` (and `tempestweb check`)
+    treat it as ✅. That keeps the gate from breaking on an app that hasn't written
+    tests yet.
+
+### The three strictness levels
+
+`lint`, `fix`, `type`, and `check` honor a **strictness** model — a layer of
+opinion **on top of** your own ruff/mypy config. It only **adds** rules; it
+**never loosens** what you already configured.
+
+| Level | ruff adds (`--extend-select`) | mypy adds |
+|---|---|---|
+| `lenient` | no extra ANN rules | no extra flag |
+| `standard` *(default)* | `ANN001`, `ANN201`, `ANN202`, `ANN205`, `ANN206` | `--ignore-missing-imports` |
+| `strict` | `ANN001`, `ANN002`, `ANN003`, `ANN201`, `ANN202`, `ANN204`, `ANN205`, `ANN206` | `--strict` |
+
+In plain terms: `standard` requires types on parameters and on public function
+returns; `strict` also demands `*args`/`**kwargs` and dunder methods, and turns on
+`mypy --strict`; `lenient` adds nothing — it stays with your own config.
+
+!!! danger "`Any` is always valid — `ANN401` is never enabled"
+    No level enables the **`ANN401`** rule (ban `typing.Any`). `Any` is a
+    **legitimate** annotation — using it on purpose *is* typing, not skipping it.
+    You choose `Any` when you need it; the CLI will never punish you for it.
+
+### Configure the level — `tempestweb.toml [quality]`
+
+The default is `standard`. To change the level for the whole project, write it in
+`tempestweb.toml`:
+
+```toml
+[quality]
+typing_strictness = "standard"   # "lenient" | "standard" | "strict"
+```
+
+`tempestweb new` already writes this block in the scaffolded `tempestweb.toml`,
+with `"standard"`.
+
+For **a single invocation**, override with `--strictness` without touching the
+file:
+
+```bash
+tempestweb check --strictness strict     # tighten just this run
+tempestweb lint  --strictness lenient    # loosen just this run
+```
+
+!!! check "Done when"
+    `tempestweb check` exits `0` with every step reporting clean. That's the same
+    green CI expects — commit with confidence.
+
+---
+
 ## Subcommand reference
 
 Every command that builds/serves takes the project **directory** via `--path`
@@ -242,6 +400,13 @@ Every command that builds/serves takes the project **directory** via `--path`
 | `tempestweb deploy` | Write the deploy files (nginx + Docker + guide). | `--out`, `--server-name`, `--tls`, `--replicas`, `--no-sticky`, `--force` |
 | `tempestweb vapid` | Generate a VAPID keypair for WebPush. | `--env` |
 | `tempestweb sync` | Fill `[wasm].modules` with pure-Python deps. | `--path`, `--dry-run` |
+| `tempestweb lint` | `ruff check` on the project. | `--path`, `--strictness <lenient\|standard\|strict>` |
+| `tempestweb fix` | `ruff check --fix` + `ruff format` (writes). | `--path`, `--strictness`, `--unsafe` |
+| `tempestweb format` | `ruff format` (writes). | `--path` |
+| `tempestweb fmt-check` | `ruff format --check` (read-only). | `--path` |
+| `tempestweb type` | `mypy` on the project. | `--path`, `--strictness` |
+| `tempestweb test` | `pytest` (exit 5 = success). | `--path` |
+| `tempestweb check` | Gate: `ruff check` → `ruff format --check` → `mypy` → `pytest`. | `--path`, `--strictness` |
 | `tempestweb --version` / `-V` | Print the installed version. | — |
 
 ## Recap
@@ -252,5 +417,10 @@ Every command that builds/serves takes the project **directory** via `--path`
 - The mode is chosen on the CLI (`--mode`), never in `app.py`.
 - `--path` takes the **directory**; the default entrypoint is `app.py`
   (configurable), and must expose `make_state()` + `view(app)`.
+- **`check`** is the quality gate (`ruff check` → `ruff format --check` → `mypy` →
+  `pytest`, stopping at the first error); `lint`/`fix`/`format`/`fmt-check`/`type`/
+  `test` are the individual steps. The `[quality] typing_strictness` level
+  (lenient/standard/strict, default `standard`) adds rules on top of your config,
+  never loosens it — and **`ANN401` is never enabled** (`Any` is valid).
 
 Ready? Head to the [Tutorial](tutorial/index.md) and build the counter. 🚀

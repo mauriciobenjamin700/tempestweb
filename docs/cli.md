@@ -16,7 +16,7 @@ Confirme que instalou:
 
 ```bash
 tempestweb --version
-# tempestweb 0.52.0
+# tempestweb 0.53.0
 ```
 
 !!! tip "`-V` é atalho de `--version`"
@@ -226,6 +226,164 @@ tempestweb sync --dry-run  # só mostra o que seria adicionado
 
 ---
 
+## 6. Qualidade de código
+
+Você escreve **Python tipado** — então a CLI também cuida da qualidade desse
+Python. Sete comandos rodam o `ruff`, o `mypy` e o `pytest` **no seu projeto**,
+com uma camada de opinião por cima que você pode afrouxar ou apertar. 🚀
+
+!!! warning "Rode do diretório do projeto"
+    Como tudo na CLI, esses comandos recebem o **diretório** do projeto via
+    `--path` (default: o diretório atual). Rode-os da raiz do seu app — eles
+    escopam o ruff/mypy/pytest a esse caminho.
+
+!!! info "Precisa do ruff, mypy e pytest instalados"
+    Os comandos **fazem shell-out** para essas ferramentas — não trazem uma cópia
+    própria. A CLI prefere o binário no seu `PATH`; se não achar, tenta
+    `uv run <tool>`. Instale-os no seu ambiente (`pip install ruff mypy pytest`)
+    ou tenha o [uv](https://docs.astral.sh/uv/) no `PATH`.
+
+### Comece pelo gate — `check`
+
+O `check` é o **gate completo**: roda as quatro etapas em sequência e **para no
+primeiro erro**, tudo escopado ao `--path` do projeto.
+
+```bash
+tempestweb check
+```
+
+A ordem é sempre a mesma:
+
+```text
+1. ruff check           # lint
+2. ruff format --check  # formatação (read-only)
+3. mypy                 # tipagem
+4. pytest               # testes
+```
+
+Antes de cada etapa o `check` ecoa o comando (em stderr) e mostra a saída da
+própria ferramenta. Num projeto limpo:
+
+```text
+$ ruff check .
+All checks passed!
+$ ruff format --check .
+1 file already formatted
+$ mypy .
+Success: no issues found in 1 source file
+$ pytest .
+no tests ran in 0.01s
+```
+
+Quando uma etapa falha, o `check` **para ali** (retorna o código de saída dela) —
+as seguintes não rodam:
+
+```text
+$ ruff check .
+All checks passed!
+$ ruff format --check .
+Would reformat: app.py
+1 file would be reformatted
+```
+
+!!! note "Sem testes ainda? Tudo bem"
+    O `pytest` retorna "nenhum teste coletado" (exit 5) num projeto recém-criado;
+    o `check` trata isso como **sucesso**, então o gate passa antes de você
+    escrever o primeiro teste.
+
+!!! tip "É o mesmo gate do CI"
+    Rode `tempestweb check` antes de cada commit. É a versão de um comando do que a
+    esteira de CI faz — se passa localmente, passa lá.
+
+### Os comandos individuais
+
+Quando você quer só uma etapa (ou quer **corrigir**, não só apontar), use os
+comandos individuais:
+
+| Comando | Roda | Escreve arquivos? |
+|---|---|---|
+| `tempestweb lint` | `ruff check` | Não (só reporta) |
+| `tempestweb fix` | `ruff check --fix` + `ruff format` | **Sim** |
+| `tempestweb format` | `ruff format` | **Sim** |
+| `tempestweb fmt-check` | `ruff format --check` | Não (read-only) |
+| `tempestweb type` | `mypy` | Não |
+| `tempestweb test` | `pytest` | Não |
+
+O fluxo mais comum: aponte com `lint`, corrija com `fix`.
+
+```bash
+tempestweb lint            # o que está errado?
+tempestweb fix             # conserta o que dá pra consertar automaticamente
+```
+
+O `fix` aplica os autofixes **seguros** do ruff e reformata. Para também aplicar
+os autofixes marcados como *unsafe* pelo ruff, passe `--unsafe`:
+
+```bash
+tempestweb fix --unsafe    # inclui os autofixes unsafe do ruff
+```
+
+O `test` filtra os testes pelo `--path`, e trata o **exit code 5** do pytest
+("nenhum teste coletado") como **sucesso** — um projeto sem testes ainda não é
+um projeto quebrado:
+
+```bash
+tempestweb test                    # roda a suíte do projeto
+tempestweb test --path ./meuapp    # escopado a um subdiretório
+```
+
+!!! note "Exit 5 do pytest = sucesso"
+    Se o pytest não encontra nenhum teste (exit 5), o `tempestweb test` (e o
+    `tempestweb check`) tratam isso como ✅. Assim o gate não quebra num app que
+    ainda não escreveu testes.
+
+### Os três níveis de strictness
+
+`lint`, `fix`, `type` e `check` respeitam um modelo de **strictness** — uma camada
+de opinião **por cima** da sua config de ruff/mypy. Ela só **adiciona** regras;
+**nunca afrouxa** o que você já configurou.
+
+| Nível | ruff adiciona (`--extend-select`) | mypy adiciona |
+|---|---|---|
+| `lenient` | nenhuma regra ANN extra | nenhum flag extra |
+| `standard` *(default)* | `ANN001`, `ANN201`, `ANN202`, `ANN205`, `ANN206` | `--ignore-missing-imports` |
+| `strict` | `ANN001`, `ANN002`, `ANN003`, `ANN201`, `ANN202`, `ANN204`, `ANN205`, `ANN206` | `--strict` |
+
+Em português: o `standard` exige tipos nos parâmetros e nos retornos das funções
+públicas; o `strict` cobra também `*args`/`**kwargs` e métodos dunder, e liga o
+`mypy --strict`; o `lenient` não adiciona nada — fica só com a sua config.
+
+!!! danger "`Any` é sempre válido — `ANN401` nunca é ligado"
+    Nenhum nível liga a regra **`ANN401`** (proibir `typing.Any`). `Any` é uma
+    anotação **legítima** — usá-la de propósito é tipar, não deixar de tipar. Você
+    escolhe `Any` quando precisa; a CLI nunca vai te punir por isso.
+
+### Configurar o nível — `tempestweb.toml [quality]`
+
+O default é `standard`. Para mudar o nível do projeto inteiro, escreva no
+`tempestweb.toml`:
+
+```toml
+[quality]
+typing_strictness = "standard"   # "lenient" | "standard" | "strict"
+```
+
+O `tempestweb new` já escreve esse bloco no `tempestweb.toml` scaffoldado, com
+`"standard"`.
+
+Para **uma invocação**, sobrescreva com `--strictness` sem tocar no arquivo:
+
+```bash
+tempestweb check --strictness strict     # aperta só nessa rodada
+tempestweb lint  --strictness lenient    # afrouxa só nessa rodada
+```
+
+!!! check "Feito quando"
+    `tempestweb check` sai com código `0` e cada etapa reporta limpo. Esse é o
+    mesmo verde que o CI espera — commite com confiança.
+
+---
+
 ## Referência de subcomandos
 
 Todos os comandos que buldam/servem recebem o **diretório** do projeto via
@@ -240,6 +398,13 @@ Todos os comandos que buldam/servem recebem o **diretório** do projeto via
 | `tempestweb deploy` | Escreve os arquivos de deploy (nginx + Docker + guia). | `--out`, `--server-name`, `--tls`, `--replicas`, `--no-sticky`, `--force` |
 | `tempestweb vapid` | Gera um par de chaves VAPID para WebPush. | `--env` |
 | `tempestweb sync` | Preenche `[wasm].modules` com as deps puro-Python. | `--path`, `--dry-run` |
+| `tempestweb lint` | `ruff check` no projeto. | `--path`, `--strictness <lenient\|standard\|strict>` |
+| `tempestweb fix` | `ruff check --fix` + `ruff format` (escreve). | `--path`, `--strictness`, `--unsafe` |
+| `tempestweb format` | `ruff format` (escreve). | `--path` |
+| `tempestweb fmt-check` | `ruff format --check` (read-only). | `--path` |
+| `tempestweb type` | `mypy` no projeto. | `--path`, `--strictness` |
+| `tempestweb test` | `pytest` (exit 5 = sucesso). | `--path` |
+| `tempestweb check` | Gate: `ruff check` → `ruff format --check` → `mypy` → `pytest`. | `--path`, `--strictness` |
 | `tempestweb --version` / `-V` | Imprime a versão instalada. | — |
 
 ## Recap
@@ -250,5 +415,10 @@ Todos os comandos que buldam/servem recebem o **diretório** do projeto via
 - O modo é escolhido na CLI (`--mode`), nunca no `app.py`.
 - `--path` recebe o **diretório**; o entrypoint default é `app.py` (configurável),
   e precisa expor `make_state()` + `view(app)`.
+- **`check`** é o gate de qualidade (`ruff check` → `ruff format --check` →
+  `mypy` → `pytest`, para no primeiro erro); `lint`/`fix`/`format`/`fmt-check`/
+  `type`/`test` são as etapas individuais. O nível `[quality] typing_strictness`
+  (lenient/standard/strict, default `standard`) adiciona regras por cima da sua
+  config, nunca afrouxa — e **`ANN401` nunca é ligado** (`Any` é válido).
 
 Pronto? Vá para o [Tutorial](tutorial/index.md) e construa o counter. 🚀

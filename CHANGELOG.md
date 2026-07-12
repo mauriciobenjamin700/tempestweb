@@ -4,6 +4,41 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.53.0] — 2026-07-11
+
+### Added
+
+- **Seven code-quality CLI commands**, each shelling out to the project's own
+  `ruff`/`mypy`/`pytest` (preferring the binary on `PATH`, falling back to
+  `uv run <tool>`), scoped to the project via `--path`:
+  - `tempestweb lint` — `ruff check` (report only).
+  - `tempestweb fix` — `ruff check --fix` + `ruff format` (writes); `--unsafe`
+    also applies ruff's unsafe autofixes.
+  - `tempestweb format` — `ruff format` (writes).
+  - `tempestweb fmt-check` — `ruff format --check` (read-only).
+  - `tempestweb type` — `mypy`.
+  - `tempestweb test` — `pytest`, filtered by `--path`.
+  - `tempestweb check` — the full gate: `ruff check` → `ruff format --check` →
+    `mypy` → `pytest`, stopping at the first error.
+- **Configurable `[quality] typing_strictness`** in `tempestweb.toml`
+  (`lenient` | `standard` | `strict`, default `standard`), overridable per
+  invocation with `--strictness`. It is a layer of opinion **on top of** the
+  user's own ruff/mypy config — it only adds rules, never loosens them:
+  - `lenient` — no extra ANN rules, no extra mypy flag.
+  - `standard` — ruff `--extend-select ANN001,ANN201,ANN202,ANN205,ANN206`; mypy
+    `--ignore-missing-imports`.
+  - `strict` — ruff `ANN001,ANN002,ANN003,ANN201,ANN202,ANN204,ANN205,ANN206`;
+    mypy `--strict`.
+  - **`ANN401` (ban `Any`) is never enabled** — `Any` is a valid annotation.
+- **`tempestweb test` treats pytest exit code 5 ("no tests collected") as
+  success**, so the gate does not break on a project without tests yet.
+- **`tempestweb new` now scaffolds the `[quality] typing_strictness = "standard"`
+  block** in the generated `tempestweb.toml`.
+- **Code-quality documentation** — new "Code quality" section in the "Using the
+  CLI" page (`docs/cli.md` + `docs/cli.en.md`) covering the seven commands, the
+  three strictness levels, and the `tempestweb.toml [quality]` block; new rows in
+  the installation CLI table; a README "Code quality" block.
+
 ## [0.52.0] — 2026-07-11
 
 ### Changed

@@ -106,6 +106,13 @@ nunca um arquivo `.py` posicional.
 | `tempestweb sync` | Sincroniza os assets do cliente para dentro do projeto. |
 | `tempestweb deploy` | Empacota o artefato para publicação. |
 | `tempestweb vapid` | Gera as chaves VAPID para Web Push. |
+| `tempestweb lint` | Roda o `ruff check` no seu projeto (só reporta). |
+| `tempestweb fix` | Aplica os autofixes do `ruff` e reformata (escreve). |
+| `tempestweb format` | Formata o código com `ruff format` (escreve). |
+| `tempestweb fmt-check` | Confere a formatação com `ruff format --check` (read-only). |
+| `tempestweb type` | Roda a checagem de tipos com `mypy`. |
+| `tempestweb test` | Roda a suíte com `pytest` (sem testes = sucesso). |
+| `tempestweb check` | Gate de qualidade: ruff → format → mypy → pytest, para no 1º erro. |
 
 !!! tip "`dev` para desenvolver, `run` para servir"
     O `tempestweb dev` roda qualquer modo localmente com watch + reload — incluindo

@@ -16,7 +16,7 @@ Confirme que instalou:
 
 ```bash
 tempestweb --version
-# tempestweb 0.53.0
+# tempestweb 0.53.2
 ```
 
 !!! tip "`-V` é atalho de `--version`"
@@ -150,7 +150,8 @@ tempestweb dev --mode server --host 0.0.0.0 --port 9000 --path ./meuapp
     rápido no segundo load.
 
 !!! check "Feito quando"
-    O terminal mostra `Serving at http://127.0.0.1:8000`, você abre no browser e vê
+    O terminal mostra `tempestweb dev: serving <app> at http://127.0.0.1:8000
+    (mode=wasm); edit a file to reload. Ctrl-C to stop.`, você abre no browser e vê
     o counter. Editar `app.py` recarrega a página (A/C) ou reinicia o servidor (B).
 
 ---

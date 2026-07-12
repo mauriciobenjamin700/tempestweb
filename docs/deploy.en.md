@@ -44,7 +44,7 @@ Writes to `deploy/`: **`nginx.conf`** (parameterized from the `tempestweb.toml`
 port, with WS upgrade, `X-Forwarded-*`, streaming timeouts, `ip_hash`, and — with
 `--tls` — a 443 block + HTTP→HTTPS redirect), **`Dockerfile`** (+ `HEALTHCHECK`),
 **`docker-compose.yml`** and **`DEPLOY.md`** (guide). Flags: `--out`,
-`--server-name`, `--tls`, `--replicas`, `--force`.
+`--server-name`, `--tls`, `--replicas`, `--no-sticky`, `--force`.
 
 ```bash
 cd deploy && docker compose up --build

@@ -93,6 +93,13 @@ Depois da primeira carga, o app abre e roda **sem rede**.
     Como o Modo C é um bundle estático sem Python, nada depende do servidor depois
     do primeiro fetch.
 
+!!! warning "Teste offline com `build`/`run`, não com `dev`"
+    O `tempestweb dev` **não registra o service worker** de propósito (ele injeta um
+    *kill-switch* para você nunca ver bundle cacheado velho — veja
+    [Usando a CLI](cli.md)). Ou seja, o comportamento offline só existe no artefato
+    de produção: teste-o com `tempestweb build --mode transpile` (e sirva o `dist/`)
+    ou com `tempestweb run --mode transpile`.
+
 !!! tip "Prompt de atualização (automático)"
     Quando você publica uma versão nova, o service worker antigo continua no ar
     até a aba fechar. O shell detecta o worker em espera e mostra um banner

@@ -17,7 +17,7 @@ Confirm the install:
 
 ```bash
 tempestweb --version
-# tempestweb 0.53.0
+# tempestweb 0.53.2
 ```
 
 !!! tip "`-V` is short for `--version`"
@@ -151,7 +151,8 @@ tempestweb dev --mode server --host 0.0.0.0 --port 9000 --path ./myapp
     makes repeat loads fast.
 
 !!! check "Done when"
-    The terminal shows `Serving at http://127.0.0.1:8000`, you open the browser and
+    The terminal shows `tempestweb dev: serving <app> at http://127.0.0.1:8000
+    (mode=wasm); edit a file to reload. Ctrl-C to stop.`, you open the browser and
     see the counter. Editing `app.py` reloads the page (A/C) or restarts the server
     (B).
 

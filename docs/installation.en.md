@@ -103,8 +103,8 @@ never a positional `.py` file.
 | `tempestweb dev --mode <wasm\|server\|transpile>` | Develop locally with watch + reload — **serves every mode**, including **Mode B (server)**. |
 | `tempestweb build --mode <wasm\|server\|transpile>` | Emit the artifact to `dist/<mode>/`. |
 | `tempestweb run --mode <wasm\|server\|transpile>` | Serve the app **as built, no watcher** (production-like). |
-| `tempestweb sync` | Sync the client assets into the project. |
-| `tempestweb deploy` | Package the artifact for publishing. |
+| `tempestweb sync` | Fill `[wasm].modules` from the installed pure-Python dependencies. |
+| `tempestweb deploy` | Write the Mode B deploy files (nginx + Docker + guide). |
 | `tempestweb vapid` | Generate VAPID keys for Web Push. |
 | `tempestweb lint` | Run `ruff check` on your project (report only). |
 | `tempestweb fix` | Apply `ruff` autofixes and reformat (writes). |

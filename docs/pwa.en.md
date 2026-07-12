@@ -92,6 +92,13 @@ After the first load, the app opens and runs **without a network**.
     Mode C is a static, Python-free bundle, nothing depends on the server after the
     first fetch.
 
+!!! warning "Test offline with `build`/`run`, not `dev`"
+    `tempestweb dev` **does not register the service worker** on purpose (it injects
+    a *kill-switch* so you never see a stale cached bundle — see
+    [Using the CLI](cli.md)). So the offline behavior only exists in the production
+    artifact: test it with `tempestweb build --mode transpile` (and serve the
+    `dist/`) or with `tempestweb run --mode transpile`.
+
 !!! tip "Update prompt (automatic)"
     When you ship a new version, the old service worker stays live until the tab
     closes. The shell detects the waiting worker and shows a discreet banner

@@ -58,6 +58,17 @@ def test_build_dispatch_writes_artifact(tmp_path: Path) -> None:
     assert (project / "dist" / "wasm" / "index.html").is_file()
 
 
+def test_build_without_mode_honors_config_mode(tmp_path: Path) -> None:
+    """`build` with no --mode uses [dev].mode from tempestweb.toml, not always wasm."""
+    assert main(["new", "p", "--into", str(tmp_path), "--template", "pwa"]) == 0
+    project = tmp_path / "p"  # pwa template -> mode = "transpile"
+    rc = main(["build", "--path", str(project)])
+    assert rc == 0
+    # Honors config: builds transpile, not a silent wrong wasm artifact.
+    assert (project / "dist" / "transpile" / "index.html").is_file()
+    assert not (project / "dist" / "wasm").exists()
+
+
 def test_build_dispatch_custom_out(tmp_path: Path) -> None:
     assert main(["new", "b2", "--into", str(tmp_path)]) == 0
     project = tmp_path / "b2"

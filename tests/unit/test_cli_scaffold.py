@@ -73,9 +73,53 @@ def test_scaffold_into_empty_existing_dir_is_allowed(tmp_path: Path) -> None:
     assert (result.root / "app.py").is_file()
 
 
+def test_scaffold_in_place_uses_dir_basename_as_name(tmp_path: Path) -> None:
+    """`new .` scaffolds into `parent` itself, naming the project after it."""
+    target = tmp_path / "todolist"
+    target.mkdir()
+    result = scaffold_project(".", parent=target)
+    assert result.root == target.resolve()
+    assert (target / "app.py").is_file()
+    # The project name is the directory basename, not ".".
+    assert 'name = "todolist"' in (target / "tempestweb.toml").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_scaffold_in_place_tolerates_unrelated_files(tmp_path: Path) -> None:
+    """In-place scaffolding writes alongside pre-existing, non-conflicting files."""
+    target = tmp_path / "proj"
+    target.mkdir()
+    (target / "notes.md").write_text("keep", encoding="utf-8")
+    result = scaffold_project(".", parent=target)
+    assert (result.root / "app.py").is_file()
+    assert (target / "notes.md").read_text(encoding="utf-8") == "keep"
+
+
+def test_scaffold_in_place_refuses_to_clobber_scaffold_files(tmp_path: Path) -> None:
+    """In-place scaffolding refuses to overwrite an existing app.py without force."""
+    target = tmp_path / "proj"
+    target.mkdir()
+    (target / "app.py").write_text("# mine", encoding="utf-8")
+    with pytest.raises(ProjectExistsError, match="app.py"):
+        scaffold_project(".", parent=target)
+    # force overwrites.
+    scaffold_project(".", parent=target, force=True)
+    assert "make_state" in (target / "app.py").read_text(encoding="utf-8")
+
+
 def test_create_project_verifies_runnable(tmp_path: Path) -> None:
     result = create_project("counter", parent=tmp_path)
     assert (result.root / "app.py").is_file()
+
+
+def test_create_project_in_place(tmp_path: Path) -> None:
+    """`create_project(".")` scaffolds in place and stays runnable."""
+    target = tmp_path / "inplace"
+    target.mkdir()
+    result = create_project(".", parent=target)
+    assert result.root == target.resolve()
+    assert (target / "app.py").is_file()
 
 
 def test_create_project_rejects_empty_name(tmp_path: Path) -> None:

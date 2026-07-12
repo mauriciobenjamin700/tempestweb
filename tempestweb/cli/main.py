@@ -88,7 +88,11 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=False)
 
     new = sub.add_parser("new", help="Scaffold a new tempestweb app.")
-    new.add_argument("name", help="Project name / directory.")
+    new.add_argument(
+        "name",
+        help="Project name / directory. Use '.' to scaffold into the current "
+        "directory (named after it).",
+    )
     new.add_argument(
         "--into",
         default=".",
@@ -123,9 +127,9 @@ def build_parser() -> argparse.ArgumentParser:
     dev.add_argument(
         "--mode",
         choices=["wasm", "server", "transpile"],
-        default="wasm",
+        default=None,
         help="Execution mode to serve: wasm (Mode A), server (Mode B) or "
-        "transpile (Mode C). Default: wasm.",
+        "transpile (Mode C). Defaults to [dev].mode in tempestweb.toml (else wasm).",
     )
     dev.add_argument(
         "--path",
@@ -139,9 +143,10 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument(
         "--mode",
         choices=["wasm", "server", "transpile"],
-        default="wasm",
+        default=None,
         help="wasm = static bundle (Pyodide); server = FastAPI app; "
-        "transpile = static bundle of native JS (no Python runtime, experimental).",
+        "transpile = static bundle of native JS. Defaults to [dev].mode in "
+        "tempestweb.toml (else wasm).",
     )
     build.add_argument(
         "--path",
@@ -167,7 +172,12 @@ def build_parser() -> argparse.ArgumentParser:
         "livereload. Use this for a production-like local run (and it is what the "
         "generated deploy Dockerfile runs); use `dev` while developing.",
     )
-    run.add_argument("--mode", choices=["wasm", "server", "transpile"], default="wasm")
+    run.add_argument(
+        "--mode",
+        choices=["wasm", "server", "transpile"],
+        default=None,
+        help="Execution mode. Defaults to [dev].mode in tempestweb.toml (else wasm).",
+    )
     run.add_argument(
         "--path",
         default=".",
@@ -355,7 +365,9 @@ def _cmd_new(args: argparse.Namespace) -> int:
         if args.template == "pwa"
         else ("tempestweb dev")
     )
-    print(f"\nNext:\n  cd {result.root.name}\n  {dev_cmd}")
+    in_place = result.root == Path.cwd().resolve()
+    next_steps = dev_cmd if in_place else f"cd {result.root.name}\n  {dev_cmd}"
+    print(f"\nNext:\n  {next_steps}")
     return 0
 
 

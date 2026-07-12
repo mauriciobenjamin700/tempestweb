@@ -396,11 +396,18 @@ def scaffold_project(
 ) -> ScaffoldResult:
     """Create a new runnable project tree under ``parent/name``.
 
+    Passing ``name="."`` scaffolds **in place** into ``parent`` (the current
+    directory) instead of creating a subdirectory, and derives the project name
+    from that directory's basename. In-place scaffolding refuses to clobber an
+    existing scaffold file (``app.py`` / ``tempestweb.toml`` / …) unless ``force``
+    is set, but tolerates other pre-existing files in the directory.
+
     Args:
-        name: The project name; also the created directory name.
+        name: The project name / directory. ``"."`` means scaffold into
+            ``parent`` itself, naming the project after that directory.
         parent: The directory to create the project inside. Defaults to the cwd.
-        force: When ``True``, write into an existing non-empty directory instead
-            of refusing.
+        force: When ``True``, write into an existing non-empty directory (or
+            overwrite existing scaffold files) instead of refusing.
         template: The scaffold template (``"default"`` or ``"pwa"``).
 
     Returns:
@@ -408,16 +415,29 @@ def scaffold_project(
 
     Raises:
         ProjectExistsError: If the target directory exists and is non-empty and
-            ``force`` is ``False``.
+            ``force`` is ``False`` (for a named project), or already contains
+            scaffold files (for in-place ``"."``).
         UnknownTemplateError: If ``template`` is unknown.
     """
-    contents = render_files(name, template=template)
-    root = (Path(parent) / name).resolve()
-    if root.exists() and any(root.iterdir()) and not force:
-        raise ProjectExistsError(
-            f"{root} already exists and is not empty (pass force=True to overwrite)"
-        )
+    in_place = name == "."
+    if in_place:
+        root = Path(parent).resolve()
+        project_name = root.name
+        conflicts = [rel for rel in PROJECT_FILES if (root / rel).exists()]
+        if conflicts and not force:
+            raise ProjectExistsError(
+                f"{root} already contains {', '.join(conflicts)} "
+                "(pass force=True to overwrite)"
+            )
+    else:
+        root = (Path(parent) / name).resolve()
+        project_name = name
+        if root.exists() and any(root.iterdir()) and not force:
+            raise ProjectExistsError(
+                f"{root} already exists and is not empty (pass force=True to overwrite)"
+            )
 
+    contents = render_files(project_name, template=template)
     root.mkdir(parents=True, exist_ok=True)
     for rel in PROJECT_FILES:
         target = root / rel

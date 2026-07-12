@@ -4,6 +4,47 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.54.0] — 2026-07-12
+
+### Added
+
+- **Computer-vision task classes (`tempestweb[vision]`).** `Classifier`,
+  `Detector` and `Segmenter` with the same input/output contract as
+  `ort-vision-sdk` and `tempest-fastapi-sdk`'s vision layer, but running the model
+  over the `native.onnx` bridge (onnxruntime-web) so they work in the browser
+  where the `onnxruntime` wheel does not exist. `await Task.create(model_url,
+  labels=...)` then `await task.predict(image)` returns ort-vision-sdk's
+  Ultralytics-style Results (`.boxes`/`.probs`/`.masks`); `to_detection_schemas` /
+  `to_classification_schema` / `to_segmentation_schemas` map them to the same JSON
+  wire shape a `tempest-fastapi-sdk` endpoint speaks. The extra pulls
+  `ort-vision-sdk` + `numpy`.
+- **`tempestweb new .`** scaffolds into the current directory (named after it)
+  instead of a literal `"."` subdir, tolerating unrelated files but refusing to
+  clobber existing scaffold files without `--force`.
+
+### Changed
+
+- **`dev`/`build`/`run` honor `[dev].mode` from `tempestweb.toml`** when `--mode`
+  is omitted (the argparse default was hard-wired to `wasm`, so a `transpile`/pwa
+  project silently built a wasm artifact). An explicit `--mode` still overrides.
+- The mypy target is now 3.12 (numpy 2.x's stubs use 3.12 syntax); the package
+  still runs on 3.11+.
+
+### Fixed
+
+- **Incomplete wasm service-worker precache** left eager-boot modules
+  (`client/icons/*`, `push/web-push-client.js`, `pwa/install-prompt.js`, PWA
+  icons) out of the precache, so an `--offline` build could fail to boot with no
+  network. The wasm precache now mirrors the transpile one.
+
+### Docs
+
+- New pages: "Routing & navigation", "Computer vision (ONNX)", "Offline + backend
+  sync". A transparent component catalog (tempestweb-native vs re-exported
+  `tempest_core.components`, by group) with links to the `tempest-core` package.
+  Plus consistency fixes (real command output, `sync`/`deploy` descriptions,
+  version snippets).
+
 ## [0.53.2] — 2026-07-12
 
 ### Fixed

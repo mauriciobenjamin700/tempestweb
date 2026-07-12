@@ -235,6 +235,31 @@ The client subscribes with `native.notifications.subscribe(public_key)` and POST
 the subscription to `/webpush/subscribe`; `POST /webpush/send` pushes to it. See
 the runnable [`examples/webpush-server`](examples/webpush-server/server.py).
 
+## Computer vision (ONNX)
+
+```bash
+pip install "tempestweb[vision]"   # pulls ort-vision-sdk + numpy
+```
+
+```python
+from tempestweb.vision import Detector, to_detection_schemas
+
+det = await Detector.create("./models/yolov8n.onnx", labels="coco")
+result = (await det.predict("./images/street.jpg"))[0]
+for d in result:
+    print(d.name, d.conf, d.box.xyxy)          # Ultralytics-style views
+payload = to_detection_schemas(result)          # JSON for a tempest-fastapi-sdk backend
+```
+
+`Classifier` / `Detector` / `Segmenter` share the **same input/output contract as
+[`ort-vision-sdk`](https://pypi.org/project/ort-vision-sdk/) and
+`tempest-fastapi-sdk`'s vision layer**, but run the model over the `native.onnx`
+bridge (onnxruntime-web) so inference works in the browser — no `onnxruntime`
+wheel needed. Preprocessing, postprocessing and the `.boxes`/`.probs`/`.masks`
+result objects are ort-vision-sdk's, unchanged; only the model run crosses the
+(async) bridge, so construction and `predict` are awaited. See the
+[Computer vision guide](https://mauriciobenjamin700.github.io/tempestweb/en/vision/).
+
 ## Deploy (server mode)
 
 ```bash

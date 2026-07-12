@@ -101,24 +101,58 @@ _ICON_ASSETS: tuple[str, ...] = (
     "material.js",
 )
 
-# Native capability bridge modules (client/native/*.js), copied into the wasm
-# artifact so the in-process FFI dispatch (geolocation/clipboard/http/…) resolves.
+# Native capability bridge modules (client/native/*.js), copied into every
+# artifact that mounts the client so ``native/index.js`` — which the WebSocket
+# transport and the wasm bootstrap both import — resolves its full closure. This
+# list MUST cover every module ``native/index.js`` imports; a stale subset 404s
+# in the browser and the whole app fails to mount. ``test_native_assets_cover_
+# index_imports`` keeps it exhaustive.
 _NATIVE_ASSETS: tuple[str, ...] = (
-    "index.js",
     "audio.js",
+    "badge.js",
+    "battery.js",
+    "bgsync.js",
+    "bluetooth.js",
     "camera.js",
     "clipboard.js",
+    "contacts.js",
     "cookies.js",
+    "eyedropper.js",
     "file.js",
+    "filesystem.js",
+    "fullscreen.js",
+    "gamepad.js",
     "geolocation.js",
+    "hid.js",
     "http.js",
     "idb-kv.js",
+    "idle.js",
+    "index.js",
     "install.js",
+    "midi.js",
+    "network.js",
+    "nfc.js",
     "notifications.js",
     "offline.js",
     "onnx.js",
+    "orientation.js",
+    "payment.js",
+    "pip.js",
+    "pointerlock.js",
+    "quota.js",
+    "recorder.js",
+    "sensors.js",
+    "serial.js",
     "share.js",
+    "speech.js",
     "storage.js",
+    "tabs.js",
+    "usb.js",
+    "vibration.js",
+    "visibility.js",
+    "wakelock.js",
+    "webaudio.js",
+    "webauthn.js",
 )
 # Offline-queue client modules (native/offline.js wraps these); shipped under
 # client/offline/ so its `../offline/{store,sync}.js` imports resolve.
@@ -167,13 +201,21 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     "client/pwa/install-prompt.js",
 )
 
-# Files a server artifact must contain, relative to the artifact root.
+# Files a server artifact must contain, relative to the artifact root. The
+# WebSocket transport imports ``native/index.js``, which eagerly loads the whole
+# native tree (+ offline queue, push and the install prompt), so the server
+# artifact must ship the same client closure the wasm artifact does — otherwise
+# the browser 404s on those modules and the app never mounts.
 SERVER_ARTIFACT_FILES: tuple[str, ...] = (
     "server.py",
     "app.py",
     "index.html",
     *(f"static/{asset}" for asset in (*_CLIENT_ASSETS, "transport-ws.js")),
     *(f"static/icons/{asset}" for asset in _ICON_ASSETS),
+    *(f"static/native/{asset}" for asset in _NATIVE_ASSETS),
+    *(f"static/offline/{asset}" for asset in _OFFLINE_ASSETS),
+    "static/push/web-push-client.js",
+    "static/pwa/install-prompt.js",
 )
 
 # Files a transpile artifact must contain, relative to the artifact root. No
@@ -505,6 +547,56 @@ def _copy_offline(client: Path, out: Path) -> None:
         shutil.copyfile(source, offline_dest / asset)
 
 
+def _copy_client_extras(client: Path, base: Path) -> None:
+    """Copy the native-bridge closure into an artifact's client base dir.
+
+    ``native/index.js`` — imported by both the wasm bootstrap and the WebSocket
+    transport — eagerly loads the entire native tree, which in turn pulls in the
+    offline queue (``../offline/{store,sync}.js``), the WebPush client
+    (``../push/web-push-client.js``) and the install prompt
+    (``../pwa/install-prompt.js``). Every artifact that mounts the client must
+    ship all of them under the same base (``client/`` for wasm, ``static/`` for
+    server), or the browser 404s mid-module-load and the app never mounts.
+
+    Args:
+        client: The shared ``client/`` directory.
+        base: The artifact's client base dir (e.g. ``out/client`` or
+            ``out/static``).
+
+    Raises:
+        BuildError: If any expected module is missing from the source tree.
+    """
+    native_dest = base / "native"
+    native_dest.mkdir(parents=True, exist_ok=True)
+    for asset in _NATIVE_ASSETS:
+        source = client / "native" / asset
+        if not source.is_file():
+            raise BuildError(f"missing native asset: {source}")
+        shutil.copyfile(source, native_dest / asset)
+
+    offline_dest = base / "offline"
+    offline_dest.mkdir(parents=True, exist_ok=True)
+    for asset in _OFFLINE_ASSETS:
+        source = client / "offline" / asset
+        if not source.is_file():
+            raise BuildError(f"missing offline asset: {source}")
+        shutil.copyfile(source, offline_dest / asset)
+
+    push_source = client / "push" / "web-push-client.js"
+    if not push_source.is_file():
+        raise BuildError(f"missing push asset: {push_source}")
+    push_dest = base / "push"
+    push_dest.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(push_source, push_dest / "web-push-client.js")
+
+    install_source = client / "pwa" / "install-prompt.js"
+    if not install_source.is_file():
+        raise BuildError(f"missing pwa asset: {install_source}")
+    pwa_dest = base / "pwa"
+    pwa_dest.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(install_source, pwa_dest / "install-prompt.js")
+
+
 def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
     """Copy the shared client assets plus a mode-specific transport into ``dest``.
 
@@ -794,7 +886,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -825,6 +917,11 @@ def build() -> FastAPI:
     async def index() -> FileResponse:
         """Serve the app shell that mounts the client over WebSocket."""
         return FileResponse(str(_HERE / "index.html"))
+
+    @api.get("/favicon.ico")
+    async def favicon() -> Response:
+        """Answer the browser's default favicon probe (avoids a noisy 404)."""
+        return Response(status_code=204)
 
     return api
 
@@ -1018,31 +1115,9 @@ def _build_wasm(
     (out / "app.py").write_text(app_source, encoding="utf-8")
     _zip_package(out / WASM_PACKAGE_ARCHIVE, project_root=project_root, modules=modules)
     _copy_client(client, out / "client", "transport-wasm.js")
-    # Native capability bridge (geolocation/clipboard/http/…) for the in-process
-    # FFI dispatch the bootstrap installs.
-    native_dest = out / "client" / "native"
-    native_dest.mkdir(parents=True, exist_ok=True)
-    for asset in _NATIVE_ASSETS:
-        source = client / "native" / asset
-        if not source.is_file():
-            raise BuildError(f"missing native asset: {source}")
-        shutil.copyfile(source, native_dest / asset)
-    # Offline-queue modules native/offline.js imports (../offline/{store,sync}).
-    _copy_offline(client, out)
-    # The notifications bridge imports the WebPush client from client/push/.
-    push_source = client / "push" / "web-push-client.js"
-    if not push_source.is_file():
-        raise BuildError(f"missing push asset: {push_source}")
-    push_dest = out / "client" / "push"
-    push_dest.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(push_source, push_dest / "web-push-client.js")
-    # The install capability imports the soft install-prompt controller.
-    install_source = client / "pwa" / "install-prompt.js"
-    if not install_source.is_file():
-        raise BuildError(f"missing pwa asset: {install_source}")
-    pwa_dest = out / "client" / "pwa"
-    pwa_dest.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(install_source, pwa_dest / "install-prompt.js")
+    # Native capability bridge + offline/push/pwa closure that the bootstrap's
+    # native/index.js eagerly imports (geolocation/clipboard/http/…).
+    _copy_client_extras(client, out / "client")
     # Project static assets (ONNX models, vendored JS libs) copied verbatim,
     # preserving their relative path, and precached for the offline second load.
     assets: list[str] = []
@@ -1103,6 +1178,10 @@ def _build_server(
     (out / "app.py").write_text(app_source, encoding="utf-8")
     (out / "index.html").write_text(_index_html_server(name), encoding="utf-8")
     _copy_client(client, out / "static", "transport-ws.js")
+    # transport-ws.js imports native/index.js, which pulls in the whole native
+    # tree + offline/push/pwa closure — ship it or the browser 404s and never
+    # mounts. Same closure the wasm artifact ships, under static/ instead.
+    _copy_client_extras(client, out / "static")
     return tuple(sorted(SERVER_ARTIFACT_FILES))
 
 

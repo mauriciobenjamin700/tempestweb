@@ -44,6 +44,40 @@ def test_build_server_layout(tmp_path: Path) -> None:
     assert set(result.files) == set(SERVER_ARTIFACT_FILES)
 
 
+def test_server_artifact_ships_native_closure(tmp_path: Path) -> None:
+    """The server artifact must ship the native tree its transport imports.
+
+    Regression: ``transport-ws.js`` imports ``./native/index.js``, which eagerly
+    loads the whole native tree. A missing module 404s in the browser and the
+    app never mounts. Assert the closure is on disk under ``static/``.
+    """
+    out = build_artifact(_project(tmp_path), mode="server").out_dir
+    static = out / "static"
+    assert (static / "native" / "index.js").is_file()
+    # A few modules index.js imports that a stale subset used to miss.
+    for module in ("battery.js", "sensors.js", "nfc.js", "vibration.js"):
+        assert (static / "native" / module).is_file(), module
+    assert (static / "offline" / "store.js").is_file()
+    assert (static / "push" / "web-push-client.js").is_file()
+    assert (static / "pwa" / "install-prompt.js").is_file()
+
+
+def test_native_assets_cover_index_imports() -> None:
+    """``_NATIVE_ASSETS`` must list every module ``native/index.js`` imports.
+
+    Guards against the subset rotting: adding a native module + importing it in
+    index.js without listing it here would 404 at runtime.
+    """
+    import re
+
+    from tempestweb.cli.commands.build import _NATIVE_ASSETS, _client_dir
+
+    index = (_client_dir() / "native" / "index.js").read_text(encoding="utf-8")
+    imported = set(re.findall(r'from\s+"\./([a-z0-9-]+\.js)"', index))
+    missing = imported - set(_NATIVE_ASSETS)
+    assert not missing, f"native/index.js imports not in _NATIVE_ASSETS: {missing}"
+
+
 def test_build_transpile_layout(tmp_path: Path) -> None:
     root = _project(tmp_path)
     result = build_artifact(root, mode="transpile")

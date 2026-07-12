@@ -4,6 +4,24 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.53.1] — 2026-07-12
+
+### Fixed
+
+- **Blank page in server (and wasm) mode — the app never mounted.** The client's
+  `native/index.js` (imported by both the WebSocket transport and the wasm
+  bootstrap) eagerly loads the whole native-capability tree, but the build's
+  `_NATIVE_ASSETS` list had gone stale — it copied only 15 of the 43 modules
+  `index.js` imports, and the **server** artifact never copied the native tree at
+  all. The browser 404'd mid-module-load, so `mount()` never ran and `#app`
+  stayed empty. Now every artifact ships the full native closure (native tree +
+  offline queue + WebPush client + install prompt) under its client base
+  (`client/` for wasm, `static/` for server), the asset list is complete and
+  guarded by a test that checks it against `index.js`'s imports, and a new test
+  asserts the built server artifact actually contains the closure on disk.
+- **Noisy `/favicon.ico` 404** in server mode: the FastAPI host now answers the
+  browser's default favicon probe with `204 No Content`.
+
 ## [0.53.0] — 2026-07-11
 
 ### Added

@@ -1206,8 +1206,18 @@ def _build_wasm(
         "/app.py",
         f"/{WASM_PACKAGE_ARCHIVE}",
         *(f"/client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
+        # Icon resolver + vendored sets: dom.js statically imports ./icons/index.js
+        # at boot, so they are part of the app shell and must precache (cache-first)
+        # or a true offline boot fails to load dom.js's icon dependency.
+        *(f"/client/icons/{asset}" for asset in _ICON_ASSETS),
         *(f"/client/native/{asset}" for asset in _NATIVE_ASSETS),
         *(f"/client/offline/{asset}" for asset in _OFFLINE_ASSETS),
+        # native/index.js eagerly imports the push client (via notifications.js) and
+        # the install prompt (via install.js); both are boot-critical shell modules.
+        "/client/push/web-push-client.js",
+        "/client/pwa/install-prompt.js",
+        # PWA icons referenced by the manifest + apple-touch-icon link.
+        *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
         *(f"/{asset}" for asset in assets),
         *(s if s.startswith("/") else f"/{s}" for s in local_scripts),
         *(f"/pyodide/{file_name}" for file_name in vendored),

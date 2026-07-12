@@ -34,6 +34,21 @@ def test_render_initial_tree_builds_node(tmp_path: Path) -> None:
     assert isinstance(node, Node)
 
 
+def test_render_initial_tree_wraps_make_state_failure(tmp_path: Path) -> None:
+    """A crash in make_state surfaces as ProjectLoadError, not a raw exception."""
+    mod = tmp_path / "boom.py"
+    mod.write_text(
+        "def make_state():\n"
+        "    raise ValueError('boom')\n\n"
+        "def view(app):\n"
+        "    return None\n",
+        encoding="utf-8",
+    )
+    loaded = load_app(mod)
+    with pytest.raises(ProjectLoadError, match="boom"):
+        render_initial_tree(loaded)
+
+
 def test_missing_entrypoint_raises(tmp_path: Path) -> None:
     with pytest.raises(ProjectLoadError, match="not found"):
         load_app(tmp_path / "does_not_exist.py")

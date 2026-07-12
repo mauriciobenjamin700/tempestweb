@@ -125,16 +125,16 @@ def render_initial_tree(loaded: LoadedApp) -> Node:
         ProjectLoadError: If ``view`` does not return a widget or building the
             tree fails.
     """
-    state = loaded.make_state()
-    app: App[Any] = App(
-        state=state,
-        view=loaded.view,
-        apply_patches=lambda _patches: None,
-    )
     try:
+        state = loaded.make_state()
+        app: App[Any] = App(
+            state=state,
+            view=loaded.view,
+            apply_patches=lambda _patches: None,
+        )
         widget = loaded.view(app)
         return build(widget)
-    except Exception as exc:  # noqa: BLE001 - surface any render failure
+    except Exception as exc:  # noqa: BLE001 - surface any make_state/render failure
         raise ProjectLoadError(
             f"failed to render the initial view of {loaded.path}: {exc}"
         ) from exc

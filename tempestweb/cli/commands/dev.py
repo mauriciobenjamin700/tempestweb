@@ -193,7 +193,7 @@ async def _serve_dev_static(
     Raises:
         DevError: If the ``server`` extra is missing or the initial build fails.
     """
-    from tempestweb.cli.commands.build import BuildError, build_artifact
+    from tempestweb.cli.commands.build import build_artifact
 
     try:
         from tempestweb.devserver import create_dev_app, make_server
@@ -220,7 +220,10 @@ async def _serve_dev_static(
         """Rebuild the bundle into the served dir before the browser reloads."""
         try:
             build_artifact(config.root, mode=mode, out_dir=out_dir, dev=True)
-        except BuildError as exc:
+        except Exception as exc:  # noqa: BLE001 - a rebuild must never kill the loop
+            # BuildError (bad edit) or an IO error (OSError from the clean/copy):
+            # either way, keep the last good build serving instead of tearing the
+            # whole watch loop down through the signal → gather chain.
             print(f"tempestweb dev: rebuild failed, keeping last build: {exc}")
 
     # Subscribed (not a waiter): trigger() runs callbacks before resolving the
@@ -295,7 +298,7 @@ async def _serve_dev_server(config: ProjectConfig, host: str, port: int) -> None
     Raises:
         DevError: If uvicorn is missing or the initial build fails.
     """
-    from tempestweb.cli.commands.build import BuildError, build_artifact
+    from tempestweb.cli.commands.build import build_artifact
 
     try:
         import uvicorn
@@ -345,7 +348,9 @@ async def _serve_dev_server(config: ProjectConfig, host: str, port: int) -> None
             try:
                 build_artifact(config.root, mode="server", out_dir=out_dir)
                 print("tempestweb dev: change detected — restarting server.")
-            except BuildError as exc:
+            except Exception as exc:  # noqa: BLE001 - keep serving the last build
+                # A bad edit (BuildError) or a transient IO error (OSError) must
+                # not tear the loop down — restart the last good build instead.
                 print(
                     f"tempestweb dev: rebuild failed, restarting last good build: {exc}"
                 )

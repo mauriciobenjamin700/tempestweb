@@ -297,7 +297,11 @@ def run_full_check(target: str, *, level: Strictness = DEFAULT_STRICTNESS) -> in
         ("pytest", [target]),
     ]
     for executable, args in steps:
-        print(f"$ {executable} {' '.join(args)}", file=sys.stderr)
+        # Echo the real argv (e.g. `uv run ruff …` when the tool is only reachable
+        # through uv), not just the bare tool name, so the log matches what runs.
+        argv = _resolve(executable)
+        shown = " ".join([*argv, *args]) if argv else f"{executable} (not found)"
+        print(f"$ {shown}", file=sys.stderr)
         code = _execute(executable, args)
         if executable == "pytest":
             code = _coerce_pytest(code)

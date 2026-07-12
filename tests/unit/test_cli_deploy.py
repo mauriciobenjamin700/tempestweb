@@ -67,6 +67,24 @@ def test_replicas_expand_upstream(tmp_path: Path) -> None:
     assert "server app2:8000;" in conf
 
 
+def test_replicas_define_matching_compose_services(tmp_path: Path) -> None:
+    """The compose defines every app replica the nginx upstream references."""
+    files = render_deploy_files(_project(tmp_path), replicas=3)
+    compose = files["docker-compose.yml"]
+    # Services app, app1, app2 exist so the nginx `server appN` hosts resolve.
+    assert "\n  app:\n" in compose
+    assert "\n  app1:\n" in compose
+    assert "\n  app2:\n" in compose
+    # The proxy depends on all of them.
+    assert "      - app1\n" in compose and "      - app2\n" in compose
+
+
+def test_single_replica_compose_has_one_app(tmp_path: Path) -> None:
+    compose = render_deploy_files(_project(tmp_path))["docker-compose.yml"]
+    assert "\n  app:\n" in compose
+    assert "app1:" not in compose
+
+
 def test_port_from_config(tmp_path: Path) -> None:
     root = _project(tmp_path)
     (root / "tempestweb.toml").write_text(

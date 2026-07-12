@@ -258,7 +258,13 @@ def sync_modules(path: str | Path, *, dry_run: bool = False) -> SyncResult:
             f"no tempestweb.toml in {config.root} — run `tempestweb new` first"
         )
 
-    exclude = {*_FRAMEWORK, *(_normalize(p) for p in config.wasm.packages)}
+    # Normalize the framework names too (not just the config packages) so the
+    # exclude set always matches the normalized dependency/module names compared
+    # against it — robust even if a name here is added in non-canonical form.
+    exclude = {
+        *(_normalize(name) for name in _FRAMEWORK),
+        *(_normalize(package) for package in config.wasm.packages),
+    }
     discovered = _discover_modules(config.root, exclude)
 
     existing = list(config.wasm.modules)

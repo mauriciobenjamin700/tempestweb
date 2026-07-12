@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.55.1] — 2026-07-12
+
+### Fixed
+
+- **`tempestweb dev` survives a transient rebuild IO error.** The rebuild
+  callbacks caught only `BuildError`, so an `OSError` from the clean/copy could
+  tear the whole watch loop down; they now keep the last good build serving.
+- **`tempestweb deploy --replicas N` generates a runnable compose.** The nginx
+  upstream listed `app1`, `app2`, … but the compose only defined `app`, so those
+  hosts never resolved. The compose now defines one service per replica.
+- **`render_initial_tree` wraps a `make_state()` crash** as `ProjectLoadError`
+  (it ran outside the try before), matching its documented contract.
+- `tempestweb sync` normalizes its framework-exclusion names; `tempestweb check`
+  echoes the real resolved argv (e.g. `uv run ruff …`).
+
 ## [0.55.0] — 2026-07-12
 
 ### Added

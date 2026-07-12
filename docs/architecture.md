@@ -32,7 +32,7 @@ O **reconciliador** (Python) e o **cliente JS** são os mesmos nos dois modos. A
 
 | Camada | O que faz | Onde vive |
 |---|---|---|
-| **Core** | IR, diff/patch, estado, estilo, widgets | pacote `tempest-core` (`import tempest_core`), extraído do tempestroid |
+| **Core** | IR, diff/patch, estado, estilo, widgets **e o catálogo de componentes Material 3** | pacote [`tempest-core`](https://pypi.org/project/tempest-core/) (`import tempest_core`), extraído do tempestroid e **reexportado** por `tempestweb.components` |
 | **Renderizador-folha** | Aplica patches no DOM, traduz `Style → CSS`, captura eventos | `client/` — JavaScript puro |
 | **Transporte** | Leva patches Python→JS e eventos JS→Python | `tempestweb/transports/{wasm,websocket}.py` + `client/transport-*.js` |
 | **Runtime / host** | Hospeda o Python | Pyodide no browser (A) · FastAPI (B) |

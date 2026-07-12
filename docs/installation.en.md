@@ -71,6 +71,20 @@ todolist/
 └── .gitignore
 ```
 
+!!! tip "Scaffold into the current folder — `tempestweb new .`"
+    Already inside the project folder? Pass `.` as the name to scaffold **right
+    there**, with no subdirectory — the project is named after the folder's
+    basename:
+
+    ```bash
+    mkdir myapp && cd myapp
+    tempestweb new .            # project "myapp", straight into the current folder
+    ```
+
+    `new .` tolerates pre-existing non-conflicting files (`.git/`, `LICENSE`…), but
+    **refuses to overwrite** `app.py`/`tempestweb.toml`/`README.md`/`.gitignore` if
+    they already exist — use `--force` to overwrite.
+
 !!! question "Does the file **have** to be named `app.py`?"
     By default, yes — the CLI looks for `app.py` at the project root. But the name
     is **configurable**: `tempestweb.toml` points at the entrypoint, so you can
@@ -120,13 +134,17 @@ never a positional `.py` file.
     the server on every edit:
 
     ```bash
-    tempestweb dev --mode wasm       # Mode A (default): Python in the browser
+    tempestweb dev --mode wasm       # Mode A: Python in the browser
     tempestweb dev --mode server     # Mode B: FastAPI + uvicorn, restart on save
     tempestweb dev --mode transpile  # Mode C: native JS, live-reload
     ```
 
     `tempestweb run` instead builds once and serves **without a watcher** — the
     production-like path (it's what the `tempestweb deploy` Dockerfile runs).
+
+    **Omitting `--mode`** (in `dev`/`build`/`run`) uses the `[dev].mode` from
+    `tempestweb.toml` — and, absent that field, `wasm`. An explicit `--mode`
+    overrides.
 
 Want the full walkthrough of each subcommand? See
 [Using the CLI](cli.md). Or jump straight into the [Tutorial](tutorial/index.md). 🚀

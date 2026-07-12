@@ -138,7 +138,9 @@ plugins:
             Capabilities: Capacidades
             "Native capability reference": "Referência de capacidades nativas"
             "Native event channel": "Canal de eventos nativo"
+            "Computer vision (ONNX)": "Visão computacional (ONNX)"
             "Device panel": "Painel do dispositivo"
+            "Routing & navigation": "Roteamento e navegação"
             "PWA & offline": "PWA e offline"
             "Offline + backend sync": "Offline + sincronização com backend"
             Observability: Observabilidade
@@ -193,12 +195,14 @@ nav:
       - "2. State and handlers": tutorial/state.md
       - "3. Patches on the wire": tutorial/patches.md
       - "4. Running the modes": tutorial/modes.md
+  - Routing & navigation: routing.md
   - Mode C — transpile: transpile.md
   - PWA & offline: pwa.md
   - Offline + backend sync: offline-sync.md
   - Capabilities: capabilities.md
   - Native capability reference: native-reference.md
   - Native event channel: native-events.md
+  - Computer vision (ONNX): vision.md
   - Ready-made components: components.md
   - Theming (Material 3): theming.md
   - Icons (Material + Lucide): icons.md

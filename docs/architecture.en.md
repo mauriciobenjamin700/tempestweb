@@ -33,7 +33,7 @@ only thing that changes is the **transport layer**.
 
 | Layer | What it does | Where it lives |
 |---|---|---|
-| **Core** | IR, diff/patch, state, style, widgets | `tempest-core` package (`import tempest_core`), extracted from tempestroid |
+| **Core** | IR, diff/patch, state, style, widgets **and the Material 3 component catalog** | [`tempest-core`](https://pypi.org/project/tempest-core/) package (`import tempest_core`), extracted from tempestroid and **re-exported** by `tempestweb.components` |
 | **Leaf renderer** | Applies patches to the DOM, translates `Style → CSS`, captures events | `client/` — plain JavaScript |
 | **Transport** | Carries patches Python→JS and events JS→Python | `tempestweb/transports/{wasm,websocket}.py` + `client/transport-*.js` |
 | **Runtime / host** | Hosts the Python | Pyodide in the browser (A) · FastAPI (B) |

@@ -115,8 +115,10 @@ O tempestweb é o **irmão web** do
 família. Os dois seguem a filosofia **"uma árvore, múltiplos renderizadores"** e
 compartilham o mesmo núcleo renderer-agnostic — o pacote
 [`tempest-core`](https://pypi.org/project/tempest-core/) (IR, `diff`/patch,
-estado, estilo, widgets). O tempestroid renderiza para telas nativas; o tempestweb
-renderiza para o DOM. Se você já conhece um, o modelo mental transfere direto —
+estado, estilo, widgets **e o catálogo de componentes Material 3**, que o
+tempestweb **reexporta** em `tempestweb.components` — veja
+[Componentes prontos](components.md)). O tempestroid renderiza para telas nativas;
+o tempestweb renderiza para o DOM. Se você já conhece um, o modelo mental transfere direto —
 mas **não é preciso conhecer o tempestroid** para usar o tempestweb.
 
 ## Convenções do projeto

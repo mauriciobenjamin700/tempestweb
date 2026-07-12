@@ -32,7 +32,9 @@ Before the commands, three ideas that hold for **all** of them:
 
 1. **A mode is chosen on the CLI — never in the app.** Your `app.py` never names a
    mode. You pick `--mode wasm` (A), `--mode server` (B) or `--mode transpile` (C)
-   at run/build time. The same code runs in all three.
+   at run/build time. The same code runs in all three. **Omitting `--mode` uses
+   the `[dev].mode` from `tempestweb.toml`** (and, absent that field, `wasm`); an
+   explicit `--mode` overrides. This holds for `dev`, `build` and `run`.
 2. **`--path` takes the project *directory*, never a `.py` file.** The default is
    the current directory (`.`). The CLI discovers the entrypoint itself.
 3. **The default entrypoint is `app.py`.** It's a Python module exposing **two**
@@ -49,7 +51,7 @@ Before the commands, three ideas that hold for **all** of them:
     entrypoint = "app.py"   # change to "main.py", "src/app.py", etc.
 
     [dev]
-    mode = "wasm"           # default mode for `dev`
+    mode = "wasm"           # mode used when you omit --mode (dev/build/run)
     port = 8000
     ```
 
@@ -87,6 +89,21 @@ Handy options:
 | `--force` | Write into an existing non-empty directory. |
 | `--no-verify` | Skip the proof render (faster, less guarantee). |
 
+!!! tip "Scaffold into the current folder — `tempestweb new .`"
+    Pass `.` as the name to scaffold **into the current directory**, instead of
+    creating a subdirectory:
+
+    ```bash
+    mkdir myapp && cd myapp
+    tempestweb new .
+    ```
+
+    The project is **named after the directory's basename** (here, `myapp`).
+    `new .` **tolerates** pre-existing non-conflicting files (a `.git/`, a
+    `LICENSE`, etc.), but **refuses to overwrite** the scaffold files (`app.py`,
+    `tempestweb.toml`, `README.md`, `.gitignore`) if any already exist — pass
+    `--force` to overwrite anyway.
+
 !!! tip "PWA template"
     `tempestweb new myapp --template pwa` ships with a manifest, service worker, and
     the offline/WebPush skeleton. `new` prints the next step at the end — for the
@@ -103,7 +120,7 @@ locally with hot-reload. And, since v0.52, it **serves all three modes**:
 
     ```bash
     tempestweb dev
-    # same as: tempestweb dev --mode wasm
+    # no --mode: uses [dev].mode from tempestweb.toml (wasm when unset)
     ```
 
     Python runs in the browser via Pyodide. Saved a file? The browser reloads

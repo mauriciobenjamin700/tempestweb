@@ -114,8 +114,10 @@ tempestweb is the **web sibling** of
 same family. Both follow the **"one tree, multiple renderers"** philosophy and
 share the same renderer-agnostic core — the
 [`tempest-core`](https://pypi.org/project/tempest-core/) package (IR, `diff`/patch,
-state, style, widgets). tempestroid renders to native screens; tempestweb renders
-to the DOM. If you already know one, the mental model transfers directly — but
+state, style, widgets **and the Material 3 component catalog**, which tempestweb
+**re-exports** under `tempestweb.components` — see
+[Ready-made components](components.md)). tempestroid renders to native screens;
+tempestweb renders to the DOM. If you already know one, the mental model transfers directly — but
 **you don't need to know tempestroid** to use tempestweb.
 
 ## Project conventions

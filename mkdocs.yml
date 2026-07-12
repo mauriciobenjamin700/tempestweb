@@ -140,6 +140,7 @@ plugins:
             "Native event channel": "Canal de eventos nativo"
             "Device panel": "Painel do dispositivo"
             "PWA & offline": "PWA e offline"
+            "Offline + backend sync": "Offline + sincronização com backend"
             Observability: Observabilidade
             "Security (Mode B)": "Segurança (Modo B)"
             "Deploy to production": "Deploy em produção"
@@ -194,6 +195,7 @@ nav:
       - "4. Running the modes": tutorial/modes.md
   - Mode C — transpile: transpile.md
   - PWA & offline: pwa.md
+  - Offline + backend sync: offline-sync.md
   - Capabilities: capabilities.md
   - Native capability reference: native-reference.md
   - Native event channel: native-events.md

@@ -206,7 +206,10 @@ async def _serve_dev_static(
         ) from exc
 
     try:
-        result = build_artifact(config.root, mode=mode)
+        # dev=True: skip the caching service worker and inject the cache
+        # kill-switch, so every reload serves the freshly rebuilt bundle (no
+        # stale SW/cache headaches). Production builds keep the caching SW.
+        result = build_artifact(config.root, mode=mode, dev=True)
     except Exception as exc:  # noqa: BLE001 - normalize to DevError
         raise DevError(f"initial build failed: {exc}") from exc
     out_dir = result.out_dir
@@ -216,7 +219,7 @@ async def _serve_dev_static(
     def rebuild(event: ReloadEvent) -> None:
         """Rebuild the bundle into the served dir before the browser reloads."""
         try:
-            build_artifact(config.root, mode=mode, out_dir=out_dir)
+            build_artifact(config.root, mode=mode, out_dir=out_dir, dev=True)
         except BuildError as exc:
             print(f"tempestweb dev: rebuild failed, keeping last build: {exc}")
 

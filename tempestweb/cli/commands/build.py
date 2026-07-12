@@ -668,8 +668,62 @@ def _copy_client_no_transport(client: Path, dest: Path) -> list[str]:
     return written
 
 
+# Dev-mode cache kill-switch injected instead of the caching service worker.
+# `tempestweb dev` must always serve the freshly rebuilt bundle, so it unregisters
+# any service worker, drops every cache, and reloads once if a worker was
+# controlling the page (guarded by a sessionStorage flag against reload loops).
+# Production builds (`run` / `build` / `deploy`) keep the caching SW for speed.
+_DEV_CACHE_KILL_SWITCH = """\
+    <script type="module">
+      // Dev: never serve stale. Kill any service worker + caches, then reload
+      // once if a worker was controlling this page so the fresh bundle shows up.
+      (async () => {
+        let hadController = false;
+        if ("serviceWorker" in navigator) {
+          hadController = Boolean(navigator.serviceWorker.controller);
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+        }
+        if (self.caches) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+        if (hadController && !sessionStorage.getItem("tw-dev-sw-cleared")) {
+          sessionStorage.setItem("tw-dev-sw-cleared", "1");
+          location.reload();
+        }
+      })();
+    </script>"""
+
+# Production service-worker registration for the wasm shell.
+_WASM_SW_REGISTER = """\
+    <script type="module">
+      import { registerServiceWorker } from "./register.js";
+      if ("serviceWorker" in navigator) {
+        registerServiceWorker({ url: "/sw.js" });
+      }
+    </script>"""
+
+# Production service-worker registration for the transpile (Mode C) shell.
+_TRANSPILE_SW_REGISTER = """\
+    <script type="module">
+      import { registerServiceWorker } from "./register.js";
+      import { showUpdatePrompt } from "./client/pwa/update-prompt.js";
+      if ("serviceWorker" in navigator) {
+        registerServiceWorker({
+          url: "./sw.js",
+          onUpdate: (registration) => showUpdatePrompt(registration),
+        });
+      }
+    </script>"""
+
+
 def _index_html(
-    name: str, scripts: tuple[str, ...] = (), theme_color: str = "#111111"
+    name: str,
+    scripts: tuple[str, ...] = (),
+    theme_color: str = "#111111",
+    *,
+    dev: bool = False,
 ) -> str:
     """Render the static ``index.html`` shell for a wasm artifact.
 
@@ -680,11 +734,15 @@ def _index_html(
             from onnxruntime-web) is loaded and ready when Python boots.
         theme_color: The manifest theme color, mirrored into the ``theme-color``
             meta so the browser chrome matches the installed app.
+        dev: When ``True`` (the ``tempestweb dev`` loop), inject the cache
+            kill-switch instead of registering the caching service worker, so
+            every reload serves the freshly rebuilt bundle.
 
     Returns:
         The HTML document that boots the app in the browser.
     """
     script_tags = "".join(f'\n    <script src="{src}"></script>' for src in scripts)
+    sw_block = _DEV_CACHE_KILL_SWITCH if dev else _WASM_SW_REGISTER
     return f"""\
 <!doctype html>
 <html lang="en">
@@ -699,12 +757,7 @@ def _index_html(
   <body>
     <div id="app"></div>
     <script type="module" src="./bootstrap.js"></script>
-    <script type="module">
-      import {{ registerServiceWorker }} from "./register.js";
-      if ("serviceWorker" in navigator) {{
-        registerServiceWorker({{ url: "/sw.js" }});
-      }}
-    </script>
+{sw_block}
   </body>
 </html>
 """
@@ -953,6 +1006,7 @@ def build_artifact(
     out_dir: str | Path | None = None,
     clean: bool = True,
     offline: bool = False,
+    dev: bool = False,
 ) -> BuildResult:
     """Build a deployable artifact for ``mode`` from a project.
 
@@ -966,6 +1020,11 @@ def build_artifact(
             wheels into the artifact so it boots fully offline (the service worker
             precaches them). Requires network *at build time* to download them.
             Ignored for server mode.
+        dev: When ``True`` (the ``tempestweb dev`` loop), the wasm/transpile shell
+            skips the caching service worker and injects a cache kill-switch, so
+            every reload serves the freshly rebuilt bundle. Production builds
+            (``run`` / ``build`` / ``deploy``) leave it ``False`` and keep the
+            caching SW for fast repeat loads.
 
     Returns:
         A :class:`BuildResult` describing the artifact.
@@ -1010,6 +1069,7 @@ def build_artifact(
             project_root=config.root,
             wasm=config.wasm,
             manifest=manifest,
+            dev=dev,
         )
     elif resolved_mode == "transpile":
         files = _build_transpile(
@@ -1019,6 +1079,7 @@ def build_artifact(
             app_source,
             config.entrypoint_path.name,
             manifest=manifest,
+            dev=dev,
         )
     else:
         files = _build_server(out, client, config.name, app_source)
@@ -1068,6 +1129,7 @@ def _build_wasm(
     project_root: Path | None = None,
     wasm: WasmConfig | None = None,
     manifest: ManifestOptions | None = None,
+    dev: bool = False,
 ) -> tuple[str, ...]:
     """Write the wasm (static) artifact layout into ``out``.
 
@@ -1082,6 +1144,8 @@ def _build_wasm(
         project_root: The project directory (source of ``[wasm]`` modules/assets).
         wasm: The project's ``[wasm]`` extras (packages, modules, assets, scripts).
         manifest: The Web-App-Manifest options; defaults to a name-only manifest.
+        dev: When ``True``, inject the dev cache kill-switch into the shell
+            instead of registering the caching service worker.
 
     Returns:
         The artifact-relative paths written, sorted.
@@ -1107,7 +1171,7 @@ def _build_wasm(
 
     theme_color = (manifest or ManifestOptions(name=name)).theme_color
     (out / "index.html").write_text(
-        _index_html(name, scripts, theme_color), encoding="utf-8"
+        _index_html(name, scripts, theme_color, dev=dev), encoding="utf-8"
     )
     (out / "bootstrap.js").write_text(
         _bootstrap_js(name, pyodide_base, extra_packages), encoding="utf-8"
@@ -1185,7 +1249,9 @@ def _build_server(
     return tuple(sorted(SERVER_ARTIFACT_FILES))
 
 
-def _index_html_transpile(name: str, theme_color: str = "#111111") -> str:
+def _index_html_transpile(
+    name: str, theme_color: str = "#111111", *, dev: bool = False
+) -> str:
     """Render the ``index.html`` shell for a transpile artifact (Mode C).
 
     The shell imports the native runtime and the generated app module and mounts
@@ -1197,10 +1263,13 @@ def _index_html_transpile(name: str, theme_color: str = "#111111") -> str:
         name: The project name (page title).
         theme_color: The manifest theme color, mirrored into the ``theme-color``
             meta so the browser chrome matches the installed app.
+        dev: When ``True`` (the ``tempestweb dev`` loop), inject the cache
+            kill-switch instead of registering the caching service worker.
 
     Returns:
         The HTML document that boots the transpiled app in the browser.
     """
+    sw_block = _DEV_CACHE_KILL_SWITCH if dev else _TRANSPILE_SW_REGISTER
     return f"""\
 <!doctype html>
 <html lang="en">
@@ -1220,16 +1289,7 @@ def _index_html_transpile(name: str, theme_color: str = "#111111") -> str:
 
       mountApp(document.getElementById("app"), {{ makeState, view }});
     </script>
-    <script type="module">
-      import {{ registerServiceWorker }} from "./register.js";
-      import {{ showUpdatePrompt }} from "./client/pwa/update-prompt.js";
-      if ("serviceWorker" in navigator) {{
-        registerServiceWorker({{
-          url: "./sw.js",
-          onUpdate: (registration) => showUpdatePrompt(registration),
-        }});
-      }}
-    </script>
+{sw_block}
   </body>
 </html>
 """
@@ -1243,6 +1303,7 @@ def _build_transpile(
     entry_name: str,
     *,
     manifest: ManifestOptions | None = None,
+    dev: bool = False,
 ) -> tuple[str, ...]:
     """Write the transpile (native-JS static) artifact layout into ``out`` (Mode C).
 
@@ -1260,6 +1321,8 @@ def _build_transpile(
         app_source: The project's entrypoint source to transpile.
         entry_name: The entrypoint file name (for the generated banner).
         manifest: The Web-App-Manifest options; defaults to a name-only manifest.
+        dev: When ``True``, inject the dev cache kill-switch into the shell
+            instead of registering the caching service worker.
 
     Returns:
         The artifact-relative paths written, sorted.
@@ -1342,6 +1405,7 @@ def _build_transpile(
     _build_pwa(out, client, manifest_options, precache)
 
     (out / "index.html").write_text(
-        _index_html_transpile(name, manifest_options.theme_color), encoding="utf-8"
+        _index_html_transpile(name, manifest_options.theme_color, dev=dev),
+        encoding="utf-8",
     )
     return tuple(sorted(TRANSPILE_ARTIFACT_FILES))

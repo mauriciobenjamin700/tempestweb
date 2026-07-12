@@ -140,6 +140,15 @@ tempestweb dev --mode server --host 0.0.0.0 --port 9000 --path ./meuapp
     está, sem watcher** (produção-like) — é o que o Dockerfile gerado pelo
     `tempestweb deploy` executa. Mesmos modos, mesmas flags; só o watcher muda.
 
+!!! info "`dev` nunca serve cache velho"
+    Nos modos estáticos (wasm/transpile) o app é um **PWA com service worker
+    cache-first**. Em `dev` isso atrapalharia — você veria o bundle antigo. Por
+    isso o `tempestweb dev` **não registra o service worker**: ele injeta um
+    *kill-switch* que desregistra qualquer worker existente e limpa os caches, de
+    modo que **todo reload serve o build recém-gerado**. O `run`/`build`/`deploy`
+    mantêm o service worker cacheador — em produção o cache é o que deixa o app
+    rápido no segundo load.
+
 !!! check "Feito quando"
     O terminal mostra `Serving at http://127.0.0.1:8000`, você abre no browser e vê
     o counter. Editar `app.py` recarrega a página (A/C) ou reinicia o servidor (B).

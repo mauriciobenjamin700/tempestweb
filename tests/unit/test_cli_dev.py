@@ -154,3 +154,22 @@ async def test_serve_dev_accepts_transpile_mode(
     )
     with pytest.raises(DevError, match=r"initial build failed: sentinel-build"):
         await serve_dev(root, mode="transpile")
+
+
+async def test_serve_dev_builds_with_dev_flag(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`dev` must build with dev=True so the shell skips the caching SW."""
+    root = _project(tmp_path)
+    seen: dict[str, object] = {}
+
+    def _capture(*_args: object, **kwargs: object) -> None:
+        seen["dev"] = kwargs.get("dev")
+        raise RuntimeError("stop-before-serve")
+
+    monkeypatch.setattr(
+        "tempestweb.cli.commands.build.build_artifact", _capture, raising=True
+    )
+    with pytest.raises(DevError):
+        await serve_dev(root, mode="wasm")
+    assert seen["dev"] is True

@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.53.2] — 2026-07-12
+
+### Fixed
+
+- **`tempestweb dev` no longer serves a stale cache.** The wasm/transpile PWA
+  registers a cache-first service worker; after upgrading, a previously-installed
+  worker kept serving old assets in the dev loop, so the browser 404'd on modules
+  the fresh build actually ships (and required a manual "unregister service
+  worker + clear site data" to recover). Dev builds now **skip the caching
+  service worker** and inject a cache kill-switch that unregisters any existing
+  worker, clears all caches, and reloads once if a worker was controlling the
+  page — so every `dev` reload serves the freshly rebuilt bundle. Production
+  builds (`run` / `build` / `deploy`) are unchanged and keep the caching service
+  worker for fast repeat loads.
+
 ## [0.53.1] — 2026-07-12
 
 ### Fixed

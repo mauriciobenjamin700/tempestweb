@@ -62,6 +62,40 @@ def test_server_artifact_ships_native_closure(tmp_path: Path) -> None:
     assert (static / "pwa" / "install-prompt.js").is_file()
 
 
+def test_wasm_prod_shell_registers_service_worker(tmp_path: Path) -> None:
+    """A production wasm build keeps the caching service worker."""
+    out = build_artifact(_project(tmp_path), mode="wasm").out_dir
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert "registerServiceWorker" in html
+    assert "tw-dev-sw-cleared" not in html
+
+
+def test_wasm_dev_shell_uses_cache_kill_switch(tmp_path: Path) -> None:
+    """A dev wasm build skips the SW and injects the cache kill-switch instead.
+
+    Regression: a stale cache-first service worker from a prior version kept
+    serving old assets in `tempestweb dev`, so the browser 404'd on modules that
+    the fresh build actually ships. Dev must never register the caching SW.
+    """
+    out = build_artifact(
+        _project(tmp_path), mode="wasm", out_dir=tmp_path / "devout", dev=True
+    ).out_dir
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert "registerServiceWorker" not in html
+    assert "tw-dev-sw-cleared" in html
+    assert "getRegistrations" in html  # unregisters any existing SW
+
+
+def test_transpile_dev_shell_uses_cache_kill_switch(tmp_path: Path) -> None:
+    """A dev transpile (Mode C) build also skips the SW for the kill-switch."""
+    out = build_artifact(
+        _project(tmp_path), mode="transpile", out_dir=tmp_path / "tdev", dev=True
+    ).out_dir
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert "registerServiceWorker" not in html
+    assert "tw-dev-sw-cleared" in html
+
+
 def test_native_assets_cover_index_imports() -> None:
     """``_NATIVE_ASSETS`` must list every module ``native/index.js`` imports.
 

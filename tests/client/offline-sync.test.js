@@ -9,7 +9,6 @@ import {
   replayOnReconnect,
   classifyReplayOutcome,
   QUEUE_TAG,
-  QUEUE_PERIODIC_TAG,
   DEFAULT_MAX_ATTEMPTS,
 } from "../../client/offline/sync.js";
 
@@ -182,10 +181,6 @@ test("failed and conflicts return [] when the queue is clean", async () => {
   const queue = freshQueue(async () => ({ ok: true }));
   assert.deepEqual(await queue.failed(), []);
   assert.deepEqual(await queue.conflicts(), []);
-});
-
-test("QUEUE_PERIODIC_TAG is distinct from the one-off tag", () => {
-  assert.notEqual(QUEUE_PERIODIC_TAG, QUEUE_TAG);
 });
 
 test("registerBackgroundSync returns false without a SyncManager", async () => {

@@ -96,6 +96,66 @@ async def test_size_and_replay() -> None:
     assert isinstance(result, ReplayResult)
     assert result.sent == 2
     assert result.remaining == 1
+    assert result.failed == 0
+    assert result.conflicts == 0
+
+
+async def test_replay_surfaces_failed_and_conflict_counts() -> None:
+    bridge = ScriptedBridge([{"sent": 1, "remaining": 0, "failed": 2, "conflicts": 1}])
+    install_bridge(bridge)
+    result = await offline.replay()
+    assert result.failed == 2
+    assert result.conflicts == 1
+
+
+async def test_failed_lists_dead_lettered_mutations() -> None:
+    bridge = ScriptedBridge(
+        [
+            {
+                "mutations": [
+                    {
+                        "id": "d",
+                        "owner": "default",
+                        "idempotency_key": "k",
+                        "method": "POST",
+                        "url": "/bad",
+                        "attempts": 5,
+                        "status": "failed",
+                    }
+                ]
+            }
+        ]
+    )
+    install_bridge(bridge)
+    rows = await offline.failed()
+    assert len(rows) == 1
+    assert rows[0].status == "failed"
+    assert bridge.calls[0]["capability"] == "offline.failed"
+
+
+async def test_conflicts_lists_409_parked_mutations() -> None:
+    bridge = ScriptedBridge(
+        [
+            {
+                "mutations": [
+                    {
+                        "id": "c",
+                        "owner": "default",
+                        "idempotency_key": "k",
+                        "method": "PUT",
+                        "url": "/conflict",
+                        "attempts": 1,
+                        "status": "conflict",
+                    }
+                ]
+            }
+        ]
+    )
+    install_bridge(bridge)
+    rows = await offline.conflicts()
+    assert len(rows) == 1
+    assert rows[0].status == "conflict"
+    assert bridge.calls[0]["capability"] == "offline.conflicts"
 
 
 def test_offline_is_a_mode_c_capability() -> None:
@@ -107,5 +167,7 @@ def test_offline_is_a_mode_c_capability() -> None:
         "offline.pending",
         "offline.replay",
         "offline.size",
+        "offline.failed",
+        "offline.conflicts",
     }
     assert offline_caps <= names

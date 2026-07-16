@@ -3,9 +3,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { IDBFactory } from "fake-indexeddb";
-import { drainOfflineQueue } from "../../client/sw/sw.js";
+import {
+  drainOfflineQueue,
+  isOfflineSyncTag,
+  replayFromSync,
+} from "../../client/sw/sw.js";
 import { createOfflineStore } from "../../client/offline/store.js";
-import { OfflineQueue } from "../../client/offline/sync.js";
+import { OfflineQueue, QUEUE_TAG, QUEUE_PERIODIC_TAG } from "../../client/offline/sync.js";
 
 /** A store over the worker's fixed db/table, backed by an isolated IDB. */
 function seedStore(indexedDB) {
@@ -101,4 +105,50 @@ test("drainOfflineQueue is a no-op on an empty queue", async () => {
     send: async () => assert.fail("nothing to send"),
   });
   assert.deepEqual(out, { sent: 0, owners: 0 });
+});
+
+// --- sync-tag routing (#1/#2) ---------------------------------------------
+
+test("isOfflineSyncTag matches the queue's one-off and periodic tags", () => {
+  assert.equal(isOfflineSyncTag(QUEUE_TAG), true, "one-off replay tag");
+  assert.equal(isOfflineSyncTag(QUEUE_PERIODIC_TAG), true, "periodic tag");
+  assert.equal(isOfflineSyncTag("tw-offline-anything"), true);
+  assert.equal(isOfflineSyncTag("other-tag"), false);
+  assert.equal(isOfflineSyncTag(undefined), false);
+  assert.equal(isOfflineSyncTag(123), false);
+});
+
+// --- replayFromSync: success + graceful fallback (F2) ----------------------
+
+test("replayFromSync drains via the loaded modules and notifies clients", async () => {
+  const messages = [];
+  await replayFromSync({
+    loadModules: async () => ({ createOfflineStore: "x", OfflineQueue: "y" }),
+    drain: async () => ({ sent: 3, owners: 2 }),
+    notify: async (m) => messages.push(m),
+  });
+  assert.deepEqual(messages, [{ type: "OFFLINE_QUEUE_DRAINED", sent: 3, owners: 2 }]);
+});
+
+test("replayFromSync falls back to client replay when module load fails", async () => {
+  const messages = [];
+  await replayFromSync({
+    loadModules: async () => {
+      throw new Error("modules unreachable (e.g. Mode B ships no SW client)");
+    },
+    notify: async (m) => messages.push(m),
+  });
+  assert.deepEqual(messages, [{ type: "REPLAY_OFFLINE_QUEUE" }]);
+});
+
+test("replayFromSync falls back when the drain itself throws", async () => {
+  const messages = [];
+  await replayFromSync({
+    loadModules: async () => ({ createOfflineStore: "x", OfflineQueue: "y" }),
+    drain: async () => {
+      throw new Error("IndexedDB unavailable in this worker");
+    },
+    notify: async (m) => messages.push(m),
+  });
+  assert.deepEqual(messages, [{ type: "REPLAY_OFFLINE_QUEUE" }]);
 });

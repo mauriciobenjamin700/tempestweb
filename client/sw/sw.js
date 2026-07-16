@@ -131,6 +131,23 @@ export function stalecaches(existing, keep) {
 }
 
 /**
+ * Whether a Background/Periodic Sync tag belongs to the offline queue.
+ *
+ * The worker owns any tag under the ``tw-offline`` prefix — the one-off replay
+ * tag (``tw-offline-replay``, registered automatically on enqueue) and any
+ * periodic tag an app opts into via ``native.bgsync.register_periodic`` (e.g.
+ * ``tw-offline-periodic``). Periodic Background Sync is permission-gated and
+ * interval-driven, so it is deliberately the app's decision to register — the
+ * worker only handles the wake-up when a matching tag fires.
+ *
+ * @param {*} tag   The sync event's tag.
+ * @returns {boolean} True when the worker should drain the queue for this tag.
+ */
+export function isOfflineSyncTag(tag) {
+  return typeof tag === "string" && tag.startsWith("tw-offline");
+}
+
+/**
  * Whether a response is safe to persist in a cache.
  *
  * Only successful, same-origin (``basic``) or plain responses are cacheable. An
@@ -497,18 +514,14 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
     event.waitUntil(onNotificationClick(event));
   });
 
-  // Background Sync: drain the durable offline queue when connectivity returns
-  // (fires even with the tab closed).
   self.addEventListener("sync", (event) => {
-    if (event.tag === "tw-offline-replay") {
+    if (isOfflineSyncTag(event.tag)) {
       event.waitUntil(replayFromSync());
     }
   });
 
-  // Periodic Background Sync: drain the queue on the browser's recurring wake-up.
-  // Any "tw-offline*" tag counts (one-off + periodic tags share the prefix).
   self.addEventListener("periodicsync", (event) => {
-    if (typeof event.tag === "string" && event.tag.startsWith("tw-offline")) {
+    if (isOfflineSyncTag(event.tag)) {
       event.waitUntil(replayFromSync());
     }
   });
@@ -589,21 +602,49 @@ async function notifyClients(message) {
  * Dynamically imports the page's queue modules and drains IndexedDB directly, so
  * the queue empties even with no tab open. On success it pings any open client to
  * refresh its UI/count (OFFLINE_QUEUE_DRAINED). If the import or the drain fails
- * (e.g. the modules are unreachable, or IndexedDB is unavailable in this worker),
- * it degrades to the legacy behavior — asking an open client to replay
+ * (e.g. the modules are unreachable — the SW ships only in the wasm/transpile
+ * artifacts that serve /client/ — or IndexedDB is unavailable in this worker), it
+ * degrades to the legacy behavior — asking an open client to replay
  * (REPLAY_OFFLINE_QUEUE) — so the queue is never stranded.
  *
+ * Concurrency: the worker drain and the page's replayOnReconnect can fire at the
+ * same time (the OfflineQueue single-flight guard is per-instance, not shared
+ * across the worker and the page). A mutation can therefore be sent twice; the
+ * idempotency key is the sole guard against a double-apply — the server dedups on
+ * it, so a concurrent double-send is safe, never duplicated. `delete` is
+ * idempotent too, so both drainers converge on an empty queue.
+ *
+ * The loader/notifier are injected so both the success and the fallback paths are
+ * unit-testable without a live ServiceWorkerGlobalScope.
+ *
+ * @param {Object} [deps]
+ * @param {() => Promise<{createOfflineStore: Function, OfflineQueue: Function}>} [deps.loadModules]
+ *        Resolve the queue modules (default: dynamic import of /client/offline/*).
+ * @param {(message: Object) => Promise<void>} [deps.notify]
+ *        Post a message to open clients (default: notifyClients).
+ * @param {(d: Object) => Promise<{sent:number, owners:number}>} [deps.drain]
+ *        The drainer (default: drainOfflineQueue).
  * @returns {Promise<void>}
  */
-async function replayFromSync() {
+async function replayFromSync(deps = {}) {
+  const loadModules =
+    deps.loadModules ??
+    (async () => {
+      const [store, sync] = await Promise.all([
+        import("/client/offline/store.js"),
+        import("/client/offline/sync.js"),
+      ]);
+      return { createOfflineStore: store.createOfflineStore, OfflineQueue: sync.OfflineQueue };
+    });
+  const notify = deps.notify ?? notifyClients;
+  const drain = deps.drain ?? drainOfflineQueue;
   try {
-    const [{ createOfflineStore }, { OfflineQueue }] = await Promise.all([
-      import("/client/offline/store.js"),
-      import("/client/offline/sync.js"),
-    ]);
-    const result = await drainOfflineQueue({ createOfflineStore, OfflineQueue });
-    await notifyClients({ type: "OFFLINE_QUEUE_DRAINED", ...result });
+    const { createOfflineStore, OfflineQueue } = await loadModules();
+    const result = await drain({ createOfflineStore, OfflineQueue });
+    await notify({ type: "OFFLINE_QUEUE_DRAINED", ...result });
   } catch (err) {
-    await notifyClients({ type: "REPLAY_OFFLINE_QUEUE" });
+    await notify({ type: "REPLAY_OFFLINE_QUEUE" });
   }
 }
+
+export { replayFromSync };

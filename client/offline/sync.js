@@ -256,7 +256,7 @@ export class OfflineQueue {
           failed += 1;
         } else {
           await this.store.update(row.id, { attempts: row.attempts + 1 });
-          break; // transient: preserve FIFO; retry the rest later
+          break;
         }
       }
     } finally {

@@ -127,7 +127,11 @@ async def flush_when_online() -> None:
     await native.offline.replay()
 ```
 
-Inspecione a fila com `native.offline.size()` e `native.offline.pending()`.
+Inspecione a fila com `native.offline.size()` e `native.offline.pending()`. Uma
+mutação que falha de forma permanente vira **dead-letter**
+(`native.offline.failed()`) e um conflito `409` vai pra **lane de conflito**
+(`native.offline.conflicts()`) — nenhum dos dois trava a fila. Veja
+[Offline + sincronização](offline-sync.md) para o ciclo completo.
 
 !!! warning "Replay precisa de idempotência"
     Ao voltar a rede, a fila reenvia as mutações. O servidor **deduplica pela chave

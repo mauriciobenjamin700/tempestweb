@@ -126,7 +126,11 @@ async def flush_when_online() -> None:
     await native.offline.replay()
 ```
 
-Inspect the queue with `native.offline.size()` and `native.offline.pending()`.
+Inspect the queue with `native.offline.size()` and `native.offline.pending()`. A
+mutation that fails permanently becomes a **dead-letter**
+(`native.offline.failed()`) and a `409` conflict moves to the **conflict lane**
+(`native.offline.conflicts()`) — neither wedges the queue. See
+[Offline + sync](offline-sync.md) for the full cycle.
 
 !!! warning "Replay needs idempotency"
     When the network returns, the queue re-sends the mutations. The server

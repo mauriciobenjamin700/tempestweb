@@ -12,7 +12,7 @@
 // handlers are unit-testable under Node with a fake store + sender.
 
 import { httpRequest } from "./http.js";
-import { createOfflineStore } from "../offline/store.js";
+import { createOfflineStore, persistStorage } from "../offline/store.js";
 import {
   OfflineQueue,
   registerBackgroundSync,
@@ -27,8 +27,9 @@ let _reconnectWired = false;
  * Lazily build (and cache) the process-wide offline queue.
  *
  * The queue persists to IndexedDB (`tempestweb-offline` / `mutations`) and sends
- * via the shared http glue. On first build, replay is wired to the `online`
- * event so a reconnect drains the queue with the tab open.
+ * via the shared http glue. On first build, durable storage is requested
+ * (best-effort) so the queue is not evicted under disk pressure, and replay is
+ * wired to the `online` event so a reconnect drains the queue with the tab open.
  *
  * @param {import("./index.js").NativeDeps} [deps]  Injected deps; `deps.offlineQueue`
  *        overrides the whole queue (tests), `deps.indexedDB` the IDB factory.
@@ -46,6 +47,7 @@ function queue(deps) {
     ownerField: "owner",
     indexedDB: deps && /** @type {any} */ (deps).indexedDB,
   });
+  persistStorage(deps && /** @type {any} */ (deps).navigator).catch(() => {});
   const send = async (mutation) => {
     const res = await httpRequest(
       {

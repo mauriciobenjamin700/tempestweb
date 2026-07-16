@@ -108,3 +108,22 @@ test("offline.conflicts lists 409-parked mutations without blocking", async () =
   assert.equal(conflicts.value.mutations[0].url, "/c");
   assert.equal(conflicts.value.mutations[0].status, "conflict");
 });
+
+test("building the real queue requests durable storage (best-effort)", async () => {
+  let persisted = false;
+  const navigator = {
+    storage: {
+      persist: async () => {
+        persisted = true;
+        return true;
+      },
+      persisted: async () => false,
+    },
+  };
+  const res = await dispatch(
+    { call_id: "1", capability: "offline.enqueue", args: { method: "POST", url: "/x" } },
+    { indexedDB: new IDBFactory(), navigator },
+  );
+  assert.equal(res.ok, true);
+  assert.equal(persisted, true, "navigator.storage.persist() was requested");
+});

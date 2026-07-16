@@ -15,8 +15,10 @@
 // ../../docs/plan.md §7 P1 for the contract.
 //
 // Files: client/sw/sw.js (this worker) + client/sw/register.js (registration).
-// The offline queue lives in client/offline/{store,sync}.js; this worker only
-// pings open clients to replay it (see replayFromSync).
+// The offline queue lives in client/offline/{store,sync}.js; on a Background /
+// Periodic Sync this worker drains it directly (dynamic import → drainOfflineQueue),
+// so the queue empties with the tab closed, and falls back to pinging open clients
+// if that import is unavailable (see replayFromSync).
 
 /* global self, caches, clients, fetch, Response, Request, URL */
 
@@ -228,6 +230,71 @@ export async function handleNavigation(request, deps = {}) {
 }
 
 /**
+ * Build the fetch-based sender the worker uses to replay a queued mutation.
+ *
+ * Reconstructs the original request from a stored queue row and carries the
+ * idempotency key so the server dedups a re-sent mutation — matching the
+ * page-side sender in client/native/offline.js.
+ *
+ * @returns {(m: Object) => Promise<{ok: boolean, status: number}>} The sender.
+ */
+function workerSend() {
+  return async (mutation) => {
+    /** @type {Object} */
+    const init = {
+      method: mutation.method,
+      headers: { "idempotency-key": mutation.idempotencyKey },
+    };
+    if (mutation.body !== undefined && mutation.body !== null) {
+      init.headers["content-type"] = "application/json";
+      init.body = JSON.stringify(mutation.body);
+    }
+    const res = await fetch(mutation.url, init);
+    return { ok: res.ok, status: res.status };
+  };
+}
+
+/**
+ * Drain the durable offline queue from within the worker (P2 §1).
+ *
+ * Reuses the page's queue logic (client/offline/{store,sync}.js) so the replay
+ * policy — FIFO, dead-letter, conflict lane — is identical whether the page or
+ * the worker drains, and replays every owner present in the store (not just the
+ * default). This is what lets a Background/Periodic Sync drain the queue with
+ * the tab closed. The store, queue class and sender are injected so the logic is
+ * unit-testable; production wires the dynamic import + the fetch sender.
+ *
+ * @param {Object} deps
+ * @param {Function} deps.createOfflineStore   The OfflineStore factory.
+ * @param {Function} deps.OfflineQueue         The OfflineQueue class.
+ * @param {IDBFactory} [deps.indexedDB]        IDB factory override (tests).
+ * @param {(m: Object) => Promise<{ok:boolean, status:number}>} [deps.send]
+ *        Network sender (default: the worker's fetch sender).
+ * @returns {Promise<{sent: number, owners: number}>} Drain outcome.
+ */
+export async function drainOfflineQueue(deps) {
+  const store = deps.createOfflineStore({
+    databaseName: "tempestweb-offline",
+    tableName: "mutations",
+    keyPath: "id",
+    ownerField: "owner",
+    indexedDB: deps.indexedDB,
+  });
+  const send = deps.send ?? workerSend();
+  const queue = new deps.OfflineQueue({ store, send });
+  const all = await store.listAll();
+  const owners = [
+    ...new Set(all.filter((r) => r.status === "pending").map((r) => r.owner)),
+  ];
+  let sent = 0;
+  for (const owner of owners) {
+    const out = await queue.replay(owner);
+    sent += out.sent;
+  }
+  return { sent, owners: owners.length };
+}
+
+/**
  * Build the notification options for an incoming push payload.
  *
  * Mirrors the React SDK's installPushHandler: a `transform` may return `null` to
@@ -430,9 +497,18 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
     event.waitUntil(onNotificationClick(event));
   });
 
-  // Background Sync: replay the durable offline queue when connectivity returns.
+  // Background Sync: drain the durable offline queue when connectivity returns
+  // (fires even with the tab closed).
   self.addEventListener("sync", (event) => {
     if (event.tag === "tw-offline-replay") {
+      event.waitUntil(replayFromSync());
+    }
+  });
+
+  // Periodic Background Sync: drain the queue on the browser's recurring wake-up.
+  // Any "tw-offline*" tag counts (one-off + periodic tags share the prefix).
+  self.addEventListener("periodicsync", (event) => {
+    if (typeof event.tag === "string" && event.tag.startsWith("tw-offline")) {
       event.waitUntil(replayFromSync());
     }
   });
@@ -498,18 +574,36 @@ async function focusOrOpen(url) {
 }
 
 /**
- * Replay the offline queue from a Background Sync event.
+ * Post a message to every controlled client (open tab), best-effort.
+ * @param {Object} message   The structured-clonable message to post.
+ * @returns {Promise<void>}
+ */
+async function notifyClients(message) {
+  const all = await clients.matchAll({ includeUncontrolled: true });
+  for (const client of all) client.postMessage(message);
+}
+
+/**
+ * Drain the offline queue from a Background/Periodic Sync event (P2 §1).
  *
- * Delegates to the page's sync module shape by posting a REPLAY message to all
- * clients (the queue lives in IndexedDB owned by client/offline/sync.js). When no
- * client is open, the worker has no network helper here; the queue stays durable
- * and replays on the next open. P2.
+ * Dynamically imports the page's queue modules and drains IndexedDB directly, so
+ * the queue empties even with no tab open. On success it pings any open client to
+ * refresh its UI/count (OFFLINE_QUEUE_DRAINED). If the import or the drain fails
+ * (e.g. the modules are unreachable, or IndexedDB is unavailable in this worker),
+ * it degrades to the legacy behavior — asking an open client to replay
+ * (REPLAY_OFFLINE_QUEUE) — so the queue is never stranded.
  *
  * @returns {Promise<void>}
  */
 async function replayFromSync() {
-  const all = await clients.matchAll({ includeUncontrolled: true });
-  for (const client of all) {
-    client.postMessage({ type: "REPLAY_OFFLINE_QUEUE" });
+  try {
+    const [{ createOfflineStore }, { OfflineQueue }] = await Promise.all([
+      import("/client/offline/store.js"),
+      import("/client/offline/sync.js"),
+    ]);
+    const result = await drainOfflineQueue({ createOfflineStore, OfflineQueue });
+    await notifyClients({ type: "OFFLINE_QUEUE_DRAINED", ...result });
+  } catch (err) {
+    await notifyClients({ type: "REPLAY_OFFLINE_QUEUE" });
   }
 }

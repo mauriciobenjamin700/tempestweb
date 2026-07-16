@@ -202,6 +202,20 @@ export class OfflineStore {
   }
 
   /**
+   * List every record across all owners, unsorted.
+   *
+   * Used by the service-worker queue drainer, which must replay mutations for
+   * every owner present (not just one). Returns [] when the store is empty.
+   *
+   * @returns {Promise<Object[]>} All records in the store.
+   */
+  async listAll() {
+    return this._withStore("readonly", (store) =>
+      promisifyRequest(store.getAll()),
+    );
+  }
+
+  /**
    * Merge a partial patch into an existing record (no-op when absent).
    * @param {IDBValidKey} key      The primary key.
    * @param {Object} patch         Fields to merge.

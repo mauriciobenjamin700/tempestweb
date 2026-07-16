@@ -59,6 +59,12 @@ const PRECACHE_ASSETS = (() => {
 const PRECACHE = `${CACHE_VERSION}-precache`;
 const RUNTIME = `${CACHE_VERSION}-runtime`;
 
+/**
+ * Max entries kept in the stale-while-revalidate runtime cache before the oldest
+ * are evicted. Bounds unbounded growth from visiting many same-origin URLs.
+ */
+const RUNTIME_MAX_ENTRIES = 60;
+
 // --- Pure helpers (exported for unit tests; harmless in the worker) ----------
 
 /**
@@ -144,6 +150,26 @@ export function isCacheable(response) {
     : null;
   if (cc && /(^|[,\s])no-store([,\s]|$)/i.test(cc)) return false;
   return true;
+}
+
+/**
+ * Evict the oldest entries so a cache holds at most ``max`` responses.
+ *
+ * The Cache API returns keys in insertion order, so the excess at the front is
+ * the least-recently-added; deleting it bounds the runtime cache's growth (a
+ * stale-while-revalidate cache would otherwise accumulate every visited URL for
+ * the cache version's lifetime). A no-op when the cache is within budget.
+ *
+ * @param {Cache} cache   The cache to trim (needs keys() + delete()).
+ * @param {number} max    The maximum number of entries to keep.
+ * @returns {Promise<number>} How many entries were evicted.
+ */
+export async function trimCache(cache, max) {
+  const keys = await cache.keys();
+  if (keys.length <= max) return 0;
+  const excess = keys.slice(0, keys.length - max);
+  for (const key of excess) await cache.delete(key);
+  return excess.length;
 }
 
 /**
@@ -387,7 +413,8 @@ async function handleFetch(request, strategy) {
     .then(async (response) => {
       if (isCacheable(response)) {
         const cache = await caches.open(RUNTIME);
-        cache.put(request, response.clone());
+        await cache.put(request, response.clone());
+        await trimCache(cache, RUNTIME_MAX_ENTRIES);
       }
       return response;
     })

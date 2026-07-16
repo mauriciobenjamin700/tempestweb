@@ -5,6 +5,7 @@ import {
   chooseStrategy,
   stalecaches,
   isCacheable,
+  trimCache,
   buildNotification,
   resolveClickUrl,
   applyBadge,
@@ -65,6 +66,27 @@ test("isCacheable: rejects error, opaque and no-store responses", () => {
 
 test("isCacheable: a plain cache-control still caches", () => {
   assert.equal(isCacheable(resp({ ok: true, cacheControl: "max-age=3600" })), true);
+});
+
+test("trimCache: evicts the oldest entries beyond the cap (FIFO)", async () => {
+  let keys = ["/a", "/b", "/c", "/d", "/e"];
+  const cache = {
+    keys: async () => keys.slice(),
+    delete: async (k) => {
+      keys = keys.filter((x) => x !== k);
+    },
+  };
+  const evicted = await trimCache(cache, 3);
+  assert.equal(evicted, 2);
+  assert.deepEqual(keys, ["/c", "/d", "/e"], "oldest two removed");
+});
+
+test("trimCache: no-op when within the cap", async () => {
+  const cache = {
+    keys: async () => ["/a", "/b"],
+    delete: async () => assert.fail("should not delete"),
+  };
+  assert.equal(await trimCache(cache, 5), 0);
 });
 
 test("buildNotification: defaults title/icon and copies fields", () => {

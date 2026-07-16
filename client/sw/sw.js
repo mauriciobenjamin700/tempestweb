@@ -123,6 +123,30 @@ export function stalecaches(existing, keep) {
 }
 
 /**
+ * Whether a response is safe to persist in a cache.
+ *
+ * Only successful, same-origin (``basic``) or plain responses are cacheable. An
+ * error (``4xx``/``5xx``) or an opaque cross-origin response must never be
+ * stored: caching a ``404``/``500`` would make the worker serve that failure as
+ * a valid app-shell asset for the whole cache lifetime, and an opaque body can't
+ * be validated. The response's own ``Cache-Control: no-store`` is honored too.
+ *
+ * @param {?Response} response   The fetched response (may be undefined).
+ * @returns {boolean} True when the response may be written to a cache.
+ */
+export function isCacheable(response) {
+  if (!response || !response.ok) return false;
+  if (response.type && response.type !== "basic" && response.type !== "default") {
+    return false;
+  }
+  const cc = response.headers && response.headers.get
+    ? response.headers.get("cache-control")
+    : null;
+  if (cc && /(^|[,\s])no-store([,\s]|$)/i.test(cc)) return false;
+  return true;
+}
+
+/**
  * Build the notification options for an incoming push payload.
  *
  * Mirrors the React SDK's installPushHandler: a `transform` may return `null` to
@@ -351,16 +375,20 @@ async function handleFetch(request, strategy) {
     const cached = await caches.match(request);
     if (cached) return cached;
     const response = await fetch(request);
-    const cache = await caches.open(PRECACHE);
-    cache.put(request, response.clone());
+    if (isCacheable(response)) {
+      const cache = await caches.open(PRECACHE);
+      cache.put(request, response.clone());
+    }
     return response;
   }
   // stale-while-revalidate
   const cached = await caches.match(request);
   const networkPromise = fetch(request)
     .then(async (response) => {
-      const cache = await caches.open(RUNTIME);
-      cache.put(request, response.clone());
+      if (isCacheable(response)) {
+        const cache = await caches.open(RUNTIME);
+        cache.put(request, response.clone());
+      }
       return response;
     })
     .catch(() => cached);

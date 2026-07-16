@@ -4,12 +4,22 @@ import assert from "node:assert/strict";
 import {
   chooseStrategy,
   stalecaches,
+  isCacheable,
   buildNotification,
   resolveClickUrl,
   applyBadge,
   installPushHandler,
   installNotificationClickHandler,
 } from "../../client/sw/sw.js";
+
+/** Build a Response-like object for isCacheable tests (no real fetch). */
+function resp({ ok = true, type = "basic", cacheControl = null } = {}) {
+  return {
+    ok,
+    type,
+    headers: { get: (h) => (h.toLowerCase() === "cache-control" ? cacheControl : null) },
+  };
+}
 
 const ORIGIN = "https://app.example";
 const SHELL = ["/", "/index.html", "/client/tempestweb.js", "/client/dom.js"];
@@ -38,6 +48,23 @@ test("stalecaches: keeps current, drops the rest", () => {
   const existing = ["v1-precache", "v1-runtime", "v2-precache", "v2-runtime"];
   const keep = ["v2-precache", "v2-runtime"];
   assert.deepEqual(stalecaches(existing, keep), ["v1-precache", "v1-runtime"]);
+});
+
+test("isCacheable: accepts a successful same-origin response", () => {
+  assert.equal(isCacheable(resp({ ok: true, type: "basic" })), true);
+  assert.equal(isCacheable(resp({ ok: true, type: "default" })), true);
+});
+
+test("isCacheable: rejects error, opaque and no-store responses", () => {
+  assert.equal(isCacheable(resp({ ok: false, type: "basic" })), false, "4xx/5xx");
+  assert.equal(isCacheable(resp({ ok: true, type: "opaque" })), false, "opaque");
+  assert.equal(isCacheable(resp({ ok: true, cacheControl: "no-store" })), false);
+  assert.equal(isCacheable(resp({ ok: true, cacheControl: "private, no-store" })), false);
+  assert.equal(isCacheable(null), false);
+});
+
+test("isCacheable: a plain cache-control still caches", () => {
+  assert.equal(isCacheable(resp({ ok: true, cacheControl: "max-age=3600" })), true);
 });
 
 test("buildNotification: defaults title/icon and copies fields", () => {

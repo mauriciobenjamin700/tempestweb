@@ -173,6 +173,61 @@ export async function trimCache(cache, max) {
 }
 
 /**
+ * A minimal last-resort offline document for a navigation with no cached shell.
+ *
+ * Returned only when the network is down and neither the requested route nor the
+ * app shell (``"/"``) is cached — a genuinely cold offline start.
+ *
+ * @returns {Response} A ``503`` HTML response.
+ */
+export function offlineFallbackResponse() {
+  const body =
+    "<!doctype html><meta charset=utf-8><title>Offline</title>" +
+    '<body style="font:1rem system-ui;margin:2rem">' +
+    "<h1>Offline</h1><p>This page isn't available offline yet.</p>";
+  return new Response(body, {
+    status: 503,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Serve a navigation request with an offline fallback to the cached app shell.
+ *
+ * SPA navigations to client-side routes (e.g. ``/orders/5``) have no precached
+ * entry of their own, so an offline navigation must fall back to the cached shell
+ * for the app to boot and route. Order: live network (cached for reuse) → the
+ * exact cached response → the cached shell → a minimal offline document.
+ *
+ * @param {Request} request   The navigation request.
+ * @param {Object} [deps]     Injected for tests.
+ * @param {(req: Request) => Promise<Response>} [deps.fetchFn]    Network fetch.
+ * @param {(req: (Request|string)) => Promise<?Response>} [deps.matchFn]  Cache match.
+ * @param {string} [deps.shellUrl]   The shell URL to fall back to (default "/").
+ * @returns {Promise<Response>} The response to serve.
+ */
+export async function handleNavigation(request, deps = {}) {
+  const fetchFn = deps.fetchFn ?? ((r) => fetch(r));
+  const matchFn = deps.matchFn ?? ((r) => caches.match(r));
+  const shellUrl = deps.shellUrl ?? "/";
+  try {
+    const response = await fetchFn(request);
+    if (isCacheable(response) && typeof caches !== "undefined") {
+      const cache = await caches.open(RUNTIME);
+      await cache.put(request, response.clone());
+      await trimCache(cache, RUNTIME_MAX_ENTRIES);
+    }
+    return response;
+  } catch (err) {
+    const exact = await matchFn(request);
+    if (exact) return exact;
+    const shell = await matchFn(shellUrl);
+    if (shell) return shell;
+    return offlineFallbackResponse();
+  }
+}
+
+/**
  * Build the notification options for an incoming push payload.
  *
  * Mirrors the React SDK's installPushHandler: a `transform` may return `null` to
@@ -357,6 +412,10 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
   self.addEventListener("fetch", (event) => {
     const request = event.request;
     if (request.method !== "GET") return; // mutations handled by the offline queue
+    if (request.mode === "navigate") {
+      event.respondWith(handleNavigation(request));
+      return;
+    }
     const strategy = chooseStrategy(request.url, self.location.origin, PRECACHE_ASSETS);
     event.respondWith(handleFetch(request, strategy));
   });

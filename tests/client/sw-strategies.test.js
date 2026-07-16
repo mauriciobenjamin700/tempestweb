@@ -6,6 +6,8 @@ import {
   stalecaches,
   isCacheable,
   trimCache,
+  handleNavigation,
+  offlineFallbackResponse,
   buildNotification,
   resolveClickUrl,
   applyBadge,
@@ -87,6 +89,56 @@ test("trimCache: no-op when within the cap", async () => {
     delete: async () => assert.fail("should not delete"),
   };
   assert.equal(await trimCache(cache, 5), 0);
+});
+
+// --- offline navigation fallback (#6) -------------------------------------
+
+test("handleNavigation: returns the live response when online", async () => {
+  const live = new Response("fresh", { status: 200 });
+  const res = await handleNavigation(new Request("https://app.example/orders/5"), {
+    fetchFn: async () => live,
+    matchFn: async () => assert.fail("should not touch the cache when online"),
+  });
+  assert.equal(await res.text(), "fresh");
+});
+
+test("handleNavigation: offline falls back to the exact cached route", async () => {
+  const cached = new Response("cached-route", { status: 200 });
+  const res = await handleNavigation(new Request("https://app.example/orders/5"), {
+    fetchFn: async () => {
+      throw new Error("offline");
+    },
+    matchFn: async (req) => (String(req.url ?? req).endsWith("/orders/5") ? cached : null),
+  });
+  assert.equal(await res.text(), "cached-route");
+});
+
+test("handleNavigation: offline falls back to the cached app shell", async () => {
+  const shell = new Response("shell", { status: 200 });
+  const res = await handleNavigation(new Request("https://app.example/deep/link"), {
+    fetchFn: async () => {
+      throw new Error("offline");
+    },
+    matchFn: async (req) => (req === "/" ? shell : null),
+  });
+  assert.equal(await res.text(), "shell");
+});
+
+test("handleNavigation: cold offline start yields the offline document", async () => {
+  const res = await handleNavigation(new Request("https://app.example/x"), {
+    fetchFn: async () => {
+      throw new Error("offline");
+    },
+    matchFn: async () => null,
+  });
+  assert.equal(res.status, 503);
+  assert.match(await res.text(), /Offline/);
+});
+
+test("offlineFallbackResponse: a 503 HTML document", async () => {
+  const res = offlineFallbackResponse();
+  assert.equal(res.status, 503);
+  assert.match(res.headers.get("content-type"), /text\/html/);
 });
 
 test("buildNotification: defaults title/icon and copies fields", () => {

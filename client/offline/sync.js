@@ -21,7 +21,7 @@
  * @property {*} [body]                 JSON-able request body.
  * @property {number} seq               Monotonic sequence for FIFO ordering.
  * @property {number} attempts          Replay attempts so far.
- * @property {string} status            "pending" | "done" | "failed".
+ * @property {string} status            "pending" | "done" | "failed" | "conflict".
  */
 
 /**
@@ -31,6 +31,10 @@
  */
 
 const QUEUE_TAG = "tw-offline-replay";
+const QUEUE_PERIODIC_TAG = "tw-offline-periodic";
+
+/** Default replay attempts before a transient failure is dead-lettered. */
+const DEFAULT_MAX_ATTEMPTS = 5;
 
 /**
  * Generate a reasonably-unique id without external deps.
@@ -44,6 +48,58 @@ function uid() {
 }
 
 /**
+ * Whether a failed HTTP status is worth retrying.
+ *
+ * A retry only helps for transient conditions: any 5xx server error and the
+ * three retryable 4xx codes (408 Request Timeout, 425 Too Early, 429 Too Many
+ * Requests). Every other 4xx is a permanent client error that will never
+ * succeed on replay, so it is dead-lettered immediately instead of blocking.
+ *
+ * @param {number} status   The HTTP status code.
+ * @returns {boolean} True when replaying the mutation may succeed later.
+ */
+function isRetryableStatus(status) {
+  if (status === 408 || status === 425 || status === 429) return true;
+  return status >= 500;
+}
+
+/**
+ * Decide what to do with a mutation after one replay send attempt.
+ *
+ * Extracted as a pure function so the replay policy is unit-testable and shared
+ * verbatim by the page-side queue and the service-worker drainer (P2 §1/§4/§9):
+ *
+ *   - `"sent"`: the send was accepted; delete the row.
+ *   - `"conflict"`: the server reported `409`; move the row to the conflict lane
+ *     (status `"conflict"`) and keep draining — a conflict never blocks.
+ *   - `"deadletter"`: a permanent client error, or attempts are exhausted; mark
+ *     the row `"failed"` and keep draining so one poison message cannot wedge
+ *     the whole queue.
+ *   - `"retry"`: a transient failure below the attempt ceiling; increment
+ *     attempts and stop so FIFO order is preserved on the next replay.
+ *
+ * @param {?SendResult} outcome    The send result ({ok:false} for a throw).
+ * @param {number} attempts        Attempts already recorded on the row.
+ * @param {number} maxAttempts     The attempt ceiling before dead-lettering.
+ * @returns {"sent"|"conflict"|"deadletter"|"retry"} The decision.
+ */
+export function classifyReplayOutcome(outcome, attempts, maxAttempts) {
+  if (outcome && outcome.ok) return "sent";
+  const status = outcome ? outcome.status : undefined;
+  if (status === 409) return "conflict";
+  if (
+    typeof status === "number" &&
+    status >= 400 &&
+    status < 500 &&
+    !isRetryableStatus(status)
+  ) {
+    return "deadletter";
+  }
+  if (attempts + 1 >= maxAttempts) return "deadletter";
+  return "retry";
+}
+
+/**
  * A durable offline mutation queue with replay-on-reconnect.
  */
 export class OfflineQueue {
@@ -54,6 +110,8 @@ export class OfflineQueue {
    * @param {(m: Mutation) => Promise<SendResult>} options.send
    *        Network sender; resolves {ok} (throws/rejects on transport failure).
    * @param {string} [options.owner]   Default owner scope (default "default").
+   * @param {number} [options.maxAttempts]   Attempts before a transient failure
+   *        is dead-lettered (default {@link DEFAULT_MAX_ATTEMPTS}).
    */
   constructor(options) {
     if (!options || !options.store || typeof options.send !== "function") {
@@ -65,6 +123,8 @@ export class OfflineQueue {
     this.send = options.send;
     /** @type {string} */
     this.owner = options.owner ?? "default";
+    /** @type {number} */
+    this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     /** @type {number} */
     this._seq = 0;
     /** @type {boolean} */
@@ -113,20 +173,62 @@ export class OfflineQueue {
   }
 
   /**
-   * Replay every pending mutation in FIFO order.
+   * List the dead-lettered (permanently failed) mutations for the owner.
    *
-   * Each accepted mutation is removed from the queue. A mutation whose send
-   * resolves {ok:false} or throws is left pending (attempts incremented) and
-   * replay stops at the first failure so order is preserved on the next attempt.
-   * Idempotency keys mean a re-sent mutation never double-applies server-side.
+   * Returns [] when none have failed (never throws for an empty result).
    *
    * @param {string} [owner]   Owner scope (default the queue owner).
-   * @returns {Promise<{sent: number, remaining: number}>} Replay outcome.
+   * @returns {Promise<Mutation[]>} Failed rows, oldest first.
+   */
+  async failed(owner) {
+    const rows = await this.store.list(owner ?? this.owner, { orderBy: "seq" });
+    return rows.filter((r) => r.status === "failed");
+  }
+
+  /**
+   * List the mutations parked in the conflict lane (server returned 409).
+   *
+   * Returns [] when none conflicted (never throws for an empty result).
+   *
+   * @param {string} [owner]   Owner scope (default the queue owner).
+   * @returns {Promise<Mutation[]>} Conflicting rows, oldest first.
+   */
+  async conflicts(owner) {
+    const rows = await this.store.list(owner ?? this.owner, { orderBy: "seq" });
+    return rows.filter((r) => r.status === "conflict");
+  }
+
+  /**
+   * Replay every pending mutation in FIFO order.
+   *
+   * Each accepted mutation is removed from the queue. The disposition of a
+   * failed send is decided by {@link classifyReplayOutcome}: a transient failure
+   * increments attempts and stops replay (preserving FIFO) until the attempt
+   * ceiling is reached, at which point the row is dead-lettered (status
+   * `"failed"`) and draining continues so one poison message cannot wedge the
+   * queue; a permanent client error (non-retryable 4xx) is dead-lettered on the
+   * first attempt; a `409` moves the row to the conflict lane (status
+   * `"conflict"`). Idempotency keys mean a re-sent mutation never double-applies
+   * server-side.
+   *
+   * @param {string} [owner]   Owner scope (default the queue owner).
+   * @returns {Promise<{sent: number, remaining: number, failed: number, conflicts: number}>}
+   *          Replay outcome: rows accepted, still pending, dead-lettered this
+   *          run, and moved to the conflict lane this run.
    */
   async replay(owner) {
-    if (this._replaying) return { sent: 0, remaining: (await this.pending(owner)).length };
+    if (this._replaying) {
+      return {
+        sent: 0,
+        remaining: (await this.pending(owner)).length,
+        failed: 0,
+        conflicts: 0,
+      };
+    }
     this._replaying = true;
     let sent = 0;
+    let failed = 0;
+    let conflicts = 0;
     try {
       const queue = await this.pending(owner);
       for (const row of queue) {
@@ -136,19 +238,32 @@ export class OfflineQueue {
         } catch {
           result = { ok: false };
         }
-        if (result && result.ok) {
+        const decision = classifyReplayOutcome(result, row.attempts, this.maxAttempts);
+        if (decision === "sent") {
           await this.store.delete(row.id);
           sent += 1;
+        } else if (decision === "conflict") {
+          await this.store.update(row.id, {
+            status: "conflict",
+            attempts: row.attempts + 1,
+          });
+          conflicts += 1;
+        } else if (decision === "deadletter") {
+          await this.store.update(row.id, {
+            status: "failed",
+            attempts: row.attempts + 1,
+          });
+          failed += 1;
         } else {
           await this.store.update(row.id, { attempts: row.attempts + 1 });
-          break; // preserve FIFO; retry the rest later
+          break; // transient: preserve FIFO; retry the rest later
         }
       }
     } finally {
       this._replaying = false;
     }
     const remaining = (await this.pending(owner)).length;
-    return { sent, remaining };
+    return { sent, remaining, failed, conflicts };
   }
 
   /**
@@ -222,4 +337,4 @@ export function replayOnReconnect(queue, deps = {}) {
   };
 }
 
-export { QUEUE_TAG };
+export { QUEUE_TAG, QUEUE_PERIODIC_TAG, DEFAULT_MAX_ATTEMPTS };

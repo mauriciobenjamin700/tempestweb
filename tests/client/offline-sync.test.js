@@ -7,7 +7,10 @@ import {
   OfflineQueue,
   registerBackgroundSync,
   replayOnReconnect,
+  classifyReplayOutcome,
   QUEUE_TAG,
+  QUEUE_PERIODIC_TAG,
+  DEFAULT_MAX_ATTEMPTS,
 } from "../../client/offline/sync.js";
 
 /** Build a queue backed by an isolated fake-indexeddb store. */
@@ -52,7 +55,7 @@ test("replay sends pending mutations in FIFO order and drains the queue", async 
   await queue.enqueue({ method: "POST", url: "/c" });
   const out = await queue.replay();
   assert.deepEqual(seen, ["/a", "/b", "/c"]);
-  assert.deepEqual(out, { sent: 3, remaining: 0 });
+  assert.deepEqual(out, { sent: 3, remaining: 0, failed: 0, conflicts: 0 });
   assert.equal(await queue.size(), 0);
 });
 
@@ -79,7 +82,7 @@ test("replay treats a thrown send as a failure (no crash, stays queued)", async 
   });
   await queue.enqueue({ method: "POST", url: "/a" });
   const out = await queue.replay();
-  assert.deepEqual(out, { sent: 0, remaining: 1 });
+  assert.deepEqual(out, { sent: 0, remaining: 1, failed: 0, conflicts: 0 });
 });
 
 test("replay is idempotent under re-entry (no double send while in flight)", async () => {
@@ -98,6 +101,91 @@ test("replay is idempotent under re-entry (no double send while in flight)", asy
   resolveSend();
   await first;
   assert.equal(sendCount, 1, "only one in-flight send");
+});
+
+// --- deadletter (#4) + conflict lane (#9) ---------------------------------
+
+test("classifyReplayOutcome: ok is sent, 409 is conflict", () => {
+  assert.equal(classifyReplayOutcome({ ok: true }, 0, 5), "sent");
+  assert.equal(classifyReplayOutcome({ ok: false, status: 409 }, 0, 5), "conflict");
+});
+
+test("classifyReplayOutcome: permanent 4xx dead-letters on the first attempt", () => {
+  assert.equal(classifyReplayOutcome({ ok: false, status: 400 }, 0, 5), "deadletter");
+  assert.equal(classifyReplayOutcome({ ok: false, status: 422 }, 0, 5), "deadletter");
+});
+
+test("classifyReplayOutcome: retryable statuses retry until the ceiling", () => {
+  for (const status of [500, 503, 408, 425, 429]) {
+    assert.equal(classifyReplayOutcome({ ok: false, status }, 0, 5), "retry");
+    assert.equal(classifyReplayOutcome({ ok: false, status }, 4, 5), "deadletter");
+  }
+  assert.equal(classifyReplayOutcome({ ok: false }, 0, 5), "retry", "thrown send");
+  assert.equal(classifyReplayOutcome({ ok: false }, 4, 5), "deadletter");
+});
+
+test("replay dead-letters a poison message and keeps draining the rest", async () => {
+  const seen = [];
+  const queue = freshQueue(async (m) => {
+    seen.push(m.url);
+    return m.url === "/poison" ? { ok: false, status: 400 } : { ok: true, status: 200 };
+  });
+  await queue.enqueue({ method: "POST", url: "/poison" });
+  await queue.enqueue({ method: "POST", url: "/good" });
+  const out = await queue.replay();
+  assert.deepEqual(seen, ["/poison", "/good"], "poison did not block /good");
+  assert.equal(out.sent, 1);
+  assert.equal(out.failed, 1);
+  assert.equal(out.remaining, 0);
+  const failed = await queue.failed();
+  assert.equal(failed.length, 1);
+  assert.equal(failed[0].url, "/poison");
+  assert.equal(failed[0].status, "failed");
+});
+
+test("replay dead-letters a transient failure once attempts are exhausted", async () => {
+  const queue = freshQueue(async () => ({ ok: false, status: 503 }));
+  await queue.enqueue({ method: "POST", url: "/flaky" });
+  for (let i = 0; i < DEFAULT_MAX_ATTEMPTS - 1; i += 1) {
+    const out = await queue.replay();
+    assert.equal(out.failed, 0, `attempt ${i + 1} still retrying`);
+    assert.equal(out.remaining, 1);
+  }
+  const last = await queue.replay();
+  assert.equal(last.failed, 1, "dead-lettered on the ceiling attempt");
+  assert.equal(await queue.size(), 0);
+  assert.equal((await queue.failed()).length, 1);
+});
+
+test("replay parks a 409 in the conflict lane without blocking", async () => {
+  const seen = [];
+  const queue = freshQueue(async (m) => {
+    seen.push(m.url);
+    return m.url === "/conflict"
+      ? { ok: false, status: 409 }
+      : { ok: true, status: 200 };
+  });
+  await queue.enqueue({ method: "PUT", url: "/conflict" });
+  await queue.enqueue({ method: "POST", url: "/good" });
+  const out = await queue.replay();
+  assert.deepEqual(seen, ["/conflict", "/good"], "conflict did not block /good");
+  assert.equal(out.sent, 1);
+  assert.equal(out.conflicts, 1);
+  assert.equal(out.remaining, 0);
+  const conflicts = await queue.conflicts();
+  assert.equal(conflicts.length, 1);
+  assert.equal(conflicts[0].url, "/conflict");
+  assert.equal(conflicts[0].status, "conflict");
+});
+
+test("failed and conflicts return [] when the queue is clean", async () => {
+  const queue = freshQueue(async () => ({ ok: true }));
+  assert.deepEqual(await queue.failed(), []);
+  assert.deepEqual(await queue.conflicts(), []);
+});
+
+test("QUEUE_PERIODIC_TAG is distinct from the one-off tag", () => {
+  assert.notEqual(QUEUE_PERIODIC_TAG, QUEUE_TAG);
 });
 
 test("registerBackgroundSync returns false without a SyncManager", async () => {

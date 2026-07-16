@@ -132,10 +132,38 @@ export async function offlineSize(args, deps) {
 }
 
 /**
- * Replay the pending queue now (FIFO, stops at the first failure).
+ * List the dead-lettered (permanently failed) mutations for an owner.
  * @param {{owner?:string}} args
  * @param {import("./index.js").NativeDeps} deps
- * @returns {Promise<{sent:number, remaining:number}>}
+ * @returns {Promise<{mutations: Object[]}>}
+ */
+export async function offlineFailed(args, deps) {
+  const rows = await queue(deps).failed(args.owner ?? undefined);
+  return { mutations: rows.map(toWire) };
+}
+
+/**
+ * List the mutations parked in the conflict lane (server returned 409).
+ * @param {{owner?:string}} args
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {Promise<{mutations: Object[]}>}
+ */
+export async function offlineConflicts(args, deps) {
+  const rows = await queue(deps).conflicts(args.owner ?? undefined);
+  return { mutations: rows.map(toWire) };
+}
+
+/**
+ * Replay the pending queue now.
+ *
+ * Drains in FIFO order: accepted rows are removed, a transient failure stops
+ * replay to preserve order (dead-lettered once attempts are exhausted), a
+ * permanent 4xx is dead-lettered immediately and a 409 moves to the conflict
+ * lane — neither blocks the rest.
+ *
+ * @param {{owner?:string}} args
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {Promise<{sent:number, remaining:number, failed:number, conflicts:number}>}
  */
 export async function offlineReplay(args, deps) {
   return queue(deps).replay(args.owner ?? undefined);

@@ -4,6 +4,39 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.58.0] — 2026-07-17
+
+### Added
+
+Offline-first patterns adopted from the famachapp-pwa / tempest-react-sdk sync
+engine, ported to the pure-JS client:
+
+- **Read-side delta-sync (pull).** `client/offline/pull.js`: `createPull`
+  (watermark + cursor pagination + single-flight) walks remote changes and
+  advances the watermark only after a full drain; `createWatermark` (localStorage
+  + in-memory fallback); `mergeRemoteInto` (last-write-wins with tombstone deletes
+  and a guard that keeps a locally-pending newer edit). Closes the "no read path"
+  gap — the queue could only push.
+- **Sync-status store + controller.** `client/offline/sync-status.js`:
+  `createSyncStatus` (observable phase/online/pending/lastSyncedAt/summary/error)
+  + `createSyncController` (single-flight `syncNow` = replay then pull, flush on
+  boot + reconnect).
+- **SW→page bridge.** `client/offline/sw-bridge.js`: `installSyncBridge` routes
+  service-worker messages (`OFFLINE_PULL`, `OFFLINE_QUEUE_DRAINED`,
+  `REPLAY_OFFLINE_QUEUE`) to page handlers; the SW now also posts `OFFLINE_PULL`
+  after a background drain so the page (which holds the token) reconciles reads.
+- **Large-binary asset cache.** `client/offline/asset-cache.js`: `ensureCached`
+  (download once, in-flight dedup, cache-first) + `syncAssets` (version-manifest
+  refresh returning `{refreshed}` for the warmup/reset-session pattern) over a
+  dedicated Cache Storage bucket — for ONNX models, wasm, datasets.
+- **Push self-notification suppression.** `WebPushClient.subscribe()` records the
+  active endpoint (`getActivePushEndpoint`); the offline queue stamps
+  `X-Push-Endpoint` on every mutation so the server skips notifying the device
+  that made the change.
+- **Manifest `launch_handler` + `display_override`.** Both emitters default to
+  `launch_handler: {client_mode: ["focus-existing","auto"]}` (reuse an open
+  window) and `display_override: [display, "minimal-ui"]`.
+
 ## [0.57.0] — 2026-07-17
 
 ### Added

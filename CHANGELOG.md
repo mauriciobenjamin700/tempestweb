@@ -4,6 +4,31 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.57.0] — 2026-07-17
+
+### Added
+
+- **The connectivity banner is auto-mounted in every shell.** The offline/online
+  banner shipped as a module in 0.56.0 but nothing mounted it; now the wasm,
+  server and transpile index shells import and call `mountConnectivityBanner()`,
+  copy the module into every artifact, and precache it (wasm + transpile). Built
+  apps show the offline banner without any app code.
+
+### Fixed
+
+- **Connectivity banner is truly idempotent per document.** A second
+  `mountConnectivityBanner()` on the same document is now a no-op (a per-document
+  guard), and `render()` reads the DOM as the source of truth — so a double mount
+  no longer attaches a second network watcher or produces a duplicate banner.
+- **The WebSocket transport no longer replays stale connection-scoped frames.**
+  Only user `event` envelopes are buffered while offline; `native_result`
+  (call_id) and `native_event` (sub_id) frames are dropped rather than flushed
+  onto the fresh post-reconnect connection, where their ids no longer exist.
+- **WS reconnect hardened.** `scheduleReconnect` is a no-op when a reconnect is
+  already pending (a stray extra `close` can't spawn two competing sockets), and
+  `connect()` detaches the previous socket's listeners before opening the new one
+  (a discarded socket can't re-fire `close`).
+
 ## [0.56.0] — 2026-07-17
 
 ### Added

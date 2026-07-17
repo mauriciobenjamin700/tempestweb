@@ -155,15 +155,16 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "webauthn.js",
 )
 # Offline client modules shipped under client/offline/. store.js + sync.js back
-# native/offline.js's `../offline/{store,sync}.js` imports; pull.js (read-side
-# delta-sync), sync-status.js (sync store + controller) and sw-bridge.js (SW→page
-# message routing) are opt-in modules an app imports directly.
+# native/offline.js's imports; pull.js (read-side delta-sync), sync-status.js
+# (sync store + controller), sw-bridge.js (SW->page routing) and asset-cache.js
+# (large-binary caching) are opt-in modules an app imports directly.
 _OFFLINE_ASSETS: tuple[str, ...] = (
     "store.js",
     "sync.js",
     "pull.js",
     "sync-status.js",
     "sw-bridge.js",
+    "asset-cache.js",
 )
 
 # Subpackages of ``tempestweb`` the Mode A runtime needs in the browser. The

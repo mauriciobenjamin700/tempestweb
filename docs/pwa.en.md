@@ -137,6 +137,32 @@ mutation that fails permanently becomes a **dead-letter**
     **dedups on the idempotency key**, so a replay never applies the effect twice.
     It is the same key from the [`native.http`](capabilities.md) capability.
 
+### Caching large binaries (models, wasm)
+
+For a large asset that does **not** belong in the precache (e.g. an ONNX model
+downloaded from the API), `client/offline/asset-cache.js` does "download once,
+version it, refresh on manifest change, serve cache-first offline" — adopted from
+the famachapp model-sync pattern.
+
+```javascript
+import { ensureCached, syncAssets } from "/client/offline/asset-cache.js";
+
+// Downloads once; later loads come from cache (concurrent fetches are deduped).
+const res = await ensureCached("/models/detect.onnx");
+
+// On boot: re-downloads only if the version manifest changed; returns { refreshed }.
+const { refreshed } = await syncAssets({
+  version: manifest.version,
+  assets: [{ url: "/models/detect.onnx" }, { url: "/models/classify.onnx" }],
+});
+if (refreshed) resetOnnxSessions();   // invalidate in-memory handles
+```
+
+!!! tip "Warmup + reset on refresh"
+    Call `syncAssets()` on boot (when online) and, if it returns
+    `refreshed: true`, discard in-memory ONNX/Pyodide sessions so the next
+    inference uses the new bytes — no reload required.
+
 ## P3 — End-to-end WebPush
 
 The browser creates the subscription; the server sends. Both sides use the

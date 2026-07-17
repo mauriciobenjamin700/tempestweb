@@ -138,6 +138,32 @@ mutação que falha de forma permanente vira **dead-letter**
     de idempotência**, então um replay nunca aplica o efeito duas vezes. É a mesma
     chave da capacidade [`native.http`](capabilities.md).
 
+### Cachear binários grandes (modelos, wasm)
+
+Para um asset grande que **não** vai no precache (ex.: um modelo ONNX baixado da
+API), `client/offline/asset-cache.js` faz "baixa uma vez, versiona, atualiza na
+mudança do manifest, serve cache-first offline" — adotado do padrão de model-sync
+do famachapp.
+
+```javascript
+import { ensureCached, syncAssets } from "/client/offline/asset-cache.js";
+
+// Baixa uma vez; nas próximas cargas vem do cache (fetches concorrentes deduplicam).
+const res = await ensureCached("/models/detect.onnx");
+
+// No boot: re-baixa só se o manifest de versão mudou; devolve { refreshed }.
+const { refreshed } = await syncAssets({
+  version: manifest.version,
+  assets: [{ url: "/models/detect.onnx" }, { url: "/models/classify.onnx" }],
+});
+if (refreshed) resetOnnxSessions();   // invalide os handles em memória
+```
+
+!!! tip "Warmup + reset no refresh"
+    Chame `syncAssets()` no boot (quando online) e, se ele retornar
+    `refreshed: true`, descarte as sessões ONNX/Pyodide em memória para a próxima
+    inferência usar os bytes novos — sem exigir reload.
+
 ## P3 — WebPush ponta a ponta
 
 O browser cria a assinatura; o servidor envia. Os dois lados usam a **chave

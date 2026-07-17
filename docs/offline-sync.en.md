@@ -501,11 +501,49 @@ async def pull_since(watermark: str | None) -> tuple[list[dict], str | None]:
     return notes, newest
 ```
 
-!!! info "Honest gap: the pull is an app pattern, not a ready-made API"
-    tempestweb has **no** "read queue" and no built-in pull mechanism — the
-    `native.offline` queue is **write-only**. The delta-sync above is a pattern you
-    assemble with `native.http` (client) + the `updated_at__gt` filter (SDK).
-    Storing the watermark locally is up to you (e.g. `native.storage`).
+### The pull engine (`client/offline/pull.js`)
+
+You **don't** have to hand-roll the delta-sync loop: the client ships a ready-made
+engine (pure JS), mirroring the `tempest-react-sdk` pattern.
+
+- **`createPull({ pullPage, applyRemote, watermark })`** — walks the pages since
+  the watermark following `nextCursor`, applies each row in order, and advances
+  the watermark to the latest `serverTime` only **after** a full drain (an
+  interrupted pull re-reads from the last committed point). Single-flight, like
+  the queue.
+- **`createWatermark(key, storage)`** — a durable `localStorage`-backed cursor
+  with an in-memory fallback.
+- **`mergeRemoteInto(store, opts)`** — the canonical merge over the
+  `OfflineStore`: last-write-wins, tombstone deletes, and a guard that **keeps a
+  locally-pending edit** that is strictly newer than the incoming server row (so
+  an unpushed offline write survives a pull).
+
+```javascript
+import { createPull, createWatermark, mergeRemoteInto } from "/client/offline/pull.js";
+
+const pull = createPull({
+  pullPage: async (since, cursor) => {
+    const qs = new URLSearchParams();
+    if (since) qs.set("since", since);
+    if (cursor) qs.set("cursor", cursor);
+    const res = await native.http.request("GET", `/api/notes?${qs}`);
+    const body = res.json_body || {};
+    return { rows: body.rows, nextCursor: body.next_cursor, serverTime: body.server_time };
+  },
+  applyRemote: mergeRemoteInto(store),          // store = createOfflineStore(...)
+  watermark: createWatermark("notes:watermark"),
+});
+await pull.pull();                              // drains everything since the last watermark
+```
+
+To combine push + pull in one gesture with observable state, use
+**`createSyncController({ queue, pull })`** (`client/offline/sync-status.js`):
+`syncNow()` replays the queue then pulls, single-flight, and reflects
+`phase`/`pending`/`lastSyncedAt`/`error` in an observable store (`subscribe`) your
+`view()` can render. And **`installSyncBridge()`** (`client/offline/sw-bridge.js`)
+wires the service-worker messages (`OFFLINE_PULL`, `OFFLINE_QUEUE_DRAINED`) to
+that controller — after the worker drains the queue in the background, the page
+(which holds the token) reconciles with a pull.
 
 ---
 
@@ -523,9 +561,12 @@ async def pull_since(watermark: str | None) -> tuple[list[dict], str | None]:
   replays by `(method, path, key)` — zero duplicate rows.
 - **Conflict is your call.** The default is last-write-wins; the conflict lane
   hands you the `409` to reconcile — version/merge is application code.
-- **Pull is manual delta-sync.** `native.http` + the repository's `updated_at__gt`
-  filter; the queue does **not** read, and replay returns only counts (re-read the
-  resource if you need the `id`/timestamps).
+- **Pull has a ready-made engine.** `createPull` + `mergeRemoteInto` +
+  `createWatermark` (`client/offline/pull.js`) do the delta-sync (watermark +
+  cursor + LWW) over the `OfflineStore` — you only supply `pullPage` (via
+  `native.http` + the repository's `updated_at__gt` filter). `createSyncController`
+  combines push+pull with observable state; `installSyncBridge` wires the SW to
+  the page.
 
 Ready to ship the backend? See [Deploy to production](deploy.md) and
 [Security (Mode B)](security.md). 🚀

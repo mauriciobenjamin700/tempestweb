@@ -127,7 +127,10 @@ test("replayFromSync drains via the loaded modules and notifies clients", async 
     drain: async () => ({ sent: 3, owners: 2 }),
     notify: async (m) => messages.push(m),
   });
-  assert.deepEqual(messages, [{ type: "OFFLINE_QUEUE_DRAINED", sent: 3, owners: 2 }]);
+  assert.deepEqual(messages, [
+    { type: "OFFLINE_QUEUE_DRAINED", sent: 3, owners: 2 },
+    { type: "OFFLINE_PULL" },
+  ]);
 });
 
 test("replayFromSync falls back to client replay when module load fails", async () => {

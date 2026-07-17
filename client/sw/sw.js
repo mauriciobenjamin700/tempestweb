@@ -601,7 +601,9 @@ async function notifyClients(message) {
  *
  * Dynamically imports the page's queue modules and drains IndexedDB directly, so
  * the queue empties even with no tab open. On success it pings any open client to
- * refresh its UI/count (OFFLINE_QUEUE_DRAINED). If the import or the drain fails
+ * refresh its UI/count (OFFLINE_QUEUE_DRAINED) and to reconcile the read side
+ * (OFFLINE_PULL — the page holds the auth token the worker lacks). If the import
+ * or the drain fails
  * (e.g. the modules are unreachable — the SW ships only in the wasm/transpile
  * artifacts that serve /client/ — or IndexedDB is unavailable in this worker), it
  * degrades to the legacy behavior — asking an open client to replay
@@ -642,6 +644,7 @@ async function replayFromSync(deps = {}) {
     const { createOfflineStore, OfflineQueue } = await loadModules();
     const result = await drain({ createOfflineStore, OfflineQueue });
     await notify({ type: "OFFLINE_QUEUE_DRAINED", ...result });
+    await notify({ type: "OFFLINE_PULL" });
   } catch (err) {
     await notify({ type: "REPLAY_OFFLINE_QUEUE" });
   }

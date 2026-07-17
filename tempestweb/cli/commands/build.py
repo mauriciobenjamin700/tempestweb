@@ -154,9 +154,17 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "webaudio.js",
     "webauthn.js",
 )
-# Offline-queue client modules (native/offline.js wraps these); shipped under
-# client/offline/ so its `../offline/{store,sync}.js` imports resolve.
-_OFFLINE_ASSETS: tuple[str, ...] = ("store.js", "sync.js")
+# Offline client modules shipped under client/offline/. store.js + sync.js back
+# native/offline.js's `../offline/{store,sync}.js` imports; pull.js (read-side
+# delta-sync), sync-status.js (sync store + controller) and sw-bridge.js (SW→page
+# message routing) are opt-in modules an app imports directly.
+_OFFLINE_ASSETS: tuple[str, ...] = (
+    "store.js",
+    "sync.js",
+    "pull.js",
+    "sync-status.js",
+    "sw-bridge.js",
+)
 
 # Subpackages of ``tempestweb`` the Mode A runtime needs in the browser. The
 # server/CLI/devserver stacks (and their Starlette/uvicorn deps) are omitted —

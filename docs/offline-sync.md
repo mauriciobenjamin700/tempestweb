@@ -498,11 +498,48 @@ async def pull_since(watermark: str | None) -> tuple[list[dict], str | None]:
     return notes, newest
 ```
 
-!!! info "Gap honesto: o pull é padrão de app, não uma API pronta"
-    O tempestweb **não** tem uma "fila de leitura" nem um mecanismo de pull
-    embutido — a fila `native.offline` é **só de escrita**. O delta-sync acima é um
-    padrão que você monta com `native.http` (cliente) + o filtro `updated_at__gt`
-    (SDK). Guardar o watermark localmente é decisão sua (ex.: `native.storage`).
+### O motor de pull (`client/offline/pull.js`)
+
+Você **não** precisa montar o loop de delta-sync na mão: o cliente traz um motor
+pronto (JS puro), espelhando o padrão do `tempest-react-sdk`.
+
+- **`createPull({ pullPage, applyRemote, watermark })`** — percorre as páginas
+  desde o watermark seguindo `nextCursor`, aplica cada linha em ordem e só avança
+  o watermark pro último `serverTime` **depois** de drenar tudo (um pull
+  interrompido reprocessa do último ponto commitado). Single-flight, como a fila.
+- **`createWatermark(key, storage)`** — watermark durável no `localStorage` com
+  fallback em memória.
+- **`mergeRemoteInto(store, opts)`** — o merge canônico sobre a `OfflineStore`:
+  last-write-wins, tombstone deleta, e **guarda uma edição local ainda pendente**
+  se ela for estritamente mais nova que a linha do servidor (a escrita offline
+  não-enviada sobrevive ao pull).
+
+```javascript
+import { createPull, createWatermark, mergeRemoteInto } from "/client/offline/pull.js";
+
+const pull = createPull({
+  pullPage: async (since, cursor) => {
+    const qs = new URLSearchParams();
+    if (since) qs.set("since", since);
+    if (cursor) qs.set("cursor", cursor);
+    const res = await native.http.request("GET", `/api/notes?${qs}`);
+    const body = res.json_body || {};
+    return { rows: body.rows, nextCursor: body.next_cursor, serverTime: body.server_time };
+  },
+  applyRemote: mergeRemoteInto(store),          // store = createOfflineStore(...)
+  watermark: createWatermark("notes:watermark"),
+});
+await pull.pull();                              // drena tudo desde o último watermark
+```
+
+Para juntar push + pull num só gesto com estado observável, use
+**`createSyncController({ queue, pull })`** (`client/offline/sync-status.js`):
+`syncNow()` faz replay da fila e depois o pull, single-flight, e reflete
+`phase`/`pending`/`lastSyncedAt`/`error` num store observável (`subscribe`) que a
+sua `view()` pode renderizar. E **`installSyncBridge()`**
+(`client/offline/sw-bridge.js`) liga as mensagens do service worker
+(`OFFLINE_PULL`, `OFFLINE_QUEUE_DRAINED`) a esse controller — depois que o SW
+drena a fila em background, a página (que tem o token) reconcilia com um pull.
 
 ---
 
@@ -520,9 +557,11 @@ async def pull_since(watermark: str | None) -> tuple[list[dict], str | None]:
   replays por `(método, caminho, chave)` — zero linha duplicada.
 - **Conflito é decisão sua.** O default é last-write-wins; a lane de conflito
   entrega o `409` pra você reconciliar — versão/merge é código de aplicação.
-- **Pull é delta-sync manual.** `native.http` + o filtro `updated_at__gt` do
-  repositório; a fila **não** faz leitura, e o replay devolve só contagens (releia
-  o recurso se precisar do `id`/timestamps).
+- **Pull tem motor pronto.** `createPull` + `mergeRemoteInto` +
+  `createWatermark` (`client/offline/pull.js`) fazem o delta-sync (watermark +
+  cursor + LWW) sobre a `OfflineStore` — você só fornece o `pullPage` (via
+  `native.http` + o filtro `updated_at__gt` do repositório). `createSyncController`
+  junta push+pull com estado observável; `installSyncBridge` liga o SW à página.
 
 Pronto para publicar o backend? Veja o [Deploy em produção](deploy.md) e a
 [Segurança (Modo B)](security.md). 🚀

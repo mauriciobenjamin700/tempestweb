@@ -81,9 +81,11 @@ export function createPostInstallOverlay(doc, opts = {}) {
  * Show a post-install overlay when the app is installed.
  *
  * Listens for `appinstalled` and shows the overlay once (idempotent per
- * document). The button best-effort closes the install tab. A no-op when already
- * running standalone (there's nothing to redirect to). Returns a teardown that
- * removes the overlay and its listener.
+ * document). The button best-effort closes the install tab; browsers may block
+ * `window.close()`, in which case the error is swallowed and the overlay simply
+ * stays with the instruction. A no-op when already running standalone (there's
+ * nothing to redirect to). Returns a teardown that removes the overlay and its
+ * listener.
  *
  * @param {Object} [opts]
  * @param {Document} [opts.document]   Document override (tests).
@@ -109,7 +111,6 @@ export function mountPostInstallRedirect(opts = {}) {
         try {
           if (typeof win.close === "function") win.close();
         } catch {
-          // Browsers may block window.close(); the overlay stays with the hint.
         }
       },
     });

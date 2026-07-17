@@ -88,7 +88,13 @@ const DISPLAY_VALUES = new Set(["standalone", "fullscreen", "minimal-ui", "brows
 /**
  * Build a Web App Manifest object from options, filling installable-shaped
  * defaults. Project config overrides every field; unknown extra keys
- * (shortcuts/share_target/file_handlers/categories/id/orientation) pass through.
+ * (shortcuts/share_target/file_handlers/categories/id/orientation) pass through
+ * untouched when present.
+ *
+ * A few fields get computed defaults: the stable app `id` falls back to the
+ * scope; `launch_handler` defaults to focus-existing so a launch reuses an open
+ * window instead of spawning a duplicate; and `display_override` defaults to the
+ * chosen display followed by minimal-ui (deduplicated).
  *
  * @param {ManifestOptions} [options] Project overrides.
  * @returns {Object} A manifest object ready to JSON.stringify.
@@ -112,15 +118,12 @@ export function buildManifest(options = {}) {
     icons: icons.map((icon) => ({ ...icon })),
   };
 
-  // Stable app identity defaults to the scope when not provided.
   manifest.id = opts.id ?? manifest.scope;
 
-  // Reuse an open window on launch instead of spawning a duplicate.
   manifest.launch_handler = opts.launch_handler ?? {
     client_mode: ["focus-existing", "auto"],
   };
 
-  // Ordered display fallbacks; default to the chosen display then minimal-ui.
   const override =
     Array.isArray(opts.display_override) && opts.display_override.length > 0
       ? opts.display_override
@@ -132,7 +135,6 @@ export function buildManifest(options = {}) {
     manifest.categories = [...opts.categories];
   }
 
-  // P5 extras pass through untouched when present.
   if (Array.isArray(opts.shortcuts) && opts.shortcuts.length > 0) {
     manifest.shortcuts = opts.shortcuts.map((s) => ({ ...s }));
   }

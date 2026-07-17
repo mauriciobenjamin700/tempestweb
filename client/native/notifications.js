@@ -15,6 +15,10 @@ import {
 
 /**
  * Map the native router's deps to the WebPushClient deps shape.
+ *
+ * An injected `registration` (tests or a non-default SW container) is passed
+ * through when present.
+ *
  * @param {import("./index.js").NativeDeps} deps
  * @returns {import("../push/web-push-client.js").PushClientDeps}
  */
@@ -25,7 +29,6 @@ function pushDeps(deps) {
   if (nav) out.navigator = nav;
   const notif = deps.Notification || /** @type {any} */ (globalThis).Notification;
   if (notif) out.notification = notif;
-  // Optional injected registration (tests / non-default SW container).
   if (/** @type {any} */ (deps).registration) {
     out.registration = /** @type {any} */ (deps).registration;
   }
@@ -34,6 +37,10 @@ function pushDeps(deps) {
 
 /**
  * Post a local notification.
+ *
+ * Silently a no-op unless permission is already granted; the Notification is
+ * constructed purely for its side effect of showing the notification.
+ *
  * @param {{title:string,body:string}} args
  * @param {import("./index.js").NativeDeps} deps
  * @returns {Promise<Object>}
@@ -43,7 +50,6 @@ export async function notificationsNotify(args, deps) {
   const Ctor = deps.Notification || /** @type {any} */ (globalThis).Notification;
   if (!Ctor) throw new CapabilityError("unavailable", "Notification is not available");
   if (Ctor.permission === "granted") {
-    // Constructed for its side effect: showing the notification.
     new Ctor(args.title || "", { body: args.body || "" });
   }
   return {};
@@ -115,13 +121,14 @@ export async function notificationsSubscribe(args, deps) {
 /**
  * Cancel the current WebPush subscription, if any.  P3.
  *
+ * The WebPushClient constructor requires a vapidPublicKey that unsubscribe() does
+ * not use, so a placeholder value is passed to keep the construction valid.
+ *
  * @param {Object} _args
  * @param {import("./index.js").NativeDeps} deps
  * @returns {Promise<{unsubscribed:boolean}>} Whether a subscription was cancelled.
  */
 export async function notificationsUnsubscribe(_args, deps) {
-  // vapidPublicKey is required by the WebPushClient constructor but unused by
-  // unsubscribe(); a placeholder keeps the construction valid.
   const client = new WebPushClient({ vapidPublicKey: "x", deps: pushDeps(deps) });
   const unsubscribed = await client.unsubscribe();
   return { unsubscribed };

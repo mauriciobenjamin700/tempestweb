@@ -88,6 +88,12 @@ function applyNodeShape(el, type, key, props) {
  * (re)translated to CSS; `content`/`label` set the text. Other keys are widget
  * metadata the DOM does not render and are ignored.
  *
+ * For text-bearing props, a Checkbox is a <label> wrapping an <input>, so its
+ * caption is set as a trailing text node (see setCheckboxLabel) rather than
+ * overwriting textContent, which would drop the nested input. An Icon is an inline
+ * <svg> whose glyph is (re)drawn when its name or size changes; a style-only
+ * update leaves the existing glyph untouched.
+ *
  * @param {HTMLElement} el     The target element.
  * @param {Object} props       The props to apply.
  * @returns {void}
@@ -102,9 +108,6 @@ function applyProps(el, props) {
       el.removeAttribute("style");
     }
   }
-  // Text-bearing props. A Checkbox is a <label> wrapping an <input>, so its
-  // caption is set as a trailing text node (see setCheckboxLabel) rather than
-  // overwriting textContent, which would drop the nested input.
   if ("content" in props) {
     el.textContent = props.content == null ? "" : String(props.content);
   }
@@ -115,8 +118,6 @@ function applyProps(el, props) {
       el.textContent = props.label == null ? "" : String(props.label);
     }
   }
-  // An Icon is an inline <svg>; (re)draw its glyph when its name or size changes
-  // (a style-only update leaves the existing glyph untouched).
   if (type === "Icon" && ("name" in props || "size" in props)) {
     renderIcon(/** @type {any} */ (el), props);
   }
@@ -180,6 +181,12 @@ const LAZY_TYPES = Object.freeze(["LazyColumn", "LazyRow", "LazyGrid"]);
  * Mark a virtualized list element and mirror its windowing metadata to data
  * attributes so the scroll controller can compute the visible window.
  *
+ * The element becomes a bounded, scrollable viewport: the app's Style sets the
+ * extent (e.g. height), overflow scrolls the materialized window, and scrolling
+ * past the edge slides the window (see client/virtualize.js). `min-height:0` stops
+ * a flex parent from growing the viewport to fit its content instead of scrolling.
+ * The `window` prop is `[start, end)` when slid, or null (start at 0).
+ *
  * @param {HTMLElement} el     The target element.
  * @param {?string} type       The widget type.
  * @param {Object} props       The props to apply.
@@ -190,10 +197,6 @@ function applyLazyProps(el, type, props) {
     return;
   }
   const horizontal = type === "LazyRow";
-  // A bounded, scrollable viewport: the app's Style sets the extent (e.g.
-  // height); overflow scrolls the materialized window, and scrolling past the
-  // edge slides the window (see client/virtualize.js). min-height:0 stops a flex
-  // parent from growing the viewport to fit its content instead of scrolling.
   el.style.overflowY = horizontal ? "hidden" : "auto";
   el.style.overflowX = horizontal ? "auto" : "hidden";
   el.style.minHeight = "0";
@@ -203,7 +206,6 @@ function applyLazyProps(el, type, props) {
   if ("window_size" in props && props.window_size != null) {
     el.setAttribute("data-tw-window-size", String(props.window_size));
   }
-  // window is [start, end) when slid, or null (start at 0).
   const start = Array.isArray(props.window) ? props.window[0] : 0;
   el.setAttribute("data-tw-window-start", String(start ?? 0));
 }
@@ -273,8 +275,10 @@ function canvasColor(c) {
  * API: ``move_to``/``line_to`` build the current path, ``draw_rect`` adds a
  * rectangle, ``stroke``/``fill`` paint it, and ``draw_text`` writes a label.
  * Width, height and commands are remembered on the element so an Update patch
- * that changes only one of them still repaints the whole canvas. A no-op when
- * the 2D context is unavailable (e.g. a jsdom harness without canvas support).
+ * that changes only one of them still repaints the whole canvas — setting a
+ * canvas's width/height resets its drawing buffer, so a full repaint is always
+ * required. A no-op when the 2D context is unavailable (e.g. a jsdom harness
+ * without canvas support).
  *
  * @param {HTMLCanvasElement} el  The Canvas element.
  * @param {Object} props          Props that may include width/height/commands.
@@ -290,7 +294,6 @@ function paintCanvas(el, props) {
   if ("commands" in props && Array.isArray(props.commands)) {
     el._twCanvasCmds = props.commands;
   }
-  // Setting width/height resets the drawing buffer, so we always repaint fully.
   if (el._twCanvasW != null) {
     el.width = el._twCanvasW;
   }
@@ -335,6 +338,23 @@ function paintCanvas(el, props) {
   }
 }
 
+/**
+ * Apply widget-type-specific control props (Canvas/Input/Checkbox/Image).
+ *
+ * For a Checkbox, the box and caption are laid out on one line as a block-level
+ * flex row so stacked checkboxes each get their own line (an inline default would
+ * let adjacent labels flow together in a non-flex parent). These are defaults
+ * only — an explicit Style on the widget (applied just before this) wins — and
+ * they are re-applied on every update because a `style` patch resets the element's
+ * inline cssText. The width is set to `fit-content` so the <label>, as a flex item
+ * of a column, does not collapse to the input's width and overflow the caption
+ * onto the next row.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
 function applyControlProps(el, type, props) {
   if (type === "Canvas") {
     paintCanvas(el, props);
@@ -354,11 +374,6 @@ function applyControlProps(el, type, props) {
     if ("checked" in props) {
       input.checked = Boolean(props.checked);
     }
-    // Lay the box and caption out on one line, as a block-level row so stacked
-    // checkboxes each get their own line (an inline default would let adjacent
-    // labels flow together in a non-flex parent). Defaults only — an explicit
-    // Style on the widget (applied just before this) wins. Re-applied here on
-    // every update because a `style` patch resets the element's inline cssText.
     if (!el.style.display) {
       el.style.display = "flex";
     }
@@ -368,9 +383,6 @@ function applyControlProps(el, type, props) {
     if (!el.style.gap) {
       el.style.gap = "0.4em";
     }
-    // Size to the box + caption. Without this the <label>, as a flex item of a
-    // column, collapses to the input's width and the caption overflows onto the
-    // next row; fit-content keeps it a tidy one-line row instead of stretching.
     if (!el.style.width) {
       el.style.width = "fit-content";
     }
@@ -386,12 +398,14 @@ function applyControlProps(el, type, props) {
 
 /**
  * Build a DOM element from an IR node (recursing into its children).
+ *
+ * An Icon is an inline <svg>, which must be created in the SVG namespace (not via
+ * createElement); it is an IR leaf, so no children are recursed into it.
+ *
  * @param {import("./transport.js").Node} node  The serialized node.
  * @returns {HTMLElement}                        The constructed element subtree.
  */
 export function buildElement(node) {
-  // An Icon is an inline <svg>, which must be created in the SVG namespace (not
-  // via createElement). It is an IR leaf, so no children are recursed into it.
   const el =
     node.type === "Icon"
       ? createIconSvg()

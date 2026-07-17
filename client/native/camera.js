@@ -18,6 +18,10 @@ function stripDataUrl(dataUrl) {
 
 /**
  * Capture a single photo from the device camera.
+ *
+ * Playing the video element is best-effort: a rejected play() is swallowed since
+ * some environments resolve frames without an explicit play().
+ *
  * @param {{facing:string,quality:number,mime_type:string}} args
  * @param {import("./index.js").NativeDeps} deps
  * @returns {Promise<{mime_type:string,width:number,height:number,data_base64:string}>}
@@ -47,7 +51,6 @@ export async function cameraCapture(args, deps) {
       try {
         await video.play();
       } catch {
-        // Some environments resolve frames without an explicit play().
       }
     }
     const width = video.videoWidth || 1280;

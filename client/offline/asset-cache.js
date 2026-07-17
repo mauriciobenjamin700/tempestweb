@@ -50,6 +50,10 @@ function safeGet(storage, key) {
 
 /**
  * Write a key to a Storage, swallowing access errors.
+ *
+ * Best-effort: a blocked write is swallowed, which just means the next boot
+ * re-checks the version.
+ *
  * @param {?Storage} storage
  * @param {string} key
  * @param {string} value
@@ -60,7 +64,6 @@ function safeSet(storage, key, value) {
   try {
     storage.setItem(key, value);
   } catch {
-    // Best-effort; a blocked write just means the next boot re-checks the version.
   }
 }
 

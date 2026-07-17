@@ -19,7 +19,9 @@
  * Install URL→navigation reporting on `window`.
  *
  * Sends the current path immediately (so a deep-linked load opens the right
- * screen) and on every `popstate`. No-ops when there is no `window` (tests).
+ * screen) and on every `popstate` (back/forward). The path plus query string is
+ * reported so the Python side can reconstruct the linked route's params, not just
+ * its path. No-ops when there is no `window` (tests).
  *
  * @param {import("./transport.js").Transport} transport  The event sink.
  * @param {Window} [win]  The window to bind (defaults to the global).
@@ -34,14 +36,11 @@ export function installRouter(transport, win) {
   }
 
   const report = () => {
-    // Report path + query string so the Python side can reconstruct the linked
-    // route's params (deep link / reload), not just its path.
     const loc = target.location;
     const path = (loc?.pathname || "/") + (loc?.search || "");
     transport.sendEvent({ type: "navigate", key: "", payload: { path } });
   };
 
-  // Deep link on load, then every back/forward.
   report();
   target.addEventListener("popstate", report);
   return {

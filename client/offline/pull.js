@@ -55,7 +55,6 @@ export function createWatermark(key, storage) {
       try {
         store.setItem(key, value);
       } catch {
-        // Best-effort: keep the in-memory value when persistence is blocked.
       }
     },
   };

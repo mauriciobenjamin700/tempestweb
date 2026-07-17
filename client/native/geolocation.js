@@ -4,11 +4,13 @@ import { CapabilityError } from "./index.js";
 
 /**
  * Map a GeolocationPositionError code to a stable capability error code.
+ *
+ * The DOM codes are 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT.
+ *
  * @param {number} code
  * @returns {string}
  */
 function geoErrorCode(code) {
-  // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
   if (code === 1) return "permission_denied";
   if (code === 3) return "timeout";
   return "unavailable";

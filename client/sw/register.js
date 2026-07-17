@@ -51,8 +51,10 @@ export function isServiceWorkerSupported(container) {
  * Register the service worker and wire the update lifecycle.
  *
  * When a new worker reaches the `installed` state while one already controls the
- * page, `onUpdate` fires (a real update is waiting). Calling skipWaiting on that
- * registration activates it and reloads the page once.
+ * page — or when one is already waiting at registration time — `onUpdate` fires
+ * (a real update is waiting). Calling skipWaiting on that registration activates
+ * it and reloads the page once. On a first install, with nothing controlling the
+ * page yet, `onReady` fires instead.
  *
  * @param {RegisterOptions} [options]
  * @returns {Promise<?ServiceWorkerRegistration>} The registration, or null when
@@ -64,9 +66,6 @@ export async function registerServiceWorker(options = {}) {
     return null;
   }
   const url = options.url ?? "/sw.js";
-  // The worker is shipped as an ES module (it `export`s helpers for unit tests),
-  // so it must be registered with `type: "module"` — a classic worker fails to
-  // evaluate `export`. Callers may override via `options.type`.
   const registerOptions = { type: options.type ?? "module" };
   if (options.scope) {
     registerOptions.scope = options.scope;
@@ -74,7 +73,6 @@ export async function registerServiceWorker(options = {}) {
   try {
     const registration = await container.register(url, registerOptions);
 
-    // A worker already waiting at registration time is an available update.
     if (registration.waiting && container.controller) {
       options.onUpdate?.(registration);
     }
@@ -85,10 +83,8 @@ export async function registerServiceWorker(options = {}) {
       installing.addEventListener("statechange", () => {
         if (installing.state === "installed") {
           if (container.controller) {
-            // An update is ready and waiting behind the active worker.
             options.onUpdate?.(registration);
           } else {
-            // First install — nothing was controlling before.
             options.onReady?.(registration);
           }
         }

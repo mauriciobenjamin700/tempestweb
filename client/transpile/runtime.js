@@ -274,6 +274,21 @@ function collectHandlers(node) {
  * the granular patches to the renderer. Click events resolve to the handler
  * registered for the originating widget key.
  *
+ * The URL round-trips in both directions. `lastPath` tracks the top-route path the
+ * URL currently reflects: a `navigate` event (deep link / back-forward) resets the
+ * nav stack from the path and updates `lastPath` without echoing it back, while an
+ * imperative push/pop/replace that changes the top path tells the router to
+ * pushState the new URL (params included). A `media` event (resize / dark-mode /
+ * orientation change) updates `app.media`, and `installMedia` keeps it in sync so
+ * the app renders responsively.
+ *
+ * An event handler may be async (e.g. `await native.http.request(...)` then
+ * set_state); the re-render fires when set_state runs, after the await, and any
+ * rejection is logged and swallowed so an unhandled promise never crashes the tab.
+ * While animation controllers are registered, a requestAnimationFrame loop (with a
+ * setTimeout fallback) ticks each with the per-frame dt, re-renders so the view
+ * reads their new `value`, and drops any that have settled.
+ *
  * @param {HTMLElement} root  The host element to mount into.
  * @param {TranspileModule} mod  The generated module (`makeState` + `view`).
  * @returns {TranspileMountHandle}  A handle to inspect and tear down the app.
@@ -292,8 +307,6 @@ export function mountApp(root, { makeState, view }) {
   let deliver = null;
   /** @type {?(path: string) => void} — view→URL sink (wired by mount via router). */
   let navSink = null;
-  // The last top-route path the URL reflects, so an imperative push/pop that
-  // changes it triggers a pushState (mirrors the server session's view→URL leg).
   let lastPath = routeToPath(app.nav.top);
 
   /** @type {import("../transport.js").Transport} */
@@ -307,16 +320,14 @@ export function mountApp(root, { makeState, view }) {
     },
     /** @param {TWEvent} event */
     sendEvent(event) {
-      // URL→view: a deep link / back-forward resets the nav stack from the path.
       if (event.type === "navigate") {
         const path = event.payload?.path;
         if (typeof path === "string" && path) {
-          lastPath = path; // this change came FROM the URL; don't echo it back
+          lastPath = path;
           app.reset(pathToRoutes(path));
         }
         return;
       }
-      // Viewport → view: a resize / dark-mode change updates app.media.
       if (event.type === "media") {
         app._setMedia(new MediaQueryData(event.payload ?? {}));
         return;
@@ -328,9 +339,6 @@ export function mountApp(root, { makeState, view }) {
       if (typeof handler !== "function") {
         return;
       }
-      // A handler may be async (e.g. `await native.http.request(...)` then
-      // set_state); the re-render fires when set_state runs, after the await.
-      // Swallow a rejection so an unhandled promise never crashes the tab.
       const result = handler(event);
       if (result != null && typeof result.then === "function") {
         result.then(undefined, (err) => {
@@ -354,8 +362,6 @@ export function mountApp(root, { makeState, view }) {
         deliver(patches);
       }
     }
-    // view→URL: if the app navigated imperatively (push/pop/replace) the top
-    // path changed — tell the router to pushState the new URL (params included).
     const path = routeToPath(app.nav.top);
     if (path !== lastPath) {
       lastPath = path;
@@ -366,13 +372,8 @@ export function mountApp(root, { makeState, view }) {
   };
 
   const handle = mount(root, transport, node);
-  // Report the viewport (size + dark mode + orientation) so the app renders
-  // responsively; keeps app.media in sync on resize / color-scheme change.
   const media = installMedia(transport);
 
-  // Animation frame loop: while controllers are registered, tick each with the
-  // per-frame dt, re-render (so the view reads their new `value`), and drop any
-  // that settled. Driven by requestAnimationFrame (falls back to setTimeout).
   let running = false;
   /** @type {?number} — previous frame timestamp; null before the first frame. */
   let lastFrame = null;

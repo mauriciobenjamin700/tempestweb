@@ -158,7 +158,9 @@ export const BASE_THEME_CSS = `
  *
  * Idempotent: if a sheet with {@link BASE_THEME_STYLE_ID} already exists (a
  * previous mount, or the page provided its own) it is left untouched. A no-op
- * when there is no `document` (e.g. a non-DOM test harness).
+ * when there is no `document` (e.g. a non-DOM test harness). The sheet is
+ * prepended to the head so app- and inline-styles declared later still win the
+ * cascade.
  *
  * @returns {?HTMLStyleElement}  The injected (or pre-existing) style element, or
  *                               `null` when no document is available.
@@ -174,7 +176,6 @@ export function installBaseTheme() {
   const el = document.createElement("style");
   el.id = STYLE_ID;
   el.textContent = BASE_THEME_CSS;
-  // Prepend so app- and inline-styles declared later still win the cascade.
   document.head.insertBefore(el, document.head.firstChild);
   return el;
 }

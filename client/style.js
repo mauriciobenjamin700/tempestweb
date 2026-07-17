@@ -271,7 +271,11 @@ function transitionToCss(transition) {
  * `null`/absent fields are skipped entirely — they mean "unset" and let the
  * browser default apply. Layout-only flags that have no CSS analogue beyond what
  * is emitted (opacity, shadow, transition, stack/position insets) are handled
- * inline; unsupported v1 fields are simply not emitted.
+ * inline; unsupported v1 fields are simply not emitted. A `transition` becomes a
+ * CSS `transition` shorthand — implicit animation that tweens changed visual
+ * properties on the next rebuild. For flex, Row/Column are flex containers by
+ * type, and an explicit `direction` in the style overrides the type's natural
+ * axis.
  *
  * @param {?Object} style  Style dump, or null.
  * @param {?string} type   The widget type ("Row"/"Column"/...), so flex
@@ -287,8 +291,6 @@ export function styleToCss(style, type) {
   /** @type {string[]} */
   const rules = [];
 
-  // Flexbox layout. Row/Column are flex containers by type; an explicit
-  // `direction` in the style overrides the type's natural axis.
   if (direction != null) {
     rules.push("display: flex");
     rules.push(`flex-direction: ${direction}`);
@@ -315,7 +317,6 @@ export function styleToCss(style, type) {
     rules.push(`flex-wrap: ${style.flex_wrap}`);
   }
 
-  // Box model.
   if (style.padding != null) {
     rules.push(`padding: ${edgeToCss(style.padding)}`);
   }
@@ -329,7 +330,6 @@ export function styleToCss(style, type) {
     rules.push(`border-radius: ${radiusValue(style.radius)}`);
   }
 
-  // Paint.
   if (style.background != null) {
     rules.push(`background: ${backgroundToCss(style.background)}`);
   }
@@ -343,7 +343,6 @@ export function styleToCss(style, type) {
     rules.push(`box-shadow: ${shadowToCss(style.shadow)}`);
   }
 
-  // Typography.
   if (style.font_family != null) {
     rules.push(`font-family: ${style.font_family}`);
   }
@@ -371,7 +370,6 @@ export function styleToCss(style, type) {
     rules.push(`line-height: ${style.line_height}`);
   }
 
-  // Dimensions.
   if (style.width != null) {
     rules.push(`width: ${style.width}px`);
   }
@@ -394,7 +392,6 @@ export function styleToCss(style, type) {
     rules.push(`aspect-ratio: ${style.aspect_ratio}`);
   }
 
-  // Implicit animation: tween changed visual properties on the next rebuild.
   if (style.transition != null) {
     rules.push(`transition: ${transitionToCss(style.transition)}`);
   }

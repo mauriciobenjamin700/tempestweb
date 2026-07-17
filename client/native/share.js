@@ -18,6 +18,12 @@ export async function shareIsSupported(_args, deps) {
 
 /**
  * Open the OS share sheet, degrading gracefully when unsupported.
+ *
+ * File sharing has uneven support, so files are only forwarded when the browser
+ * reports it accepts them via canShare. Any rejection from share() (AbortError
+ * when the user dismisses the sheet, or any other share failure) is treated as a
+ * normal "cancelled" outcome, never an error.
+ *
  * @param {{title:string,text:string,url:string,files:Array<Object>}} args
  * @param {import("./index.js").NativeDeps} deps
  * @returns {Promise<{outcome:"shared"|"cancelled"|"unsupported"}>}
@@ -32,7 +38,6 @@ export async function shareShare(args, deps) {
   if (args.title) data.title = args.title;
   if (args.text) data.text = args.text;
   if (args.url) data.url = args.url;
-  // File sharing has uneven support; only forward when the browser accepts it.
   if (Array.isArray(args.files) && args.files.length > 0 && nav.canShare) {
     const files = args.files;
     if (nav.canShare({ files })) data.files = /** @type {any} */ (files);
@@ -41,8 +46,6 @@ export async function shareShare(args, deps) {
     await nav.share(data);
     return { outcome: "shared" };
   } catch {
-    // A rejection (AbortError when the user dismisses the sheet, or any other
-    // share failure) is treated as a normal "cancelled" outcome, never an error.
     return { outcome: "cancelled" };
   }
 }

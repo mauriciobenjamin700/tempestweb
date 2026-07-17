@@ -91,6 +91,13 @@ function toWire(row) {
 
 /**
  * Enqueue a mutation for durable, replay-on-reconnect delivery.
+ *
+ * After enqueueing, a Background Sync is scheduled so the worker drains the queue
+ * when connectivity returns even with the tab closed; this is best-effort and a
+ * no-op where unsupported (its rejection is swallowed). The tab-open drain path is
+ * the `online` listener wired in `queue()`, and an app can also force a drain with
+ * `native.offline.replay()`.
+ *
  * @param {{method:string, url:string, body?:*, idempotency_key?:string, owner?:string}} args
  * @param {import("./index.js").NativeDeps} deps
  * @returns {Promise<Object>} The enqueued mutation (wire shape).
@@ -104,10 +111,6 @@ export async function offlineEnqueue(args, deps) {
     idempotencyKey: args.idempotency_key ?? undefined,
     owner: args.owner ?? undefined,
   });
-  // Schedule a Background Sync so the worker drains the queue when connectivity
-  // returns (even with the tab closed). Best-effort: a no-op where unsupported.
-  // The tab-open path is the `online` listener wired in `queue()`; an app can
-  // also force a drain with `native.offline.replay()`.
   registerBackgroundSync().catch(() => {});
   return toWire(row);
 }

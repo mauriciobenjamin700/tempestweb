@@ -81,6 +81,36 @@ async def on_install_tap() -> None:
     Renderize o botão quando `can_install` for verdadeiro e dispare o prompt no
     `on_click`.
 
+### Método de instalação + cooldown de recusa (adotado do famachapp)
+
+`state.method` classifica **como** o usuário instala aqui: `"native"` (há prompt
+— mostre o botão), `"ios"` (Share → "Adicionar à Tela de Início" — mostre um
+tutorial) ou `"manual"` (ex.: Firefox desktop). Assim a UI não mostra um botão
+que não faz nada no iOS.
+
+Do lado JS, `client/pwa/install-prompt.js` traz um **cooldown de recusa** pra não
+insistir: `recordInstallDecline()` quando o usuário fecha o banner e
+`canPromptInstall()` (default 7 dias) antes de reexibir.
+
+```javascript
+import { recordInstallDecline, canPromptInstall } from "/client/pwa/install-prompt.js";
+
+if (canPromptInstall()) showInstallBanner();
+// ... no "agora não":
+recordInstallDecline();
+```
+
+### Redirect pós-instalação
+
+`client/pwa/post-install-redirect.js` mostra um overlay em tela cheia quando o
+`appinstalled` dispara (a aba que instalou ainda é uma aba comum — o usuário deve
+ir pro app standalone). Opt-in:
+
+```javascript
+import { mountPostInstallRedirect } from "/client/pwa/post-install-redirect.js";
+mountPostInstallRedirect();   // no-op se já estiver rodando standalone
+```
+
 ## P1 — Service worker: offline após o 1º load
 
 No Modo C, o `sw.js` gerado **pré-cacheia o bundle estático inteiro** —

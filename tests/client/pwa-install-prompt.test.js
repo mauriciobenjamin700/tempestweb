@@ -4,6 +4,11 @@ import assert from "node:assert/strict";
 import {
   createInstallPrompt,
   isStandalone,
+  isIOS,
+  installMethod,
+  recordInstallDecline,
+  canPromptInstall,
+  INSTALL_DECLINE_KEY,
 } from "../../client/pwa/install-prompt.js";
 
 /**
@@ -65,7 +70,11 @@ test("isStandalone: detects iOS navigator.standalone", () => {
 test("createInstallPrompt: starts with canInstall=false", () => {
   const win = fakeWindow();
   const ctrl = createInstallPrompt({ window: win });
-  assert.deepEqual(ctrl.getState(), { canInstall: false, installed: false });
+  assert.deepEqual(ctrl.getState(), {
+    canInstall: false,
+    installed: false,
+    method: "manual",
+  });
 });
 
 test("createInstallPrompt: captures beforeinstallprompt and suppresses infobar", () => {
@@ -107,7 +116,11 @@ test("appinstalled: flips installed and clears the prompt", () => {
   const ctrl = createInstallPrompt({ window: win });
   win.dispatch("beforeinstallprompt", bipEvent());
   win.dispatch("appinstalled", {});
-  assert.deepEqual(ctrl.getState(), { canInstall: false, installed: true });
+  assert.deepEqual(ctrl.getState(), {
+    canInstall: false,
+    installed: true,
+    method: "manual",
+  });
 });
 
 test("subscribe: notifies immediately and on change, unsubscribe stops it", () => {
@@ -132,4 +145,43 @@ test("destroy: removes all window listeners", () => {
   ctrl.destroy();
   assert.equal(win.listenerCount("beforeinstallprompt"), 0);
   assert.equal(win.listenerCount("appinstalled"), 0);
+});
+
+// --- method classification + decline cooldown (install UX) ----------------
+
+/** A window with a given userAgent (+ optional maxTouchPoints). */
+function uaWindow(userAgent, maxTouchPoints = 0) {
+  return { navigator: { userAgent, maxTouchPoints } };
+}
+
+test("isIOS detects iPhone/iPad and iPadOS-as-Mac", () => {
+  assert.equal(isIOS(uaWindow("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)")), true);
+  assert.equal(isIOS(uaWindow("Mozilla/5.0 (Macintosh; Intel Mac OS X)", 5)), true, "iPadOS");
+  assert.equal(isIOS(uaWindow("Mozilla/5.0 (Macintosh; Intel Mac OS X)", 0)), false, "real Mac");
+  assert.equal(isIOS(uaWindow("Mozilla/5.0 (Windows NT 10.0)")), false);
+});
+
+test("installMethod classifies native / ios / manual", () => {
+  assert.equal(installMethod(true, uaWindow("Windows")), "native", "deferred prompt");
+  assert.equal(installMethod(false, uaWindow("iPhone")), "ios");
+  assert.equal(installMethod(false, uaWindow("Windows")), "manual");
+});
+
+test("decline cooldown: canPromptInstall respects the window", () => {
+  const map = new Map();
+  const storage = {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => map.set(k, String(v)),
+  };
+  assert.equal(canPromptInstall({ storage, now: 1000 }), true, "nothing recorded");
+  recordInstallDecline({ storage, now: 1000 });
+  assert.equal(map.get(INSTALL_DECLINE_KEY), "1000");
+  assert.equal(canPromptInstall({ storage, now: 1000, cooldownMs: 5000 }), false, "in cooldown");
+  assert.equal(canPromptInstall({ storage, now: 6000, cooldownMs: 5000 }), true, "cooldown elapsed");
+});
+
+test("installMethod is reflected in the controller state", () => {
+  const ctrl = createInstallPrompt({ window: { navigator: { userAgent: "iPhone" } } });
+  assert.equal(ctrl.getState().method, "ios");
+  ctrl.destroy();
 });

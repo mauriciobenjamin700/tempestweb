@@ -21,12 +21,17 @@ class InstallState(BaseModel):
     Attributes:
         can_install: A deferred prompt is available to fire.
         installed: The app reports as installed (standalone / appinstalled).
+        method: How the user can install here — ``"native"`` (a prompt is
+            available), ``"ios"`` (manual Share → Add to Home) or ``"manual"``
+            (e.g. Firefox desktop). Lets the view show a native button vs. a
+            platform tutorial.
     """
 
     model_config = ConfigDict(frozen=True)
 
     can_install: bool = False
     installed: bool = False
+    method: str = "manual"
 
 
 async def state() -> InstallState:

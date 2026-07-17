@@ -209,6 +209,7 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     "client/push/web-push-client.js",
     "client/pwa/install-prompt.js",
     "client/pwa/connectivity-banner.js",
+    "client/pwa/post-install-redirect.js",
 )
 
 # Files a server artifact must contain, relative to the artifact root. The
@@ -227,6 +228,7 @@ SERVER_ARTIFACT_FILES: tuple[str, ...] = (
     "static/push/web-push-client.js",
     "static/pwa/install-prompt.js",
     "static/pwa/connectivity-banner.js",
+    "static/pwa/post-install-redirect.js",
 )
 
 # Files a transpile artifact must contain, relative to the artifact root. No
@@ -245,6 +247,7 @@ TRANSPILE_ARTIFACT_FILES: tuple[str, ...] = (
     "client/pwa/install-prompt.js",
     "client/pwa/update-prompt.js",
     "client/pwa/connectivity-banner.js",
+    "client/pwa/post-install-redirect.js",
     # PWA layer: manifest, service worker + registration, icons. Mode C is a
     # first-class installable, offline-capable PWA (static bundle).
     *_PWA_FILES,
@@ -606,7 +609,11 @@ def _copy_client_extras(client: Path, base: Path) -> None:
 
     pwa_dest = base / "pwa"
     pwa_dest.mkdir(parents=True, exist_ok=True)
-    for pwa_asset in ("install-prompt.js", "connectivity-banner.js"):
+    for pwa_asset in (
+        "install-prompt.js",
+        "connectivity-banner.js",
+        "post-install-redirect.js",
+    ):
         pwa_source = client / "pwa" / pwa_asset
         if not pwa_source.is_file():
             raise BuildError(f"missing pwa asset: {pwa_source}")
@@ -1241,6 +1248,7 @@ def _build_wasm(
         # The shell's inline script imports the connectivity banner at boot, so it
         # must precache too for a true offline boot.
         "/client/pwa/connectivity-banner.js",
+        "/client/pwa/post-install-redirect.js",
         # PWA icons referenced by the manifest + apple-touch-icon link.
         *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
         *(f"/{asset}" for asset in assets),
@@ -1408,6 +1416,7 @@ def _build_transpile(
         "pwa/install-prompt.js",
         "pwa/update-prompt.js",
         "pwa/connectivity-banner.js",
+        "pwa/post-install-redirect.js",
     ):
         source = client / rel
         if not source.is_file():
@@ -1436,6 +1445,7 @@ def _build_transpile(
         "/client/pwa/install-prompt.js",
         "/client/pwa/update-prompt.js",
         "/client/pwa/connectivity-banner.js",
+        "/client/pwa/post-install-redirect.js",
         *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
     )
     manifest_options = manifest or ManifestOptions(name=name)

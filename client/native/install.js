@@ -32,11 +32,15 @@ if (typeof globalThis !== "undefined" && globalThis.addEventListener) {
  * Report the current install state.
  * @param {Object} _args
  * @param {import("./index.js").NativeDeps} deps
- * @returns {Promise<{can_install:boolean, installed:boolean}>}
+ * @returns {Promise<{can_install:boolean, installed:boolean, method:string}>}
  */
 export async function installState(_args, deps) {
   const state = controller(deps).getState();
-  return { can_install: Boolean(state.canInstall), installed: Boolean(state.installed) };
+  return {
+    can_install: Boolean(state.canInstall),
+    installed: Boolean(state.installed),
+    method: state.method,
+  };
 }
 
 /**

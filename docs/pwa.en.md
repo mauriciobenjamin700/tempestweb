@@ -80,6 +80,36 @@ async def on_install_tap() -> None:
     Browsers only allow `install.prompt()` from a real gesture (a click). Render
     the button when `can_install` is true and fire the prompt in `on_click`.
 
+### Install method + decline cooldown (adopted from famachapp)
+
+`state.method` classifies **how** the user installs here: `"native"` (a prompt is
+available — show the button), `"ios"` (Share → "Add to Home Screen" — show a
+tutorial) or `"manual"` (e.g. Firefox desktop). So the UI never shows a button
+that does nothing on iOS.
+
+On the JS side, `client/pwa/install-prompt.js` ships a **decline cooldown** so you
+don't nag: `recordInstallDecline()` when the user dismisses the banner and
+`canPromptInstall()` (7 days by default) before showing it again.
+
+```javascript
+import { recordInstallDecline, canPromptInstall } from "/client/pwa/install-prompt.js";
+
+if (canPromptInstall()) showInstallBanner();
+// ... on "not now":
+recordInstallDecline();
+```
+
+### Post-install redirect
+
+`client/pwa/post-install-redirect.js` shows a full-screen overlay when
+`appinstalled` fires (the tab that installed is still a plain tab — the user
+should switch to the standalone app). Opt-in:
+
+```javascript
+import { mountPostInstallRedirect } from "/client/pwa/post-install-redirect.js";
+mountPostInstallRedirect();   // no-op if already running standalone
+```
+
 ## P1 — Service worker: offline after the 1st load
 
 In Mode C, the generated `sw.js` **precaches the entire static bundle** —

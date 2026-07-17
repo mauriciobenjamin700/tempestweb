@@ -23,7 +23,14 @@
  * @typedef {Object} InstallState
  * @property {boolean} canInstall   A deferred prompt is available to fire.
  * @property {boolean} installed    The app reports as installed (appinstalled or standalone).
+ * @property {"native"|"ios"|"manual"} method   How the user can install here.
  */
+
+/** Default decline cooldown: don't re-nag for 7 days. */
+export const INSTALL_DECLINE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** localStorage key for the last install-prompt decline timestamp. */
+export const INSTALL_DECLINE_KEY = "tw-install-declined-at";
 
 /**
  * @typedef {Object} InstallPromptController
@@ -62,6 +69,96 @@ export function isStandalone(win) {
 }
 
 /**
+ * Detect an iOS browser (iPhone/iPad/iPod), including iPadOS masquerading as Mac.
+ *
+ * iOS has no `beforeinstallprompt` — installing is a manual Share → "Add to Home
+ * Screen" — so the UI must show a tutorial instead of a native prompt button.
+ *
+ * @param {Window} [win]   Window override (tests). Defaults to the global.
+ * @returns {boolean} Whether this is an iOS browser.
+ */
+export function isIOS(win) {
+  const w = win ?? (typeof window !== "undefined" ? window : undefined);
+  const nav = w && w.navigator;
+  if (!nav) return false;
+  const ua = String(nav.userAgent || nav.vendor || "");
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  // iPadOS 13+ reports a Mac UA but exposes touch — treat as iOS.
+  return /Macintosh/.test(ua) && typeof nav.maxTouchPoints === "number" && nav.maxTouchPoints > 1;
+}
+
+/**
+ * Classify how the user can install the app here.
+ *
+ * ``"native"`` when a deferred `beforeinstallprompt` is available (Chromium),
+ * ``"ios"`` on iOS (manual Share → Add to Home), else ``"manual"`` (e.g. Firefox
+ * desktop) — the UI picks a native button vs. a platform tutorial accordingly.
+ *
+ * @param {boolean} hasDeferredPrompt   Whether a prompt was captured.
+ * @param {Window} [win]                Window override (tests).
+ * @returns {"native"|"ios"|"manual"} The install method.
+ */
+export function installMethod(hasDeferredPrompt, win) {
+  if (hasDeferredPrompt) return "native";
+  if (isIOS(win)) return "ios";
+  return "manual";
+}
+
+/**
+ * Resolve a Storage for the decline cooldown (injected or global localStorage).
+ * @param {Storage} [storage]
+ * @returns {?Storage}
+ */
+function _declineStorage(storage) {
+  return storage ?? (typeof localStorage !== "undefined" ? localStorage : null);
+}
+
+/**
+ * Record that the user just declined the install prompt (starts the cooldown).
+ *
+ * @param {Object} [opts]
+ * @param {Storage} [opts.storage]   Storage override (default localStorage).
+ * @param {number} [opts.now]        Epoch ms (default Date.now), injectable for tests.
+ * @returns {void}
+ */
+export function recordInstallDecline(opts = {}) {
+  const storage = _declineStorage(opts.storage);
+  if (!storage) return;
+  const now = opts.now ?? Date.now();
+  try {
+    storage.setItem(INSTALL_DECLINE_KEY, String(now));
+  } catch {
+    // Best-effort: a blocked write just means we may re-ask sooner.
+  }
+}
+
+/**
+ * Whether an install prompt may be shown, honoring the decline cooldown.
+ *
+ * @param {Object} [opts]
+ * @param {Storage} [opts.storage]      Storage override (default localStorage).
+ * @param {number} [opts.now]           Epoch ms (default Date.now).
+ * @param {number} [opts.cooldownMs]    Cooldown window (default 7 days).
+ * @returns {boolean} True when outside the cooldown (or nothing recorded).
+ */
+export function canPromptInstall(opts = {}) {
+  const storage = _declineStorage(opts.storage);
+  if (!storage) return true;
+  let raw = null;
+  try {
+    raw = storage.getItem(INSTALL_DECLINE_KEY);
+  } catch {
+    return true;
+  }
+  if (!raw) return true;
+  const declinedAt = Number(raw);
+  if (!Number.isFinite(declinedAt)) return true;
+  const now = opts.now ?? Date.now();
+  const cooldownMs = opts.cooldownMs ?? INSTALL_DECLINE_COOLDOWN_MS;
+  return now - declinedAt >= cooldownMs;
+}
+
+/**
  * Create a soft install-prompt controller.
  *
  * It listens for `beforeinstallprompt` (calling preventDefault so the browser's
@@ -84,7 +181,11 @@ export function createInstallPrompt(options = {}) {
 
   /** @returns {InstallState} */
   function getState() {
-    return { canInstall: deferred !== null, installed };
+    return {
+      canInstall: deferred !== null,
+      installed,
+      method: installMethod(deferred !== null, win ?? undefined),
+    };
   }
 
   function notify() {

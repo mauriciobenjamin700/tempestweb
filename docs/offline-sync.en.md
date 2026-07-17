@@ -545,6 +545,26 @@ wires the service-worker messages (`OFFLINE_PULL`, `OFFLINE_QUEUE_DRAINED`) to
 that controller — after the worker drains the queue in the background, the page
 (which holds the token) reconciles with a pull.
 
+### From Python: the `native.sync` capability
+
+You don't have to touch JS: **`native.sync`** exposes all of this to your
+`view()` (like `native.network` does for connectivity). You `configure` a named
+source (endpoint + local table, convention `GET <url>?since=&cursor=` →
+`{rows, next_cursor, server_time}`); `installSyncBridge` is wired automatically on
+the first configure (the SW's `OFFLINE_PULL` reconciles every configured source).
+
+```python
+from tempestweb import native
+
+await native.sync.configure("notes", "/api/notes", "app-db", "notes")
+
+summary = await native.sync.now("notes")   # replay the queue + pull
+state = await native.sync.status("notes")  # SyncState(phase, pending, last_synced_at, ...)
+
+async for s in native.sync.watch("notes"):  # stream the state (T-EV)
+    app.set_state(lambda st: setattr(st, "sync", s))
+```
+
 ---
 
 ## Recap

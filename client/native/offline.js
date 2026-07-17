@@ -73,6 +73,16 @@ function queue(deps) {
 }
 
 /**
+ * The process-wide offline queue (built lazily), shared with native.sync so a
+ * sync run replays the same write queue it enqueues into.
+ * @param {import("./index.js").NativeDeps} [deps]
+ * @returns {import("../offline/sync.js").OfflineQueue} The shared queue.
+ */
+export function getOfflineQueue(deps) {
+  return queue(deps);
+}
+
+/**
  * Serialize a queue row into the wire shape the Python `Mutation` validates.
  * @param {import("../offline/sync.js").Mutation} row
  * @returns {Object}

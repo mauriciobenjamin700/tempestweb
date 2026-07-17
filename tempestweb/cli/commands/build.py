@@ -199,6 +199,7 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     *(f"client/offline/{asset}" for asset in _OFFLINE_ASSETS),
     "client/push/web-push-client.js",
     "client/pwa/install-prompt.js",
+    "client/pwa/connectivity-banner.js",
 )
 
 # Files a server artifact must contain, relative to the artifact root. The
@@ -216,6 +217,7 @@ SERVER_ARTIFACT_FILES: tuple[str, ...] = (
     *(f"static/offline/{asset}" for asset in _OFFLINE_ASSETS),
     "static/push/web-push-client.js",
     "static/pwa/install-prompt.js",
+    "static/pwa/connectivity-banner.js",
 )
 
 # Files a transpile artifact must contain, relative to the artifact root. No
@@ -233,6 +235,7 @@ TRANSPILE_ARTIFACT_FILES: tuple[str, ...] = (
     "client/push/web-push-client.js",
     "client/pwa/install-prompt.js",
     "client/pwa/update-prompt.js",
+    "client/pwa/connectivity-banner.js",
     # PWA layer: manifest, service worker + registration, icons. Mode C is a
     # first-class installable, offline-capable PWA (static bundle).
     *_PWA_FILES,
@@ -554,9 +557,12 @@ def _copy_client_extras(client: Path, base: Path) -> None:
     transport — eagerly loads the entire native tree, which in turn pulls in the
     offline queue (``../offline/{store,sync}.js``), the WebPush client
     (``../push/web-push-client.js``) and the install prompt
-    (``../pwa/install-prompt.js``). Every artifact that mounts the client must
-    ship all of them under the same base (``client/`` for wasm, ``static/`` for
-    server), or the browser 404s mid-module-load and the app never mounts.
+    (``../pwa/install-prompt.js``). The connectivity banner
+    (``../pwa/connectivity-banner.js``), which the shell mounts and which itself
+    imports ``../native/network.js``, ships alongside them. Every artifact that
+    mounts the client must ship all of them under the same base (``client/`` for
+    wasm, ``static/`` for server), or the browser 404s mid-module-load and the
+    app never mounts.
 
     Args:
         client: The shared ``client/`` directory.
@@ -589,12 +595,13 @@ def _copy_client_extras(client: Path, base: Path) -> None:
     push_dest.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(push_source, push_dest / "web-push-client.js")
 
-    install_source = client / "pwa" / "install-prompt.js"
-    if not install_source.is_file():
-        raise BuildError(f"missing pwa asset: {install_source}")
     pwa_dest = base / "pwa"
     pwa_dest.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(install_source, pwa_dest / "install-prompt.js")
+    for pwa_asset in ("install-prompt.js", "connectivity-banner.js"):
+        pwa_source = client / "pwa" / pwa_asset
+        if not pwa_source.is_file():
+            raise BuildError(f"missing pwa asset: {pwa_source}")
+        shutil.copyfile(pwa_source, pwa_dest / pwa_asset)
 
 
 def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
@@ -699,6 +706,8 @@ _DEV_CACHE_KILL_SWITCH = """\
 _WASM_SW_REGISTER = """\
     <script type="module">
       import { registerServiceWorker } from "./register.js";
+      import { mountConnectivityBanner } from "./client/pwa/connectivity-banner.js";
+      mountConnectivityBanner();
       if ("serviceWorker" in navigator) {
         registerServiceWorker({ url: "/sw.js" });
       }
@@ -709,6 +718,8 @@ _TRANSPILE_SW_REGISTER = """\
     <script type="module">
       import { registerServiceWorker } from "./register.js";
       import { showUpdatePrompt } from "./client/pwa/update-prompt.js";
+      import { mountConnectivityBanner } from "./client/pwa/connectivity-banner.js";
+      mountConnectivityBanner();
       if ("serviceWorker" in navigator) {
         registerServiceWorker({
           url: "./sw.js",
@@ -901,7 +912,9 @@ def _index_html_server(name: str) -> str:
     <script type="module">
       import {{ mount }} from "./static/tempestweb.js";
       import {{ createWebSocketTransport }} from "./static/transport-ws.js";
+      import {{ mountConnectivityBanner }} from "./static/pwa/connectivity-banner.js";
 
+      mountConnectivityBanner();
       const scheme = location.protocol === "https:" ? "wss://" : "ws://";
       const transport = createWebSocketTransport(scheme + location.host + "/ws");
       mount(document.getElementById("app"), transport);
@@ -1216,6 +1229,9 @@ def _build_wasm(
         # the install prompt (via install.js); both are boot-critical shell modules.
         "/client/push/web-push-client.js",
         "/client/pwa/install-prompt.js",
+        # The shell's inline script imports the connectivity banner at boot, so it
+        # must precache too for a true offline boot.
+        "/client/pwa/connectivity-banner.js",
         # PWA icons referenced by the manifest + apple-touch-icon link.
         *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
         *(f"/{asset}" for asset in assets),
@@ -1382,6 +1398,7 @@ def _build_transpile(
         "push/web-push-client.js",
         "pwa/install-prompt.js",
         "pwa/update-prompt.js",
+        "pwa/connectivity-banner.js",
     ):
         source = client / rel
         if not source.is_file():
@@ -1409,6 +1426,7 @@ def _build_transpile(
         "/client/push/web-push-client.js",
         "/client/pwa/install-prompt.js",
         "/client/pwa/update-prompt.js",
+        "/client/pwa/connectivity-banner.js",
         *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
     )
     manifest_options = manifest or ManifestOptions(name=name)

@@ -17,6 +17,13 @@ import { networkWatch } from "../native/network.js";
 export const CONNECTIVITY_BANNER_ID = "tw-connectivity-banner";
 
 /**
+ * Documents with an active banner mount, so a second mountConnectivityBanner on
+ * the same document is a no-op instead of attaching a duplicate watcher.
+ * @type {WeakSet<Document>}
+ */
+const _mounted = new WeakSet();
+
+/**
  * Build the offline banner element (not attached to the DOM).
  *
  * @param {Document} doc              The document to create nodes in.
@@ -83,8 +90,12 @@ function isOnline(nav) {
  *
  * Shows the banner while offline and removes it when connectivity returns,
  * reflecting the initial state immediately and then every online/offline
- * transition via ../native/network.js's connectivity watch. Idempotent per
- * document: the banner id guards against duplicates.
+ * transition via ../native/network.js's connectivity watch.
+ *
+ * Idempotent per document: a second call while a mount is already active on the
+ * same document is a no-op (returns a no-op teardown) — it neither duplicates the
+ * banner nor attaches a second watcher. render() also reads the DOM as the source
+ * of truth, so it never appends a second banner even across the state cycle.
  *
  * @param {Object} [opts]
  * @param {Document} [opts.document]   Document override (tests).
@@ -99,6 +110,8 @@ export function mountConnectivityBanner(opts = {}) {
   const doc =
     opts.document ?? (typeof document !== "undefined" ? document : null);
   if (!doc || !doc.body) return () => {};
+  if (_mounted.has(doc)) return () => {};
+  _mounted.add(doc);
   const win =
     opts.window ?? (typeof window !== "undefined" ? window : globalThis);
   const nav =
@@ -106,16 +119,12 @@ export function mountConnectivityBanner(opts = {}) {
   const watch = opts.watch ?? networkWatch;
   const message = opts.message;
 
-  /** @type {?HTMLElement} */
-  let banner = doc.getElementById(CONNECTIVITY_BANNER_ID);
-
   const render = (online) => {
-    if (!online && !banner) {
-      banner = createConnectivityBanner(doc, { message });
-      doc.body.appendChild(banner);
-    } else if (online && banner) {
-      banner.remove();
-      banner = null;
+    const existing = doc.getElementById(CONNECTIVITY_BANNER_ID);
+    if (!online && !existing) {
+      doc.body.appendChild(createConnectivityBanner(doc, { message }));
+    } else if (online && existing) {
+      existing.remove();
     }
   };
 
@@ -128,9 +137,8 @@ export function mountConnectivityBanner(opts = {}) {
 
   return () => {
     teardown();
-    if (banner) {
-      banner.remove();
-      banner = null;
-    }
+    const existing = doc.getElementById(CONNECTIVITY_BANNER_ID);
+    if (existing) existing.remove();
+    _mounted.delete(doc);
   };
 }

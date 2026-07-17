@@ -70,6 +70,15 @@ def test_wasm_prod_shell_registers_service_worker(tmp_path: Path) -> None:
     assert "tw-dev-sw-cleared" not in html
 
 
+def test_shells_mount_the_connectivity_banner(tmp_path: Path) -> None:
+    """Every mode's shell auto-mounts the offline/online connectivity banner."""
+    root = _project(tmp_path)
+    for mode in ("wasm", "server", "transpile"):
+        out = build_artifact(root, mode=mode, out_dir=tmp_path / mode).out_dir
+        html = (out / "index.html").read_text(encoding="utf-8")
+        assert "mountConnectivityBanner" in html, mode
+
+
 def test_wasm_dev_shell_uses_cache_kill_switch(tmp_path: Path) -> None:
     """A dev wasm build skips the SW and injects the cache kill-switch instead.
 

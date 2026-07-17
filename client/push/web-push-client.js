@@ -23,6 +23,33 @@
  */
 
 /**
+ * This device's active push endpoint, set on subscribe and cleared on
+ * unsubscribe. The outbound mutation sender stamps it as `X-Push-Endpoint` so the
+ * server can skip notifying the very device that made a change (no redundant
+ * "data changed" push for your own edit).
+ * @type {?string}
+ */
+let _activePushEndpoint = null;
+
+/**
+ * The device's active push endpoint, or null when not subscribed.
+ * @returns {?string} The endpoint URL.
+ */
+export function getActivePushEndpoint() {
+  return _activePushEndpoint;
+}
+
+/**
+ * Record (or clear) the device's active push endpoint. Called by
+ * WebPushClient.subscribe/unsubscribe; exposed for tests and manual wiring.
+ * @param {?string} endpoint   The endpoint URL, or null to clear.
+ * @returns {void}
+ */
+export function setActivePushEndpoint(endpoint) {
+  _activePushEndpoint = endpoint || null;
+}
+
+/**
  * Decode a base64url VAPID public key into the Uint8Array pushManager expects.
  *
  * @param {string} base64String   The base64url-encoded application server key.
@@ -168,6 +195,7 @@ export class WebPushClient {
       });
     }
     const json = typeof sub.toJSON === "function" ? sub.toJSON() : sub;
+    setActivePushEndpoint(json.endpoint ?? sub.endpoint ?? null);
     await this.onSubscribe(json);
     return json;
   }
@@ -184,7 +212,10 @@ export class WebPushClient {
     if (!sub) return false;
     const json = typeof sub.toJSON === "function" ? sub.toJSON() : sub;
     const ok = await sub.unsubscribe();
-    if (ok) await this.onUnsubscribe(json);
+    if (ok) {
+      setActivePushEndpoint(null);
+      await this.onUnsubscribe(json);
+    }
     return ok;
   }
 }

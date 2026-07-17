@@ -6,6 +6,8 @@ import {
   isPushSupported,
   getPermission,
   urlBase64ToUint8Array,
+  getActivePushEndpoint,
+  setActivePushEndpoint,
 } from "../../client/push/web-push-client.js";
 
 const VAPID =
@@ -183,4 +185,21 @@ test("requestPermission short-circuits a decided permission", async () => {
   const client = new WebPushClient({ vapidPublicKey: VAPID, deps: { notification: notif } });
   assert.equal(await client.requestPermission(), "granted");
   assert.equal(asked, false);
+});
+
+test("subscribe records the active push endpoint; unsubscribe clears it", async () => {
+  setActivePushEndpoint(null);
+  const reg = fakeRegistration();
+  const client = new WebPushClient({
+    vapidPublicKey: VAPID,
+    deps: {
+      registration: reg,
+      navigator: { serviceWorker: {} },
+      notification: fakeNotification("granted"),
+    },
+  });
+  const json = await client.subscribe();
+  assert.equal(getActivePushEndpoint(), json.endpoint, "endpoint recorded on subscribe");
+  await client.unsubscribe();
+  assert.equal(getActivePushEndpoint(), null, "endpoint cleared on unsubscribe");
 });

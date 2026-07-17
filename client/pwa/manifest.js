@@ -45,6 +45,8 @@
  * @property {string} [lang]               BCP-47 language tag, e.g. "pt-BR".
  * @property {string} [dir]                "ltr" | "rtl" | "auto".
  * @property {string} [id]                 Stable app identity.
+ * @property {Object} [launch_handler]     launch_handler (defaults to focus-existing).
+ * @property {string[]} [display_override] Ordered display fallbacks.
  * @property {ManifestIcon[]} [icons]      Icon set (defaults to the standard set).
  * @property {ManifestShortcut[]} [shortcuts]  P5 shortcuts (optional).
  * @property {Object} [share_target]       P5 share target (optional, passed through).
@@ -112,6 +114,18 @@ export function buildManifest(options = {}) {
 
   // Stable app identity defaults to the scope when not provided.
   manifest.id = opts.id ?? manifest.scope;
+
+  // Reuse an open window on launch instead of spawning a duplicate.
+  manifest.launch_handler = opts.launch_handler ?? {
+    client_mode: ["focus-existing", "auto"],
+  };
+
+  // Ordered display fallbacks; default to the chosen display then minimal-ui.
+  const override =
+    Array.isArray(opts.display_override) && opts.display_override.length > 0
+      ? opts.display_override
+      : [manifest.display, "minimal-ui"];
+  manifest.display_override = [...new Set(override)];
 
   if (opts.orientation) manifest.orientation = opts.orientation;
   if (Array.isArray(opts.categories) && opts.categories.length > 0) {

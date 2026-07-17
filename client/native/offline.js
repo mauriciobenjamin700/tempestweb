@@ -12,6 +12,7 @@
 // handlers are unit-testable under Node with a fake store + sender.
 
 import { httpRequest } from "./http.js";
+import { getActivePushEndpoint } from "../push/web-push-client.js";
 import { createOfflineStore, persistStorage } from "../offline/store.js";
 import {
   OfflineQueue,
@@ -49,13 +50,12 @@ function queue(deps) {
   });
   persistStorage(deps && /** @type {any} */ (deps).navigator).catch(() => {});
   const send = async (mutation) => {
+    /** @type {Record<string, string>} */
+    const headers = { "idempotency-key": mutation.idempotencyKey };
+    const endpoint = getActivePushEndpoint();
+    if (endpoint) headers["x-push-endpoint"] = endpoint;
     const res = await httpRequest(
-      {
-        method: mutation.method,
-        url: mutation.url,
-        json: mutation.body ?? null,
-        headers: { "idempotency-key": mutation.idempotencyKey },
-      },
+      { method: mutation.method, url: mutation.url, json: mutation.body ?? null, headers },
       deps,
     );
     return { ok: res.ok, status: res.status };

@@ -106,3 +106,26 @@ test("mountConnectivityBanner is a no-op without a document body", () => {
   assert.equal(typeof teardown, "function");
   teardown();
 });
+
+test("a second mount on the same document is a no-op (no dup banner / watcher)", () => {
+  const doc = freshDoc();
+  const win = fakeWin();
+  const nav = { onLine: true };
+  const teardown1 = mountConnectivityBanner({ document: doc, window: win, navigator: nav });
+  const teardown2 = mountConnectivityBanner({ document: doc, window: win, navigator: nav });
+
+  assert.equal(win.count("offline"), 1, "only one watcher attached");
+
+  nav.onLine = false;
+  win.fire("offline");
+  assert.equal(
+    doc.querySelectorAll(`#${CONNECTIVITY_BANNER_ID}`).length,
+    1,
+    "exactly one banner after the toggle",
+  );
+
+  teardown2();
+  teardown1();
+  assert.equal(doc.getElementById(CONNECTIVITY_BANNER_ID), null);
+  assert.equal(win.count("offline"), 0, "watcher detached");
+});

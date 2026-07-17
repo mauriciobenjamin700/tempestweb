@@ -11,6 +11,10 @@ const players = new Map();
 
 /**
  * Play a short sound on a channel.
+ *
+ * A blocked play (NotAllowedError, normal before the first user gesture) is
+ * swallowed and reported as { played:false, blocked:true } rather than throwing.
+ *
  * @param {{src:string,volume:number,channel:string}} args
  * @param {import("./index.js").NativeDeps} deps
  * @returns {Promise<{played:boolean,blocked:boolean,channel:string}>}
@@ -33,13 +37,16 @@ export async function audioPlay(args, deps) {
     if (maybe && typeof maybe.then === "function") await maybe;
     return { played: true, blocked: false, channel };
   } catch {
-    // NotAllowedError (autoplay blocked) is normal before a user gesture.
     return { played: false, blocked: true, channel };
   }
 }
 
 /**
  * Stop and reset playback on a channel.
+ *
+ * Resetting currentTime is best-effort: some environments (e.g. jsdom Audio) may
+ * not implement it, and that failure is swallowed.
+ *
  * @param {{channel:string}} args
  * @returns {Promise<Object>}
  */
@@ -51,7 +58,6 @@ export async function audioStop(args) {
     try {
       el.currentTime = 0;
     } catch {
-      // jsdom Audio may not implement currentTime; ignore.
     }
   }
   return {};

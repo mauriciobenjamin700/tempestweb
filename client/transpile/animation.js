@@ -188,6 +188,10 @@ export class Tween {
 
   /**
    * Interpolate between `begin` and `end` at fraction `t`.
+   *
+   * Supports three endpoint shapes: numbers, colors ({ r, g, b, a } — r/g/b
+   * rounded, alpha kept as a float) and edges ({ top, right, bottom, left }).
+   *
    * @param {number} t  Usually a controller's `value` (0..1).
    * @returns {*}  The interpolated value (same shape as the endpoints).
    */
@@ -197,7 +201,6 @@ export class Tween {
     if (typeof a === "number" && typeof b === "number") {
       return lerp(a, b, t);
     }
-    // Color: { r, g, b, a } — r/g/b rounded, alpha as float.
     if (a && b && "r" in a && "g" in a && "b" in a) {
       return {
         r: Math.round(lerp(a.r, b.r, t)),
@@ -206,7 +209,6 @@ export class Tween {
         a: lerp(a.a ?? 1, b.a ?? 1, t),
       };
     }
-    // Edge: { top, right, bottom, left }.
     if (a && b && "top" in a && "left" in a) {
       return {
         top: lerp(a.top, b.top, t),

@@ -140,6 +140,10 @@ function payloadFor(domType, target) {
  * keyed widget owns the event — calls `transport.sendEvent` with the TWEvent.
  * Events on unkeyed elements are ignored (no key = nothing for Python to resolve).
  *
+ * Gesture recognition pairs a pointerdown over a GestureDetector with its
+ * pointerup to emit tap / swipe / long_press, tracked per pointerId so overlapping
+ * pointers don't clobber each other.
+ *
  * @param {HTMLElement} root  The mounted root element to delegate from.
  * @param {import("./transport.js").Transport} transport  The event sink.
  * @returns {() => void}      An unbind function that removes every listener.
@@ -164,9 +168,6 @@ export function bindEvents(root, transport) {
     bound.push([domType, handler]);
   }
 
-  // Gesture recognition: pair a pointerdown over a GestureDetector with its
-  // pointerup to emit tap / swipe / long_press. Tracked per pointerId so
-  // overlapping pointers don't clobber each other.
   /** @type {Map<number, {key: string, x: number, y: number, t: number}>} */
   const pending = new Map();
   const now = () => (globalThis.performance?.now?.() ?? 0);

@@ -64,7 +64,6 @@ export function isStandalone(win) {
       : null;
   if (mql && mql.matches) return true;
   const nav = w.navigator;
-  // iOS Safari exposes navigator.standalone for home-screen apps.
   return Boolean(nav && nav.standalone === true);
 }
 
@@ -73,6 +72,8 @@ export function isStandalone(win) {
  *
  * iOS has no `beforeinstallprompt` — installing is a manual Share → "Add to Home
  * Screen" — so the UI must show a tutorial instead of a native prompt button.
+ * iPadOS 13+ reports a Mac user agent but exposes multi-touch, so a touch-capable
+ * "Macintosh" UA is treated as iOS.
  *
  * @param {Window} [win]   Window override (tests). Defaults to the global.
  * @returns {boolean} Whether this is an iOS browser.
@@ -83,7 +84,6 @@ export function isIOS(win) {
   if (!nav) return false;
   const ua = String(nav.userAgent || nav.vendor || "");
   if (/iPad|iPhone|iPod/.test(ua)) return true;
-  // iPadOS 13+ reports a Mac UA but exposes touch — treat as iOS.
   return /Macintosh/.test(ua) && typeof nav.maxTouchPoints === "number" && nav.maxTouchPoints > 1;
 }
 
@@ -116,6 +116,9 @@ function _declineStorage(storage) {
 /**
  * Record that the user just declined the install prompt (starts the cooldown).
  *
+ * Best-effort: a blocked storage write is swallowed, which only means the prompt
+ * may be re-offered sooner than the cooldown intends.
+ *
  * @param {Object} [opts]
  * @param {Storage} [opts.storage]   Storage override (default localStorage).
  * @param {number} [opts.now]        Epoch ms (default Date.now), injectable for tests.
@@ -128,7 +131,6 @@ export function recordInstallDecline(opts = {}) {
   try {
     storage.setItem(INSTALL_DECLINE_KEY, String(now));
   } catch {
-    // Best-effort: a blocked write just means we may re-ask sooner.
   }
 }
 
@@ -195,7 +197,6 @@ export function createInstallPrompt(options = {}) {
 
   /** @param {BeforeInstallPromptEvent} event */
   function onBeforeInstallPrompt(event) {
-    // Prevent the cold mini-infobar; we drive the prompt in-context.
     if (typeof event.preventDefault === "function") event.preventDefault();
     deferred = event;
     notify();
@@ -212,20 +213,27 @@ export function createInstallPrompt(options = {}) {
     win.addEventListener("appinstalled", onAppInstalled);
   }
 
-  /** @returns {Promise<"accepted"|"dismissed"|"unavailable">} */
+  /**
+   * Fire the stashed native prompt and resolve with the outcome.
+   *
+   * A deferred prompt can only be used once, so it is cleared before awaiting.
+   * On acceptance `appinstalled` will also fire, but the outcome is returned
+   * optimistically. A rejected userChoice is swallowed and reported as
+   * "dismissed".
+   *
+   * @returns {Promise<"accepted"|"dismissed"|"unavailable">}
+   */
   async function promptInstall() {
     if (!deferred || typeof deferred.prompt !== "function") {
       return "unavailable";
     }
     const event = deferred;
-    // A deferred prompt can only be used once; clear it before awaiting.
     deferred = null;
     notify();
     await event.prompt();
     try {
       const choice = await event.userChoice;
       if (choice && choice.outcome === "accepted") {
-        // appinstalled will also fire, but mark optimistically.
         return "accepted";
       }
       return "dismissed";

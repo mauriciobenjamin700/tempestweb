@@ -35,11 +35,17 @@ const CACHE_VERSION = "__CACHE_VERSION__".includes("CACHE_VERSION")
   ? "tw-dev"
   : "__CACHE_VERSION__";
 
-/** @type {string[]} */
+/**
+ * App-shell URLs to precache (cache-first).
+ *
+ * When the build has not replaced the placeholder, the dev-default app-shell
+ * below is used (Mode A adds pyodide + wheel + app.py at build time).
+ *
+ * @type {string[]}
+ */
 const PRECACHE_ASSETS = (() => {
   const injected = "__PRECACHE_MANIFEST__";
   if (injected.includes("PRECACHE_MANIFEST")) {
-    // Dev default app-shell (Mode A adds pyodide + wheel + app.py at build).
     return [
       "/",
       "/index.html",
@@ -74,7 +80,8 @@ const RUNTIME_MAX_ENTRIES = 60;
  *
  * App-shell assets are cache-first (instant offline after first load). API calls
  * (under /api/, /ws, /sse) are network-first/never-cached. Other same-origin GETs
- * use stale-while-revalidate. See P2 in the plan.
+ * use stale-while-revalidate. Cross-origin requests (CDNs, analytics) are left to
+ * the network (network-only). See P2 in the plan.
  *
  * @param {string} url        The request URL (absolute).
  * @param {string} origin     The worker's origin.
@@ -88,11 +95,9 @@ export function chooseStrategy(url, origin, shell) {
   } catch {
     return "network-only";
   }
-  // Cross-origin (CDNs, analytics) — don't manage; let the network handle it.
   if (parsed.origin !== origin) return "network-only";
 
   const path = parsed.pathname;
-  // Never cache live data / transport endpoints.
   if (
     path.startsWith("/api/") ||
     path.startsWith("/ws") ||
@@ -102,7 +107,6 @@ export function chooseStrategy(url, origin, shell) {
     return "network-first";
   }
 
-  // App-shell precached assets: cache-first.
   const shellPaths = shell.map((a) => {
     try {
       return new URL(a, origin).pathname;
@@ -112,7 +116,6 @@ export function chooseStrategy(url, origin, shell) {
   });
   if (shellPaths.includes(path)) return "cache-first";
 
-  // Everything else same-origin: stale-while-revalidate.
   return "stale-while-revalidate";
 }
 
@@ -372,7 +375,9 @@ export function resolveClickUrl(notificationData, action, fallbackUrl = "/") {
  * Apply the Badging API based on a push payload, where supported.
  *
  * A numeric `data.badge_count` (or top-level `badge_count`) sets the app icon
- * badge; `0` clears it. Degrades silently where the Badging API is absent.
+ * badge; `0` clears it. Degrades silently where the Badging API is absent, and
+ * badging is best-effort: any failure is swallowed so it never breaks the push
+ * handler.
  *
  * @param {Object} data        Parsed push JSON.
  * @param {Object} [navigatorLike]   Object exposing setAppBadge/clearAppBadge
@@ -392,7 +397,6 @@ export async function applyBadge(data, navigatorLike) {
       await nav.clearAppBadge();
     }
   } catch {
-    // Badging is best-effort; never let it break the push handler.
   }
 }
 
@@ -464,12 +468,17 @@ export function installNotificationClickHandler(opts = {}) {
 // --- Worker lifecycle (guarded so this file is also importable in tests) -----
 
 if (typeof self !== "undefined" && typeof self.addEventListener === "function") {
+  /**
+   * Precache the app shell on install.
+   *
+   * Deliberately does not call skipWaiting: the page drives the update prompt,
+   * so a new worker waits until the user confirms before taking over.
+   */
   self.addEventListener("install", (event) => {
     event.waitUntil(
       (async () => {
         const cache = await caches.open(PRECACHE);
         await cache.addAll(PRECACHE_ASSETS);
-        // Do NOT skipWaiting automatically — the page drives the update prompt.
       })(),
     );
   });
@@ -486,16 +495,28 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
     );
   });
 
-  // The page posts {type:"SKIP_WAITING"} when the user confirms the update.
+  /**
+   * Activate a waiting worker on demand.
+   *
+   * The page posts {type:"SKIP_WAITING"} when the user confirms the update, which
+   * lets the new worker take over immediately.
+   */
   self.addEventListener("message", (event) => {
     if (event.data && event.data.type === "SKIP_WAITING") {
       self.skipWaiting();
     }
   });
 
+  /**
+   * Route GET requests through the caching strategies.
+   *
+   * Non-GET requests return early and are left to the offline queue, which owns
+   * mutation replay. Navigations get the app-shell fallback; other GETs use the
+   * strategy chosen by chooseStrategy.
+   */
   self.addEventListener("fetch", (event) => {
     const request = event.request;
-    if (request.method !== "GET") return; // mutations handled by the offline queue
+    if (request.method !== "GET") return;
     if (request.mode === "navigate") {
       event.respondWith(handleNavigation(request));
       return;
@@ -531,6 +552,10 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
 
 /**
  * Serve a request according to the chosen strategy.
+ *
+ * Any strategy other than network-only/network-first/cache-first falls through to
+ * stale-while-revalidate (served from cache while the network revalidates).
+ *
  * @param {Request} request   The fetch request.
  * @param {string} strategy   The strategy id from chooseStrategy.
  * @returns {Promise<Response>} The response.
@@ -555,7 +580,6 @@ async function handleFetch(request, strategy) {
     }
     return response;
   }
-  // stale-while-revalidate
   const cached = await caches.match(request);
   const networkPromise = fetch(request)
     .then(async (response) => {

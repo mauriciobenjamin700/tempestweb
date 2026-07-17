@@ -54,14 +54,15 @@ export class NativeError extends Error {
 /**
  * Dispatch a capability in-process and unwrap its result.
  *
+ * The IndexedDB KV store is injected so `storage.*` persists over IndexedDB (the
+ * other capabilities ignore it); it falls back to localStorage when IDB is absent.
+ *
  * @param {string} capability  The dotted capability name (e.g. "http.request").
  * @param {Object} args        The JSON-able capability arguments.
  * @returns {Promise<*>}        The capability's value.
  * @throws {NativeError}        When the capability reports `ok: false`.
  */
 async function call(capability, args) {
-  // Inject the IndexedDB KV store so `storage.*` persists over IndexedDB; the
-  // other capabilities ignore it. Falls back to localStorage when IDB is absent.
   const deps = browserDeps();
   const store = idbStore();
   if (store !== null) {

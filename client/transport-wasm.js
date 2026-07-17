@@ -32,6 +32,10 @@
 /**
  * Create a Mode A (WASM) transport bridging the JS client to in-process Python.
  *
+ * Registers the sink the Python side calls with each patch batch. Batches that
+ * arrive before the renderer has registered its handler (e.g. the initial mount
+ * race) are buffered and flushed in order once onPatches() lands.
+ *
  * @param {WasmBridge} bridge  The pyodide.ffi adapter from the bootstrap.
  * @returns {import("./transport.js").Transport}
  */
@@ -46,9 +50,6 @@ export function createWasmTransport(bridge) {
   const pending = [];
   let closed = false;
 
-  // Register the sink the Python side calls with each patch batch. Batches that
-  // arrive before the renderer has registered its handler (e.g. the initial
-  // mount race) are buffered and flushed in order once onPatches() lands.
   bridge.onDeliver((patches) => {
     if (closed) return;
     if (patchHandler) {

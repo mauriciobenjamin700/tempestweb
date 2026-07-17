@@ -22,6 +22,9 @@ import { subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
 /**
  * Create an SSE + POST transport (Mode B, B5).
  *
+ * A named `ping` heartbeat event keeps the connection warm and carries nothing to
+ * apply, so its listener is intentionally empty.
+ *
  * @param {Object} config
  * @param {string} config.session
  *        Stable per-client session id; both URLs are derived from it.
@@ -121,7 +124,6 @@ export function createSSETransport(config) {
     }
   });
 
-  // Named heartbeat: keep the connection warm, nothing to apply.
   source.addEventListener("ping", () => {});
 
   return {

@@ -182,14 +182,12 @@ function reconcileKeyed(oldChildren, newChildren, path, patches) {
   const newKeys = new Set(newChildren.map((node) => node.key));
   const oldKeys = new Set(oldChildren.map((node) => node.key));
 
-  // 1. Remove keys gone from `new`, descending so lower indices stay valid.
   for (let index = oldChildren.length - 1; index >= 0; index -= 1) {
     if (!newKeys.has(oldChildren[index].key)) {
       patches.push({ path, index });
     }
   }
 
-  // 2. Realign the survivors (old order) to their new relative order.
   /** @type {Map<?string, number>} */
   const survivorIndex = new Map();
   let seen = 0;
@@ -206,14 +204,12 @@ function reconcileKeyed(oldChildren, newChildren, path, patches) {
     patches.push({ path, order });
   }
 
-  // 3. Insert keys new to the list at their final indices, ascending.
   newChildren.forEach((node, index) => {
     if (!oldKeys.has(node.key)) {
       patches.push({ path, index, node });
     }
   });
 
-  // 4. Recurse matched keys at their final (new) indices.
   /** @type {Map<?string, Node>} */
   const oldByKey = new Map(oldChildren.map((node) => [node.key, node]));
   newChildren.forEach((node, index) => {

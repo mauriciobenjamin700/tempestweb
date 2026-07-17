@@ -93,7 +93,9 @@ export function createIconSvg() {
  * (Re)render an Icon's geometry into its `<svg>` from a (possibly partial) props
  * bag. The name and size are remembered on the element, so an Update patch that
  * changes only one of them keeps the other. An unknown name clears the glyph but
- * leaves the box, so layout does not jump.
+ * leaves the box, so layout does not jump. For sizing, an explicit `size` wins;
+ * otherwise the icon scales to the surrounding font ("1em") so an icon inline with
+ * text matches its size out of the box.
  *
  * @param {SVGSVGElement} svg  The Icon's `<svg>` element.
  * @param {Object} props       Props that may include `name` and/or `size`.
@@ -106,8 +108,6 @@ export function renderIcon(svg, props) {
   const name = svg.getAttribute(DATA_NAME);
   const def = resolveIcon(name);
 
-  // Size: an explicit `size` wins; otherwise scale to the surrounding font
-  // ("1em"), so an icon inline with text matches its size out of the box.
   if ("size" in props) {
     if (props.size == null) {
       svg.style.removeProperty("width");

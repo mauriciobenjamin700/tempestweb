@@ -76,6 +76,10 @@ function bytesToB64(view) {
 
 /**
  * Build an onnxruntime-web Tensor from the wire shape.
+ *
+ * The decoded base64 bytes are reinterpreted as the dtype's typed array over the
+ * underlying buffer.
+ *
  * @param {any} ort
  * @param {{data_base64:string,dims:number[],dtype:string}} t
  * @returns {any}
@@ -85,7 +89,6 @@ function toOrtTensor(ort, t) {
   const ctor = DTYPE_CTORS[t.dtype];
   if (!ctor) throw new CapabilityError("bad_dtype", `unsupported dtype: ${t.dtype}`);
   const bytes = b64ToBytes(t.data_base64);
-  // Reinterpret the raw bytes as the typed array (copy via the underlying buffer).
   const typed = new ctor(bytes.buffer, bytes.byteOffset, bytes.byteLength / ctor.BYTES_PER_ELEMENT);
   return new ort.Tensor(t.dtype, typed, t.dims || []);
 }

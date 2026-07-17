@@ -389,7 +389,6 @@ export function unsubscribeDispatch(subId) {
   try {
     unsubscribe();
   } catch {
-    // A failing teardown must not propagate; the subscription is dropped anyway.
   }
   _subscriptions.delete(subId);
 }

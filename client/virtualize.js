@@ -64,15 +64,17 @@ function styleSheet() {
  *
  * Maps `scrollTop` to the top item index and reports a `scroll` wire event when
  * the window changes; `refresh()` (re-run after each patch batch) reserves the
- * off-window scroll space so the scrollbar is proportional to `item_count`.
+ * off-window scroll space so the scrollbar is proportional to `item_count`. About
+ * a third of the window is kept as leading context above the viewport top. The
+ * last window start reported per key is remembered so repeated scroll ticks before
+ * the slide lands don't resend the same window. Because `scroll` does not bubble,
+ * the listener is registered in the capture phase on the root.
  *
  * @param {HTMLElement} root  The mount root.
  * @param {import("./transport.js").Transport} transport  The event sink.
  * @returns {{refresh: () => void, dispose: () => void}}
  */
 export function installVirtualization(root, transport) {
-  // Window start last reported per key, so repeated scroll ticks before the slide
-  // lands don't resend the same window.
   const requested = new Map();
 
   /** Rebuild the spacer stylesheet for every lazy viewport under `root`. */
@@ -129,7 +131,6 @@ export function installVirtualization(root, transport) {
     if (extent <= 0 || windowSize <= 0 || windowSize >= count) {
       return;
     }
-    // Keep ~a third of the window as leading context above the viewport top.
     const lead = Math.floor(windowSize / 3);
     const top = Math.floor(viewport.scrollTop / extent);
     const maxStart = Math.max(0, count - windowSize);
@@ -145,7 +146,6 @@ export function installVirtualization(root, transport) {
     });
   };
 
-  // scroll does not bubble — capture it on the root.
   root.addEventListener("scroll", onScroll, true);
   return {
     refresh,

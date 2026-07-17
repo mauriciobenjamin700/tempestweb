@@ -67,6 +67,13 @@ function b64ToBytes(b64) {
 
 /**
  * Share or download a generated file.
+ *
+ * Prefers the Web Share API with a File when the platform supports sharing files,
+ * and otherwise falls back to an <a download> click. If the user dismisses the
+ * share sheet (AbortError) this surfaces share_cancelled rather than silently
+ * downloading behind their back; any other share failure falls through to the
+ * download path.
+ *
  * @param {{filename:string,data_base64:string,mime:string}} args
  * @param {import("./index.js").NativeDeps} deps
  * @returns {Promise<{method:string,shared:boolean}>}
@@ -80,7 +87,6 @@ export async function fileSave(args, deps) {
   const bytes = b64ToBytes(args.data_base64);
   const blob = new Blob([bytes], { type: mime });
 
-  // Prefer the Web Share API with a File when the platform supports sharing files.
   const FileCtor = /** @type {any} */ (globalThis).File;
   if (nav && typeof nav.share === "function" && FileCtor) {
     try {
@@ -90,12 +96,9 @@ export async function fileSave(args, deps) {
         return { method: "share", shared: true };
       }
     } catch (err) {
-      // AbortError means the user dismissed the share sheet on purpose; surface it
-      // rather than silently downloading behind their back.
       if (err && err.name === "AbortError") {
         throw new CapabilityError("share_cancelled", "share was cancelled");
       }
-      // Any other share failure falls through to the download path below.
     }
   }
 

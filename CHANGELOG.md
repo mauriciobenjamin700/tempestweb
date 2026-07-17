@@ -4,6 +4,26 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.60.0] — 2026-07-17
+
+### Added
+
+- **`native.sync` capability.** Drive and observe read-side sync from a `view()`
+  (like `native.network` for connectivity): `configure` a named source (endpoint
+  + local table, convention `GET <url>?since=&cursor=` → `{rows, next_cursor,
+  server_time}`), `now()` runs a single-flight replay-then-pull, `status()` /
+  `watch()` read/stream the observable `SyncState`. Configuring a source
+  auto-wires the SW bridge, so an `OFFLINE_PULL` posted after a background drain
+  reconciles every configured source with the page's token. Wires the 0.58.0
+  read-sync libs (pull / sync-status / sw-bridge) into a first-class surface; the
+  write queue is shared with `native.offline`.
+- **`pushsubscriptionchange` auto-resubscribe.** The service worker now handles
+  subscription rotation/expiry: it re-subscribes with the old subscription's own
+  `applicationServerKey` (or uses `event.newSubscription`) and re-POSTs to the
+  server subscribe endpoint (default `/webpush/subscribe`), then pings clients —
+  so a VAPID rotation no longer silently breaks push. No VAPID key needs to be
+  stored or build-injected.
+
 ## [0.59.0] — 2026-07-17
 
 ### Added

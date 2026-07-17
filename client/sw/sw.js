@@ -465,6 +465,69 @@ export function installNotificationClickHandler(opts = {}) {
   };
 }
 
+/**
+ * Build the `pushsubscriptionchange` handler (P3), extracted for unit testing.
+ *
+ * When the browser rotates or expires a push subscription (VAPID key rotation,
+ * expiry), it fires `pushsubscriptionchange` — without a handler, push silently
+ * stops working. This re-subscribes using the OLD subscription's own
+ * applicationServerKey (recovered from `event.oldSubscription.options`, so no
+ * VAPID key needs to be stored or build-injected) and POSTs the fresh
+ * subscription to the server's subscribe endpoint, then pings open clients so an
+ * open page can refresh its own subscription state.
+ *
+ * Degrades: if the browser already provides `event.newSubscription`, that is used
+ * directly; if no key is recoverable and no new subscription exists, it only
+ * notifies clients (a foreground page can then re-subscribe with its own key).
+ *
+ * @param {Object} [opts]
+ * @param {ServiceWorkerRegistration} [opts.registration]  Default: self.registration.
+ * @param {typeof fetch} [opts.fetch]                       Default: global fetch.
+ * @param {string} [opts.subscribeUrl]                      Default: "/webpush/subscribe".
+ * @param {(message: Object) => Promise<void>} [opts.notify]  Default: notifyClients.
+ * @returns {(event: Object) => Promise<void>} The handler body.
+ */
+export function installPushSubscriptionChangeHandler(opts = {}) {
+  const subscribeUrl = opts.subscribeUrl ?? "/webpush/subscribe";
+  return async function onPushSubscriptionChange(event) {
+    const reg =
+      opts.registration ??
+      (typeof self !== "undefined" ? self.registration : undefined);
+    const fetchFn = opts.fetch ?? (typeof fetch !== "undefined" ? fetch : null);
+    const notify = opts.notify ?? notifyClients;
+
+    let sub = event && event.newSubscription ? event.newSubscription : null;
+    if (!sub) {
+      const old = event && event.oldSubscription;
+      const key = old && old.options ? old.options.applicationServerKey : null;
+      if (reg && reg.pushManager && key) {
+        try {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: key,
+          });
+        } catch {
+          sub = null;
+        }
+      }
+    }
+
+    if (sub && fetchFn) {
+      const body = JSON.stringify(typeof sub.toJSON === "function" ? sub.toJSON() : sub);
+      try {
+        await fetchFn(subscribeUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body,
+        });
+      } catch {
+        // The server re-POST is best-effort; the client can retry on next open.
+      }
+    }
+    await notify({ type: "PUSH_RESUBSCRIBED", ok: Boolean(sub) });
+  };
+}
+
 // --- Worker lifecycle (guarded so this file is also importable in tests) -----
 
 if (typeof self !== "undefined" && typeof self.addEventListener === "function") {
@@ -533,6 +596,11 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
   const onNotificationClick = installNotificationClickHandler();
   self.addEventListener("notificationclick", (event) => {
     event.waitUntil(onNotificationClick(event));
+  });
+
+  const onPushSubscriptionChange = installPushSubscriptionChangeHandler();
+  self.addEventListener("pushsubscriptionchange", (event) => {
+    event.waitUntil(onPushSubscriptionChange(event));
   });
 
   self.addEventListener("sync", (event) => {

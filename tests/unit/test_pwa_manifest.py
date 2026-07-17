@@ -157,3 +157,21 @@ def test_validator_catches_broken_manifest() -> None:
     errors = validate_installable(broken)
     assert "start_url is required" in errors
     assert "a 192x192 icon is required" in errors
+
+
+def test_manifest_has_launch_handler_and_display_override() -> None:
+    """The JS emitter defaults to focus-existing launch + display fallbacks."""
+    manifest = _emit_manifest()
+    assert manifest["launch_handler"]["client_mode"][0] == "focus-existing"
+    assert manifest["display_override"] == ["standalone", "minimal-ui"]
+
+
+def test_python_emitter_matches_launch_handler_and_display_override() -> None:
+    """The Python build emitter (tempestweb.pwa.manifest) carries the same fields."""
+    from tempestweb.pwa.manifest import ManifestOptions, build_manifest
+
+    manifest = build_manifest(ManifestOptions())
+    assert manifest["launch_handler"]["client_mode"][0] == "focus-existing"
+    assert manifest["display_override"] == ["standalone", "minimal-ui"]
+    custom = build_manifest(ManifestOptions(display_override=["fullscreen"]))
+    assert custom["display_override"] == ["fullscreen"]

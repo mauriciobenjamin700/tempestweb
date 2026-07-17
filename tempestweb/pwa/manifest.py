@@ -76,6 +76,12 @@ class ManifestOptions:
         app_id: Stable app identity; defaults to ``scope`` when None.
         icons: Icon set; defaults to ``DEFAULT_ICONS`` when empty.
         categories: App-store categories.
+        launch_handler: ``launch_handler`` object; defaults to reusing an open
+            window (``{"client_mode": ["focus-existing", "auto"]}``) when None, so
+            launching the installed app focuses the existing window instead of
+            spawning a duplicate.
+        display_override: Ordered display fallbacks; defaults to
+            ``[display, "minimal-ui"]`` when empty.
         shortcuts: P5 app shortcuts.
         share_target: P5 share target descriptor.
         file_handlers: P5 file handler descriptors.
@@ -95,6 +101,8 @@ class ManifestOptions:
     app_id: str | None = None
     icons: list[dict[str, str]] = field(default_factory=list)
     categories: list[str] = field(default_factory=list)
+    launch_handler: dict[str, Any] | None = None
+    display_override: list[str] = field(default_factory=list)
     shortcuts: list[dict[str, Any]] = field(default_factory=list)
     share_target: dict[str, Any] | None = None
     file_handlers: list[dict[str, Any]] = field(default_factory=list)
@@ -129,6 +137,21 @@ def build_manifest(options: ManifestOptions | None = None) -> dict[str, Any]:
 
     # Stable app identity defaults to the scope.
     manifest["id"] = opts.app_id if opts.app_id is not None else manifest["scope"]
+
+    # Reuse an open window on launch instead of spawning a duplicate.
+    manifest["launch_handler"] = (
+        opts.launch_handler
+        if opts.launch_handler is not None
+        else {"client_mode": ["focus-existing", "auto"]}
+    )
+
+    # Ordered display fallbacks; default to the chosen display then minimal-ui.
+    override = (
+        list(opts.display_override)
+        if opts.display_override
+        else [display, "minimal-ui"]
+    )
+    manifest["display_override"] = list(dict.fromkeys(override))
 
     if opts.orientation:
         manifest["orientation"] = opts.orientation

@@ -541,6 +541,26 @@ sua `view()` pode renderizar. E **`installSyncBridge()`**
 (`OFFLINE_PULL`, `OFFLINE_QUEUE_DRAINED`) a esse controller — depois que o SW
 drena a fila em background, a página (que tem o token) reconcilia com um pull.
 
+### Do Python: a capacidade `native.sync`
+
+Não precisa tocar em JS: **`native.sync`** expõe tudo isso à sua `view()` (como
+`native.network` faz com conectividade). Você `configure` uma fonte nomeada
+(endpoint + tabela local, convenção `GET <url>?since=&cursor=` →
+`{rows, next_cursor, server_time}`); o `installSyncBridge` é ligado sozinho na 1ª
+configuração (o `OFFLINE_PULL` do SW reconcilia toda fonte configurada).
+
+```python
+from tempestweb import native
+
+await native.sync.configure("notes", "/api/notes", "app-db", "notes")
+
+summary = await native.sync.now("notes")   # replay da fila + pull
+state = await native.sync.status("notes")  # SyncState(phase, pending, last_synced_at, ...)
+
+async for s in native.sync.watch("notes"):  # stream do estado (T-EV)
+    app.set_state(lambda st: setattr(st, "sync", s))
+```
+
 ---
 
 ## Recap

@@ -146,6 +146,7 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "share.js",
     "speech.js",
     "storage.js",
+    "sync.js",
     "tabs.js",
     "usb.js",
     "vibration.js",

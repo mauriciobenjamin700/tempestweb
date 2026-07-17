@@ -75,6 +75,7 @@ from tempestweb.native import (
     serial,
     speech,
     storage,
+    sync,
     tabs,
     usb,
     vibration,
@@ -95,6 +96,7 @@ from tempestweb.native.contract import (
     Capability,
     capability_names,
     mode_c_capability_names,
+    streaming_capability_names,
 )
 from tempestweb.native.dispatch import (
     NATIVE_RESULT_PREFIX,
@@ -169,6 +171,7 @@ from tempestweb.native.storage import (
     put,
     remove,
 )
+from tempestweb.native.sync import SyncState, SyncSummary
 from tempestweb.native.usb import UsbDevice
 
 __all__ = [
@@ -208,6 +211,9 @@ __all__ = [
     "serial",
     "speech",
     "storage",
+    "sync",
+    "SyncState",
+    "SyncSummary",
     "tabs",
     "usb",
     "vibration",
@@ -221,6 +227,7 @@ __all__ = [
     "Capability",
     "capability_names",
     "mode_c_capability_names",
+    "streaming_capability_names",
     # dispatch core + bridges (the Mode-A vs Mode-B seam)
     "NATIVE_RESULT_PREFIX",
     "BrowserUnavailableError",

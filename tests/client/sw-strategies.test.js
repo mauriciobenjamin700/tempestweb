@@ -13,6 +13,7 @@ import {
   applyBadge,
   installPushHandler,
   installNotificationClickHandler,
+  installPushSubscriptionChangeHandler,
 } from "../../client/sw/sw.js";
 
 /** Build a Response-like object for isCacheable tests (no real fetch). */
@@ -292,4 +293,59 @@ test("installNotificationClickHandler: action url wins, falls back otherwise", a
   assert.equal(opened, "/deep");
   await onClick({ action: null, notification: { data: {}, close: () => {} } });
   assert.equal(opened, "/home");
+});
+
+// --- pushsubscriptionchange auto-resubscribe (P3) --------------------------
+
+test("pushsubscriptionchange re-subscribes with the old key and re-POSTs", async () => {
+  const posts = [];
+  const messages = [];
+  let subscribedWith = null;
+  const registration = {
+    pushManager: {
+      subscribe: async (opts) => {
+        subscribedWith = opts.applicationServerKey;
+        return { toJSON: () => ({ endpoint: "https://push/new", keys: {} }) };
+      },
+    },
+  };
+  const onChange = installPushSubscriptionChangeHandler({
+    registration,
+    fetch: async (url, init) => {
+      posts.push({ url, body: JSON.parse(init.body) });
+      return { ok: true };
+    },
+    notify: async (m) => messages.push(m),
+    subscribeUrl: "/webpush/subscribe",
+  });
+  await onChange({ oldSubscription: { options: { applicationServerKey: "KEY" } } });
+
+  assert.equal(subscribedWith, "KEY", "re-subscribed with the old key");
+  assert.equal(posts[0].url, "/webpush/subscribe");
+  assert.equal(posts[0].body.endpoint, "https://push/new");
+  assert.deepEqual(messages, [{ type: "PUSH_RESUBSCRIBED", ok: true }]);
+});
+
+test("pushsubscriptionchange uses newSubscription directly when provided", async () => {
+  const posts = [];
+  const onChange = installPushSubscriptionChangeHandler({
+    registration: { pushManager: { subscribe: async () => assert.fail("should not re-subscribe") } },
+    fetch: async (url, init) => posts.push(JSON.parse(init.body)),
+    notify: async () => {},
+  });
+  await onChange({ newSubscription: { toJSON: () => ({ endpoint: "https://push/fresh" }) } });
+  assert.equal(posts[0].endpoint, "https://push/fresh");
+});
+
+test("pushsubscriptionchange with no key and no newSub only notifies (ok:false)", async () => {
+  const messages = [];
+  let posted = false;
+  const onChange = installPushSubscriptionChangeHandler({
+    registration: { pushManager: {} },
+    fetch: async () => (posted = true),
+    notify: async (m) => messages.push(m),
+  });
+  await onChange({ oldSubscription: null });
+  assert.equal(posted, false, "nothing to POST");
+  assert.deepEqual(messages, [{ type: "PUSH_RESUBSCRIBED", ok: false }]);
 });

@@ -327,6 +327,20 @@ export const native = Object.freeze({
      */
     replay: (owner = null) => call("offline.replay", { owner }),
   }),
+  sync: Object.freeze({
+    /**
+     * Configure (or replace) a named sync source (endpoint + local table).
+     * @param {{name:string, url:string, database:string, table:string, key_path?:string, owner_field?:string, watermark_key?:string}} config
+     * @returns {Promise<{configured:boolean, name:string}>}
+     */
+    configure: (config) => call("sync.configure", config),
+    /** Run one sync now (replay the queue, then pull). @returns {Promise<Object>} */
+    now: (name) => call("sync.now", { name }),
+    /** Read a source's current sync state. @returns {Promise<Object>} */
+    status: (name) => call("sync.status", { name }),
+    /** Stream a source's sync state on every change. @returns {() => void} */
+    watch: (name, onEvent) => stream("sync.watch", { name }, onEvent),
+  }),
   vibration: Object.freeze({
     /**
      * Vibrate the device with a duration or pattern.

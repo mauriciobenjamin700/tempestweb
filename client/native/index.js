@@ -50,6 +50,7 @@ import {
   offlineFailed,
   offlineConflicts,
 } from "./offline.js";
+import { syncConfigure, syncNow, syncStatus, syncWatch } from "./sync.js";
 import {
   notificationsNotify,
   notificationsPushState,
@@ -180,6 +181,9 @@ export const HANDLERS = {
   "offline.size": offlineSize,
   "offline.failed": offlineFailed,
   "offline.conflicts": offlineConflicts,
+  "sync.configure": syncConfigure,
+  "sync.now": syncNow,
+  "sync.status": syncStatus,
   "notifications.notify": notificationsNotify,
   "notifications.push_state": notificationsPushState,
   "notifications.request_permission": notificationsRequestPermission,
@@ -247,6 +251,7 @@ export const EVENT_HANDLERS = {
   "midi.messages": midiMessages,
   "nfc.scan": nfcScan,
   "network.watch": networkWatch,
+  "sync.watch": syncWatch,
   "orientation.watch": orientationWatch,
   "sensors.motion": sensorsMotion,
   "sensors.orientation": sensorsOrientation,

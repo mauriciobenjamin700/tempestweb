@@ -4,6 +4,45 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.56.0] — 2026-07-17
+
+### Added
+
+- **WebSocket transport auto-reconnects (Mode B resilience).** A dropped
+  connection no longer kills the app: the socket reconnects with exponential
+  backoff + jitter, outbound envelopes are buffered while offline and flushed on
+  reopen (capped, oldest dropped + logged), and an `onReconnect` hook fires on
+  each resumed connection. `{reconnect: false}` restores the old single-shot
+  behavior. `backoffDelay` is exported.
+- **Offline queue dead-letter + conflict lanes.** A replay failure is now
+  classified: a permanent client error (non-retryable `4xx`) is dead-lettered
+  immediately, a transient failure retries to a ceiling then dead-letters, and a
+  `409` moves to a conflict lane — so one poison message can no longer wedge the
+  queue. New surface: `native.offline.failed()` / `native.offline.conflicts()`,
+  and `ReplayResult.failed` / `ReplayResult.conflicts`.
+- **Service worker drains the offline queue with the tab closed.** On `sync`
+  (auto-registered) and `periodicsync` (app opt-in via `native.bgsync`), the
+  worker drains IndexedDB directly, replaying every owner with the shared policy;
+  it falls back to a client-replay message when the queue modules are
+  unreachable.
+- **Offline navigation fallback.** A navigation with no cached route falls back
+  to the cached app shell (then a minimal offline document), so an offline SPA
+  navigation boots and routes instead of showing the browser error page.
+- **Connectivity banner.** A shell-level offline/online banner
+  (`client/pwa/connectivity-banner.js`, `mountConnectivityBanner`) shows while
+  offline and clears when connectivity returns, reflecting the core's
+  `ConnectivityEvent`.
+
+### Fixed
+
+- **Service worker never caches error/opaque/`no-store` responses**, so a
+  transient `404`/`500` can no longer poison the cache and be served as a valid
+  asset for the cache's lifetime.
+- **Runtime cache is capped** (insertion-order eviction) so
+  stale-while-revalidate can't grow it without bound.
+- **The offline queue requests durable storage** (`navigator.storage.persist()`)
+  when it is built, so it is not evicted under disk pressure.
+
 ## [0.55.1] — 2026-07-12
 
 ### Fixed

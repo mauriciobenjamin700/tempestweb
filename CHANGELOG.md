@@ -4,6 +4,24 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.59.0] — 2026-07-17
+
+### Added
+
+Richer install UX, adopted from famachapp-pwa (completes the offline-first
+adoption):
+
+- **Install-method classification.** `InstallState.method` (`native` | `ios` |
+  `manual`), surfaced through `native.install`, so a view shows a native prompt
+  button on Chromium and a Share → "Add to Home" tutorial on iOS instead of a
+  dead button. Adds `isIOS()` / `installMethod()`.
+- **Decline cooldown.** `recordInstallDecline()` / `canPromptInstall()` (7-day
+  default, localStorage-backed) so the install banner doesn't nag.
+- **Post-install redirect.** `client/pwa/post-install-redirect.js`
+  (`mountPostInstallRedirect`) — a full-screen overlay shown on `appinstalled`
+  that best-effort closes the install tab; opt-in and a no-op when already
+  standalone.
+
 ## [0.58.0] — 2026-07-17
 
 ### Added

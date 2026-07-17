@@ -314,7 +314,16 @@ export const native = Object.freeze({
       call("offline.pending", { owner }).then((r) => r.mutations),
     /** Pending-mutation count. @returns {Promise<number>} */
     size: (owner = null) => call("offline.size", { owner }).then((r) => r.size),
-    /** Replay the queue now. @returns {Promise<{sent:number, remaining:number}>} */
+    /** Dead-lettered (permanently failed) mutations. @returns {Promise<Object[]>} */
+    failed: (owner = null) =>
+      call("offline.failed", { owner }).then((r) => r.mutations),
+    /** Mutations parked in the conflict lane (409). @returns {Promise<Object[]>} */
+    conflicts: (owner = null) =>
+      call("offline.conflicts", { owner }).then((r) => r.mutations),
+    /**
+     * Replay the queue now.
+     * @returns {Promise<{sent:number, remaining:number, failed:number, conflicts:number}>}
+     */
     replay: (owner = null) => call("offline.replay", { owner }),
   }),
   vibration: Object.freeze({

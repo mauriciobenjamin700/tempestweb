@@ -106,14 +106,19 @@ await native.offline.enqueue(
 ```
 
 It returns a `Mutation` (`id`, `owner`, `idempotency_key`, `method`, `url`,
-`attempts`, `status`). You can also **inspect** and **drain** the queue:
+`attempts`, `status`). `status` is `"pending"` until it drains; a mutation that
+fails permanently becomes `"failed"` (dead-letter) and a `409` conflict becomes
+`"conflict"` — neither wedges the queue. You can also **inspect** and **drain**
+the queue:
 
 | Call | Does | Returns |
 |---|---|---|
 | `native.offline.enqueue(...)` | Queue a durable mutation. | `Mutation` |
 | `native.offline.pending(owner=None)` | List pending ones, oldest first. | `list[Mutation]` |
 | `native.offline.size(owner=None)` | Count the pending ones. | `int` |
-| `native.offline.replay(owner=None)` | Drain the queue **now** (FIFO, stops at 1st failure). | `ReplayResult(sent, remaining)` |
+| `native.offline.replay(owner=None)` | Drain the queue **now** (FIFO). | `ReplayResult(sent, remaining, failed, conflicts)` |
+| `native.offline.failed(owner=None)` | List the **dead-lettered** mutations (permanent failure / attempts exhausted). | `list[Mutation]` |
+| `native.offline.conflicts(owner=None)` | List mutations parked in the **conflict lane** (server returned `409`). | `list[Mutation]` |
 
 ### The full app
 
@@ -335,9 +340,20 @@ protocol. tempestweb drains the queue on three triggers:
 - **Explicit.** Your app calls `await native.offline.replay()` whenever you want
   (e.g. a "Sync" button or when a screen opens).
 
-Replay is **FIFO and stops at the first failure** — if a mutation fails it stays
-pending (with `attempts` incremented) and the following ones do **not** jump
-ahead, preserving order. The `ReplayResult` tells you the outcome:
+Replay is **FIFO** and classifies each failure, without letting the queue wedge:
+
+- **Transient failure** (network error, `5xx`, `408`/`425`/`429`): the mutation
+  stays pending (with `attempts` incremented) and replay **stops** there,
+  preserving order. After `maxAttempts` tries (default 5) it is **dead-lettered**
+  (`status="failed"`) and replay keeps draining the rest.
+- **Permanent error** (non-retryable `4xx`, e.g. `400`/`422`): dead-lettered on
+  the **first attempt** — re-sending a body the server always rejects is
+  pointless, so it never blocks the queue.
+- **Conflict** (`409`): the mutation moves to the **conflict lane**
+  (`status="conflict"`) for you to reconcile (Part D); it does not block either.
+
+So a single "poison message" never holds every write behind it. The
+`ReplayResult` tells you the outcome (`sent`, `remaining`, `failed`, `conflicts`):
 
 ```python
 from tempestweb import native
@@ -416,11 +432,27 @@ async def update_note(
     return NoteResponseSchema.model_validate(await repo.update(note))
 ```
 
+When the server answers `409`, the client **neither drops nor retries in a loop**
+the mutation: it leaves the pending set and moves to the **conflict lane**. Replay
+keeps draining the rest of the queue and the app reconciles later by reading that
+lane:
+
+```python
+from tempestweb import native
+
+
+async def reconcile_conflicts() -> None:
+    """Re-read and reconcile the mutations the server rejected with 409."""
+    for m in await native.offline.conflicts():
+        fresh = await native.http.request("GET", m.url)   # re-read current state
+        ...                                                # merge/UI at your discretion
+```
+
 !!! note "Honesty about the boundary"
-    The snippet above is **application code**, not a framework API — the `version`
-    field is yours. tempestweb delivers the mutation idempotently; **what the
-    server does with a conflict is up to you** (last-write-wins, version, per-field
-    merge, CRDT…).
+    The endpoint snippet above is **application code**, not a framework API — the
+    `version` field is yours. tempestweb delivers the mutation idempotently and
+    **parks** the `409` in the conflict lane for you; **how you reconcile is up to
+    you** (last-write-wins, version, per-field merge, CRDT…).
 
 ---
 
@@ -482,11 +514,15 @@ async def pull_since(watermark: str | None) -> tuple[list[dict], str | None]:
 - **Push is handled by the queue.** `native.offline.enqueue(...)` writes locally;
   the runtime drains FIFO when the network returns (`online` + Background Sync) or
   via `replay()`. Each mutation carries an **idempotency key**.
+- **The queue never wedges.** A transient failure retries up to `maxAttempts` then
+  becomes a **dead-letter** (`native.offline.failed()`); a permanent `4xx` is
+  dead-lettered immediately; a `409` moves to the **conflict lane**
+  (`native.offline.conflicts()`). One poison message won't hold the rest.
 - **The backend is FastAPI + the SDK.** `BaseRepository.add()` persists; the
   `IdempotencyMiddleware` (header `Idempotency-Key`, case-insensitive) dedups
   replays by `(method, path, key)` — zero duplicate rows.
-- **Conflict is your call.** The default is last-write-wins; version/merge is
-  application code — the framework imposes no protocol.
+- **Conflict is your call.** The default is last-write-wins; the conflict lane
+  hands you the `409` to reconcile — version/merge is application code.
 - **Pull is manual delta-sync.** `native.http` + the repository's `updated_at__gt`
   filter; the queue does **not** read, and replay returns only counts (re-read the
   resource if you need the `id`/timestamps).

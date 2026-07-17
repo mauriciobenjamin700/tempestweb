@@ -143,7 +143,9 @@ from tempestweb.native.notifications import (
     unsubscribe,
 )
 from tempestweb.native.offline import Mutation, ReplayResult
+from tempestweb.native.offline import conflicts as offline_conflicts
 from tempestweb.native.offline import enqueue as offline_enqueue
+from tempestweb.native.offline import failed as offline_failed
 from tempestweb.native.offline import pending as offline_pending
 from tempestweb.native.offline import replay as offline_replay
 from tempestweb.native.offline import size as offline_size
@@ -301,7 +303,9 @@ __all__ = [
     # offline (durable mutation queue + replay)
     "Mutation",
     "ReplayResult",
+    "offline_conflicts",
     "offline_enqueue",
+    "offline_failed",
     "offline_pending",
     "offline_replay",
     "offline_size",

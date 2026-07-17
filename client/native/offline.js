@@ -12,7 +12,7 @@
 // handlers are unit-testable under Node with a fake store + sender.
 
 import { httpRequest } from "./http.js";
-import { createOfflineStore } from "../offline/store.js";
+import { createOfflineStore, persistStorage } from "../offline/store.js";
 import {
   OfflineQueue,
   registerBackgroundSync,
@@ -27,8 +27,9 @@ let _reconnectWired = false;
  * Lazily build (and cache) the process-wide offline queue.
  *
  * The queue persists to IndexedDB (`tempestweb-offline` / `mutations`) and sends
- * via the shared http glue. On first build, replay is wired to the `online`
- * event so a reconnect drains the queue with the tab open.
+ * via the shared http glue. On first build, durable storage is requested
+ * (best-effort) so the queue is not evicted under disk pressure, and replay is
+ * wired to the `online` event so a reconnect drains the queue with the tab open.
  *
  * @param {import("./index.js").NativeDeps} [deps]  Injected deps; `deps.offlineQueue`
  *        overrides the whole queue (tests), `deps.indexedDB` the IDB factory.
@@ -46,6 +47,7 @@ function queue(deps) {
     ownerField: "owner",
     indexedDB: deps && /** @type {any} */ (deps).indexedDB,
   });
+  persistStorage(deps && /** @type {any} */ (deps).navigator).catch(() => {});
   const send = async (mutation) => {
     const res = await httpRequest(
       {
@@ -132,10 +134,38 @@ export async function offlineSize(args, deps) {
 }
 
 /**
- * Replay the pending queue now (FIFO, stops at the first failure).
+ * List the dead-lettered (permanently failed) mutations for an owner.
  * @param {{owner?:string}} args
  * @param {import("./index.js").NativeDeps} deps
- * @returns {Promise<{sent:number, remaining:number}>}
+ * @returns {Promise<{mutations: Object[]}>}
+ */
+export async function offlineFailed(args, deps) {
+  const rows = await queue(deps).failed(args.owner ?? undefined);
+  return { mutations: rows.map(toWire) };
+}
+
+/**
+ * List the mutations parked in the conflict lane (server returned 409).
+ * @param {{owner?:string}} args
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {Promise<{mutations: Object[]}>}
+ */
+export async function offlineConflicts(args, deps) {
+  const rows = await queue(deps).conflicts(args.owner ?? undefined);
+  return { mutations: rows.map(toWire) };
+}
+
+/**
+ * Replay the pending queue now.
+ *
+ * Drains in FIFO order: accepted rows are removed, a transient failure stops
+ * replay to preserve order (dead-lettered once attempts are exhausted), a
+ * permanent 4xx is dead-lettered immediately and a 409 moves to the conflict
+ * lane — neither blocks the rest.
+ *
+ * @param {{owner?:string}} args
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {Promise<{sent:number, remaining:number, failed:number, conflicts:number}>}
  */
 export async function offlineReplay(args, deps) {
   return queue(deps).replay(args.owner ?? undefined);

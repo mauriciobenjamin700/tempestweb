@@ -15,8 +15,10 @@
 // ../../docs/plan.md §7 P1 for the contract.
 //
 // Files: client/sw/sw.js (this worker) + client/sw/register.js (registration).
-// The offline queue lives in client/offline/{store,sync}.js; this worker only
-// pings open clients to replay it (see replayFromSync).
+// The offline queue lives in client/offline/{store,sync}.js; on a Background /
+// Periodic Sync this worker drains it directly (dynamic import → drainOfflineQueue),
+// so the queue empties with the tab closed, and falls back to pinging open clients
+// if that import is unavailable (see replayFromSync).
 
 /* global self, caches, clients, fetch, Response, Request, URL */
 
@@ -58,6 +60,12 @@ const PRECACHE_ASSETS = (() => {
 /** Names of the caches this worker owns, derived from the version. */
 const PRECACHE = `${CACHE_VERSION}-precache`;
 const RUNTIME = `${CACHE_VERSION}-runtime`;
+
+/**
+ * Max entries kept in the stale-while-revalidate runtime cache before the oldest
+ * are evicted. Bounds unbounded growth from visiting many same-origin URLs.
+ */
+const RUNTIME_MAX_ENTRIES = 60;
 
 // --- Pure helpers (exported for unit tests; harmless in the worker) ----------
 
@@ -120,6 +128,187 @@ export function chooseStrategy(url, origin, shell) {
 export function stalecaches(existing, keep) {
   const keepSet = new Set(keep);
   return existing.filter((name) => !keepSet.has(name));
+}
+
+/**
+ * Whether a Background/Periodic Sync tag belongs to the offline queue.
+ *
+ * The worker owns any tag under the ``tw-offline`` prefix — the one-off replay
+ * tag (``tw-offline-replay``, registered automatically on enqueue) and any
+ * periodic tag an app opts into via ``native.bgsync.register_periodic`` (e.g.
+ * ``tw-offline-periodic``). Periodic Background Sync is permission-gated and
+ * interval-driven, so it is deliberately the app's decision to register — the
+ * worker only handles the wake-up when a matching tag fires.
+ *
+ * @param {*} tag   The sync event's tag.
+ * @returns {boolean} True when the worker should drain the queue for this tag.
+ */
+export function isOfflineSyncTag(tag) {
+  return typeof tag === "string" && tag.startsWith("tw-offline");
+}
+
+/**
+ * Whether a response is safe to persist in a cache.
+ *
+ * Only successful, same-origin (``basic``) or plain responses are cacheable. An
+ * error (``4xx``/``5xx``) or an opaque cross-origin response must never be
+ * stored: caching a ``404``/``500`` would make the worker serve that failure as
+ * a valid app-shell asset for the whole cache lifetime, and an opaque body can't
+ * be validated. The response's own ``Cache-Control: no-store`` is honored too.
+ *
+ * @param {?Response} response   The fetched response (may be undefined).
+ * @returns {boolean} True when the response may be written to a cache.
+ */
+export function isCacheable(response) {
+  if (!response || !response.ok) return false;
+  if (response.type && response.type !== "basic" && response.type !== "default") {
+    return false;
+  }
+  const cc = response.headers && response.headers.get
+    ? response.headers.get("cache-control")
+    : null;
+  if (cc && /(^|[,\s])no-store([,\s]|$)/i.test(cc)) return false;
+  return true;
+}
+
+/**
+ * Evict the oldest entries so a cache holds at most ``max`` responses.
+ *
+ * The Cache API returns keys in insertion order, so the excess at the front is
+ * the least-recently-added; deleting it bounds the runtime cache's growth (a
+ * stale-while-revalidate cache would otherwise accumulate every visited URL for
+ * the cache version's lifetime). A no-op when the cache is within budget.
+ *
+ * @param {Cache} cache   The cache to trim (needs keys() + delete()).
+ * @param {number} max    The maximum number of entries to keep.
+ * @returns {Promise<number>} How many entries were evicted.
+ */
+export async function trimCache(cache, max) {
+  const keys = await cache.keys();
+  if (keys.length <= max) return 0;
+  const excess = keys.slice(0, keys.length - max);
+  for (const key of excess) await cache.delete(key);
+  return excess.length;
+}
+
+/**
+ * A minimal last-resort offline document for a navigation with no cached shell.
+ *
+ * Returned only when the network is down and neither the requested route nor the
+ * app shell (``"/"``) is cached — a genuinely cold offline start.
+ *
+ * @returns {Response} A ``503`` HTML response.
+ */
+export function offlineFallbackResponse() {
+  const body =
+    "<!doctype html><meta charset=utf-8><title>Offline</title>" +
+    '<body style="font:1rem system-ui;margin:2rem">' +
+    "<h1>Offline</h1><p>This page isn't available offline yet.</p>";
+  return new Response(body, {
+    status: 503,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Serve a navigation request with an offline fallback to the cached app shell.
+ *
+ * SPA navigations to client-side routes (e.g. ``/orders/5``) have no precached
+ * entry of their own, so an offline navigation must fall back to the cached shell
+ * for the app to boot and route. Order: live network (cached for reuse) → the
+ * exact cached response → the cached shell → a minimal offline document.
+ *
+ * @param {Request} request   The navigation request.
+ * @param {Object} [deps]     Injected for tests.
+ * @param {(req: Request) => Promise<Response>} [deps.fetchFn]    Network fetch.
+ * @param {(req: (Request|string)) => Promise<?Response>} [deps.matchFn]  Cache match.
+ * @param {string} [deps.shellUrl]   The shell URL to fall back to (default "/").
+ * @returns {Promise<Response>} The response to serve.
+ */
+export async function handleNavigation(request, deps = {}) {
+  const fetchFn = deps.fetchFn ?? ((r) => fetch(r));
+  const matchFn = deps.matchFn ?? ((r) => caches.match(r));
+  const shellUrl = deps.shellUrl ?? "/";
+  try {
+    const response = await fetchFn(request);
+    if (isCacheable(response) && typeof caches !== "undefined") {
+      const cache = await caches.open(RUNTIME);
+      await cache.put(request, response.clone());
+      await trimCache(cache, RUNTIME_MAX_ENTRIES);
+    }
+    return response;
+  } catch (err) {
+    const exact = await matchFn(request);
+    if (exact) return exact;
+    const shell = await matchFn(shellUrl);
+    if (shell) return shell;
+    return offlineFallbackResponse();
+  }
+}
+
+/**
+ * Build the fetch-based sender the worker uses to replay a queued mutation.
+ *
+ * Reconstructs the original request from a stored queue row and carries the
+ * idempotency key so the server dedups a re-sent mutation — matching the
+ * page-side sender in client/native/offline.js.
+ *
+ * @returns {(m: Object) => Promise<{ok: boolean, status: number}>} The sender.
+ */
+function workerSend() {
+  return async (mutation) => {
+    /** @type {Object} */
+    const init = {
+      method: mutation.method,
+      headers: { "idempotency-key": mutation.idempotencyKey },
+    };
+    if (mutation.body !== undefined && mutation.body !== null) {
+      init.headers["content-type"] = "application/json";
+      init.body = JSON.stringify(mutation.body);
+    }
+    const res = await fetch(mutation.url, init);
+    return { ok: res.ok, status: res.status };
+  };
+}
+
+/**
+ * Drain the durable offline queue from within the worker (P2 §1).
+ *
+ * Reuses the page's queue logic (client/offline/{store,sync}.js) so the replay
+ * policy — FIFO, dead-letter, conflict lane — is identical whether the page or
+ * the worker drains, and replays every owner present in the store (not just the
+ * default). This is what lets a Background/Periodic Sync drain the queue with
+ * the tab closed. The store, queue class and sender are injected so the logic is
+ * unit-testable; production wires the dynamic import + the fetch sender.
+ *
+ * @param {Object} deps
+ * @param {Function} deps.createOfflineStore   The OfflineStore factory.
+ * @param {Function} deps.OfflineQueue         The OfflineQueue class.
+ * @param {IDBFactory} [deps.indexedDB]        IDB factory override (tests).
+ * @param {(m: Object) => Promise<{ok:boolean, status:number}>} [deps.send]
+ *        Network sender (default: the worker's fetch sender).
+ * @returns {Promise<{sent: number, owners: number}>} Drain outcome.
+ */
+export async function drainOfflineQueue(deps) {
+  const store = deps.createOfflineStore({
+    databaseName: "tempestweb-offline",
+    tableName: "mutations",
+    keyPath: "id",
+    ownerField: "owner",
+    indexedDB: deps.indexedDB,
+  });
+  const send = deps.send ?? workerSend();
+  const queue = new deps.OfflineQueue({ store, send });
+  const all = await store.listAll();
+  const owners = [
+    ...new Set(all.filter((r) => r.status === "pending").map((r) => r.owner)),
+  ];
+  let sent = 0;
+  for (const owner of owners) {
+    const out = await queue.replay(owner);
+    sent += out.sent;
+  }
+  return { sent, owners: owners.length };
 }
 
 /**
@@ -307,6 +496,10 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
   self.addEventListener("fetch", (event) => {
     const request = event.request;
     if (request.method !== "GET") return; // mutations handled by the offline queue
+    if (request.mode === "navigate") {
+      event.respondWith(handleNavigation(request));
+      return;
+    }
     const strategy = chooseStrategy(request.url, self.location.origin, PRECACHE_ASSETS);
     event.respondWith(handleFetch(request, strategy));
   });
@@ -321,9 +514,14 @@ if (typeof self !== "undefined" && typeof self.addEventListener === "function") 
     event.waitUntil(onNotificationClick(event));
   });
 
-  // Background Sync: replay the durable offline queue when connectivity returns.
   self.addEventListener("sync", (event) => {
-    if (event.tag === "tw-offline-replay") {
+    if (isOfflineSyncTag(event.tag)) {
+      event.waitUntil(replayFromSync());
+    }
+  });
+
+  self.addEventListener("periodicsync", (event) => {
+    if (isOfflineSyncTag(event.tag)) {
       event.waitUntil(replayFromSync());
     }
   });
@@ -351,16 +549,21 @@ async function handleFetch(request, strategy) {
     const cached = await caches.match(request);
     if (cached) return cached;
     const response = await fetch(request);
-    const cache = await caches.open(PRECACHE);
-    cache.put(request, response.clone());
+    if (isCacheable(response)) {
+      const cache = await caches.open(PRECACHE);
+      cache.put(request, response.clone());
+    }
     return response;
   }
   // stale-while-revalidate
   const cached = await caches.match(request);
   const networkPromise = fetch(request)
     .then(async (response) => {
-      const cache = await caches.open(RUNTIME);
-      cache.put(request, response.clone());
+      if (isCacheable(response)) {
+        const cache = await caches.open(RUNTIME);
+        await cache.put(request, response.clone());
+        await trimCache(cache, RUNTIME_MAX_ENTRIES);
+      }
       return response;
     })
     .catch(() => cached);
@@ -384,18 +587,64 @@ async function focusOrOpen(url) {
 }
 
 /**
- * Replay the offline queue from a Background Sync event.
- *
- * Delegates to the page's sync module shape by posting a REPLAY message to all
- * clients (the queue lives in IndexedDB owned by client/offline/sync.js). When no
- * client is open, the worker has no network helper here; the queue stays durable
- * and replays on the next open. P2.
- *
+ * Post a message to every controlled client (open tab), best-effort.
+ * @param {Object} message   The structured-clonable message to post.
  * @returns {Promise<void>}
  */
-async function replayFromSync() {
+async function notifyClients(message) {
   const all = await clients.matchAll({ includeUncontrolled: true });
-  for (const client of all) {
-    client.postMessage({ type: "REPLAY_OFFLINE_QUEUE" });
+  for (const client of all) client.postMessage(message);
+}
+
+/**
+ * Drain the offline queue from a Background/Periodic Sync event (P2 §1).
+ *
+ * Dynamically imports the page's queue modules and drains IndexedDB directly, so
+ * the queue empties even with no tab open. On success it pings any open client to
+ * refresh its UI/count (OFFLINE_QUEUE_DRAINED). If the import or the drain fails
+ * (e.g. the modules are unreachable — the SW ships only in the wasm/transpile
+ * artifacts that serve /client/ — or IndexedDB is unavailable in this worker), it
+ * degrades to the legacy behavior — asking an open client to replay
+ * (REPLAY_OFFLINE_QUEUE) — so the queue is never stranded.
+ *
+ * Concurrency: the worker drain and the page's replayOnReconnect can fire at the
+ * same time (the OfflineQueue single-flight guard is per-instance, not shared
+ * across the worker and the page). A mutation can therefore be sent twice; the
+ * idempotency key is the sole guard against a double-apply — the server dedups on
+ * it, so a concurrent double-send is safe, never duplicated. `delete` is
+ * idempotent too, so both drainers converge on an empty queue.
+ *
+ * The loader/notifier are injected so both the success and the fallback paths are
+ * unit-testable without a live ServiceWorkerGlobalScope.
+ *
+ * @param {Object} [deps]
+ * @param {() => Promise<{createOfflineStore: Function, OfflineQueue: Function}>} [deps.loadModules]
+ *        Resolve the queue modules (default: dynamic import of /client/offline/*).
+ * @param {(message: Object) => Promise<void>} [deps.notify]
+ *        Post a message to open clients (default: notifyClients).
+ * @param {(d: Object) => Promise<{sent:number, owners:number}>} [deps.drain]
+ *        The drainer (default: drainOfflineQueue).
+ * @returns {Promise<void>}
+ */
+async function replayFromSync(deps = {}) {
+  const loadModules =
+    deps.loadModules ??
+    (async () => {
+      const [store, sync] = await Promise.all([
+        import("/client/offline/store.js"),
+        import("/client/offline/sync.js"),
+      ]);
+      return { createOfflineStore: store.createOfflineStore, OfflineQueue: sync.OfflineQueue };
+    });
+  const notify = deps.notify ?? notifyClients;
+  const drain = deps.drain ?? drainOfflineQueue;
+  try {
+    const { createOfflineStore, OfflineQueue } = await loadModules();
+    const result = await drain({ createOfflineStore, OfflineQueue });
+    await notify({ type: "OFFLINE_QUEUE_DRAINED", ...result });
+  } catch (err) {
+    await notify({ type: "REPLAY_OFFLINE_QUEUE" });
   }
 }
+
+export { replayFromSync };

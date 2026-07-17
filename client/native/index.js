@@ -47,6 +47,8 @@ import {
   offlinePending,
   offlineReplay,
   offlineSize,
+  offlineFailed,
+  offlineConflicts,
 } from "./offline.js";
 import {
   notificationsNotify,
@@ -176,6 +178,8 @@ export const HANDLERS = {
   "offline.pending": offlinePending,
   "offline.replay": offlineReplay,
   "offline.size": offlineSize,
+  "offline.failed": offlineFailed,
+  "offline.conflicts": offlineConflicts,
   "notifications.notify": notificationsNotify,
   "notifications.push_state": notificationsPushState,
   "notifications.request_permission": notificationsRequestPermission,

@@ -78,4 +78,52 @@ test("offline.replay stops at the first failure, preserving FIFO", async () => {
   const res = await callCap("offline.replay", {}, queue);
   assert.equal(res.value.sent, 1);
   assert.equal(res.value.remaining, 1);
+  assert.equal(res.value.failed, 0);
+  assert.equal(res.value.conflicts, 0);
+});
+
+test("offline.failed lists dead-lettered mutations (permanent 4xx)", async () => {
+  const queue = freshQueue(async () => ({ ok: false, status: 400 }));
+  await callCap("offline.enqueue", { method: "POST", url: "/bad" }, queue);
+  const replay = await callCap("offline.replay", {}, queue);
+  assert.equal(replay.value.failed, 1);
+  assert.equal(replay.value.remaining, 0);
+  const failed = await callCap("offline.failed", {}, queue);
+  assert.equal(failed.value.mutations.length, 1);
+  assert.equal(failed.value.mutations[0].url, "/bad");
+  assert.equal(failed.value.mutations[0].status, "failed");
+});
+
+test("offline.conflicts lists 409-parked mutations without blocking", async () => {
+  const queue = freshQueue(async (m) =>
+    m.url === "/c" ? { ok: false, status: 409 } : { ok: true, status: 200 },
+  );
+  await callCap("offline.enqueue", { method: "PUT", url: "/c" }, queue);
+  await callCap("offline.enqueue", { method: "POST", url: "/ok" }, queue);
+  const replay = await callCap("offline.replay", {}, queue);
+  assert.equal(replay.value.sent, 1);
+  assert.equal(replay.value.conflicts, 1);
+  const conflicts = await callCap("offline.conflicts", {}, queue);
+  assert.equal(conflicts.value.mutations.length, 1);
+  assert.equal(conflicts.value.mutations[0].url, "/c");
+  assert.equal(conflicts.value.mutations[0].status, "conflict");
+});
+
+test("building the real queue requests durable storage (best-effort)", async () => {
+  let persisted = false;
+  const navigator = {
+    storage: {
+      persist: async () => {
+        persisted = true;
+        return true;
+      },
+      persisted: async () => false,
+    },
+  };
+  const res = await dispatch(
+    { call_id: "1", capability: "offline.enqueue", args: { method: "POST", url: "/x" } },
+    { indexedDB: new IDBFactory(), navigator },
+  );
+  assert.equal(res.ok, true);
+  assert.equal(persisted, true, "navigator.storage.persist() was requested");
 });

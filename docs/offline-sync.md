@@ -106,14 +106,19 @@ await native.offline.enqueue(
 ```
 
 O retorno é uma `Mutation` (`id`, `owner`, `idempotency_key`, `method`, `url`,
-`attempts`, `status`). Você também pode **inspecionar** e **drenar** a fila:
+`attempts`, `status`). O `status` é `"pending"` até drenar; uma mutação que falha
+de forma permanente vira `"failed"` (dead-letter) e um conflito `409` vira
+`"conflict"` — nenhum dos dois trava a fila. Você também pode **inspecionar** e
+**drenar** a fila:
 
 | Chamada | Faz | Retorna |
 |---|---|---|
 | `native.offline.enqueue(...)` | Enfileira uma mutação durável. | `Mutation` |
 | `native.offline.pending(owner=None)` | Lista as pendentes, mais antigas primeiro. | `list[Mutation]` |
 | `native.offline.size(owner=None)` | Conta as pendentes. | `int` |
-| `native.offline.replay(owner=None)` | Drena a fila **agora** (FIFO, para no 1º erro). | `ReplayResult(sent, remaining)` |
+| `native.offline.replay(owner=None)` | Drena a fila **agora** (FIFO). | `ReplayResult(sent, remaining, failed, conflicts)` |
+| `native.offline.failed(owner=None)` | Lista as mutações **dead-lettered** (falha permanente / tentativas esgotadas). | `list[Mutation]` |
+| `native.offline.conflicts(owner=None)` | Lista as mutações paradas na **lane de conflito** (servidor devolveu `409`). | `list[Mutation]` |
 
 ### O app completo
 
@@ -332,9 +337,20 @@ de sync. O tempestweb drena a fila em três gatilhos:
 - **Explícito.** O seu app chama `await native.offline.replay()` quando quiser
   (ex.: um botão "Sincronizar" ou ao abrir a tela).
 
-O replay é **FIFO e para no primeiro erro** — se uma mutação falha, ela fica
-pendente (com `attempts` incrementado) e as seguintes **não** passam na frente,
-preservando a ordem. O `ReplayResult` te diz o resultado:
+O replay é **FIFO** e classifica cada falha, sem deixar a fila travar:
+
+- **Falha transitória** (erro de rede, `5xx`, `408`/`425`/`429`): a mutação fica
+  pendente (com `attempts` incrementado) e o replay **para** ali, preservando a
+  ordem. Depois de `maxAttempts` tentativas (default 5) ela é **dead-lettered**
+  (`status="failed"`) e o replay segue drenando o resto.
+- **Erro permanente** (`4xx` não-retentável, ex.: `400`/`422`): dead-letter
+  **na primeira tentativa** — não adianta reenviar um corpo que o servidor sempre
+  rejeita, então ele não bloqueia a fila.
+- **Conflito** (`409`): a mutação vai pra **lane de conflito** (`status="conflict"`)
+  para você reconciliar (Parte D); também não bloqueia.
+
+Assim uma única "poison message" nunca prende todas as escritas atrás dela. O
+`ReplayResult` te diz o resultado (`sent`, `remaining`, `failed`, `conflicts`):
 
 ```python
 from tempestweb import native
@@ -414,11 +430,26 @@ async def update_note(
     return NoteResponseSchema.model_validate(await repo.update(note))
 ```
 
+Quando o servidor responde `409`, o cliente **não descarta nem reenvia em loop** a
+mutação: ela sai das pendentes e vai pra **lane de conflito**. O replay continua
+drenando o resto da fila e o app reconcilia depois, lendo essa lane:
+
+```python
+from tempestweb import native
+
+
+async def reconcile_conflicts() -> None:
+    """Relê e reconcilia as mutações que o servidor rejeitou com 409."""
+    for m in await native.offline.conflicts():
+        fresh = await native.http.request("GET", m.url)   # relê o estado atual
+        ...                                                # merge/UI a seu critério
+```
+
 !!! note "Honestidade sobre a fronteira"
-    O trecho acima é **código de aplicação**, não uma API do framework — o campo
-    `version` é seu. O tempestweb entrega a mutação de forma idempotente; **o que o
-    servidor faz com um conflito é você quem decide** (last-write-wins, versão,
-    merge por campo, CRDT…).
+    O trecho do endpoint acima é **código de aplicação**, não uma API do framework
+    — o campo `version` é seu. O tempestweb entrega a mutação de forma idempotente
+    e **parqueia** o `409` na lane de conflito para você; **como reconciliar é você
+    quem decide** (last-write-wins, versão, merge por campo, CRDT…).
 
 ---
 
@@ -480,11 +511,15 @@ async def pull_since(watermark: str | None) -> tuple[list[dict], str | None]:
 - **Push é resolvido pela fila.** `native.offline.enqueue(...)` grava local; o
   runtime drena FIFO ao voltar a rede (`online` + Background Sync) ou via
   `replay()`. Cada mutação carrega uma **chave de idempotência**.
+- **A fila nunca trava.** Falha transitória repete até `maxAttempts` e então vira
+  **dead-letter** (`native.offline.failed()`); erro permanente (`4xx`) é
+  dead-lettered na hora; `409` vai pra **lane de conflito**
+  (`native.offline.conflicts()`). Uma poison message não prende o resto.
 - **O backend é FastAPI + SDK.** `BaseRepository.add()` persiste; o
   `IdempotencyMiddleware` (header `Idempotency-Key`, case-insensitive) deduplica os
   replays por `(método, caminho, chave)` — zero linha duplicada.
-- **Conflito é decisão sua.** O default é last-write-wins; versão/merge é código de
-  aplicação — o framework não impõe protocolo.
+- **Conflito é decisão sua.** O default é last-write-wins; a lane de conflito
+  entrega o `409` pra você reconciliar — versão/merge é código de aplicação.
 - **Pull é delta-sync manual.** `native.http` + o filtro `updated_at__gt` do
   repositório; a fila **não** faz leitura, e o replay devolve só contagens (releia
   o recurso se precisar do `id`/timestamps).

@@ -111,7 +111,7 @@ pelos Modos A e B.
 | Fase | Escopo | Status |
 |---|---|---|
 | B0 | Host FastAPI + tempest-fastapi-sdk com endpoint WS; patches iniciais ao conectar | ✅ ao vivo (counter por WS no browser, 2026-06-11) |
-| B1 | Transporte WebSocket (Python + JS); `counter` por WS — **mesmo `app.py` do Modo A** | ✅ ao vivo (Playwright, round-trip +/- verificado) |
+| B1 | Transporte WebSocket (Python + JS); `counter` por WS — **mesmo `app.py` do Modo A** | ✅ ao vivo (Playwright, round-trip +/- verificado). **Reconnect** com backoff exponencial + jitter (`backoffDelay`), buffer de saída (cap + drop-oldest logado) drenado no reopen, hook `onReconnect` — paridade de resiliência com o SSE (que herda o reconnect do `EventSource`). Servidor faz estado fresco por conexão → reconnect re-renderiza e o DOM re-sincroniza; resume de sessão (replay exato do estado antigo) é follow-up do servidor |
 | B2 | Sessão e ciclo de vida por conexão (connect=mount, disconnect=unmount, cancelamento de tasks) | ✅ |
 | B3 | `native/` split cliente/servidor (camera/geo no cliente, proxiados por WS) | ✅ (`ProxyBridge` + split documentado em T4) |
 | B4 | `tempestweb dev` (modo B): reload do servidor + push aos clientes | ✅ (via T5 devserver) |

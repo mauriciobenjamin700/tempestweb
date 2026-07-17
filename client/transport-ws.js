@@ -11,13 +11,16 @@
 // and Style->CSS translator run above it as in Mode A; only this file differs.
 //
 // Resilience: the socket auto-reconnects with exponential backoff + jitter (a
-// dropped connection no longer kills the app). Outbound envelopes issued while
-// the socket is not OPEN are buffered and flushed on the next open, and an
-// onReconnect hook lets the runtime re-sync after a drop. The server builds a
-// fresh state per connection (no session resume yet), so on reconnect it
-// re-renders and the client receives a full patch batch that re-syncs the DOM;
-// buffered events are therefore replayed best-effort against that fresh state —
-// full session-resume reconciliation is a server-side follow-up.
+// dropped connection no longer kills the app). User `event` envelopes issued
+// while the socket is not OPEN are buffered and flushed on the next open, and an
+// onReconnect hook lets the runtime re-sync after a drop. Connection-scoped
+// frames (native_result keyed to a call_id, native_event keyed to a sub_id) are
+// NOT buffered — after a reconnect the fresh server never issued that call/sub,
+// so replaying them would act on a stale id. The server builds fresh state per
+// connection (no session resume yet), so on reconnect it re-renders and the
+// client receives a full patch batch that re-syncs the DOM; the buffered events
+// replay best-effort against that fresh state — full session-resume
+// reconciliation is a server-side follow-up.
 
 import { subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
 
@@ -140,6 +143,13 @@ export function createWebSocketTransport(url, options = {}) {
    * `maxOutbox`; once full the oldest envelope is dropped (and logged) so a long
    * outage cannot grow it without bound.
    *
+   * Only connection-agnostic user `event` envelopes are buffered. A
+   * `native_result` (keyed to a `call_id`) or a `native_event` (keyed to a
+   * `sub_id`) is meaningful only to the connection that requested it: after a
+   * reconnect the server builds fresh state and never issued that call/sub, so
+   * replaying it onto the new connection is at best a no-op and at worst acts on
+   * a stale id. Those are dropped when the socket is not OPEN rather than queued.
+   *
    * @param {Object} envelope
    * @returns {void}
    */
@@ -148,6 +158,7 @@ export function createWebSocketTransport(url, options = {}) {
       socket.send(JSON.stringify(envelope));
       return;
     }
+    if (envelope.kind !== "event") return;
     if (outbox.length >= maxOutbox) {
       const dropped = outbox.shift();
       if (typeof console !== "undefined" && console.warn) {
@@ -257,10 +268,25 @@ export function createWebSocketTransport(url, options = {}) {
   }
 
   /**
-   * Open a socket and wire its listeners.
+   * Detach the four listeners from a socket (so a discarded socket can neither
+   * re-fire `close` into scheduleReconnect nor deliver a late message).
+   * @param {?WebSocket} sock
+   * @returns {void}
+   */
+  function detach(sock) {
+    if (!sock || typeof sock.removeEventListener !== "function") return;
+    sock.removeEventListener("open", onOpen);
+    sock.removeEventListener("message", onMessage);
+    sock.removeEventListener("close", onClose);
+    sock.removeEventListener("error", onError);
+  }
+
+  /**
+   * Open a socket and wire its listeners, detaching the previous one first.
    * @returns {void}
    */
   function connect() {
+    detach(socket);
     socket = new WebSocketImpl(url);
     socket.addEventListener("open", onOpen);
     socket.addEventListener("message", onMessage);
@@ -270,9 +296,13 @@ export function createWebSocketTransport(url, options = {}) {
 
   /**
    * Schedule the next reconnect attempt with backoff + jitter.
+   *
+   * A no-op when a reconnect is already pending, so a stray extra `close` can
+   * never schedule two timers (which would spawn two competing sockets).
    * @returns {void}
    */
   function scheduleReconnect() {
+    if (reconnectTimer !== null) return;
     const delay = backoffDelay(attempt, backoff);
     attempt += 1;
     reconnectTimer = setTimeoutImpl(() => {

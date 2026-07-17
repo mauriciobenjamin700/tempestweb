@@ -340,3 +340,60 @@ test("ws transport rejects ready on error only when reconnect is disabled", asyn
   sockets[0].error();
   await assert.rejects(transport.ready);
 });
+
+// --- reconnect hardening (0.56.1) -----------------------------------------
+
+test("all handlers are re-attached on the reconnected socket", async () => {
+  const { transport, sockets, timers } = reconnectingHarness();
+  sockets[0].open();
+  await transport.ready;
+
+  const batches = [];
+  transport.onPatches((p) => batches.push(p));
+
+  sockets[0].close();
+  timers[0].fn();
+  sockets[1].open();
+
+  sockets[1].serverSend({ kind: "patches", data: [{ set_props: { x: 1 } }] });
+  assert.equal(batches.length, 1, "message re-attached on the new socket");
+
+  sockets[1].close();
+  assert.equal(timers.filter(Boolean).length, 2, "close re-attached (reschedules)");
+});
+
+test("chained reconnects grow the backoff (attempt not reset without an open)", async () => {
+  const { sockets, timers } = reconnectingHarness();
+  sockets[0].open();
+  sockets[0].close();
+  timers[0].fn();
+  sockets[1].close();
+
+  assert.equal(timers[0].ms, 250, "first backoff: 500*2^0*0.5");
+  assert.equal(timers[1].ms, 500, "second backoff: 500*2^1*0.5 (grew)");
+});
+
+test("a stray extra close never schedules a second reconnect timer", async () => {
+  const { sockets, timers } = reconnectingHarness();
+  sockets[0].open();
+  sockets[0].close();
+  assert.equal(timers.filter(Boolean).length, 1);
+  sockets[0]._emit("close", {});
+  assert.equal(timers.filter(Boolean).length, 1, "guarded: still one timer");
+});
+
+test("native_result is NOT buffered across a reconnect (stale call_id)", async () => {
+  const { transport, sockets, timers } = reconnectingHarness();
+  sockets[0].open();
+  await transport.ready;
+
+  sockets[0].close();
+  transport.sendNativeResult("dead-call", true, { ok: 1 });
+  transport.sendEvent({ type: "click", key: "k", payload: {} });
+
+  timers[0].fn();
+  sockets[1].open();
+
+  const kinds = sockets[1].sent.map((e) => e.kind);
+  assert.deepEqual(kinds, ["event"], "only the event flushed; native_result dropped");
+});

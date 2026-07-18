@@ -4,6 +4,22 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.61.0] — 2026-07-18
+
+### Added
+
+- **`tempestweb gen api` — generate a typed client from OpenAPI.** Reads an
+  OpenAPI 3.x document (a FastAPI `/openapi.json` URL or a file) and emits, per
+  route-group tag, a package with `@dataclass` models (`schemas.py`, each with a
+  `from_dict`; enums become `Literal[...]` aliases) and a service class
+  (`service.py`, one async method per route) that calls `native.http.request`,
+  raising `ApiError` on non-2xx. A shared `_runtime.py` (`ApiError`,
+  `encode_query`) and re-export `__init__.py`s complete the client. Models are
+  dataclasses (not pydantic) so the client runs in all three modes, transpile
+  included. The Python analog of `tempest-react-sdk`'s `tempest gen api`. See the
+  new "Generate a client from OpenAPI" guide. Usage:
+  `tempestweb gen api http://127.0.0.1:8000/openapi.json --out api`.
+
 ## [0.60.0] — 2026-07-17
 
 ### Added

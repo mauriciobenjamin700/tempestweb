@@ -253,6 +253,19 @@ tempestweb sync            # writes tempestweb.toml
 tempestweb sync --dry-run  # just shows what would be added
 ```
 
+### `gen api` — a typed client from OpenAPI
+
+Generate `@dataclass` models + service classes from an OpenAPI 3.x spec (a
+FastAPI backend's `/openapi.json`, or a file):
+
+```bash
+tempestweb gen api http://127.0.0.1:8000/openapi.json --out api
+tempestweb gen api ./openapi.json --out api   # from a file
+```
+
+One package per tag, each with `schemas.py` + `service.py`. Details in
+[Generate a client from OpenAPI](openapi.md).
+
 ---
 
 ## 6. Code quality
@@ -427,6 +440,7 @@ Every command that builds/serves takes the project **directory** via `--path`
 | `tempestweb deploy` | Write the deploy files (nginx + Docker + guide). | `--out`, `--server-name`, `--tls`, `--replicas`, `--no-sticky`, `--force` |
 | `tempestweb vapid` | Generate a VAPID keypair for WebPush. | `--env` |
 | `tempestweb sync` | Fill `[wasm].modules` with pure-Python deps. | `--path`, `--dry-run` |
+| `tempestweb gen api <src>` | Generate a typed client (dataclasses + services) from OpenAPI. | `--out` |
 | `tempestweb lint` | `ruff check` on the project. | `--path`, `--strictness <lenient\|standard\|strict>` |
 | `tempestweb fix` | `ruff check --fix` + `ruff format` (writes). | `--path`, `--strictness`, `--unsafe` |
 | `tempestweb format` | `ruff format` (writes). | `--path` |

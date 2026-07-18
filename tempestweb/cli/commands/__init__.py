@@ -28,6 +28,7 @@ from tempestweb.cli.commands.dev import (
     create_dev_session,
     serve_dev,
 )
+from tempestweb.cli.commands.gen import GenError, GenResult, generate_api
 from tempestweb.cli.commands.new import NewError, create_project
 from tempestweb.cli.commands.run import RunError, RunPlan, prepare_run, serve_run
 from tempestweb.cli.commands.sync import SyncError, SyncResult, sync_modules
@@ -43,6 +44,8 @@ __all__ = [
     "DeployResult",
     "DevError",
     "DevSession",
+    "GenError",
+    "GenResult",
     "NewError",
     "RunError",
     "RunPlan",
@@ -52,6 +55,7 @@ __all__ = [
     "build_artifact",
     "create_dev_session",
     "create_project",
+    "generate_api",
     "render_deploy_files",
     "scaffold_deploy",
     "prepare_run",

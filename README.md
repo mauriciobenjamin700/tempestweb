@@ -76,7 +76,16 @@ tempestweb build --mode transpile  --path myapp   # emit a static, CDN-servable 
 > **directory** via `--path` (default: cwd) — not a positional `.py` file. Check
 > your install with `tempestweb --version`.
 
+Talking to a FastAPI backend? Generate a typed client from its OpenAPI spec —
+`@dataclass` models + service classes, one package per route group, working in
+all three modes (the Python analog of `tempest-react-sdk`'s `tempest gen api`):
+
+```bash
+tempestweb gen api http://127.0.0.1:8000/openapi.json --out api
+```
+
 Full walkthrough: the [Using the CLI](https://mauriciobenjamin700.github.io/tempestweb/en/cli/),
+[Generate a client from OpenAPI](https://mauriciobenjamin700.github.io/tempestweb/en/openapi/),
 [Installation](https://mauriciobenjamin700.github.io/tempestweb/en/installation/)
 and [Tutorial](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/) guides.
 
@@ -294,7 +303,7 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | `tempestweb/native/` | Web API capability adapters (Tracks N + T) — core (http, audio, share, geo, clipboard, storage, camera) plus Tier 1-3 web-platform parity (vibration, wakelock, fullscreen, network, sensors, bluetooth, usb, midi, …) and a streaming event channel (T-EV) consumed with `async for`. |
 | `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
 | `tempestweb/pwa/` | Web App Manifest + icon emitter (Track P). |
-| `tempestweb/cli/` | `tempestweb new/dev/build/run/sync`. |
+| `tempestweb/cli/` | `tempestweb new/dev/build/run/sync/gen`. |
 | `client/` | Pure-JS DOM renderer (incl. Canvas draw-command execution for charts), Style→CSS, event capture; `pwa/` `sw/` `offline/` `push/` `native/` subdirs. |
 | `tests/fixtures/` | Golden wire-format fixtures derived from the core. |
 

@@ -21,11 +21,13 @@ from tempestweb.cli.commands import (
     BuildError,
     DeployError,
     DevError,
+    GenError,
     NewError,
     RunError,
     SyncError,
     build_artifact,
     create_project,
+    generate_api,
     prepare_run,
     scaffold_deploy,
     serve_dev,
@@ -257,6 +259,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--env",
         action="store_true",
         help="Print as VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY env lines.",
+    )
+
+    gen = sub.add_parser(
+        "gen",
+        help="Generate code from a spec (currently: `gen api` from OpenAPI).",
+    )
+    gen_sub = gen.add_subparsers(dest="gen_target", required=True)
+    gen_api = gen_sub.add_parser(
+        "api",
+        help="Generate a typed client (dataclasses + services) from OpenAPI.",
+    )
+    gen_api.add_argument(
+        "source",
+        help="OpenAPI source: a file path or an http(s) URL to openapi.json.",
+    )
+    gen_api.add_argument(
+        "--out",
+        default="api",
+        help="Output directory for the generated client (default: ./api).",
     )
 
     _add_quality_parsers(sub)
@@ -549,6 +570,32 @@ def _cmd_vapid(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_gen(args: argparse.Namespace) -> int:
+    """Handle ``tempestweb gen``.
+
+    Currently supports ``gen api`` — generate a typed client (dataclasses +
+    service classes) from an OpenAPI 3.x spec.
+
+    Args:
+        args: Parsed arguments for the ``gen`` subcommand.
+
+    Returns:
+        Process exit code.
+    """
+    if args.gen_target != "api":
+        print(f"tempestweb gen: unknown target {args.gen_target!r}.", file=sys.stderr)
+        return 1
+    try:
+        result = generate_api(args.source, out=args.out)
+    except GenError as exc:
+        print(f"tempestweb gen api: {exc}", file=sys.stderr)
+        return 1
+    print(f"Generated {len(result.files)} file(s) for {len(result.tags)} tag(s) in {result.out_dir}:")
+    for tag in result.tags:
+        print(f"  + {tag}")
+    return 0
+
+
 def _resolve_level(args: argparse.Namespace) -> Strictness:
     """Resolve the strictness level for a quality command.
 
@@ -634,6 +681,7 @@ def main(argv: list[str] | None = None) -> int:
         "sync": _cmd_sync,
         "deploy": _cmd_deploy,
         "vapid": _cmd_vapid,
+        "gen": _cmd_gen,
         "lint": _cmd_lint,
         "fix": _cmd_fix,
         "format": _cmd_format,

@@ -4,6 +4,19 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.61.1] — 2026-07-19
+
+### Fixed
+
+- **Root `Replace` now re-tracks the mounted tree.** When a patch batch replaced
+  the whole tree at path `[]` (e.g. swapping a login screen for a dashboard, or
+  any view whose root widget/type changes), `mount()` kept its reference to the
+  now-detached old root element. Every subsequent patch then resolved against the
+  stale subtree and threw `RangeError: patch path out of range`, silently
+  dropping all post-swap updates in Mode A. `mount()` now follows the root swap
+  (`applyTreePatches`), so live in-place updates after a root replace apply
+  correctly. Regression test in `tests/client/root-replace.test.js`.
+
 ## [0.61.0] — 2026-07-18
 
 ### Added

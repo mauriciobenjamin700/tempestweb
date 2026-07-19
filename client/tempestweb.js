@@ -13,6 +13,59 @@ import { installBaseTheme } from "./theme.js";
 import { installVirtualization } from "./virtualize.js";
 
 /**
+ * Is this patch a **root** Replace — an empty path with a replacement node (and
+ * none of the other patch fields)?
+ * @param {import("./transport.js").Patch} patch  The patch to classify.
+ * @returns {boolean}  True for a whole-tree replacement at path `[]`.
+ */
+function isRootReplace(patch) {
+  return (
+    Array.isArray(patch.path) &&
+    patch.path.length === 0 &&
+    "node" in patch &&
+    !("index" in patch) &&
+    !("order" in patch) &&
+    !("set_props" in patch) &&
+    !("unset_props" in patch)
+  );
+}
+
+/**
+ * Apply a tree patch batch, following a root Replace so the caller's root
+ * reference stays live.
+ *
+ * A Replace at path `[]` swaps the whole tree: it detaches the old root element
+ * and mounts a fresh one. `applyPatches`/`applyReplace` mutate the DOM correctly,
+ * but the *reference* the mount holds would still point at the detached old tree
+ * — so every later patch in this or a future batch would resolve against a stale
+ * subtree and throw `patch path out of range`. This helper rebuilds + swaps the
+ * root itself and returns the current root so the mount can keep tracking it;
+ * all non-root patches apply in place.
+ *
+ * @param {HTMLElement} tree       The current root element.
+ * @param {import("./transport.js").Patch[]} patches  The tree patch batch.
+ * @param {HTMLElement} mountRoot  The mount host (insertion parent fallback).
+ * @returns {HTMLElement}          The current root element after the batch.
+ */
+function applyTreePatches(tree, patches, mountRoot) {
+  let current = tree;
+  for (const patch of patches) {
+    if (isRootReplace(patch)) {
+      const fresh = buildElement(patch.node);
+      if (current.parentNode) {
+        current.parentNode.replaceChild(fresh, current);
+      } else {
+        mountRoot.insertBefore(fresh, mountRoot.firstChild);
+      }
+      current = fresh;
+    } else {
+      applyPatches(current, [patch]);
+    }
+  }
+  return current;
+}
+
+/**
  * @typedef {Object} MountHandle
  * @property {HTMLElement} root  The mounted root element (the initial tree's host).
  * @property {() => void} unmount  Tear down: unbind events and clear the tree.
@@ -111,7 +164,7 @@ export function mount(root, transport, initialNode = null) {
       }
     }
     if (treePatches.length > 0) {
-      applyPatches(tree, treePatches);
+      tree = applyTreePatches(tree, treePatches, root);
     }
     if (overlayPatches.length > 0) {
       applyPatches(overlayHost(), overlayPatches);

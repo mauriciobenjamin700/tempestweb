@@ -128,8 +128,47 @@ balanceador para drenar uma instância cheia.
 `tempestweb_connections_rejected_total` (counters), e `tempestweb_sessions_max`
 quando há cap. Aponte seu scraper pra lá.
 
+### Handler lento: `spawn` primeiro, `concurrent_dispatch` depois
+
+Cada sessão despacha **um evento por vez**. É o que garante que duas teclas
+digitadas rápido cheguem na ordem — e é o que faz um handler demorado congelar
+aquela conexão inteira: nenhum outro botão daquele usuário responde enquanto ele
+roda.
+
+Na esmagadora maioria dos casos a resposta **não** é mudar o dispatch, é tirar o
+trabalho do handler com
+[`tempestweb.runtime.spawn`](best-practices.md#trabalho-longo-o-dispatch-e-serial).
+Ele não muda semântica nenhuma: a ordem dos eventos continua a mesma, e a task
+morre junto com a conexão.
+
+Quando você realmente quer handlers de widgets diferentes rodando ao mesmo
+tempo:
+
+```python
+app = create_app(make_state, view, concurrent_dispatch=True)
+```
+
+Cada evento vira sua própria task. Eventos do **mesmo `key`** continuam em ordem
+de chegada (há um lock por widget), então digitação não embaralha; handlers de
+widgets diferentes se sobrepõem. Um handler que levanta exceção nesse modo é
+logado e descartado em vez de derrubar a conexão.
+
+!!! warning "O que a opção exige de você"
+    Com `concurrent_dispatch=True` dois handlers podem mutar o estado ao mesmo
+    tempo. O app precisa estar escrito para isso — um `set_state` que lê o
+    estado, calcula e grava deixa de ser atômico em relação a outro handler. Por
+    isso vem desligada por padrão.
+
+    Vale também ler o efeito no limite de carga: ligada, cada envelope aceito
+    vira uma task, e `max_events_per_minute` passa a ser o teto de tasks
+    concorrentes por IP — veja
+    [Segurança → S2](security.md#s2-limites-anti-dos).
+
 ## Recap
 
 - **A/C**: `build` → publique o diretório estático num CDN. Fim.
 - **B**: endureça com `SecurityConfig`, rode atrás de nginx (TLS + upgrade WS),
   escale com réplicas **sticky** (1 worker cada), monitore `/health`.
+- **Handler lento**: `spawn` resolve sem mudar semântica;
+  `concurrent_dispatch=True` só quando você quer sobreposição de verdade — e aí
+  configure `max_events_per_minute`.

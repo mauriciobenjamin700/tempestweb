@@ -118,6 +118,20 @@ SecurityConfig(
     legitimately-idle users, so it is **not** enforced — use `max_connections` +
     rate limiting + the reverse proxy's `limit_req` for defense in depth.
 
+!!! danger "`concurrent_dispatch=True` changes what `max_events_per_minute` protects"
+    By default a session dispatches **one event at a time**, so a client
+    flooding envelopes only queues work up — the queue grows, but there is
+    always exactly one handler running.
+
+    With [`create_app(..., concurrent_dispatch=True)`](deploy.md#slow-handler-spawn-first-concurrent_dispatch-second)
+    every accepted envelope becomes **its own task**. The queue no longer holds
+    the flood back: what limits how many tasks one connection can open becomes
+    `max_events_per_minute` and nothing else.
+
+    If you turn the option on, set that cap **explicitly**. It defaults to
+    `None`, and `None` with `concurrent_dispatch=True` means unbounded task
+    fan-out per connection.
+
 ## S6 — security headers
 
 ```python
@@ -145,7 +159,9 @@ A middleware adds the headers to **every** HTTP response.
 - Mode B is **open by default**; production needs a `SecurityConfig`.
 - **S0** `authenticate` rejects unauthorized connections before mounting a session.
 - **S1** `allowed_origins` enables CORS **and** locks the WS origin.
-- **S2** `max_connections` / `max_message_bytes` bound load (partial).
+- **S2** `max_connections` / `max_message_bytes` /
+  `max_connections_per_minute` / `max_events_per_minute` bound load (partial).
+  Turned `concurrent_dispatch` on? `max_events_per_minute` stops being optional.
 - **S3** `verify_jwt` / `jwt_authenticator` authenticate with a signed JWT.
 - **S6** `security_headers` / `hsts` / `content_security_policy` harden responses;
   the client is XSS-safe by construction.

@@ -144,6 +144,37 @@ def view(app: App[VisionState]) -> Widget:
     can also pass a list, a `{id: name}` dict, a file path, or `None` to
     auto-generate `class_N`.
 
+!!! warning "Loading a model and running inference **freeze the whole session**"
+    The example above is the smallest code that works, which is why it `await`s
+    straight inside the handler. But a session dispatches **one event at a
+    time**: while `Detector.create` downloads the `.onnx` or `predict` runs
+    inference, no other button responds, no field accepts text, and not even a
+    "Cancel" helps.
+
+    Computer vision is the extreme case — a model download and a CPU inference
+    take seconds, sometimes far more. Move the work out of the handler with
+    [`spawn`](best-practices.md#long-work-dispatch-is-serial):
+
+    ```python
+    from tempestweb.runtime import spawn
+
+
+    async def load_model() -> None:
+        app.set_state(lambda s: setattr(s, "status", "loading the model…"))
+
+        async def load() -> None:
+            detector = await Detector.create("./models/yolov8n.onnx", labels="coco")
+            app.set_state(lambda s: setattr(s, "detector", detector))
+            app.set_state(lambda s: setattr(s, "status", "model ready"))
+
+        spawn(load())     # the handler returns now; the UI stays alive
+    ```
+
+    The first `set_state` paints "loading…" immediately, and every `set_state`
+    inside `load()` schedules the normal repaint — so you can show progress
+    while it runs. The task is owned by the session and is cancelled if the user
+    closes the tab. The same applies to `detect()`.
+
 ---
 
 ## From result to JSON schema

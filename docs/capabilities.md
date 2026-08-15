@@ -128,6 +128,16 @@ async def submit_order(payload: dict[str, object]) -> dict[str, object]:
     servidor aplica o efeito **uma só vez**. Essa é a peça que torna a fila offline
     do [Trilho P](pwa.md) segura.
 
+!!! warning "Capacidade lenta dentro do handler trava a sessão"
+    A sessão despacha **um evento por vez**. Um `http.request` com
+    `RetryOptions(attempts=3, backoff=0.5)` que bate em timeout gasta segundos —
+    e durante todos eles nenhum outro botão daquele usuário responde. O mesmo
+    vale para `file.pick` num arquivo grande, upload, e qualquer `onnx.*`.
+
+    Quando a chamada pode demorar, tire-a do handler com
+    [`spawn`](best-practices.md#trabalho-longo-o-dispatch-e-serial) e pinte um
+    estado de "carregando" antes.
+
 ## Exemplo: geolocalização
 
 ```python

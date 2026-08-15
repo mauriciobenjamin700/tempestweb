@@ -127,8 +127,45 @@ balancer's readiness probe to drain a full instance.
 `tempestweb_connections_rejected_total` (counters), plus `tempestweb_sessions_max`
 when a cap is set. Point your scraper at it.
 
+### Slow handler: `spawn` first, `concurrent_dispatch` second
+
+Each session dispatches **one event at a time**. That is what guarantees two
+fast keystrokes arrive in order — and it is also what lets a slow handler freeze
+that whole connection: no other button of that user responds while it runs.
+
+In the overwhelming majority of cases the answer is **not** to change dispatch,
+it is to move the work out of the handler with
+[`tempestweb.runtime.spawn`](best-practices.md#long-work-dispatch-is-serial). It
+changes no semantics: event order stays the same, and the task dies with the
+connection.
+
+When you genuinely want handlers of different widgets running at the same time:
+
+```python
+app = create_app(make_state, view, concurrent_dispatch=True)
+```
+
+Each event becomes its own task. Events on the **same `key`** still run in
+arrival order (there is a per-widget lock), so typing does not scramble;
+handlers of different widgets overlap. A handler that raises in this mode is
+logged and dropped instead of tearing down the connection.
+
+!!! warning "What the option demands of you"
+    With `concurrent_dispatch=True` two handlers can mutate the state at the
+    same time. The app has to be written for that — a `set_state` that reads the
+    state, computes and writes is no longer atomic with respect to another
+    handler. That is why it ships off by default.
+
+    Also read the effect on your load limits: once on, every accepted envelope
+    becomes a task, and `max_events_per_minute` becomes the ceiling on
+    concurrent tasks per IP — see
+    [Security → S2](security.md#s2-limits-anti-dos).
+
 ## Recap
 
 - **A/C**: `build` → publish the static directory to a CDN. Done.
 - **B**: harden with `SecurityConfig`, run behind nginx (TLS + WS upgrade), scale
   with **sticky** replicas (1 worker each), watch `/health`.
+- **Slow handler**: `spawn` solves it without changing semantics;
+  `concurrent_dispatch=True` only when you really want overlap — and then
+  configure `max_events_per_minute`.

@@ -128,6 +128,16 @@ async def submit_order(payload: dict[str, object]) -> dict[str, object]:
     server applies the effect **only once**. That is the piece that makes the
     [Track P](pwa.md) offline queue safe.
 
+!!! warning "A slow capability inside a handler freezes the session"
+    A session dispatches **one event at a time**. An `http.request` with
+    `RetryOptions(attempts=3, backoff=0.5)` that hits a timeout burns seconds —
+    and for all of them no other button of that user responds. The same goes for
+    `file.pick` on a large file, uploads, and any `onnx.*`.
+
+    When the call can take a while, move it out of the handler with
+    [`spawn`](best-practices.md#long-work-dispatch-is-serial) and paint a
+    "loading" state first.
+
 ## Example: geolocation
 
 ```python

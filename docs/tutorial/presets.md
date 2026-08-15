@@ -72,6 +72,21 @@ Os **presets** resolvem os dois: você diz *o que* tem na tela, eles decidem
 | `form_page` / `settings_page` | Campos rotulados em grid + barra de ações |
 | `auth_page` | Card centrado com o seu formulário dentro |
 
+!!! info "`form_page` ou `settings_page`?"
+    Os dois desenham **a mesma tela**. A diferença é de assinatura:
+    `settings_page` só aceita `sections` — campos sempre agrupados —, enquanto
+    `form_page` também aceita `fields` soltos. Passando os dois juntos, os
+    soltos vêm primeiro, na própria grade.
+
+    Use `form_page` para um formulário simples ("criar registro") e
+    `settings_page` quando os campos sempre pertencem a um grupo. O prefixo de
+    key também muda (`tw-form` × `tw-settings`), então as duas telas mantêm keys
+    distintas.
+
+    A barra de ações fica alinhada à direita no desktop e **empilha no celular
+    com a última ação da lista em cima** — ponha a primária por último em
+    `actions=`.
+
 Cada um recebe **registros tipados**, não widgets de layout:
 
 ```python

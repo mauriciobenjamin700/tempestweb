@@ -363,6 +363,45 @@ def test_settings_page_groups_fields_into_sections() -> None:
     assert roles.FORM_GRID in _roles(tree)
 
 
+def test_form_page_puts_loose_fields_before_the_sections() -> None:
+    """Passing ``fields`` and ``sections`` together keeps the loose ones first.
+
+    The docstring of ``form_page`` promises this order and nothing verified it —
+    the other two form tests pass one or the other, never both. The order is
+    what makes a "a few fields, then grouped settings" screen read top-down, and
+    silently flipping it would look like a styling bug rather than a code one.
+    """
+    tree = build(
+        form_page(
+            title="Novo usuário",
+            fields=[FormField("Nome", _text("nome"))],
+            sections=[FormSection("Conta", [FormField("Email", _text("e"))])],
+        )
+    )
+    keys = [child.key for child in tree.children]
+    assert "tw-form-grid" in keys, keys
+    assert "tw-form-s0" in keys, keys
+    assert keys.index("tw-form-grid") < keys.index("tw-form-s0"), keys
+    assert _find(tree, "tw-form-f0") is not None
+    assert _find(tree, "tw-form-s0-f0") is not None
+
+
+def test_settings_page_renders_the_same_tree_as_an_equivalent_form_page() -> None:
+    """``settings_page`` is a facade: same layout, different signature and key.
+
+    Documented as identical rendering, so the guard is that the two trees match
+    role for role. If someone later gives settings its own layout role, this
+    fails and the docs have to be updated with it — which is the point.
+    """
+    sections = [FormSection("Conta", [FormField("Email", _text("e"))])]
+    actions = [_text("salvar")]
+    as_form = build(form_page(title="X", sections=sections, actions=actions))
+    as_settings = build(settings_page(title="X", sections=sections, actions=actions))
+    assert _roles(as_settings) == _roles(as_form)
+    assert as_settings.key == "tw-settings"
+    assert as_form.key == "tw-form"
+
+
 def test_auth_page_centres_a_capped_card() -> None:
     """The auth screen is one card the sheet centres and caps."""
     found = _roles(build(auth_page(title="Entrar", body=_text("form"))))

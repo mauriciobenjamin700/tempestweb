@@ -96,8 +96,13 @@ def form_page(
     the grid, which fits as many columns as the viewport allows and drops to one
     on a phone — a field marked ``span="full"`` always takes the whole row.
 
-    The action bar sits at the end, right-aligned on a wide screen and stacked
-    (primary action last, so it lands under the thumb) on a phone.
+    The action bar sits at the end: a right-aligned row on a wide screen, and a
+    stack on a phone. The stack is **reversed** (``column-reverse`` in
+    ``client/layouts.js``), so the *last* entry in ``actions`` renders on top —
+    put the primary action last and it leads the stack, the way Material stacks
+    dialog buttons.
+
+    See :func:`settings_page` for the grouped-only variant of this same page.
 
     Args:
         title: The page title.
@@ -141,10 +146,22 @@ def settings_page(
 ) -> Widget:
     """Build a settings screen — a form page whose fields are always grouped.
 
+    Renders **identically** to :func:`form_page`; this is a deliberate public
+    facade over it, not a distinct layout. Two things differ, and neither is
+    visual:
+
+    * the signature — ``sections`` is required and loose ``fields`` are not
+      accepted, because a settings screen always groups its fields;
+    * the key prefix — ``tw-settings`` rather than ``tw-form``, so the two kinds
+      of screen keep distinct widget keys.
+
+    Reach for :func:`form_page` when the screen is a single flat form.
+
     Args:
         title: The page title.
         sections: The setting groups, each rendered as a card.
-        actions: The save/discard buttons.
+        actions: The save/discard buttons. See :func:`form_page` for how they
+            stack on a phone.
         subtitle: Optional line under the title.
         key: The key prefix for the page's widgets.
 

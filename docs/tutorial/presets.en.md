@@ -72,6 +72,20 @@ looks.
 | `form_page` / `settings_page` | Labelled fields in a grid + an action bar |
 | `auth_page` | A centred card wrapping your own form |
 
+!!! info "`form_page` or `settings_page`?"
+    Both draw **the same screen**. The difference is the signature:
+    `settings_page` only takes `sections` — fields always grouped — while
+    `form_page` also takes loose `fields`. Pass both and the loose ones come
+    first, in their own grid.
+
+    Use `form_page` for a simple form ("create record") and `settings_page` when
+    the fields always belong to a group. The key prefix differs too (`tw-form`
+    vs `tw-settings`), so the two kinds of screen keep distinct keys.
+
+    The action bar is right-aligned on desktop and **stacks on a phone with the
+    last action of the list on top** — put the primary action last in
+    `actions=`.
+
 Each takes **typed records**, not layout widgets:
 
 ```python

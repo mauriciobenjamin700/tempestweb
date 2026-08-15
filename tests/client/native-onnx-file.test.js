@@ -163,6 +163,92 @@ test("file.pick: reads the chosen file back as base64", async () => {
   assert.equal(res.value.name, "ovino.png");
 });
 
+// Regression (issue #61): dismissing the dialog fires `cancel`, not `change`.
+// Listening only for `change` left the promise pending forever — and because a
+// Mode B session dispatches in series, that parked handler froze the whole app.
+
+test("file.pick: a dismissed dialog rejects with cancelled and leaves no input", async () => {
+  const dom = new JSDOM("<!doctype html><html><body></body></html>");
+  const doc = dom.window.document;
+  globalThis.FileReader = class {
+    readAsDataURL() {}
+  };
+  const realCreate = doc.createElement.bind(doc);
+  doc.createElement = (tag) => {
+    const el = realCreate(tag);
+    if (tag === "input") {
+      el.click = () => {
+        // What the browser does when the picker is closed with the X or Esc.
+        if (el.oncancel) el.oncancel();
+      };
+    }
+    return el;
+  };
+
+  const res = await dispatch(call("file.pick", { accept: "image/*" }), { document: doc });
+
+  assert.equal(res.ok, false);
+  assert.equal(res.error, "cancelled");
+  assert.equal(doc.querySelector("input[type=file]"), null, "no orphan input left");
+});
+
+test("file.pick: a change with no file still rejects (browser without cancel)", async () => {
+  const dom = new JSDOM("<!doctype html><html><body></body></html>");
+  const doc = dom.window.document;
+  globalThis.FileReader = class {
+    readAsDataURL() {}
+  };
+  const realCreate = doc.createElement.bind(doc);
+  doc.createElement = (tag) => {
+    const el = realCreate(tag);
+    if (tag === "input") {
+      Object.defineProperty(el, "files", { value: [], configurable: true });
+      el.click = () => {
+        if (el.onchange) el.onchange();
+      };
+    }
+    return el;
+  };
+
+  const res = await dispatch(call("file.pick", {}), { document: doc });
+
+  assert.equal(res.ok, false);
+  assert.equal(res.error, "cancelled");
+  assert.equal(doc.querySelector("input[type=file]"), null);
+});
+
+test("file.pick: cancel after a successful read does not settle twice", async () => {
+  const dom = new JSDOM("<!doctype html><html><body></body></html>");
+  const doc = dom.window.document;
+  globalThis.FileReader = class {
+    readAsDataURL(_file) {
+      this.result = "data:image/png;base64,aGVsbG8=";
+      if (this.onload) this.onload();
+    }
+  };
+  let input;
+  const realCreate = doc.createElement.bind(doc);
+  doc.createElement = (tag) => {
+    const el = realCreate(tag);
+    if (tag === "input") {
+      Object.defineProperty(el, "files", {
+        value: [{ name: "a.png", type: "image/png" }],
+        configurable: true,
+      });
+      input = el;
+      el.click = () => {
+        if (el.onchange) el.onchange();
+      };
+    }
+    return el;
+  };
+
+  const res = await dispatch(call("file.pick", {}), { document: doc });
+  assert.equal(res.ok, true);
+  input.oncancel();  // a browser that fires both must not change the outcome
+  assert.equal(res.value.data_base64, "aGVsbG8=");
+});
+
 test("install.state/prompt: no captured event → not installable, unavailable", async () => {
   const fakeWindow = {
     addEventListener() {},

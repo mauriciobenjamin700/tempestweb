@@ -6,17 +6,12 @@ from collections.abc import Sequence
 
 from tempest_core import Style, Widget
 from tempest_core.components import Card
-from tempest_core.components.base import ON_SURFACE
-from tempest_core.style import Color, FontWeight
 from tempest_core.widgets import Column, Text
 from tempestweb.presets import roles
 from tempestweb.presets.layout import box, heading, muted, page_header
 from tempestweb.presets.models import FormField, FormSection
 
 __all__ = ["form_page", "form_section", "settings_page"]
-
-#: The core's error red, for a field's validation line.
-_ERROR = Color(r=179, g=38, b=30, a=1.0)
 
 
 def _field(field: FormField, *, key: str) -> Widget:
@@ -33,7 +28,7 @@ def _field(field: FormField, *, key: str) -> Widget:
         Text(
             content=field.label,
             key=f"{key}-label",
-            style=Style(font_size=13.0, font_weight=FontWeight.BOLD, color=ON_SURFACE),
+            attrs={roles.LAYOUT_ATTR: roles.LABEL},
         ),
         field.control,
     ]
@@ -42,11 +37,11 @@ def _field(field: FormField, *, key: str) -> Widget:
             Text(
                 content=field.error,
                 key=f"{key}-error",
-                style=Style(font_size=12.0, color=_ERROR),
+                attrs={roles.LAYOUT_ATTR: roles.ERROR},
             )
         )
     elif field.help is not None:
-        children.append(muted(field.help, key=f"{key}-help", size=12.0))
+        children.append(muted(field.help, key=f"{key}-help"))
     return box(
         roles.FORM_FIELD,
         [Column(key=f"{key}-col", style=Style(gap=6.0), children=children)],
@@ -65,7 +60,7 @@ def form_section(section: FormSection, *, key: str) -> Widget:
     Returns:
         The section card.
     """
-    head: list[Widget] = [heading(section.title, key=f"{key}-title", size=18.0)]
+    head: list[Widget] = [heading(section.title, key=f"{key}-title", level="group")]
     if section.subtitle is not None:
         head.append(muted(section.subtitle, key=f"{key}-subtitle"))
     fields = box(

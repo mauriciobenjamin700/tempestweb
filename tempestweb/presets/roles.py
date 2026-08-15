@@ -19,10 +19,12 @@ from typing import Final
 __all__ = [
     "AUTH",
     "AUTH_CARD",
+    "ERROR",
     "FORM_ACTIONS",
     "FORM_FIELD",
     "FORM_GRID",
     "KPI_GRID",
+    "LABEL",
     "LAYOUT_ATTR",
     "NAV_ITEM",
     "PAGE",
@@ -37,11 +39,14 @@ __all__ = [
     "SHELL_MAIN",
     "SHELL_SCRIM",
     "SHELL_SIDEBAR",
+    "SUBTITLE",
     "TABLE",
     "TABLE_CELL",
     "TABLE_HEADER_CELL",
     "TABLE_HEAD",
     "TABLE_ROW",
+    "TABLE_SCROLL",
+    "TITLE",
     "TOOLBAR",
 ]
 
@@ -79,6 +84,11 @@ FORM_ACTIONS: Final[str] = "form-actions"
 AUTH: Final[str] = "auth"
 AUTH_CARD: Final[str] = "auth-card"
 
+TITLE: Final[str] = "title"
+SUBTITLE: Final[str] = "subtitle"
+LABEL: Final[str] = "label"
+ERROR: Final[str] = "error"
+
 #: Every role the presets emit, for the drift guard against ``layouts.js``.
 ROLES: Final[frozenset[str]] = frozenset(
     {
@@ -107,5 +117,9 @@ ROLES: Final[frozenset[str]] = frozenset(
         FORM_ACTIONS,
         AUTH,
         AUTH_CARD,
+        TITLE,
+        SUBTITLE,
+        LABEL,
+        ERROR,
     }
 )

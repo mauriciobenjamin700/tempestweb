@@ -11,14 +11,16 @@ layout to ``client/layouts.js``.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Literal
 
 from tempest_core import Style, Text, Widget
-from tempest_core.components.base import ON_MUTED, ON_SURFACE
-from tempest_core.style import FontWeight
 from tempest_core.widgets import Column, Stack
 from tempestweb.presets import roles
 
-__all__ = ["box", "heading", "muted", "page_header"]
+__all__ = ["Level", "box", "heading", "muted", "page_header"]
+
+#: Which step of the type scale a heading sits on.
+Level = Literal["page", "section", "group"]
 
 
 def box(
@@ -49,36 +51,40 @@ def box(
     return Stack(key=key, children=list(children), attrs=merged, style=style)
 
 
-def heading(text: str, *, key: str, size: float = 20.0) -> Widget:
-    """Render a section or page heading.
+def heading(text: str, *, key: str, level: Level = "section") -> Widget:
+    """Render a page, section or group heading.
+
+    Size, weight and colour come from the stylesheet, not from here. A preset
+    that hard-coded them would pick a colour from one palette and land on a page
+    themed with another — a white title on a white page. The sheet resolves them
+    from the theme's own tokens, so a rebranded app rebrands its headings too.
 
     Args:
         text: The heading text.
         key: The widget key.
-        size: The font size in pixels.
+        level: Which step of the type scale to use.
 
     Returns:
-        A bold, on-surface :class:`~tempest_core.widgets.Text`.
+        The heading text, tagged for the sheet.
     """
     return Text(
         content=text,
         key=key,
-        style=Style(font_size=size, font_weight=FontWeight.BOLD, color=ON_SURFACE),
+        attrs={roles.LAYOUT_ATTR: roles.TITLE, "data-tw-level": level},
     )
 
 
-def muted(text: str, *, key: str, size: float = 13.0) -> Widget:
+def muted(text: str, *, key: str) -> Widget:
     """Render supporting text (a subtitle, a hint, a help line).
 
     Args:
         text: The text.
         key: The widget key.
-        size: The font size in pixels.
 
     Returns:
-        A muted :class:`~tempest_core.widgets.Text`.
+        The text, tagged so the sheet gives it the muted treatment.
     """
-    return Text(content=text, key=key, style=Style(font_size=size, color=ON_MUTED))
+    return Text(content=text, key=key, attrs={roles.LAYOUT_ATTR: roles.SUBTITLE})
 
 
 def page_header(
@@ -102,7 +108,7 @@ def page_header(
     Returns:
         The header container.
     """
-    titles: list[Widget] = [heading(title, key=f"{key}-title", size=24.0)]
+    titles: list[Widget] = [heading(title, key=f"{key}-title", level="page")]
     if subtitle is not None:
         titles.append(muted(subtitle, key=f"{key}-subtitle"))
     children: list[Widget] = [

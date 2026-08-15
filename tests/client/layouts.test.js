@@ -9,7 +9,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixture, freshDom } from "./setup.js";
 import { LAYOUT_CSS, installLayoutStyles } from "../../client/layouts.js";
-import { LAYOUT_STYLE_ID } from "../../client/constants.js";
+import { BASE_THEME_STYLE_ID, LAYOUT_STYLE_ID } from "../../client/constants.js";
+import { installBaseTheme } from "../../client/theme.js";
 import { buildElement } from "../../client/dom.js";
 
 /** Install jsdom's `document` globally, as the renderer expects. */
@@ -46,6 +47,19 @@ test("the sheet is prepended so app styles declared later still win", () => {
   dom.document.head.appendChild(appStyle);
   const sheet = installLayoutStyles();
   assert.equal(dom.document.head.firstChild, sheet);
+});
+
+test("the sheet lands after the base theme so ties go to the layout", () => {
+  // Both sheets select on one attribute, so their rules tie on specificity and
+  // source order decides. Ahead of the theme, its `[data-tw-type="Button"]`
+  // display rule beat `[data-tw-layout="shell-burger"] { display: none }` and
+  // the burger stayed on screen at desktop widths.
+  const dom = withDocument();
+  installBaseTheme();
+  const sheet = installLayoutStyles();
+  const ids = [...dom.document.head.children].map((el) => el.id);
+  assert.deepEqual(ids, [BASE_THEME_STYLE_ID, LAYOUT_STYLE_ID]);
+  assert.equal(sheet.previousSibling.id, BASE_THEME_STYLE_ID);
 });
 
 test("the sheet carries the rules inline style cannot express", () => {

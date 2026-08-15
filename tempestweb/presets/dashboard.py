@@ -65,7 +65,9 @@ def section_grid(sections: Sequence[Section], *, key: str = "tw-sections") -> Wi
     """
     blocks: list[Widget] = []
     for index, section in enumerate(sections):
-        head: list[Widget] = [heading(section.title, key=f"{key}-{index}-title")]
+        head: list[Widget] = [
+            heading(section.title, key=f"{key}-{index}-title", level="group")
+        ]
         if section.subtitle is not None:
             head.append(muted(section.subtitle, key=f"{key}-{index}-subtitle"))
         blocks.append(

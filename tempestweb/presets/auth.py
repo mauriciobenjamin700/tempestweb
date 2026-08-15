@@ -45,8 +45,8 @@ def auth_page(
     """
     head: list[Widget] = []
     if brand is not None:
-        head.append(muted(brand, key=f"{key}-brand", size=12.0))
-    head.append(heading(title, key=f"{key}-title", size=22.0))
+        head.append(muted(brand, key=f"{key}-brand"))
+    head.append(heading(title, key=f"{key}-title", level="page"))
     if subtitle is not None:
         head.append(muted(subtitle, key=f"{key}-subtitle"))
 

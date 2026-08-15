@@ -6,7 +6,6 @@ from collections.abc import Callable, Sequence
 
 from tempest_core import Style, Text, Widget
 from tempest_core.components import EmptyState, SearchBar
-from tempest_core.components.base import ON_MUTED
 from tempest_core.style import Edge
 from tempest_core.widgets import Button, Row, TextChangeEvent
 from tempestweb.presets import roles
@@ -157,7 +156,7 @@ def _pagination(
             Text(
                 content=f"Página {page} de {page_count}",
                 key=f"{key}-label",
-                style=Style(font_size=13.0, color=ON_MUTED),
+                attrs={roles.LAYOUT_ATTR: roles.SUBTITLE},
             ),
             Button(label="Próxima", on_click=go(page + 1), key=f"{key}-next"),
         ],

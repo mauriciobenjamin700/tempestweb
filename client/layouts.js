@@ -18,13 +18,14 @@
 //
 //   1. `Column`/`Row` always carry an inline `display: flex` (style.js writes it
 //      per widget type), and inline beats a stylesheet. So every container this
-//      sheet lays out is a `Container`, which has no inline display of its own.
+//      sheet lays out is a `Stack`, which renders a bare div with no inline
+//      display of its own.
 //   2. An app's inline `Style` always wins, here as in theme.js — nothing below
 //      uses `!important`. The sheet is a floor, not a cage.
 //
 // Tokens (`--tw-layout-*`) are overridable from the app, same as the theme's.
 
-import { LAYOUT_STYLE_ID as STYLE_ID } from "./constants.js";
+import { BASE_THEME_STYLE_ID, LAYOUT_STYLE_ID as STYLE_ID } from "./constants.js";
 
 /**
  * The layout CSS, exported so tests can assert its content without a live DOM.
@@ -43,6 +44,35 @@ export const LAYOUT_CSS = `
   --tw-layout-zebra: rgba(0, 0, 0, 0.025);
   --tw-layout-hover: rgba(0, 0, 0, 0.045);
   --tw-layout-divider: rgba(0, 0, 0, 0.12);
+  --tw-layout-sidebar-muted: #9ca3af;
+}
+
+/* ── Type scale: colours resolve from the theme, never from Python ─────────
+   A preset that hard-coded a heading colour would pick one palette's value and
+   land on a page themed with another — the exact way a title ends up white on
+   white. These read the same --tw-* tokens theme.js defines, so rebranding the
+   theme rebrands the presets with it. */
+[data-tw-layout="title"] {
+  color: var(--tw-on-surface, #1d1b20);
+  font-weight: 600;
+  line-height: 1.25;
+}
+[data-tw-layout="title"][data-tw-level="page"] { font-size: 1.5rem; }
+[data-tw-layout="title"][data-tw-level="section"] { font-size: 1.25rem; }
+[data-tw-layout="title"][data-tw-level="group"] { font-size: 1.05rem; }
+[data-tw-layout="subtitle"] {
+  color: var(--tw-on-surface-variant, #49454f);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+[data-tw-layout="label"] {
+  color: var(--tw-on-surface, #1d1b20);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+[data-tw-layout="error"] {
+  color: var(--tw-error, #b3261e);
+  font-size: 0.78rem;
 }
 
 /* ── Shell: sidebar + header + scrolling main ─────────────────────────────
@@ -64,6 +94,12 @@ export const LAYOUT_CSS = `
   height: 100dvh;
   overflow-y: auto;
   border-right: 1px solid var(--tw-layout-divider);
+}
+/* The shell's chrome is a dark surface by design — the contrast is what makes
+   the content area read as the page. Its own text therefore opts out of the
+   content type scale's colour, which is tuned for the light surface. */
+[data-tw-layout="shell-sidebar"] [data-tw-layout="subtitle"] {
+  color: var(--tw-layout-sidebar-muted);
 }
 [data-tw-layout="shell-header"] {
   grid-area: header;
@@ -109,13 +145,18 @@ export const LAYOUT_CSS = `
     transition: transform var(--tw-motion, 180ms ease);
   }
   [data-tw-layout="shell-sidebar"][data-tw-open="true"] { transform: translateX(0); }
+  /* Flex, not block: the scrim's only child is the button that closes it, and a
+     block parent leaves that button at its intrinsic (zero) size — the backdrop
+     would dim the page and swallow nothing. Stretching it is what makes tapping
+     outside the drawer work. */
   [data-tw-layout="shell-scrim"][data-tw-open="true"] {
-    display: block;
+    display: flex;
     position: fixed;
     inset: 0;
     z-index: 30;
     background: var(--tw-layout-scrim);
   }
+  [data-tw-layout="shell-scrim"][data-tw-open="true"] > * { flex: 1; }
 }
 
 /* The burger only makes sense where the sidebar is an overlay. */
@@ -273,10 +314,17 @@ export const LAYOUT_CSS = `
 /**
  * Inject the layout stylesheet once, at mount.
  *
+ * Position matters, and only in one direction: this sheet goes **after** the
+ * base theme and **before** anything the app writes. Both sheets select on a
+ * single attribute, so their rules tie on specificity and the later one wins —
+ * with this sheet first, the theme's `[data-tw-type="Button"] { display: … }`
+ * beat `[data-tw-layout="shell-burger"] { display: none }` and the burger stayed
+ * visible on desktop. Landing right after the theme settles those ties in favour
+ * of the layout, while app styles (declared later still) keep beating both.
+ *
  * Idempotent: a second call (a re-mount, or a page that shipped the sheet
  * itself) leaves the existing element alone. A no-op without a `document`, so a
- * headless harness can import this module. The sheet is prepended to the head,
- * after nothing and before everything, so app styles declared later still win.
+ * headless harness can import this module.
  *
  * @returns {?HTMLStyleElement}  The injected (or pre-existing) style element, or
  *                               `null` when no document is available.
@@ -292,6 +340,11 @@ export function installLayoutStyles() {
   const el = document.createElement("style");
   el.id = STYLE_ID;
   el.textContent = LAYOUT_CSS;
-  document.head.insertBefore(el, document.head.firstChild);
+  const theme = document.getElementById(BASE_THEME_STYLE_ID);
+  if (theme != null && theme.parentNode === document.head) {
+    document.head.insertBefore(el, theme.nextSibling);
+  } else {
+    document.head.insertBefore(el, document.head.firstChild);
+  }
   return el;
 }

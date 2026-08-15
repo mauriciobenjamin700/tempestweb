@@ -6,7 +6,7 @@ from collections.abc import Callable, Sequence
 
 from tempest_core import Style, Widget
 from tempest_core.components import AppBar
-from tempest_core.components.base import ACCENT, ON_MUTED, ON_SURFACE, SURFACE
+from tempest_core.components.base import ACCENT, ON_MUTED, SURFACE
 from tempest_core.style import Color, Edge, FontWeight
 from tempest_core.widgets import Button, Column
 from tempest_core.widgets.base import Semantics
@@ -19,6 +19,11 @@ __all__ = ["admin_shell"]
 #: Fully transparent, for a nav entry that is not the current one. The core
 #: resolves a Button's fill inline, so "no background" has to be said explicitly.
 _TRANSPARENT = Color(r=0, g=0, b=0, a=0.0)
+
+#: Text on the accent fill. Accent is the one colour that reads the same on the
+#: shell's dark chrome and on a light header, so the two controls that must be
+#: visible in both — the current nav entry and the burger — share it.
+_ON_ACCENT = Color(r=255, g=255, b=255, a=1.0)
 
 
 def _nav_button(
@@ -55,7 +60,7 @@ def _nav_button(
             padding=Edge.symmetric(vertical=10.0, horizontal=12.0),
             radius=8.0,
             background=ACCENT if active else _TRANSPARENT,
-            color=ON_SURFACE if active else ON_MUTED,
+            color=_ON_ACCENT if active else ON_MUTED,
             font_size=14.0,
             font_weight=FontWeight.BOLD if active else FontWeight.NORMAL,
         ),
@@ -115,7 +120,7 @@ def admin_shell(
             Column(
                 key=f"{key}-brand",
                 style=Style(padding=Edge.all(16.0)),
-                children=[muted(brand, key=f"{key}-brand-text", size=12.0)],
+                children=[muted(brand, key=f"{key}-brand-text")],
             )
         )
     nav_children.append(
@@ -129,7 +134,13 @@ def admin_shell(
         )
     )
     if footer is not None:
-        nav_children.append(footer)
+        nav_children.append(
+            Column(
+                key=f"{key}-footer",
+                style=Style(padding=Edge.all(16.0)),
+                children=[footer],
+            )
+        )
 
     header_actions: list[Widget] = list(actions)
     leading: Widget | None = None
@@ -138,9 +149,13 @@ def admin_shell(
             label="☰",
             on_click=on_toggle_sidebar,
             key=f"{key}-burger",
+            semantics=Semantics(label="Abrir menu"),
             attrs={roles.LAYOUT_ATTR: roles.SHELL_BURGER},
             style=Style(
-                padding=Edge.all(8.0), background=_TRANSPARENT, color=ON_SURFACE
+                padding=Edge.symmetric(vertical=8.0, horizontal=12.0),
+                radius=8.0,
+                background=ACCENT,
+                color=_ON_ACCENT,
             ),
         )
 

@@ -4,6 +4,52 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.64.0] — 2026-08-15
+
+Four reported defects, three of them silent and one of them the reason another
+looked unexplainable.
+
+### Added
+
+- **`tempestweb.runtime.spawn` — hand long work out of a handler.** A session
+  dispatches events **in series**, so a handler that takes its time takes the
+  whole application with it for that user: no button responds, no field takes
+  text, and even a "Cancel" queues behind the work it is meant to interrupt.
+  `spawn(coro)` schedules the work as a task the session owns — held so the loop
+  cannot collect it mid-flight, cancelled when the connection ends — and returns
+  the handler immediately. Available in Mode A and Mode B. The serial behaviour
+  was undocumented until now, which is what made it discoverable only by
+  symptom; the handler guide says it plainly ("Trabalho longo: o dispatch é
+  serial"). Part of #62.
+- **`concurrent_dispatch=True` on `create_app`/`AppSession`.** Opt-in: each event
+  becomes its own task, ordered per widget `key` (a per-key lock, so two quick
+  edits of one field cannot land out of order) and overlapping across keys. A
+  handler that raises is logged rather than ending the connection. Off by
+  default — it allows concurrent state mutation, which an app must be written
+  for. Closes #62.
+
+### Fixed
+
+- **`file.pick` settles when the dialog is dismissed.** Closing the picker with
+  the X or Esc fires `cancel`, never `change`, and only `change` was handled: the
+  promise stayed pending, so in Mode B the `native_call` never returned, the
+  handler stayed parked on its `await`, and — dispatch being serial — the whole
+  app went dead until a reload, with no browser error and no server log line.
+  Each cancelled attempt also leaked an orphan `<input type="file">`. Both exits
+  now settle and detach the input; the `change`-with-no-file branch stays for
+  browsers older than the `cancel` event. Closes #61.
+- **Component keys are derived from the caller's key.** `TextField` pinned its
+  inner `Input` to `key="text-field-input"`, and the same literal pattern ran
+  through `EmailField`, `PasswordField`, the shared label/error wrapper and both
+  forms. Keys are how the event router finds the handler that fired, so two
+  fields of the same kind on one screen were indistinguishable and an edit could
+  apply to the wrong field — found on a 137-field screen of monetary values.
+  Without a caller key the previously documented keys are unchanged. Closes #63.
+- **The wheel ships `py.typed`.** The package is fully annotated but never
+  declared it, so under PEP 561 mypy treated every symbol as `Any` in the
+  consuming app — checking vanished exactly where apps err most, assembling the
+  widget tree. Closes #64.
+
 ## [0.63.0] — 2026-08-15
 
 ### Added

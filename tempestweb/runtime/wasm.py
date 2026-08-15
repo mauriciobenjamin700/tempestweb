@@ -29,11 +29,12 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from typing import Any, Generic, TypeVar
 
 from tempest_core import App, Node, Scene, Widget
 from tempest_core.core.ir import Patch
+from tempestweb.runtime.background import install_spawner
 from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
 from tempestweb.runtime.routing import route_to_path
 from tempestweb.transports.base import (
@@ -246,6 +247,7 @@ class WasmRuntime(Generic[S]):
         self._on_navigate: Callable[[str], Any] | None = on_navigate
         self._last_path: str = "/"
         self._sends: set[asyncio.Future[None]] = set()
+        self._tasks: set[asyncio.Future[None]] = set()
         self._app: App[S] = App(
             state=state,
             view=view,
@@ -361,13 +363,43 @@ class WasmRuntime(Generic[S]):
         if inspect.isawaitable(result):
             await result
 
+    def spawn(self, coro: Coroutine[Any, Any, None]) -> None:
+        """Schedule a coroutine as a tracked background task.
+
+        Backs :func:`tempestweb.runtime.spawn` in Mode A. The reference is held
+        until the task settles — the loop keeps only a weak one — and
+        :meth:`cancel_background` drops the lot at teardown.
+
+        Args:
+            coro: The coroutine to run.
+        """
+        task: asyncio.Future[None] = asyncio.ensure_future(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    def cancel_background(self) -> None:
+        """Cancel every task started through :meth:`spawn`.
+
+        Called when the app tears down, so background work does not outlive the
+        page that started it.
+        """
+        for task in list(self._tasks):
+            task.cancel()
+        self._tasks.clear()
+
     async def run(self) -> None:
         """Run the client→Python event loop until the transport closes.
 
         Awaits events from the transport and dispatches each. Returns when the
         transport raises :class:`~tempestweb.transports.base.TransportClosedError`
         from :meth:`recv_event` (the page closed or the bridge tore down).
+
+        Installs this runtime as the context's task spawner first, so a handler
+        can hand long work to :func:`tempestweb.runtime.spawn` instead of holding
+        the dispatch — Mode A reads events in series exactly like a server
+        session, so a slow handler freezes the tab the same way.
         """
+        install_spawner(self.spawn)
         while True:
             try:
                 event = await self._transport.recv_event()

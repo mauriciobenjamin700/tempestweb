@@ -109,6 +109,7 @@ class TempestWebServer(Generic[S]):
         security: SecurityConfig | None = None,
         metrics: bool = False,
         sse_backend: SessionRouter | None = None,
+        concurrent_dispatch: bool = False,
     ) -> None:
         """Build the server and register the WebSocket and SSE routes.
 
@@ -123,11 +124,17 @@ class TempestWebServer(Generic[S]):
             sse_backend: Router for SSE inbound events (Track S — S4). ``None``
                 uses the in-process router (needs sticky sessions across
                 instances); a :class:`RedisSessionRouter` drops that requirement.
+            concurrent_dispatch: Run each event's handler as its own task instead
+                of awaiting it before the next event is read. Events for the same
+                widget key keep their arrival order; handlers for different keys
+                overlap, so one slow handler no longer freezes the connection.
+                Off by default — see :class:`~tempestweb.runtime.AppSession`.
         """
         self._router: SessionRouter = sse_backend or InProcessRouter()
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
         self._sse_sessions: dict[str, _SSESession[S]] = {}
+        self._concurrent_dispatch: bool = concurrent_dispatch
         self._security: SecurityConfig = security or SecurityConfig()
         self._live: int = 0  # concurrent live sessions (S2 cap)
         self._metrics_enabled: bool = metrics
@@ -229,7 +236,12 @@ class TempestWebServer(Generic[S]):
         Returns:
             A fresh :class:`AppSession` for this connection.
         """
-        return AppSession(self._state_factory, self._view, transport)
+        return AppSession(
+            self._state_factory,
+            self._view,
+            transport,
+            concurrent_dispatch=self._concurrent_dispatch,
+        )
 
     def _register_routes(self) -> None:
         """Mount the ``/health``, ``/ws``, ``/sse`` and ``/sse/{id}`` routes."""
@@ -517,6 +529,7 @@ def create_app(
     security: SecurityConfig | None = None,
     metrics: bool = False,
     sse_backend: SessionRouter | None = None,
+    concurrent_dispatch: bool = False,
 ) -> FastAPI:
     """Build a Mode B FastAPI app for a ``view`` and state factory.
 
@@ -530,6 +543,10 @@ def create_app(
         metrics: When ``True``, mount ``GET /metrics`` (Prometheus text) — S8.
         sse_backend: SSE inbound router (Track S — S4). ``None`` is in-process
             (sticky sessions); a ``RedisSessionRouter`` scales SSE without sticky.
+        concurrent_dispatch: Dispatch each event as its own task (ordered per
+            widget key) instead of one at a time, so a slow handler cannot freeze
+            the connection. Off by default; ``tempestweb.runtime.spawn`` handles
+            the common case without changing dispatch semantics.
 
     Returns:
         The configured FastAPI application with WS and SSE routes mounted.
@@ -541,4 +558,5 @@ def create_app(
         security=security,
         metrics=metrics,
         sse_backend=sse_backend,
+        concurrent_dispatch=concurrent_dispatch,
     ).api

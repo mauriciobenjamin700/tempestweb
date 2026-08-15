@@ -11,6 +11,7 @@ See ``docs/plan.md`` (Trilhos A e B) and ``docs/contract.md``.
 
 from __future__ import annotations
 
+from tempestweb.runtime.background import NoSessionError, spawn
 from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
 from tempestweb.runtime.serialize import (
     EVENT_TYPE_TO_HANDLER_PROPS,
@@ -27,6 +28,7 @@ from tempestweb.runtime.wasm_main import WasmAppHandle, bootstrap
 
 __all__ = [
     "AppSession",
+    "NoSessionError",
     "EVENT_TYPE_TO_HANDLER_PROPS",
     "NativeCallError",
     "WasmAppHandle",
@@ -43,4 +45,5 @@ __all__ = [
     "scene_to_initial_patches",
     "serialize_node",
     "serialize_patches",
+    "spawn",
 ]

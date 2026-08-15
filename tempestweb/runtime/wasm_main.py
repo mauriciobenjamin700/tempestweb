@@ -119,10 +119,13 @@ class WasmAppHandle(Generic[S]):
     async def close(self) -> None:
         """Tear the app down: close the transport and stop the event loop.
 
-        Also uninstalls the in-process :class:`FFIBridge` if :func:`bootstrap`
+        Cancels any background work started through
+        :func:`tempestweb.runtime.spawn` so it does not outlive the app, and
+        uninstalls the in-process :class:`FFIBridge` if :func:`bootstrap`
         installed one, so a torn-down app never leaves a stale process-wide bridge.
         """
         await self._transport.close()
+        self._runtime.cancel_background()
         self._task.cancel()
         if self._bridge_installed:
             uninstall_bridge()

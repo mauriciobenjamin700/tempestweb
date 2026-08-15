@@ -339,6 +339,50 @@ def view(app: App[AppState]) -> Widget:
     `dependencies/` + `Depends()`. Nothing down there instantiates what's below
     it inline.
 
+## Long work: dispatch is serial
+
+!!! danger "One slow handler freezes that user's whole application"
+    A session reads **one** event, waits for its handler, and only then reads the
+    next. That is what keeps two quick edits of the same field in the order you
+    typed them — and it is also what makes a slow handler stop everything: no
+    other button responds, no field takes text, and even a "Cancel" is useless
+    (its click queues **behind** the work it is supposed to interrupt).
+
+    It holds in both modes: Mode A reads events in series just like the server.
+
+Long work is anything past a few seconds: model inference, report generation, a
+slow upstream API, a large import. Move it out of the handler with `spawn`:
+
+```python
+from tempest_core import App
+from tempestweb.runtime import spawn
+
+
+async def analyse(app: App[State]) -> None:
+    app.set_state(lambda s: setattr(s, "status", "reading the document…"))
+
+    async def work() -> None:
+        summary = await model.read(app.state.document)     # minutes
+        app.set_state(lambda s: setattr(s, "summary", summary))
+        app.set_state(lambda s: setattr(s, "status", "done"))
+
+    spawn(work())     # the handler returns now; the session keeps serving
+```
+
+`spawn` is **not** `asyncio.create_task`: the task is held by the session (a
+loose reference can be garbage-collected mid-flight) and cancelled when the
+connection ends, so nothing outlives the user who closed the tab. Every
+`set_state` from inside the work schedules the usual repaint, so you can show
+progress as it runs.
+
+!!! tip "Need handlers for different widgets to overlap?"
+    `create_app(..., concurrent_dispatch=True)` dispatches each event as its own
+    task. Events for the **same `key`** keep their arrival order (a per-widget
+    lock), so typing never scrambles; handlers for different widgets overlap. It
+    is off by default because it lets two handlers mutate the state at once — the
+    app has to be written for that. A handler that raises in this mode is logged
+    and dropped instead of ending the connection.
+
 ## Anti-patterns: how NOT to write garbage code
 
 !!! danger "❌ Skipping layers"

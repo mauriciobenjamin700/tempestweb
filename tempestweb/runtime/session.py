@@ -22,6 +22,7 @@ The session is transport-agnostic: the same class drives the WebSocket transport
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable, Coroutine
 from contextlib import suppress
 from itertools import count
@@ -36,6 +37,7 @@ from tempestweb.native.dispatch import (
     native_call,
     uninstall_bridge,
 )
+from tempestweb.runtime.background import install_spawner, uninstall_spawner
 from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
 from tempestweb.runtime.routing import route_to_path
 from tempestweb.runtime.serialize import (
@@ -52,6 +54,8 @@ from tempestweb.transports.base import (
 )
 
 __all__ = ["AppSession", "NativeCallError"]
+
+_LOGGER = logging.getLogger("tempestweb.session")
 
 S = TypeVar("S")
 
@@ -79,6 +83,8 @@ class AppSession(Generic[S]):
         state_factory: Callable[[], S],
         view: Callable[[App[S]], Widget],
         transport: PatchTransport,
+        *,
+        concurrent_dispatch: bool = False,
     ) -> None:
         """Initialize the session.
 
@@ -87,12 +93,22 @@ class AppSession(Generic[S]):
                 factory (not a shared value) guarantees per-connection isolation.
             view: The shared ``view`` function (identical to Mode A's ``app.py``).
             transport: The transport carrying patches/events for this connection.
+            concurrent_dispatch: Run each event's handler as its own task instead
+                of awaiting it before reading the next event. Events for the
+                **same widget key** still run in arrival order (a per-key lock), so
+                two quick edits of one field cannot land out of order; handlers for
+                different keys overlap. Off by default: it lets two handlers mutate
+                the state concurrently, which an app must be written for. Prefer
+                :func:`tempestweb.runtime.spawn` inside the slow handler when only
+                one screen is affected.
         """
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
         self.transport: PatchTransport = transport
         self.app: App[S] | None = None
         self._tasks: set[asyncio.Task[None]] = set()
+        self._concurrent_dispatch: bool = concurrent_dispatch
+        self._key_locks: dict[str, asyncio.Lock] = {}
         self._closed: bool = False
         self._native_seq: count[int] = count(1)
         # The Mode-B native bridge: it owns the call_id -> Future registry and
@@ -216,6 +232,7 @@ class AppSession(Generic[S]):
             apply_patches=self._apply_patches,
         )
         install_bridge(self._bridge)
+        install_spawner(self._spawn)
         self._bridge_installed = True
         scene = self.app.start()
         await self.transport.send_patches(scene_to_initial_patches(scene))
@@ -332,11 +349,38 @@ class AppSession(Generic[S]):
         try:
             while not self._closed:
                 event = await self.transport.recv_event()
-                await self.dispatch(event)
+                if self._concurrent_dispatch:
+                    self._spawn(self._dispatch_ordered_by_key(event))
+                else:
+                    await self.dispatch(event)
         except TransportClosedError:
             return
         finally:
             await self.close()
+
+    async def _dispatch_ordered_by_key(self, event: Event) -> None:
+        """Dispatch one event under its widget's lock (concurrent mode).
+
+        The lock is per event ``key``, so a widget's own events stay in arrival
+        order — two quick edits of the same field cannot apply out of order —
+        while handlers for different widgets overlap.
+
+        A handler that raises is logged and dropped. In serial mode the exception
+        propagates out of :meth:`run` and ends the connection; here it must not,
+        or one failing handler would take down a session that is still serving
+        other events — and an unretrieved task exception would vanish into the
+        event loop's warning instead of the app's log.
+
+        Args:
+            event: The JSON-able client event.
+        """
+        key = str(event.get("key") or "")
+        lock = self._key_locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            try:
+                await self.dispatch(event)
+            except Exception:  # noqa: BLE001 - one bad handler must not end the session
+                _LOGGER.exception("tempestweb: handler for %r raised", key)
 
     async def close(self) -> None:
         """Unmount the session: cancel orphan tasks and tear down the transport.
@@ -357,7 +401,9 @@ class AppSession(Generic[S]):
         self._bridge.close()
         if self._bridge_installed:
             uninstall_bridge()
+            uninstall_spawner()
             self._bridge_installed = False
+        self._key_locks.clear()
         tasks = list(self._tasks)
         for task in tasks:
             task.cancel()

@@ -336,6 +336,53 @@ def view(app: App[AppState]) -> Widget:
     análogo ao `dependencies/` + `Depends()` do FastAPI. Nada lá embaixo
     instancia o que está abaixo dele inline.
 
+## Trabalho longo: o dispatch é serial
+
+!!! danger "Um handler lento congela a aplicação inteira daquele usuário"
+    A sessão lê **um** evento, espera o handler dele terminar, e só então lê o
+    próximo. É o que garante que duas edições rápidas do mesmo campo cheguem na
+    ordem em que você digitou — e é também o que faz um handler demorado parar
+    tudo: nenhum outro botão responde, nenhum campo aceita texto, nem um
+    "Cancelar" adianta (o clique nele entraria na fila **atrás** do trabalho que
+    ele deveria interromper).
+
+    Isso vale nos dois modos: o Modo A lê eventos em série igual ao servidor.
+
+Trabalho longo é qualquer coisa que passe de uns poucos segundos: inferência de
+modelo, geração de relatório, API externa lenta, importação de arquivo grande.
+Tire-o do handler com `spawn`:
+
+```python
+from tempest_core import App
+from tempestweb.runtime import spawn
+
+
+async def analisar(app: App[State]) -> None:
+    app.set_state(lambda s: setattr(s, "status", "lendo o edital…"))
+
+    async def trabalho() -> None:
+        resumo = await modelo.ler(app.state.arquivo)      # minutos
+        app.set_state(lambda s: setattr(s, "resumo", resumo))
+        app.set_state(lambda s: setattr(s, "status", "pronto"))
+
+    spawn(trabalho())     # o handler retorna agora; a sessão segue viva
+```
+
+`spawn` **não** é `asyncio.create_task`: a task fica pendurada na sessão (uma
+referência solta pode ser coletada no meio do caminho) e é cancelada quando a
+conexão cai, então nada sobrevive ao usuário que fechou a aba. Cada
+`set_state` de dentro do trabalho agenda o repaint normal, então dá para mostrar
+progresso enquanto roda.
+
+!!! tip "Precisa que handlers de widgets diferentes rodem ao mesmo tempo?"
+    `create_app(..., concurrent_dispatch=True)` despacha cada evento como sua
+    própria task. Eventos do **mesmo `key`** continuam em ordem de chegada (um
+    lock por widget), então digitação não embaralha; handlers de widgets
+    diferentes se sobrepõem. Fica desligado por padrão porque abre a porta para
+    dois handlers mutarem o estado ao mesmo tempo — o app precisa estar escrito
+    para isso. Um handler que levanta exceção nesse modo é logado e descartado,
+    em vez de derrubar a conexão.
+
 ## Anti-padrões: como NÃO escrever código lixo
 
 !!! danger "❌ Pular camadas"

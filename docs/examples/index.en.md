@@ -80,7 +80,8 @@ The high-level components of `tempest_core` — shells, cards, and feedback out 
 App shells, tabs, drawers, and routes.
 
 - [**Tabbed profile**](tabs-profile.md) — `TabView` + `RouteChangeEvent` with three sections and a `Switch`. **[A/B]**
-- [**Dashboard app shell**](dashboard-shell.md) — `Scaffold` + `AppBar` + `Sidebar` + `NavBar` with swappable sections. **[A/B]**
+- [**Admin console (presets)**](admin-console.md) — the whole panel (shell, dashboard, listing, settings) in 261 lines of typed records, and responsive. **[A/B]**
+- [**Dashboard app shell**](dashboard-shell.md) — the same panel built by hand: `Scaffold` + `AppBar` + `Sidebar` + `NavBar` with swappable sections. **[A/B]**
 - [**Drawer navigation & routing**](router-drawer.md) — a sliding `RouteDrawer`, 2-level route push/pop, and a `Breadcrumb`. **[A/B]**
 - [**Onboarding carousel**](onboarding-carousel.md) — `PageView` with `PageChangeEvent`, a dot indicator, and a completion screen. **[A/B]**
 

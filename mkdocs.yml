@@ -104,6 +104,7 @@ plugins:
             "Brazilian registration": "Cadastro brasileiro"
             "Quiz with score": "Quiz com pontuação"
             "Tabbed profile": "Perfil com abas"
+            "Admin console (presets)": "Console administrativo (presets)"
             "Dashboard app shell": "Dashboard app shell"
             "Drawer navigation & routing": "Drawer de navegação e rotas"
             "Onboarding carousel": "Onboarding carousel"
@@ -229,6 +230,7 @@ nav:
       - "Brazilian registration": examples/br-cadastro.md
       - "Quiz with score": examples/quiz-app.md
       - "Tabbed profile": examples/tabs-profile.md
+      - "Admin console (presets)": examples/admin-console.md
       - "Dashboard app shell": examples/dashboard-shell.md
       - "Drawer navigation & routing": examples/router-drawer.md
       - "Onboarding carousel": examples/onboarding-carousel.md

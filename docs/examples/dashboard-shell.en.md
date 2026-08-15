@@ -30,6 +30,16 @@ In this tutorial you'll learn to:
     browser) and Server (FastAPI + WebSocket). The same Python `view()` serves both
     transports.
 
+!!! tip "There is a shorter path to this same screen"
+    This tutorial assembles the frame **widget by widget** — which is what you
+    want to read to understand how `Scaffold`, `Sidebar` and `Grid` fit together,
+    and the right path when the layout is specific to your product.
+
+    If what you need is just *an admin panel*, the
+    [Admin Console](admin-console.md) delivers the same screens in **261 lines**
+    instead of 716, describing the data rather than the widgets — and it comes
+    out responsive, which this one is not (the widths are fixed).
+
 ---
 
 ## Prerequisites

@@ -80,7 +80,8 @@ Os componentes de alto nível do `tempest_core` — cascas, cards e feedback pro
 Cascas de app, abas, drawers e rotas.
 
 - [**Perfil com abas**](tabs-profile.md) — `TabView` + `RouteChangeEvent` com três seções e um `Switch`. **[A/B]**
-- [**Dashboard app shell**](dashboard-shell.md) — `Scaffold` + `AppBar` + `Sidebar` + `NavBar` com seções alternáveis. **[A/B]**
+- [**Console administrativo (presets)**](admin-console.md) — o painel inteiro (shell, dashboard, listagem, ajustes) em 261 linhas de registros tipados, e responsivo. **[A/B]**
+- [**Dashboard app shell**](dashboard-shell.md) — o mesmo painel montado à mão: `Scaffold` + `AppBar` + `Sidebar` + `NavBar` com seções alternáveis. **[A/B]**
 - [**Drawer de navegação e rotas**](router-drawer.md) — `RouteDrawer` deslizante, push/pop em 2 níveis e `Breadcrumb`. **[A/B]**
 - [**Onboarding carousel**](onboarding-carousel.md) — `PageView` com `PageChangeEvent`, indicador de pontos e tela de conclusão. **[A/B]**
 

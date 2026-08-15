@@ -239,5 +239,20 @@ admin_shell(
 - **No dead ends.** Inline `Style` still wins, tokens rebrand the sheet, and any
   region takes a widget of your own instead.
 
-Full example:
-[`examples/admin-console`](https://github.com/mauriciobenjamin700/tempestweb/tree/main/examples/admin-console).
+!!! warning "Modes A and B — presets do not transpile"
+    The Mode C compiler only accepts imports from `tempest_core` and
+    `tempestweb.native`. An app that imports `tempestweb.presets` stops at
+    `build --mode transpile`, with `file:line`:
+
+    ```text
+    tempestweb build: transpile failed: app.py:23: import from
+    'tempestweb.presets' is not supported (only tempest_core and `tempestweb.native`)
+    ```
+
+    Presets target internal panels and signed-in apps, where Mode B is the
+    natural choice. A public screen that needs a static bundle is still built
+    from core widgets.
+
+Full example, walked through step by step:
+[**Admin Console**](examples/admin-console.md) — the same screens as
+[`dashboard-shell`](examples/dashboard-shell.md) in 261 lines instead of 716.

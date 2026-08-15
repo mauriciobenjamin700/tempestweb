@@ -30,6 +30,16 @@ Neste tutorial você vai aprender a:
     browser) e Servidor (FastAPI + WebSocket). A mesma função `view()` Python serve
     os dois transportes.
 
+!!! tip "Existe um caminho mais curto para esta mesma tela"
+    Este tutorial monta a moldura **widget a widget** — é o que você quer ler
+    para entender como `Scaffold`, `Sidebar` e `Grid` se encaixam, e é o caminho
+    certo quando o layout é específico do seu produto.
+
+    Se o que você precisa é só *um painel administrativo*, o
+    [Console Administrativo](admin-console.md) entrega as mesmas telas em **261
+    linhas** em vez de 716, descrevendo os dados em vez dos widgets — e sai
+    responsivo, o que este aqui não é (as larguras são fixas).
+
 ---
 
 ## Pré-requisitos

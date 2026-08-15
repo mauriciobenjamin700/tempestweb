@@ -5,7 +5,8 @@ code calls, plus one or more swappable adapters behind it. Changing the backend
 (console -> Sentry, in-memory flags -> LaunchDarkly, ...) never touches a call
 site.
 
-Modules:
+**Modules**
+
     * :mod:`telemetry` (O0) — ``track`` / ``identify`` with console/Sentry/PostHog
       adapters.
     * :mod:`logger` (O1) — structured logging with pluggable sinks and typed

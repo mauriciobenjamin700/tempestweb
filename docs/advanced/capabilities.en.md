@@ -301,3 +301,6 @@ scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injected before the b
 
 The `storage` capability connects to the offline layer — see
 [PWA & offline](pwa.md). 🚀
+
+!!! info "API reference"
+    Every capability's signature: [`tempestweb.native`](../reference/native.md).

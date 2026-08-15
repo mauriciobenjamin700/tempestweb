@@ -2,7 +2,12 @@
 
 📚 **Documentation:** [Português (Brasil)](https://mauriciobenjamin700.github.io/tempestweb/)
 · [English (US)](https://mauriciobenjamin700.github.io/tempestweb/en/) — bilingual
-docs site (PT-BR default + EN-US), deployed to GitHub Pages.
+docs site (PT-BR default + EN-US), deployed to GitHub Pages. A linear
+[Tutorial](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/), an
+[Advanced Guide](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/capabilities/),
+and a generated
+[API reference](https://mauriciobenjamin700.github.io/tempestweb/en/reference/presets/)
+covering all 14 subpackages.
 
 > Build web apps in **typed Python**. One declarative widget tree, a **DOM**
 > renderer, and **three execution modes** that share 100% of the application code:

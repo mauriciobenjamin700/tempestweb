@@ -256,3 +256,6 @@ admin_shell(
 Full example, walked through step by step:
 [**Admin Console**](../examples/admin-console.md) — the same screens as
 [`dashboard-shell`](../examples/dashboard-shell.md) in 261 lines instead of 716.
+
+!!! info "API reference"
+    Every preset's and record's signature: [`tempestweb.presets`](../reference/presets.md).

@@ -235,3 +235,6 @@ BarChart(series=[ChartSeries(points=[3.0, 7.0, 2.0, 9.0, 5.0], label="vendas")])
 - Validadores (`validate_email`, `validate_phone`, …) devolvem `None` quando OK.
 - Os componentes do core (incl. `BarChart`/`LineChart` via `Canvas`) renderizam
   igual no Modo A (WASM) e no Modo B (servidor).
+
+!!! info "Referência de API"
+    Assinatura de cada componente: [`tempestweb.components`](../reference/components.md).

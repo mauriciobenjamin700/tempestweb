@@ -167,3 +167,6 @@ A middleware adds the headers to **every** HTTP response.
   the client is XSS-safe by construction.
 - Deploy (S5), scale (S4) and server observability (S8) remain on the
   [roadmap](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md) — Track S.
+
+!!! info "API reference"
+    Every `SecurityConfig` field: [`tempestweb.server`](../reference/server.md).

@@ -55,6 +55,20 @@ exclude_docs: |
   agents/
 
 plugins:
+  - autorefs:
+      resolve_closest: true
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            filters: ["!^_"]
   - search:
       lang:
         - pt
@@ -78,6 +92,7 @@ plugins:
             "Tutorial - User Guide": "Tutorial - Guia do usuário"
             "Advanced User Guide": "Guia avançado"
             Project: Projeto
+            "API reference": "Referência de API"
             "Tutorial — the Counter": "Tutorial — o Counter"
             "1. The view tree": "1. A árvore de view"
             "2. State and handlers": "2. Estado e handlers"
@@ -247,6 +262,21 @@ nav:
       - "Security (Mode B)": advanced/security.md
       - "Deploy to production": advanced/deploy.md
       - Generate a client from OpenAPI: advanced/openapi.md
+  - API reference:
+      - tempestweb.presets: reference/presets.md
+      - tempestweb.components: reference/components.md
+      - tempestweb.server: reference/server.md
+      - tempestweb.native: reference/native.md
+      - tempestweb.runtime: reference/runtime.md
+      - tempestweb.transports: reference/transports.md
+      - tempestweb.transpile: reference/transpile.md
+      - tempestweb.pwa: reference/pwa.md
+      - tempestweb.observability: reference/observability.md
+      - tempestweb.vision: reference/vision.md
+      - tempestweb.html: reference/html.md
+      - tempestweb.cli: reference/cli.md
+      - tempestweb.devserver: reference/devserver.md
+      - tempestweb.core: reference/core.md
   - Examples:
       - "Example gallery": examples/index.md
       - "To-do list": examples/todo.md

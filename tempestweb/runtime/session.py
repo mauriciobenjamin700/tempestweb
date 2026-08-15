@@ -70,8 +70,7 @@ class AppSession(Generic[S]):
     Each session builds its own :class:`~tempest_core.App` from a factory, so
     connections are fully isolated — a ``set_state`` in one never affects another.
 
-    Type Args:
-        S: The application state type.
+    ``S`` is the application state type.
 
     Attributes:
         transport: The patch transport carrying this client's patches and events.

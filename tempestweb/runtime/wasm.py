@@ -215,8 +215,7 @@ class WasmRuntime(Generic[S]):
     this class never names Pyodide. The live ``pyodide.ffi`` wiring lives in
     :class:`tempestweb.transports.wasm.WasmTransport`.
 
-    Type Args:
-        S: The application state type.
+    ``S`` is the application state type.
 
     Methods:
         start: Build the initial scene, register handlers, return the JSON node.

@@ -93,8 +93,7 @@ def _credentials_from_headers(
 class TempestWebServer(Generic[S]):
     """Holds the app definition and the live SSE session registry.
 
-    Type Args:
-        S: The application state type.
+    ``S`` is the application state type.
 
     Attributes:
         api: The FastAPI application instance with the routes mounted.

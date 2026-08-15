@@ -255,3 +255,6 @@ admin_shell(
 Exemplo completo, comentado passo a passo:
 [**Console Administrativo**](../examples/admin-console.md) — as mesmas telas do
 [`dashboard-shell`](../examples/dashboard-shell.md) em 261 linhas em vez de 716.
+
+!!! info "Referência de API"
+    Assinatura de cada preset e de cada registro: [`tempestweb.presets`](../reference/presets.md).

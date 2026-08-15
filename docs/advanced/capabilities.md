@@ -300,3 +300,6 @@ scripts  = ["./vendor/ort/ort.wasm.min.js"]     # <script> injetado antes do boo
 
 A capacidade `storage` se conecta à camada offline — veja
 [PWA e offline](pwa.md). 🚀
+
+!!! info "Referência de API"
+    Assinatura de cada capacidade: [`tempestweb.native`](../reference/native.md).

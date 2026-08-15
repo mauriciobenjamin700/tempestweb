@@ -590,7 +590,10 @@ def _cmd_gen(args: argparse.Namespace) -> int:
     except GenError as exc:
         print(f"tempestweb gen api: {exc}", file=sys.stderr)
         return 1
-    print(f"Generated {len(result.files)} file(s) for {len(result.tags)} tag(s) in {result.out_dir}:")
+    print(
+        f"Generated {len(result.files)} file(s) for "
+        f"{len(result.tags)} tag(s) in {result.out_dir}:"
+    )
     for tag in result.tags:
         print(f"  + {tag}")
     return 0

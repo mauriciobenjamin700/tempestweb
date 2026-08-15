@@ -49,6 +49,29 @@ chamada chega na Web API, não o seu código.
     Modo C não há envelope — a chamada é transcrita — mas a **assinatura tipada é
     idêntica**. Você escreve uma linha; o modo decide o mecanismo.
 
+!!! info "No Modo B a ponte do cliente já vem ligada"
+    Você não precisa escrever nenhuma linha de JavaScript para as capacidades
+    funcionarem no Modo B. Ao receber um `native_call`, o transporte
+    (`transport-ws.js` · `transport-sse.js`) executa a capacidade pelo mesmo
+    registro que o Modo A usa (`dispatch()`, em `native/index.js`) e devolve o
+    `native_result` — inclusive o mesmo código de erro. Qualquer shell serve,
+    o gerado por `tempestweb build --mode server` inclusive.
+
+    Só se você quiser **interceptar** as chamadas — mockar em teste, exigir uma
+    confirmação do usuário, roteá-las para outro lugar — passe `onNativeCall`
+    ao criar o transporte; a opção substitui a ponte padrão:
+
+    ```javascript
+    const transport = createWebSocketTransport(url, {
+      onNativeCall: async (capability, args) => {
+        if (capability === "clipboard.write" && !confirm("Copiar?")) {
+          throw new Error("cancelled");
+        }
+        return runMyOwnBridge(capability, args);
+      },
+    });
+    ```
+
 ## As capacidades
 
 | Capacidade | API Python | Espelha (React SDK) |

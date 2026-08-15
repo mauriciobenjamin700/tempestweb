@@ -62,6 +62,24 @@ def test_server_artifact_ships_native_closure(tmp_path: Path) -> None:
     assert (static / "pwa" / "install-prompt.js").is_file()
 
 
+def test_server_artifact_wires_the_native_bridge(tmp_path: Path) -> None:
+    """The shipped Mode B transports must route native calls to ``dispatch``.
+
+    Regression (issue #60): the generated shell mounts the transport with no
+    ``onNativeCall``, so a transport that only proxied through that option
+    answered ``"no native handler"`` to every capability — ``file.pick``,
+    ``clipboard.*``, ``geolocation.get``, ``http.*`` — leaving Mode B with no
+    native surface at all. Shipping the native tree (asserted above) is not
+    enough on its own: the files were on disk and unused. The fallback lives in
+    the transports so any shell, present or future, inherits it.
+    """
+    out = build_artifact(_project(tmp_path), mode="server").out_dir
+    transport = (out / "static" / "transport-ws.js").read_text(encoding="utf-8")
+    assert "import { dispatch, subscribeDispatch" in transport
+    assert "await dispatch(envelope)" in transport
+    assert "no native handler" not in transport
+
+
 def test_wasm_prod_shell_registers_service_worker(tmp_path: Path) -> None:
     """A production wasm build keeps the caching service worker."""
     out = build_artifact(_project(tmp_path), mode="wasm").out_dir

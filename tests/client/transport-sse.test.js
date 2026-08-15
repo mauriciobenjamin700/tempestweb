@@ -150,3 +150,32 @@ test("sse transport POSTs native_result for a native_call", async () => {
     value: { ok: 1 },
   });
 });
+
+test("sse transport runs a native_call through the built-in bridge", async () => {
+  const posts = [];
+  let source;
+  const Impl = class extends FakeEventSource {
+    constructor(url) {
+      super(url);
+      source = this;
+    }
+  };
+  createSSETransport({
+    session: "abc",
+    EventSourceImpl: Impl,
+    fetchImpl: makeFetch(posts),
+  });
+
+  source.serverSend({
+    kind: "native_call",
+    call_id: "c10",
+    capability: "network.state",
+    args: {},
+  });
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.equal(posts[0].body.kind, "native_result");
+  assert.equal(posts[0].body.call_id, "c10");
+  assert.equal(posts[0].body.ok, true);
+  assert.equal(typeof posts[0].body.value.online, "boolean");
+});

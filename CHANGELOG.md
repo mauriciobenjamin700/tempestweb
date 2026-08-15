@@ -4,6 +4,31 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.61.2] — 2026-08-15
+
+### Fixed
+
+- **Mode B native capabilities now run — the transports wire their own bridge.**
+  The Mode B shell mounted the transport with no `onNativeCall`, and both
+  `transport-ws.js` and `transport-sse.js` refused every proxied `native_call`
+  with `"no native handler"`. The whole native surface was dead in Mode B —
+  `file.pick`, `file.save`, `clipboard.*`, `geolocation.get`, `http.*` — and
+  silently so: the failure only ever surfaced inside the Python handler's
+  `await`, never in the server log. Both transports now fall back to
+  `dispatch()` from `native/index.js` — the same registry Mode A runs, and the
+  one `native_subscribe` already used — so a plain shell inherits the whole
+  native surface with no wiring. `onNativeCall` stays as an explicit override
+  (mock in tests, gate behind a confirmation, route elsewhere). The
+  `dispatch()` envelope is forwarded verbatim, so a Mode B failure now reports
+  the same `error` code and `message` detail Mode A does instead of a
+  stringified message. Fixes #60. Regression tests in
+  `tests/client/transport-ws.test.js`, `tests/client/transport-sse.test.js` and
+  `tests/unit/test_cli_build.py::test_server_artifact_wires_the_native_bridge`
+  (the existing artifact test asserted the native files were shipped, which they
+  were — unused).
+- **`tempestweb gen api` no longer breaks `ruff check`.** Its summary `print()`
+  in `cli/main.py` was 102 columns, failing the repo's own lint gate.
+
 ## [0.61.1] — 2026-07-19
 
 ### Fixed

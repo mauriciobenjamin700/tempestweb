@@ -49,6 +49,29 @@ how the call reaches the Web API, not your code.
     is no envelope — the call is transcribed — but the **typed signature is
     identical**. You write one line; the mode decides the mechanism.
 
+!!! info "In Mode B the client bridge is already wired"
+    You do not write a line of JavaScript to get capabilities working in Mode B.
+    On a `native_call`, the transport (`transport-ws.js` · `transport-sse.js`)
+    runs the capability through the very registry Mode A uses (`dispatch()`, in
+    `native/index.js`) and answers with the `native_result` — same error codes
+    included. Any shell works, the one `tempestweb build --mode server`
+    generates included.
+
+    Pass `onNativeCall` when you want to **intercept** the calls instead — mock
+    them in a test, ask the user to confirm, route them somewhere else. The
+    option replaces the default bridge:
+
+    ```javascript
+    const transport = createWebSocketTransport(url, {
+      onNativeCall: async (capability, args) => {
+        if (capability === "clipboard.write" && !confirm("Copy?")) {
+          throw new Error("cancelled");
+        }
+        return runMyOwnBridge(capability, args);
+      },
+    });
+    ```
+
 ## The capabilities
 
 | Capability | Python API | Mirrors (React SDK) |

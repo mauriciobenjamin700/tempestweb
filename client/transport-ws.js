@@ -22,7 +22,7 @@
 // replay best-effort against that fresh state — full session-resume
 // reconciliation is a server-side follow-up.
 
-import { subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
+import { dispatch, subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
 
 /**
  * @typedef {import("./transport.js").Patch} Patch
@@ -60,9 +60,12 @@ export function backoffDelay(attempt, opts) {
  *        The ws:// or wss:// endpoint (e.g. "ws://127.0.0.1:8000/ws").
  * @param {Object} [options]
  * @param {(capability: string, args: Object) => (Promise<*>|*)} [options.onNativeCall]
- *        Optional handler that runs a proxied native capability and resolves
- *        with its JSON-able value (or throws to signal failure). The transport
- *        replies with the matching `native_result` envelope automatically.
+ *        Optional **override** for the built-in native bridge: runs a proxied
+ *        native capability and resolves with its JSON-able value (or throws to
+ *        signal failure). The transport replies with the matching
+ *        `native_result` envelope automatically. Omit it and proxied calls go to
+ *        `dispatch()` from `native/index.js` — the same registry Mode A uses —
+ *        so a plain shell gets the whole native surface with no wiring.
  * @param {typeof WebSocket} [options.WebSocketImpl]
  *        WebSocket constructor to use (injectable for tests/jsdom).
  * @param {boolean} [options.reconnect]
@@ -187,12 +190,19 @@ export function createWebSocketTransport(url, options = {}) {
 
   /**
    * Run a proxied native_call and reply with its native_result.
+   *
+   * With no `onNativeCall` override the call goes to the built-in `dispatch()`,
+   * whose result envelope is already the wire shape (`call_id` + `ok` +
+   * `value`, or `error` + `message`) and is sent verbatim — so a Mode B failure
+   * keeps the same error code and detail Mode A reports. This mirrors
+   * `native_subscribe`, which has always gone straight to `subscribeDispatch`.
+   *
    * @param {{call_id: string, capability: string, args: Object}} envelope
    * @returns {Promise<void>}
    */
   async function handleNativeCall(envelope) {
     if (!onNativeCall) {
-      sendNativeResult(envelope.call_id, false, "no native handler");
+      send({ kind: "native_result", ...(await dispatch(envelope)) });
       return;
     }
     try {

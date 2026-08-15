@@ -12,7 +12,7 @@
 // id via the Last-Event-ID header); the server replays the missed ticks. The
 // same DOM renderer runs above this transport as in every other mode.
 
-import { subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
+import { dispatch, subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
 
 /**
  * @typedef {import("./transport.js").Patch} Patch
@@ -33,8 +33,10 @@ import { subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
  * @param {string} [config.postUrl]
  *        Event POST URL. Defaults to `/sse/<session>`.
  * @param {(capability: string, args: Object) => (Promise<*>|*)} [config.onNativeCall]
- *        Optional handler that runs a proxied native capability and resolves
- *        with its JSON-able value (or throws to signal failure).
+ *        Optional **override** for the built-in native bridge: runs a proxied
+ *        native capability and resolves with its JSON-able value (or throws to
+ *        signal failure). Omit it and proxied calls go to `dispatch()` from
+ *        `native/index.js` — the same registry Mode A uses.
  * @param {typeof EventSource} [config.EventSourceImpl]
  *        EventSource constructor (injectable for tests/jsdom).
  * @param {typeof fetch} [config.fetchImpl]
@@ -90,12 +92,18 @@ export function createSSETransport(config) {
 
   /**
    * Run a proxied native_call and POST back its native_result.
+   *
+   * With no `onNativeCall` override the call goes to the built-in `dispatch()`,
+   * whose result envelope is already the wire shape (`call_id` + `ok` +
+   * `value`, or `error` + `message`) and is POSTed verbatim, keeping Mode B's
+   * error codes identical to Mode A's.
+   *
    * @param {{call_id: string, capability: string, args: Object}} envelope
    * @returns {Promise<void>}
    */
   async function handleNativeCall(envelope) {
     if (!onNativeCall) {
-      sendNativeResult(envelope.call_id, false, "no native handler");
+      await post({ kind: "native_result", ...(await dispatch(envelope)) });
       return;
     }
     try {

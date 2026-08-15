@@ -180,6 +180,67 @@ test("ws transport reports a failing native_call as ok:false", async () => {
   });
 });
 
+// --- the built-in native bridge (no onNativeCall override) -----------------
+//
+// Regression for issue #60: the Mode B shell never passed an onNativeCall, so
+// every proxied capability answered "no native handler" and the whole native
+// surface was dead in Mode B — silently, since the failure only surfaces inside
+// the Python handler's await. The transport now falls back to dispatch(), the
+// same registry Mode A runs, so a plain shell needs no wiring.
+
+test("ws transport runs a native_call through the built-in bridge", async () => {
+  let socket;
+  const Impl = class extends FakeWebSocket {
+    constructor(url) {
+      super(url);
+      socket = this;
+    }
+  };
+  const transport = createWebSocketTransport("ws://x/ws", { WebSocketImpl: Impl });
+  await transport.ready;
+
+  socket.serverSend({
+    kind: "native_call",
+    call_id: "c3",
+    capability: "network.state",
+    args: {},
+  });
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.equal(socket.sent[0].kind, "native_result");
+  assert.equal(socket.sent[0].call_id, "c3");
+  assert.equal(socket.sent[0].ok, true);
+  assert.equal(typeof socket.sent[0].value.online, "boolean");
+});
+
+test("ws transport surfaces the capability error code, not 'no native handler'", async () => {
+  let socket;
+  const Impl = class extends FakeWebSocket {
+    constructor(url) {
+      super(url);
+      socket = this;
+    }
+  };
+  const transport = createWebSocketTransport("ws://x/ws", { WebSocketImpl: Impl });
+  await transport.ready;
+
+  socket.serverSend({
+    kind: "native_call",
+    call_id: "c4",
+    capability: "nope.thing",
+    args: {},
+  });
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.deepEqual(socket.sent[0], {
+    kind: "native_result",
+    call_id: "c4",
+    ok: false,
+    error: "unknown_capability",
+    message: "nope.thing",
+  });
+});
+
 // --- reconnect + outbound buffer (WS resilience) ---------------------------
 
 /** A WebSocket double whose open/close the test drives explicitly. */

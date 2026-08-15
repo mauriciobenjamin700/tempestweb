@@ -789,6 +789,6 @@ Experimente estender o exemplo:
 
 - 💡 Adicione um campo `timestamp` em `Notification` e mostre a hora relativa ("2 min atrás") em cada Banner
 - 💡 Implemente "marcar como lida" (muda `read=True`) sem remover o item — observe o `Badge` diminuir
-- 💡 Filtre as notificações por `tone` com um seletor de abas (veja o exemplo [Tabs Profile](./tabs-profile.md))
-- 💡 Explore o [Stopwatch](./stopwatch.md) para outro padrão de estado com máquina de fases temporal
+- 💡 Filtre as notificações por `tone` com um seletor de abas (veja o exemplo [Tabs Profile](tabs-profile.md))
+- 💡 Explore o [Stopwatch](stopwatch.md) para outro padrão de estado com máquina de fases temporal
 - 💡 Leia sobre os [componentes de feedback](../tutorial/index.md) para ver `Snackbar` e `ProgressBar`

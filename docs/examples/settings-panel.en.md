@@ -1025,7 +1025,7 @@ In this tutorial you learned:
 
 ## Next steps
 
-- 💡 Explore [Tabs Profile](./tabs-profile.en.md) to see `Switch` and `Checkbox` inside a tabbed panel
-- 💡 See [Stopwatch](./stopwatch.en.md) to learn temporal state management with `asyncio`
+- 💡 Explore [Tabs Profile](tabs-profile.en.md) to see `Switch` and `Checkbox` inside a tabbed panel
+- 💡 See [Stopwatch](stopwatch.en.md) to learn temporal state management with `asyncio`
 - 💡 Read [Managing state](../tutorial/state.md) for a complete treatment of the `set_state` cycle
 - 💡 Add persistence: serialize `SettingsState` to `localStorage` in Mode A via `pyodide.ffi`, or to a REST endpoint in Mode B

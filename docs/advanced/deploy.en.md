@@ -135,7 +135,7 @@ that whole connection: no other button of that user responds while it runs.
 
 In the overwhelming majority of cases the answer is **not** to change dispatch,
 it is to move the work out of the handler with
-[`tempestweb.runtime.spawn`](best-practices.md#long-work-dispatch-is-serial). It
+[`tempestweb.runtime.spawn`](../tutorial/best-practices.md#long-work-dispatch-is-serial). It
 changes no semantics: event order stays the same, and the task dies with the
 connection.
 

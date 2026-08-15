@@ -45,7 +45,7 @@ Leitura recomendada (opcional):
 
 - [Tutorial básico](../tutorial/index.md) — primeiros passos com `App`, `view` e `set_state`
 - [Modos de execução](../tutorial/modes.md) — WASM vs. servidor
-- [PWA e offline](../pwa.md) — camada P do roadmap
+- [PWA e offline](../advanced/pwa.md) — camada P do roadmap
 
 ---
 
@@ -1050,6 +1050,6 @@ Neste tutorial você aprendeu:
   com sua própria chave VAPID gerada por `py-vapid`
 - 💡 Persista a `subscription` no `localStorage` via `tempestweb.native.storage.put` para
   não pedir re-assinatura a cada visita
-- 💡 Explore a [documentação PWA](../pwa.md) para o Service Worker (P1) e o modo offline-first (P2)
+- 💡 Explore a [documentação PWA](../advanced/pwa.md) para o Service Worker (P1) e o modo offline-first (P2)
 - 💡 Leia o [exemplo de notification-center](notification-center.md) para ver como exibir
   notificações locais com `tempestweb.native.notifications.notify`

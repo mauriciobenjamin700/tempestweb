@@ -151,7 +151,7 @@ def view(app: App[VisionState]) -> Widget:
 
     Visão computacional é o caso extremo disso — o download de um modelo e uma
     inferência em CPU levam segundos, às vezes muito mais. Tire o trabalho do
-    handler com [`spawn`](best-practices.md#trabalho-longo-o-dispatch-e-serial):
+    handler com [`spawn`](../tutorial/best-practices.md#trabalho-longo-o-dispatch-e-serial):
 
     ```python
     from tempestweb.runtime import spawn
@@ -285,4 +285,4 @@ A API é idêntica — só muda a classe e o conversor:
   [fila offline](offline-sync.md).
 
 Pronto para desenhar as caixas na tela? Os overlays `DetectionOverlay`/
-`DetectionBox`/`ResultView` estão em [Componentes prontos](components.md). 🚀
+`DetectionBox`/`ResultView` estão em [Componentes prontos](../tutorial/components.md). 🚀

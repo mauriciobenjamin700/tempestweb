@@ -588,5 +588,5 @@ no espírito do `mypy --strict`.
   [`docs/modo-c-transpile.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/modo-c-transpile.md).
 
 Continue para [PWA e offline](pwa.md) para o fluxo completo de instalação e
-WebPush, ou volte ao [Tutorial](tutorial/index.md) para revisar o counter nos
+WebPush, ou volte ao [Tutorial](../tutorial/index.md) para revisar o counter nos
 outros modos. 🚀

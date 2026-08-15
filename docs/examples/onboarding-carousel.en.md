@@ -1001,6 +1001,6 @@ Try extending the example:
 
 - 💡 Add slide transition animations using the `_core` animation module
 - 💡 Persist `done` to `localStorage` via Mode A's storage API so the onboarding is not shown again
-- 💡 Add a fourth slide with a registration form — see the [BR Cadastro](./br-cadastro.en.md) example
-- 💡 Explore [Signup Wizard](./signup-wizard.en.md) for a paged flow with per-step validation
+- 💡 Add a fourth slide with a registration form — see the [BR Cadastro](br-cadastro.en.md) example
+- 💡 Explore [Signup Wizard](signup-wizard.en.md) for a paged flow with per-step validation
 - 💡 Read the [Basic tutorial](../tutorial/index.md) to understand the `view` → `set_state` cycle in depth

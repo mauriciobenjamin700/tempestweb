@@ -153,7 +153,7 @@ def view(app: App[VisionState]) -> Widget:
 
     Computer vision is the extreme case — a model download and a CPU inference
     take seconds, sometimes far more. Move the work out of the handler with
-    [`spawn`](best-practices.md#long-work-dispatch-is-serial):
+    [`spawn`](../tutorial/best-practices.md#long-work-dispatch-is-serial):
 
     ```python
     from tempestweb.runtime import spawn
@@ -288,4 +288,4 @@ The API is identical — only the class and the converter change:
   [offline queue](offline-sync.md).
 
 Ready to draw the boxes on screen? The `DetectionOverlay`/`DetectionBox`/
-`ResultView` overlays are in [Ready-made components](components.md). 🚀
+`ResultView` overlays are in [Ready-made components](../tutorial/components.md). 🚀

@@ -226,4 +226,4 @@ Neste exemplo você viu:
 
 - 💡 O [Clima (HTTP + geolocalização)](weather-native.md) encadeia **duas** capacidades nativas com esse mesmo padrão
 - 💡 Volte à [Lista de tarefas](todo.md) para outro uso de `LazyColumn`
-- 💡 Leia [capacidades nativas](../capabilities.md) para trocar `_default_fetch` por `native.http.request`
+- 💡 Leia [capacidades nativas](../advanced/capabilities.md) para trocar `_default_fetch` por `native.http.request`

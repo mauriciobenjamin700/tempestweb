@@ -126,7 +126,7 @@ Depois da primeira carga, o app abre e roda **sem rede**.
 !!! warning "Teste offline com `build`/`run`, não com `dev`"
     O `tempestweb dev` **não registra o service worker** de propósito (ele injeta um
     *kill-switch* para você nunca ver bundle cacheado velho — veja
-    [Usando a CLI](cli.md)). Ou seja, o comportamento offline só existe no artefato
+    [Usando a CLI](../tutorial/cli.md)). Ou seja, o comportamento offline só existe no artefato
     de produção: teste-o com `tempestweb build --mode transpile` (e sirva o `dist/`)
     ou com `tempestweb run --mode transpile`.
 
@@ -245,7 +245,7 @@ O `webpush_router` já expõe os endpoints de assinatura e envio; o
     veja [Verificação manual](#verificacao-manual).
 
 !!! info "O fluxo completo tem uma página só pra ele"
-    O exemplo [WebPush ponta a ponta (servidor)](examples/webpush-server.md)
+    O exemplo [WebPush ponta a ponta (servidor)](../examples/webpush-server.md)
     percorre a geração de chaves, o roteador, a assinatura e o envio, passo a
     passo, com um diagrama de sequência.
 

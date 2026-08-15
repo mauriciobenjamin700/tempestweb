@@ -32,7 +32,7 @@ Leitura recomendada (opcional, mas útil):
 
 - [Tutorial básico](../tutorial/index.md) — primeiros passos com `App`, `view` e `set_state`
 - [Gerenciando estado](../tutorial/state.md) — como `set_state` e handlers assíncronos funcionam
-- [Capacidades nativas](../capabilities.md) — visão geral do módulo `tempestweb.native`
+- [Capacidades nativas](../advanced/capabilities.md) — visão geral do módulo `tempestweb.native`
 
 ---
 
@@ -1115,6 +1115,6 @@ Experimente estender o exemplo:
 
 - 💡 Adicione um botão **Refresh** que só aparece na fase `loaded` e repete o ciclo
 - 💡 Mostre o ícone de condição do tempo (ensolarado, nublado) usando dados adicionais da Open-Meteo (`weathercode`)
-- 💡 Explore [capacidades nativas](../capabilities.md) para ver `audio`, `camera`, `share` e `notifications`
+- 💡 Explore [capacidades nativas](../advanced/capabilities.md) para ver `audio`, `camera`, `share` e `notifications`
 - 💡 Adicione retry automático em falhas HTTP com `RetryOptions` — já embutido em `native.http.request`
-- 💡 Leia [wire contract](../wire-contract.md) para entender o envelope `native_call` / `native_result` completo
+- 💡 Leia [wire contract](../advanced/wire-contract.md) para entender o envelope `native_call` / `native_result` completo

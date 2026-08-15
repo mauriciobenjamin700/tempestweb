@@ -82,24 +82,24 @@ mutate the DOM — it does not care where the patch came from. That is why the
 renderer is the **same** across all three modes.
 
 !!! tip "Where to start"
-    Head straight to [Installation](installation.md) and then follow the
+    Head straight to [Installation](tutorial/installation.md) and then follow the
     [Tutorial — the Counter](tutorial/index.md). In four short pages you build
     the canonical app and understand the wire contract end to end.
 
 ## What you will find here
 
-- **[Installation](installation.md)** — set up your environment in a minute.
+- **[Installation](tutorial/installation.md)** — set up your environment in a minute.
 - **[Architecture](architecture.md)** — the four layers and why the renderer is
   shared.
 - **[Tutorial](tutorial/index.md)** — build the counter, one concept per page, and
   run it in all three modes.
-- **[Mode C — transpile](transpile.md)** — Python → native JavaScript: static
+- **[Mode C — transpile](advanced/transpile.md)** — Python → native JavaScript: static
   bundle, SEO, turnkey PWA.
-- **[PWA & offline](pwa.md)** — installable app, service worker, IndexedDB, WebPush.
-- **[Capabilities](capabilities.md)** — typed Web APIs (geolocation, clipboard,
+- **[PWA & offline](advanced/pwa.md)** — installable app, service worker, IndexedDB, WebPush.
+- **[Capabilities](advanced/capabilities.md)** — typed Web APIs (geolocation, clipboard,
   camera) as Python awaitables.
-- **[Wire contract](wire-contract.md)** — the Python↔client wire format.
-- **[Observability](observability.md)** — telemetry, logger, feature flags, auth.
+- **[Wire contract](advanced/wire-contract.md)** — the Python↔client wire format.
+- **[Observability](advanced/observability.md)** — telemetry, logger, feature flags, auth.
 - **[Roadmap & design docs](design-docs.md)** — what's coming and the project's
   living design plans.
 
@@ -116,7 +116,7 @@ share the same renderer-agnostic core — the
 [`tempest-core`](https://pypi.org/project/tempest-core/) package (IR, `diff`/patch,
 state, style, widgets **and the Material 3 component catalog**, which tempestweb
 **re-exports** under `tempestweb.components` — see
-[Ready-made components](components.md)). tempestroid renders to native screens;
+[Ready-made components](tutorial/components.md)). tempestroid renders to native screens;
 tempestweb renders to the DOM. If you already know one, the mental model transfers directly — but
 **you don't need to know tempestroid** to use tempestweb.
 

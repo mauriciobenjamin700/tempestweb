@@ -355,5 +355,5 @@ def view(app: App[GateState]) -> Widget:
 - **Guardas/redirect** vêm do `route_guard` (`tempestweb.observability`): uma
   função pura `rota_pedida -> rota_efetiva` que você aplica na `view`.
 
-Quer ver tudo junto? O [exemplo de navegação com drawer](examples/router-drawer.md)
+Quer ver tudo junto? O [exemplo de navegação com drawer](../examples/router-drawer.md)
 compõe `NavStack`, `Navigator`, `RouteDrawer` e `Breadcrumb` num app completo. 🚀

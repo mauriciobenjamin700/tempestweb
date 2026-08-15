@@ -767,9 +767,9 @@ Neste tutorial você viu:
 
 ## Próximos passos
 
-- 💡 Experimente o exemplo [Data Table](./data-table.md) para ver `LazyColumn`
+- 💡 Experimente o exemplo [Data Table](data-table.md) para ver `LazyColumn`
   com dados paginados.
-- 💡 Explore o exemplo [Tabs & Profile](./tabs-profile.md) para navegação entre
+- 💡 Explore o exemplo [Tabs & Profile](tabs-profile.md) para navegação entre
   seções.
 - 📖 Volte ao [Tutorial principal](../tutorial/index.md) para conhecer outros
   widgets.

@@ -135,7 +135,7 @@ async def submit_order(payload: dict[str, object]) -> dict[str, object]:
     vale para `file.pick` num arquivo grande, upload, e qualquer `onnx.*`.
 
     Quando a chamada pode demorar, tire-a do handler com
-    [`spawn`](best-practices.md#trabalho-longo-o-dispatch-e-serial) e pinte um
+    [`spawn`](../tutorial/best-practices.md#trabalho-longo-o-dispatch-e-serial) e pinte um
     estado de "carregando" antes.
 
 ## Exemplo: geolocalização

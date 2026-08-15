@@ -379,9 +379,9 @@ In this tutorial you assembled a whole admin panel and learned:
 
 ## Next steps
 
-- Read [Ready-made screens (presets)](../presets.md) for the reference of all
+- Read [Ready-made screens (presets)](../tutorial/presets.md) for the reference of all
   five presets and every record.
 - Compare with the [Dashboard App Shell](dashboard-shell.md), the same panel
   assembled widget by widget.
-- See [Ready-made components](../components.md) for the catalogue you use inside
+- See [Ready-made components](../tutorial/components.md) for the catalogue you use inside
   a `Section`.

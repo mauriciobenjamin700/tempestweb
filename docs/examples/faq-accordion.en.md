@@ -417,7 +417,7 @@ Now bring everything together in the widget tree returned by `view`.
     `Edge.symmetric(vertical=v, horizontal=h)` is a `Style` shortcut for
     `top=v, bottom=v, left=h, right=h` in one call. See other shortcuts like
     `Edge.all(n)` and `Edge.only(top=n)` in the
-    [Tabbed Profile](./tabs-profile.en.md) example.
+    [Tabbed Profile](tabs-profile.en.md) example.
 
 ---
 
@@ -740,5 +740,5 @@ In this tutorial you built a complete FAQ page with live filtering and learned:
 ## Next steps
 
 - Read the [core tutorial](../tutorial/index.md) to understand the full tempestweb lifecycle.
-- Explore the tab navigation pattern in the [Tabbed Profile](./tabs-profile.en.md) example.
+- Explore the tab navigation pattern in the [Tabbed Profile](tabs-profile.en.md) example.
 - Add open/close animations to `Accordion` with `AnimatedSwitcher` (coming soon).

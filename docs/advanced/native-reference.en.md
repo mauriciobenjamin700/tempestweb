@@ -537,6 +537,6 @@ async def beep() -> None:
   subscription when the loop exits.
 - Track T is **complete**, with no known capability gaps.
 
-See the bridge in action in the [Device panel](examples/device-panel.md) and the
+See the bridge in action in the [Device panel](../examples/device-panel.md) and the
 call wire format in
 [`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md). 🚀

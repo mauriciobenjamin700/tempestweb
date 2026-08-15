@@ -769,8 +769,8 @@ In this tutorial you saw:
 
 ## Next steps
 
-- 💡 Try the [Data Table](./data-table.en.md) example to see `LazyColumn` with
+- 💡 Try the [Data Table](data-table.en.md) example to see `LazyColumn` with
   paginated data.
-- 💡 Explore [Tabs & Profile](./tabs-profile.en.md) for navigation between
+- 💡 Explore [Tabs & Profile](tabs-profile.en.md) for navigation between
   sections.
 - 📖 Return to the [Main Tutorial](../tutorial/index.md) to meet more widgets.

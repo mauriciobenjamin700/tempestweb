@@ -183,4 +183,4 @@ nothing — the generator just sits there.
 
 See the full list of streams in the
 [Native capability reference](native-reference.md) and a live showcase in the
-[Device panel](examples/device-panel.md). 🚀
+[Device panel](../examples/device-panel.md). 🚀

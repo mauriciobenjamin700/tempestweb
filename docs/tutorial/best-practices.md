@@ -6,7 +6,7 @@ verdade se organiza em **camadas com donos claros**. O runtime te dá um ciclo;
 as camadas te dão **onde colocar cada coisa** para o app não virar código lixo. 🚀
 
 !!! info "Pré-requisitos"
-    Leia o [Tutorial](tutorial/index.md) primeiro — aqui assumimos que você já
+    Leia o [Tutorial](index.md) primeiro — aqui assumimos que você já
     conhece `view()`, `state` e `set_state`. Esta página é sobre **como
     estruturar** um app real em cima desse ciclo.
 
@@ -443,4 +443,4 @@ progresso enquanto roda.
   pelo construtor.
 - App pequeno cabe num arquivo; as camadas **emergem conforme cresce**.
 
-Agora veja os padrões na prática na [Galeria de exemplos](examples/index.md). 🚀
+Agora veja os padrões na prática na [Galeria de exemplos](../examples/index.md). 🚀

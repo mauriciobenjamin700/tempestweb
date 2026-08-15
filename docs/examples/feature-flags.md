@@ -1279,7 +1279,7 @@ Neste tutorial você aprendeu:
 Experimente estender o exemplo:
 
 - 💡 Adicione uma terceira flag `dark_mode` e use-a para trocar a paleta de cores
-  — combine com o exemplo [Theme Switcher](./theme-switcher.md)
+  — combine com o exemplo [Theme Switcher](theme-switcher.md)
 - 💡 Implemente um `GrowthBookFeatureFlagsAdapter` usando o cliente GrowthBook
   Python e troque o adapter no `make_state` sem mudar o `view`
 - 💡 Registre um listener com `flags.on_change(lambda: app.set_state(...))` em

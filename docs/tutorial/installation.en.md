@@ -147,7 +147,7 @@ never a positional `.py` file.
     overrides.
 
 Want the full walkthrough of each subcommand? See
-[Using the CLI](cli.md). Or jump straight into the [Tutorial](tutorial/index.md). 🚀
+[Using the CLI](cli.md). Or jump straight into the [Tutorial](index.md). 🚀
 
 ---
 
@@ -233,5 +233,5 @@ uv run mkdocs serve            # local preview at http://127.0.0.1:8000
 - Extras control which modes/capabilities you enable.
 - `make check` is the gate; `uv run mkdocs build --strict` is the docs gate.
 
-Ready? Head to the [Architecture](architecture.md) or jump straight into the
-[Tutorial](tutorial/index.md). 🚀
+Ready? Head to the [Architecture](../architecture.md) or jump straight into the
+[Tutorial](index.md). 🚀

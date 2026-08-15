@@ -7,7 +7,7 @@ you a cycle; the layers give you **where to put each thing** so the app doesn't
 rot into garbage code. 🚀
 
 !!! info "Prerequisites"
-    Read the [Tutorial](tutorial/index.md) first — here we assume you already
+    Read the [Tutorial](index.md) first — here we assume you already
     know `view()`, `state` and `set_state`. This page is about **how to
     structure** a real app on top of that cycle.
 
@@ -448,4 +448,4 @@ progress as it runs.
   receives dependencies through the constructor.
 - A small app fits in one file; the layers **emerge as it grows**.
 
-Now see the patterns in practice in the [Example gallery](examples/index.md). 🚀
+Now see the patterns in practice in the [Example gallery](../examples/index.md). 🚀

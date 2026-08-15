@@ -43,7 +43,7 @@ de rota puro), `decode_jwt` + `is_jwt_expired` (helpers de JWT offline) e `Logge
 
 ## Pré-requisitos
 
-Certifique-se de ter feito a [Instalação](../installation.md) e lido o
+Certifique-se de ter feito a [Instalação](../tutorial/installation.md) e lido o
 [Tutorial do Counter](../tutorial/index.md). Este exemplo assume que você já
 conhece `App`, `set_state`, `make_state` e `view`.
 
@@ -979,11 +979,11 @@ Neste exemplo você aprendeu:
 
 ## Próximos passos
 
-- Leia [Formulário de Login](./login-form.md) para ver validação em três camadas
+- Leia [Formulário de Login](login-form.md) para ver validação em três camadas
   com `Form` + `FormField` + `Banner`.
-- Explore o exemplo de [Dashboard Shell](./dashboard-shell.md) para ver como o
+- Explore o exemplo de [Dashboard Shell](dashboard-shell.md) para ver como o
   `AuthStore` se integra a um layout com barra lateral e header.
-- Veja [Notification Center](./notification-center.md) para usar `Logger` com
+- Veja [Notification Center](notification-center.md) para usar `Logger` com
   um sink que alimenta um painel de notificações ao vivo.
-- Consulte a referência de [`tempestweb.observability`](../observability.md)
+- Consulte a referência de [`tempestweb.observability`](../advanced/observability.md)
   para a lista completa de métodos do `AuthStore` e do `RefreshQueue`.

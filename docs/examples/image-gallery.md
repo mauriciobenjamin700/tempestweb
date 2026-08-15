@@ -1106,6 +1106,6 @@ Experimente estender o exemplo:
 
 - 💡 Adicione um campo de **pesquisa** que filtra `state.images` por caption
 - 💡 Implemente **arrastar para fechar** com `GestureDetector.on_pan_end`
-- 💡 Explore o exemplo [Data Table](./data-table.md) para ver outro padrão de lista grande com seleção de linha
-- 💡 Explore o exemplo [Tabs Profile](./tabs-profile.md) para navegação por abas dentro de overlays
+- 💡 Explore o exemplo [Data Table](data-table.md) para ver outro padrão de lista grande com seleção de linha
+- 💡 Explore o exemplo [Tabs Profile](tabs-profile.md) para navegação por abas dentro de overlays
 - 💡 Volte ao [Tutorial básico](../tutorial/index.md) para ver como o reconciliador calcula os diffs que tornam tudo isso eficiente

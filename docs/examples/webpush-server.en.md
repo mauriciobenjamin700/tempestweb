@@ -218,7 +218,7 @@ await fetch("/webpush/subscribe", {
 
 !!! tip "On the Python side, use the native module"
     In a tempestweb app you don't write this JS by hand. The
-    [transpile guide](../transpile.md) shows
+    [transpile guide](../advanced/transpile.md) shows
     `native.notifications.subscribe(vapid_public_key)` — it returns exactly the
     subscription JSON you `POST` to `/webpush/subscribe` — and
     `native.notifications.push_state()`, which reports `{supported, permission}`
@@ -332,5 +332,5 @@ In this guide you:
   consent flow (permission + `subscribe`) written in pure Python.
 - 💡 Swap `InMemorySubscriptionStore` for a persistent `SubscriptionStore`
   implementation (SQLAlchemy, Redis) and resolve the `owner` from your auth.
-- 💡 Read the [PWA docs](../pwa.md) (Track P) for the service worker (P1) and the
+- 💡 Read the [PWA docs](../advanced/pwa.md) (Track P) for the service worker (P1) and the
   offline-first mode (P2).

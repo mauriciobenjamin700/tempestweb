@@ -30,7 +30,7 @@ sobreviver a isso sem travar ou exibir `"nan"`.
 ## Pré-requisitos
 
 Antes de continuar, certifique-se de ter feito a
-[Instalação](../installation.md) e lido o
+[Instalação](../tutorial/installation.md) e lido o
 [Tutorial do Counter](../tutorial/index.md) — este exemplo assume que você já
 conhece `Column`, `Row`, `Text`, `App`, `make_state` e `view`.
 

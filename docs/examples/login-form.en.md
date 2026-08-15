@@ -39,7 +39,7 @@ error?" (state) and "how to render it?" (the child widgets).
 
 ## Prerequisites
 
-Make sure you have completed the [Installation](../installation.en.md) and read
+Make sure you have completed the [Installation](../tutorial/installation.en.md) and read
 the [Counter Tutorial](../tutorial/index.en.md). This example assumes you
 already know `App`, `set_state`, `make_state`, and `view`.
 
@@ -787,9 +787,9 @@ In this example you learned:
 
 - Read the [Counter Tutorial](../tutorial/index.en.md) if you haven't yet — it
   explains `set_state` and the rebuild cycle in more depth.
-- See the [Temperature Converter](./temperature-converter.md) example to dive
+- See the [Temperature Converter](temperature-converter.md) example to dive
   deeper into two-way binding with controlled fields.
-- Explore the [Stopwatch](./stopwatch.md) example to see how state evolves in
+- Explore the [Stopwatch](stopwatch.md) example to see how state evolves in
   response to timer events.
 - Check [Patches on the wire](../tutorial/patches.en.md) to understand which
   operations the reconciler emits during the form → success screen transition.

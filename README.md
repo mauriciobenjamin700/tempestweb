@@ -41,16 +41,16 @@ i18n, canvas charts, app shells, native capabilities, observability, PWA/WebPush
 a Mode C tour, and a server-mode walkthrough), each running unchanged across the
 execution modes.
 
-Building an admin panel? Skip the chrome with **[ready-made screens](https://mauriciobenjamin700.github.io/tempestweb/en/presets/)**
-([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/presets/)) — an admin
+Building an admin panel? Skip the chrome with **[ready-made screens](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/presets/)**
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/tutorial/presets/)) — an admin
 shell, a KPI dashboard, a searchable list, forms and an auth screen, described
 with typed records instead of assembled widget by widget. They come with the
 responsive behaviour inline styles cannot express: a sidebar that collapses to a
 drawer, grids that reflow, a table that scrolls under a sticky header, and a
 print layout without the chrome. No CSS, no breakpoints of your own.
 
-Building something real? Read the **[App architecture & best practices](https://mauriciobenjamin700.github.io/tempestweb/best-practices/)**
-guide ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/best-practices/)) —
+Building something real? Read the **[App architecture & best practices](https://mauriciobenjamin700.github.io/tempestweb/tutorial/best-practices/)**
+guide ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/best-practices/)) —
 the ideal layered structure (routes · pages · components · styles · controllers ·
 services · storages · schemas · utils · core), mirroring `tempest-fastapi-sdk`, so
 your app doesn't rot into garbage code.
@@ -92,9 +92,9 @@ all three modes (the Python analog of `tempest-react-sdk`'s `tempest gen api`):
 tempestweb gen api http://127.0.0.1:8000/openapi.json --out api
 ```
 
-Full walkthrough: the [Using the CLI](https://mauriciobenjamin700.github.io/tempestweb/en/cli/),
-[Generate a client from OpenAPI](https://mauriciobenjamin700.github.io/tempestweb/en/openapi/),
-[Installation](https://mauriciobenjamin700.github.io/tempestweb/en/installation/)
+Full walkthrough: the [Using the CLI](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/cli/),
+[Generate a client from OpenAPI](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/openapi/),
+[Installation](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/installation/)
 and [Tutorial](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/) guides.
 
 ## Code quality
@@ -113,7 +113,7 @@ level — `[quality] typing_strictness` in `tempestweb.toml` (`lenient` |
 `standard` | `strict`, default `standard`, `tempestweb new` scaffolds it). It only
 **adds** rules, never loosens yours, and `ANN401` is never enabled — `Any` is a
 valid annotation. `--strictness` overrides per invocation. Full details in the
-[Code quality](https://mauriciobenjamin700.github.io/tempestweb/en/cli/#code-quality)
+[Code quality](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/cli/#code-quality)
 guide.
 
 ## How it works
@@ -143,9 +143,9 @@ bgsync, tabs, idle), and **Tier 3 / Chromium-only** (bluetooth, usb, serial, hid
 nfc, contacts, payment, pip, eyedropper, pointerlock, gamepad, midi, webaudio).
 A **native event channel** streams continuous capabilities (geolocation/network/
 battery watch, sensors, STT, …) as typed `async for` iterators. See the
-[capability reference](https://mauriciobenjamin700.github.io/tempestweb/native-reference/)
-([EN](https://mauriciobenjamin700.github.io/tempestweb/en/native-reference/)) and
-the [event-channel guide](https://mauriciobenjamin700.github.io/tempestweb/native-events/).
+[capability reference](https://mauriciobenjamin700.github.io/tempestweb/advanced/native-reference/)
+([EN](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/native-reference/)) and
+the [event-channel guide](https://mauriciobenjamin700.github.io/tempestweb/advanced/native-events/).
 
 ## Static SSR — `render_to_html`
 
@@ -171,8 +171,8 @@ The CSS is **byte-identical** to what the DOM client emits (the `style_to_css`
 port mirrors `client/style.js`), and the new `tempest-core` 0.9.0 `Widget.tag` /
 `Widget.attrs` fields let you emit semantic, htmx-ready markup
 (`Container(tag="nav", attrs={"hx-get": "/x"})`). All text/attributes are escaped.
-See the [Static SSR guide](https://mauriciobenjamin700.github.io/tempestweb/ssr/)
-([EN](https://mauriciobenjamin700.github.io/tempestweb/en/ssr/)).
+See the [Static SSR guide](https://mauriciobenjamin700.github.io/tempestweb/advanced/ssr/)
+([EN](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/ssr/)).
 
 ## Mode C — transpile to native JS 🚀
 
@@ -214,8 +214,8 @@ that is a **first-class PWA — installable and offline out of the box** (manife
 
 See the canonical [`examples/transpile-tour`](examples/transpile-tour/app.py) —
 one app exercising the whole surface — and the guide
-([PT](https://mauriciobenjamin700.github.io/tempestweb/transpile/) ·
-[EN](https://mauriciobenjamin700.github.io/tempestweb/en/transpile/)). It is a
+([PT](https://mauriciobenjamin700.github.io/tempestweb/advanced/transpile/) ·
+[EN](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/transpile/)). It is a
 **first-class mode**: only a handful of advanced constructs sit outside the typed
 subset (out-of-subset constructs fail loud with `file:line`).
 
@@ -275,7 +275,7 @@ bridge (onnxruntime-web) so inference works in the browser — no `onnxruntime`
 wheel needed. Preprocessing, postprocessing and the `.boxes`/`.probs`/`.masks`
 result objects are ort-vision-sdk's, unchanged; only the model run crosses the
 (async) bridge, so construction and `predict` are awaited. See the
-[Computer vision guide](https://mauriciobenjamin700.github.io/tempestweb/en/vision/).
+[Computer vision guide](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/vision/).
 
 ## Deploy (server mode)
 
@@ -287,8 +287,8 @@ cd deploy && docker compose up --build
 Generates a tailored `nginx.conf` (WebSocket upgrade, streaming timeouts, sticky
 `ip_hash`, optional TLS), a `Dockerfile`, `docker-compose.yml` and a `DEPLOY.md`.
 Harden the app with a `SecurityConfig` (auth, CORS, limits, rate limiting,
-headers) — see the [Security](https://mauriciobenjamin700.github.io/tempestweb/en/security/)
-and [Deploy](https://mauriciobenjamin700.github.io/tempestweb/en/deploy/) guides.
+headers) — see the [Security](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/security/)
+and [Deploy](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/deploy/) guides.
 Static modes (A/C) need no server — publish the build to any CDN.
 
 ## Develop
@@ -303,15 +303,15 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | Path | What |
 |---|---|
 | `tempest-core` (dependency) | Renderer-agnostic engine — IR/reconciler/state/style/widgets (`import tempest_core`), extracted from tempestroid. |
-| `tempestweb/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — 54 Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
+| `tempestweb/tutorial/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — 54 Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
 | `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`, `sse.py`). |
 | `tempestweb/html/` | Static SSR leaf renderer — `render_to_html` / `render_document` / `style_to_css` (Python port of `client/style.js`). |
-| `tempestweb/transpile/` | **Mode C:** `ast`-based Python→JS compiler for the app layer. Paired with the native runtime in `client/transpile/` (`diff.js` · `widgets.js` · `runtime.js`). |
+| `tempestweb/advanced/transpile/` | **Mode C:** `ast`-based Python→JS compiler for the app layer. Paired with the native runtime in `client/transpile/` (`diff.js` · `widgets.js` · `runtime.js`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
 | `tempestweb/native/` | Web API capability adapters (Tracks N + T) — core (http, audio, share, geo, clipboard, storage, camera) plus Tier 1-3 web-platform parity (vibration, wakelock, fullscreen, network, sensors, bluetooth, usb, midi, …) and a streaming event channel (T-EV) consumed with `async for`. |
-| `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
-| `tempestweb/pwa/` | Web App Manifest + icon emitter (Track P). |
-| `tempestweb/cli/` | `tempestweb new/dev/build/run/sync/gen`. |
+| `tempestweb/advanced/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
+| `tempestweb/advanced/pwa/` | Web App Manifest + icon emitter (Track P). |
+| `tempestweb/tutorial/cli/` | `tempestweb new/dev/build/run/sync/gen`. |
 | `client/` | Pure-JS DOM renderer (incl. Canvas draw-command execution for charts), Style→CSS, event capture; `pwa/` `sw/` `offline/` `push/` `native/` subdirs. |
 | `tests/fixtures/` | Golden wire-format fixtures derived from the core. |
 

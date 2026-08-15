@@ -1,7 +1,7 @@
 # Painel do dispositivo — Capacidades Tier 1 📱
 
 Um pequeno painel de controle que liga **quatro** capacidades nativas do
-[Trilho T](../native-reference.md) a botões: vibrar o aparelho, manter a tela acesa,
+[Trilho T](../advanced/native-reference.md) a botões: vibrar o aparelho, manter a tela acesa,
 ir para tela cheia e ler o estado da conexão. Uma tela, quatro Web APIs, o **mesmo**
 Python nos dois modos. 🚀
 
@@ -265,8 +265,8 @@ tempestweb dev --mode server  --path examples/device-panel   # Python no servido
 - 💡 Guarde o id de `wakelock.request()` no estado e chame `wakelock.release(id)` no
   toggle, para liberar de verdade.
 - 💡 Adicione um botão que **observa** a rede em stream com
-  `native.network.watch()` — veja o [canal de eventos nativo](../native-events.md).
+  `native.network.watch()` — veja o [canal de eventos nativo](../advanced/native-events.md).
 - 💡 Explore o catálogo completo na
-  [Referência de capacidades nativas](../native-reference.md).
+  [Referência de capacidades nativas](../advanced/native-reference.md).
 - 💡 Compare com o [Copiar e compartilhar](clipboard-share.md), que injeta as
   capacidades no estado para testar sem browser.

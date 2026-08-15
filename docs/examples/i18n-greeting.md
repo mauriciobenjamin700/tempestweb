@@ -772,5 +772,5 @@ Experimente estender o exemplo:
 
 - 💡 Adicione um **quarto idioma** (ex.: Japonês `ja-JP`, LTR) — basta acrescentar entradas em `TRANSLATIONS` e `LOCALES`
 - 💡 Carregue o catálogo de um **arquivo JSON externo** com `json.load()` para separar strings do código
-- 💡 Explore o exemplo [settings-panel](./settings-panel.md) para ver como o `SegmentedControl` é usado em persistência de preferências
+- 💡 Explore o exemplo [settings-panel](settings-panel.md) para ver como o `SegmentedControl` é usado em persistência de preferências
 - 💡 Leia [Modos de execução](../tutorial/modes.md) para entender como o Modo B envia patches RTL para o cliente JS sem nenhuma mudança no Python

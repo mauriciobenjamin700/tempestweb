@@ -42,7 +42,7 @@ a Track-S follow-up (S10).
 
 The transpiler accepts a **typed subset** of Python — stable and fail-loud
 (`file:line` for anything outside it). See the full list in the
-[Mode C guide](transpile.md#the-supported-subset).
+[Mode C guide](advanced/transpile.md#the-supported-subset).
 
 **In (stable):** dataclasses (inheritance/methods/kwargs), `view()` + handler
 closures, full arithmetic, chained comparison, comprehensions (list/dict, with

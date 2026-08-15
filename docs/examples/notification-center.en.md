@@ -789,6 +789,6 @@ Try extending the example:
 
 - 💡 Add a `timestamp` field to `Notification` and show relative time ("2 min ago") in each Banner
 - 💡 Implement "mark as read" (sets `read=True`) without removing the item — watch the `Badge` count decrease
-- 💡 Filter notifications by `tone` with a tab selector (see the [Tabs Profile](./tabs-profile.en.md) example)
-- 💡 Explore [Stopwatch](./stopwatch.en.md) for another phase-machine state pattern
+- 💡 Filter notifications by `tone` with a tab selector (see the [Tabs Profile](tabs-profile.en.md) example)
+- 💡 Explore [Stopwatch](stopwatch.en.md) for another phase-machine state pattern
 - 💡 Read about [feedback components](../tutorial/index.md) to discover `Snackbar` and `ProgressBar`

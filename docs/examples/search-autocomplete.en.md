@@ -38,7 +38,7 @@ tempestweb solves all of this with explicit state and two typed events:
 ## Prerequisites
 
 Before continuing, make sure you have completed the
-[Installation](../installation.md) and read the
+[Installation](../tutorial/installation.md) and read the
 [Counter Tutorial](../tutorial/index.md) — this example assumes you already know
 `Column`, `Row`, `Text`, `App`, `make_state`, `view`, and the `set_state` rebuild
 cycle.

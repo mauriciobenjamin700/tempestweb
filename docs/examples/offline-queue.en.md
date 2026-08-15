@@ -204,6 +204,6 @@ In this example you saw:
 
 ## Next steps
 
-- 💡 See [PWA & offline](../pwa.md) for the full offline + WebPush story
+- 💡 See [PWA & offline](../advanced/pwa.md) for the full offline + WebPush story
 - 💡 The [Mode C tour](transpile-tour.md) also uses `native.offline` in a static bundle
-- 💡 Read [native capabilities](../capabilities.md) for the whole `tempestweb.native` module
+- 💡 Read [native capabilities](../advanced/capabilities.md) for the whole `tempestweb.native` module

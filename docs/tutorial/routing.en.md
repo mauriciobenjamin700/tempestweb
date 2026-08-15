@@ -362,6 +362,6 @@ def view(app: App[GateState]) -> Widget:
 - **Guards/redirects** come from `route_guard` (`tempestweb.observability`): a pure
   `requested_route -> effective_route` function you apply in `view`.
 
-Want to see it all together? The [drawer navigation example](examples/router-drawer.md)
+Want to see it all together? The [drawer navigation example](../examples/router-drawer.md)
 composes `NavStack`, `Navigator`, `RouteDrawer` and `Breadcrumb` into a complete
 app. 🚀

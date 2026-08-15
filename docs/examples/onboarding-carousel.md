@@ -1001,6 +1001,6 @@ Experimente estender o exemplo:
 
 - 💡 Adicione animação de transição entre slides usando o módulo de animações do `_core`
 - 💡 Persista o campo `done` em `localStorage` via a API de storage do Modo A para não exibir o onboarding novamente
-- 💡 Adicione um quarto slide com um formulário de cadastro — veja o exemplo [BR Cadastro](./br-cadastro.md)
-- 💡 Explore o [Signup Wizard](./signup-wizard.md) para um fluxo paginado com validação de etapa
+- 💡 Adicione um quarto slide com um formulário de cadastro — veja o exemplo [BR Cadastro](br-cadastro.md)
+- 💡 Explore o [Signup Wizard](signup-wizard.md) para um fluxo paginado com validação de etapa
 - 💡 Veja o [Tutorial básico](../tutorial/index.md) para entender melhor o ciclo `view` → `set_state`

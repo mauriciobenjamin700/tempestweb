@@ -34,7 +34,7 @@ Leitura recomendada (opcional, mas útil):
 - [Tutorial básico](../tutorial/index.md) — primeiros passos com `App`, `view` e `set_state`
 - [Gerenciando estado](../tutorial/state.md) — como `set_state` funciona
 - [Modos de execução](../tutorial/modes.md) — WASM vs. servidor
-- [Capacidades nativas](../capabilities.md) — o que são pontes e por que são necessárias
+- [Capacidades nativas](../advanced/capabilities.md) — o que são pontes e por que são necessárias
 
 ---
 
@@ -1006,5 +1006,5 @@ Experimente estender o exemplo:
 - 💡 Adicione um campo `created_at` às notas (serialize como JSON no `content`) e ordene a lista por data
 - 💡 Implemente edição de notas: clique em Open para carregar o draft nos campos e salve sobre a mesma chave
 - 💡 Adicione uma busca por prefixo filtrando `app.state.keys` na renderização — sem round-trip extra
-- 💡 Explore `tempestweb.native.clipboard` para copiar o conteúdo de uma nota com um botão (veja o exemplo [Clipboard & Share](./clipboard-share.md))
-- 💡 Combine com [PWA Web Push](./notification-center.md) para notificar o usuário quando uma nota é salva em outro dispositivo
+- 💡 Explore `tempestweb.native.clipboard` para copiar o conteúdo de uma nota com um botão (veja o exemplo [Clipboard & Share](clipboard-share.md))
+- 💡 Combine com [PWA Web Push](notification-center.md) para notificar o usuário quando uma nota é salva em outro dispositivo

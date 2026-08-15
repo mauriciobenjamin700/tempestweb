@@ -224,7 +224,7 @@ BarChart(series=[ChartSeries(points=[3.0, 7.0, 2.0, 9.0, 5.0], label="sales")])
 !!! note "Vision overlays pair with `[vision]`"
     `DetectionOverlay`/`DetectionBox`/`ConfidenceBadge`/`ResultView` draw a model's
     outputs — they pair with client-side inference from
-    [Computer vision (ONNX)](vision.md).
+    [Computer vision (ONNX)](../advanced/vision.md).
 
 ## Recap
 

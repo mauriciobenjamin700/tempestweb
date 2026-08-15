@@ -182,4 +182,4 @@ parado.
 
 Veja a lista completa de streams na
 [Referência de capacidades nativas](native-reference.md) e uma vitrine ao vivo no
-[Painel do dispositivo](examples/device-panel.md). 🚀
+[Painel do dispositivo](../examples/device-panel.md). 🚀

@@ -37,7 +37,7 @@ componentes que separam "qual regra?" (validators) de "quando mostrar o erro?"
 
 ## Pré-requisitos
 
-Certifique-se de ter feito a [Instalação](../installation.md) e lido o
+Certifique-se de ter feito a [Instalação](../tutorial/installation.md) e lido o
 [Tutorial do Counter](../tutorial/index.md). Este exemplo assume que você já
 conhece `App`, `set_state`, `make_state` e `view`.
 
@@ -785,9 +785,9 @@ Neste exemplo você aprendeu:
 
 - Leia o [Tutorial do Counter](../tutorial/index.md) se ainda não o fez — ele
   explica `set_state` e o ciclo de rebuild com mais detalhes.
-- Veja o exemplo de [Conversor de Temperatura](./temperature-converter.md) para
+- Veja o exemplo de [Conversor de Temperatura](temperature-converter.md) para
   aprofundar two-way binding com campos controlados.
-- Explore o exemplo de [Stopwatch](./stopwatch.md) para ver como o estado evolui
+- Explore o exemplo de [Stopwatch](stopwatch.md) para ver como o estado evolui
   em resposta a eventos de timer.
 - Consulte [Patches na rede](../tutorial/patches.md) para entender quais operações
   o reconciliador emite durante a transição form → tela de sucesso.

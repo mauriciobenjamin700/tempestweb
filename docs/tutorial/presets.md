@@ -253,5 +253,5 @@ admin_shell(
     com widgets do core.
 
 Exemplo completo, comentado passo a passo:
-[**Console Administrativo**](examples/admin-console.md) — as mesmas telas do
-[`dashboard-shell`](examples/dashboard-shell.md) em 261 linhas em vez de 716.
+[**Console Administrativo**](../examples/admin-console.md) — as mesmas telas do
+[`dashboard-shell`](../examples/dashboard-shell.md) em 261 linhas em vez de 716.

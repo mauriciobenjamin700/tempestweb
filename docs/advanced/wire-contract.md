@@ -169,4 +169,4 @@ browser. No Modo B ela é **proxiada** por um round-trip:
 
 Para cada campo, leia o
 [`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md)
-canônico. Para ver o contrato em ação, faça o [Tutorial](tutorial/index.md). 🚀
+canônico. Para ver o contrato em ação, faça o [Tutorial](../tutorial/index.md). 🚀

@@ -1031,6 +1031,6 @@ In this tutorial you built a complete BR registration form. Here's what you lear
 
 ## Next steps
 
-- Explore other form examples: [Temperature Converter](./temperature-converter.en.md) shows real-time validation without an explicit submit.
-- See [Data Table](./data-table.en.md) to display registered entries after persistence.
+- Explore other form examples: [Temperature Converter](temperature-converter.en.md) shows real-time validation without an explicit submit.
+- See [Data Table](data-table.en.md) to display registered entries after persistence.
 - Learn the fundamentals in [Tutorial — Introduction](../tutorial/index.en.md) and [Tutorial — State](../tutorial/state.en.md).

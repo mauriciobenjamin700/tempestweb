@@ -1106,6 +1106,6 @@ Try extending the example:
 
 - 💡 Add a **search field** that filters `state.images` by caption
 - 💡 Implement **swipe to dismiss** with `GestureDetector.on_pan_end`
-- 💡 Explore the [Data Table](./data-table.en.md) example for another pattern of large lists with row selection
-- 💡 Explore the [Tabs Profile](./tabs-profile.en.md) example for tab navigation inside overlays
+- 💡 Explore the [Data Table](data-table.en.md) example for another pattern of large lists with row selection
+- 💡 Explore the [Tabs Profile](tabs-profile.en.md) example for tab navigation inside overlays
 - 💡 Return to the [Basic tutorial](../tutorial/index.en.md) to see how the reconciler computes the diffs that make all of this efficient

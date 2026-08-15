@@ -137,7 +137,7 @@ roda.
 
 Na esmagadora maioria dos casos a resposta **não** é mudar o dispatch, é tirar o
 trabalho do handler com
-[`tempestweb.runtime.spawn`](best-practices.md#trabalho-longo-o-dispatch-e-serial).
+[`tempestweb.runtime.spawn`](../tutorial/best-practices.md#trabalho-longo-o-dispatch-e-serial).
 Ele não muda semântica nenhuma: a ordem dos eventos continua a mesma, e a task
 morre junto com a conexão.
 

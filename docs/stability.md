@@ -43,7 +43,7 @@ controles nativos (`<input>`/`<button>`) onde possível. Um **gate axe-core no C
 
 O transpilador aceita um **subset tipado** de Python — estável e fail-loud
 (`arquivo:linha` para o que estiver fora). Ver a lista completa no
-[guia do Modo C](transpile.md#o-subset-suportado).
+[guia do Modo C](advanced/transpile.md#o-subset-suportado).
 
 **Dentro (estável):** dataclasses (com herança/métodos/kwargs), `view()` +
 closures de handler, aritmética completa, comparação encadeada, comprehensions

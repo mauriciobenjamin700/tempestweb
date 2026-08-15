@@ -75,6 +75,9 @@ plugins:
             "Using the CLI": "Usando a CLI"
             Architecture: Arquitetura
             Tutorial: Tutorial
+            "Tutorial - User Guide": "Tutorial - Guia do usuário"
+            "Advanced User Guide": "Guia avançado"
+            Project: Projeto
             "Tutorial — the Counter": "Tutorial — o Counter"
             "1. The view tree": "1. A árvore de view"
             "2. State and handlers": "2. Estado e handlers"
@@ -155,6 +158,33 @@ plugins:
           build: true
           site_name: tempestweb
 
+  - redirects:
+      redirect_maps:
+        installation.md: tutorial/installation.md
+        cli.md: tutorial/cli.md
+        components.md: tutorial/components.md
+        presets.md: tutorial/presets.md
+        theming.md: tutorial/theming.md
+        icons.md: tutorial/icons.md
+        routing.md: tutorial/routing.md
+        best-practices.md: tutorial/best-practices.md
+        capabilities.md: advanced/capabilities.md
+        native-reference.md: advanced/native-reference.md
+        native-events.md: advanced/native-events.md
+        vision.md: advanced/vision.md
+        pwa.md: advanced/pwa.md
+        offline-sync.md: advanced/offline-sync.md
+        transpile.md: advanced/transpile.md
+        ssr.md: advanced/ssr.md
+        wire-contract.md: advanced/wire-contract.md
+        observability.md: advanced/observability.md
+        security.md: advanced/security.md
+        deploy.md: advanced/deploy.md
+        openapi.md: advanced/openapi.md
+
+hooks:
+  - hooks/i18n_redirects.py
+
 markdown_extensions:
   - admonition
   - attr_list
@@ -188,29 +218,35 @@ extra:
 
 nav:
   - Home: index.md
-  - Installation: installation.md
-  - Using the CLI: cli.md
-  - Generate a client from OpenAPI: openapi.md
   - Architecture: architecture.md
-  - Tutorial:
+  - Tutorial - User Guide:
+      - Installation: tutorial/installation.md
       - "Tutorial — the Counter": tutorial/index.md
       - "1. The view tree": tutorial/view.md
       - "2. State and handlers": tutorial/state.md
       - "3. Patches on the wire": tutorial/patches.md
       - "4. Running the modes": tutorial/modes.md
-  - Routing & navigation: routing.md
-  - Mode C — transpile: transpile.md
-  - PWA & offline: pwa.md
-  - Offline + backend sync: offline-sync.md
-  - Capabilities: capabilities.md
-  - Native capability reference: native-reference.md
-  - Native event channel: native-events.md
-  - Computer vision (ONNX): vision.md
-  - Ready-made components: components.md
-  - Ready-made screens (presets): presets.md
-  - Theming (Material 3): theming.md
-  - Icons (Material + Lucide): icons.md
-  - Best practices: best-practices.md
+      - Using the CLI: tutorial/cli.md
+      - Ready-made components: tutorial/components.md
+      - Ready-made screens (presets): tutorial/presets.md
+      - Theming (Material 3): tutorial/theming.md
+      - Icons (Material + Lucide): tutorial/icons.md
+      - Routing & navigation: tutorial/routing.md
+      - Best practices: tutorial/best-practices.md
+  - Advanced User Guide:
+      - Capabilities: advanced/capabilities.md
+      - Native capability reference: advanced/native-reference.md
+      - Native event channel: advanced/native-events.md
+      - Computer vision (ONNX): advanced/vision.md
+      - "Mode C — transpile": advanced/transpile.md
+      - Static SSR: advanced/ssr.md
+      - PWA & offline: advanced/pwa.md
+      - Offline + backend sync: advanced/offline-sync.md
+      - Wire contract: advanced/wire-contract.md
+      - Observability: advanced/observability.md
+      - "Security (Mode B)": advanced/security.md
+      - "Deploy to production": advanced/deploy.md
+      - Generate a client from OpenAPI: advanced/openapi.md
   - Examples:
       - "Example gallery": examples/index.md
       - "To-do list": examples/todo.md
@@ -262,10 +298,6 @@ nav:
       - "Execution modes":
           - "Running Mode B (server)": examples/server-mode.md
           - "Mode C tour (transpile)": examples/transpile-tour.md
-  - Static SSR: ssr.md
-  - Wire contract: wire-contract.md
-  - Observability: observability.md
-  - "Security (Mode B)": security.md
-  - "Deploy to production": deploy.md
-  - "Stability & support": stability.md
-  - Roadmap & design docs: design-docs.md
+  - Project:
+      - "Stability & support": stability.md
+      - Roadmap & design docs: design-docs.md

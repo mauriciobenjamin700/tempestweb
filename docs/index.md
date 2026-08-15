@@ -83,24 +83,24 @@ DOM — não liga de onde o patch veio. Por isso o renderizador é **um só** no
 modos.
 
 !!! tip "Por onde começar"
-    Vá direto para a [Instalação](installation.md) e depois siga o
+    Vá direto para a [Instalação](tutorial/installation.md) e depois siga o
     [Tutorial — o Counter](tutorial/index.md). Em quatro páginas curtas você
     constrói o app canônico e entende o contrato de fronteira de ponta a ponta.
 
 ## O que você vai encontrar aqui
 
-- **[Instalação](installation.md)** — prepare o ambiente em um minuto.
+- **[Instalação](tutorial/installation.md)** — prepare o ambiente em um minuto.
 - **[Arquitetura](architecture.md)** — as quatro camadas e por que o renderizador
   é compartilhado.
 - **[Tutorial](tutorial/index.md)** — construa o counter, um conceito por página,
   e rode-o nos três modos.
-- **[Modo C — transpile](transpile.md)** — Python → JavaScript nativo: bundle
+- **[Modo C — transpile](advanced/transpile.md)** — Python → JavaScript nativo: bundle
   estático, SEO e PWA turnkey.
-- **[PWA e offline](pwa.md)** — app instalável, service worker, IndexedDB, WebPush.
-- **[Capacidades](capabilities.md)** — Web APIs tipadas (geolocation, clipboard,
+- **[PWA e offline](advanced/pwa.md)** — app instalável, service worker, IndexedDB, WebPush.
+- **[Capacidades](advanced/capabilities.md)** — Web APIs tipadas (geolocation, clipboard,
   camera) como awaitables Python.
-- **[Contrato de fronteira](wire-contract.md)** — o wire format Python↔cliente.
-- **[Observabilidade](observability.md)** — telemetry, logger, feature flags, auth.
+- **[Contrato de fronteira](advanced/wire-contract.md)** — o wire format Python↔cliente.
+- **[Observabilidade](advanced/observability.md)** — telemetry, logger, feature flags, auth.
 - **[Roadmap e docs de design](design-docs.md)** — o que vem por aí e os planos
   vivos do projeto.
 
@@ -117,7 +117,7 @@ compartilham o mesmo núcleo renderer-agnostic — o pacote
 [`tempest-core`](https://pypi.org/project/tempest-core/) (IR, `diff`/patch,
 estado, estilo, widgets **e o catálogo de componentes Material 3**, que o
 tempestweb **reexporta** em `tempestweb.components` — veja
-[Componentes prontos](components.md)). O tempestroid renderiza para telas nativas;
+[Componentes prontos](tutorial/components.md)). O tempestroid renderiza para telas nativas;
 o tempestweb renderiza para o DOM. Se você já conhece um, o modelo mental transfere direto —
 mas **não é preciso conhecer o tempestroid** para usar o tempestweb.
 

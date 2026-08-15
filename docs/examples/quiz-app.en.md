@@ -17,7 +17,7 @@ A complete, functional quiz featuring:
 - 🔄 **Restart Quiz** button to play again from the beginning
 
 !!! note "Note — screen switching vs. routing"
-    This example uses a single boolean state field (`finished`) to toggle between the question card and the results screen. There are no routes, no URLs — tempestweb reconstructs the widget tree on every state change. For navigation with browser history and URLs see the [Tabs - Profile](./tabs-profile.en.md) example.
+    This example uses a single boolean state field (`finished`) to toggle between the question card and the results screen. There are no routes, no URLs — tempestweb reconstructs the widget tree on every state change. For navigation with browser history and URLs see the [Tabs - Profile](tabs-profile.en.md) example.
 
 ---
 
@@ -34,7 +34,7 @@ Recommended reading (optional):
 - [Basic tutorial](../tutorial/index.md) — first steps with `App`, `view`, and `set_state`
 - [Managing state](../tutorial/state.md) — how `set_state` works
 - [Execution modes](../tutorial/modes.md) — WASM vs. server
-- [Login form](./login-form.en.md) — another example with forms and validation
+- [Login form](login-form.en.md) — another example with forms and validation
 
 ---
 
@@ -987,7 +987,7 @@ In this tutorial you learned:
 
 Try extending the example:
 
-- 💡 Add a **per-question timer** — store `time_limit: int` in the state and use a periodic tick to auto-advance (see [Stopwatch](./stopwatch.en.md) for the timer pattern)
+- 💡 Add a **per-question timer** — store `time_limit: int` in the state and use a periodic tick to auto-advance (see [Stopwatch](stopwatch.en.md) for the timer pattern)
 - 💡 Add **question shuffling** — in `make_state`, randomise the order and store it in the state
-- 💡 Explore the [Signup Wizard](./signup-wizard.en.md) example for a multi-step flow with per-step validation
-- 💡 See the [Settings Panel](./settings-panel.md) for more `RadioGroup` usage in a preferences context
+- 💡 Explore the [Signup Wizard](signup-wizard.en.md) example for a multi-step flow with per-step validation
+- 💡 See the [Settings Panel](settings-panel.md) for more `RadioGroup` usage in a preferences context

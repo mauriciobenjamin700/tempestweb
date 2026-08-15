@@ -1117,6 +1117,6 @@ In this tutorial you learned:
 Try extending the example:
 
 - 💡 Add an **opacity selector** with a third `Dropdown` and use the `a` channel of `StrokeCmd`
-- 💡 Persist strokes to `localStorage` via [native capabilities](../capabilities.md) in Mode A
-- 💡 Explore the [Image Gallery](./image-gallery.md) example for another use of graphic surfaces
-- 💡 Read the [wire contract](../wire-contract.md) to understand how `DrawCommand` objects are serialized as JSON and sent to the client
+- 💡 Persist strokes to `localStorage` via [native capabilities](../advanced/capabilities.md) in Mode A
+- 💡 Explore the [Image Gallery](image-gallery.md) example for another use of graphic surfaces
+- 💡 Read the [wire contract](../advanced/wire-contract.md) to understand how `DrawCommand` objects are serialized as JSON and sent to the client

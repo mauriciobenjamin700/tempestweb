@@ -34,7 +34,7 @@ Recommended reading (optional, but helpful):
 - [Basic tutorial](../tutorial/index.md) — first steps with `App`, `view`, and `set_state`
 - [Managing state](../tutorial/state.md) — how `set_state` works
 - [Execution modes](../tutorial/modes.md) — WASM vs. server
-- [Native capabilities](../capabilities.md) — what bridges are and why they're needed
+- [Native capabilities](../advanced/capabilities.md) — what bridges are and why they're needed
 
 ---
 
@@ -1006,5 +1006,5 @@ Try extending the example:
 - 💡 Add a `created_at` field to notes (serialize as JSON in `content`) and sort the list by date
 - 💡 Implement note editing: click Open to load the draft into the fields, then save under the same key
 - 💡 Add prefix-based search by filtering `app.state.keys` at render time — no extra round-trip
-- 💡 Explore `tempestweb.native.clipboard` to copy note content with a button (see the [Clipboard & Share](./clipboard-share.en.md) example)
-- 💡 Combine with [PWA Web Push](./notification-center.en.md) to notify the user when a note is saved on another device
+- 💡 Explore `tempestweb.native.clipboard` to copy note content with a button (see the [Clipboard & Share](clipboard-share.en.md) example)
+- 💡 Combine with [PWA Web Push](notification-center.en.md) to notify the user when a note is saved on another device

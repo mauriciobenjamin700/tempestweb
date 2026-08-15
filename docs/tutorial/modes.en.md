@@ -87,7 +87,7 @@ app + the JS client into a static bundle:
 
 !!! tip "Mode A is fully offline"
     After the initial load, everything runs in the browser — no server. It is the
-    natural target for [PWA & offline](../pwa.md). The cost is the WASM bundle
+    natural target for [PWA & offline](../advanced/pwa.md). The cost is the WASM bundle
     cold-start (which the Track P service worker solves via precache).
 
 ## Mode B — Python on the server (FastAPI)
@@ -139,7 +139,7 @@ the result is a 100% static bundle:
 !!! tip "Mode C is the perfect target for PWA and SEO"
     Because the bundle is static and Python-free, first-paint is immediate and the
     `build` already emits the **installable + offline PWA** layer out of the box.
-    The [Mode C — transpile](../transpile.md) page dives into the full flow. 🚀
+    The [Mode C — transpile](../advanced/transpile.md) page dives into the full flow. 🚀
 
 ## Side by side
 
@@ -168,6 +168,6 @@ the result is a 100% static bundle:
 - The **JS client and renderer are the same**; only the mode changes.
 
 🎉 You finished the tutorial! You built the counter and understand the wire
-contract end to end. To go further, dive into [Mode C — transpile](../transpile.md),
-the [PWA & offline](../pwa.md) layer, the [native capabilities](../capabilities.md)
-and [observability](../observability.md).
+contract end to end. To go further, dive into [Mode C — transpile](../advanced/transpile.md),
+the [PWA & offline](../advanced/pwa.md) layer, the [native capabilities](../advanced/capabilities.md)
+and [observability](../advanced/observability.md).

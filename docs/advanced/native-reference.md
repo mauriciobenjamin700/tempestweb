@@ -537,6 +537,6 @@ async def beep() -> None:
   ao sair do laço.
 - O Trilho T está **completo**, sem lacunas de capacidade conhecidas.
 
-Veja a ponte em ação no [Painel do dispositivo](examples/device-panel.md) e o
+Veja a ponte em ação no [Painel do dispositivo](../examples/device-panel.md) e o
 formato de wire das chamadas em
 [`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md). 🚀

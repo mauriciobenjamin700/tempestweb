@@ -1025,7 +1025,7 @@ Neste tutorial você aprendeu:
 
 ## Próximos passos
 
-- 💡 Explore [Tabs Profile](./tabs-profile.md) para ver `Switch` e `Checkbox` dentro de um painel com abas
-- 💡 Veja [Stopwatch](./stopwatch.md) para aprender a gerenciar estado temporal com `asyncio`
+- 💡 Explore [Tabs Profile](tabs-profile.md) para ver `Switch` e `Checkbox` dentro de um painel com abas
+- 💡 Veja [Stopwatch](stopwatch.md) para aprender a gerenciar estado temporal com `asyncio`
 - 💡 Leia [Gerenciando estado](../tutorial/state.md) para um tratamento completo do ciclo `set_state`
 - 💡 Adicione persistência: serialize `SettingsState` para `localStorage` no Modo A via `pyodide.ffi` ou para um endpoint REST no Modo B

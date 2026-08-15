@@ -172,4 +172,4 @@ in the browser. In Mode B it is **proxied** via a round-trip:
 
 For each field, read the canonical
 [`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md).
-To see the contract in action, take the [Tutorial](tutorial/index.md). 🚀
+To see the contract in action, take the [Tutorial](../tutorial/index.md). 🚀

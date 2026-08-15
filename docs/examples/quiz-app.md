@@ -17,7 +17,7 @@ Um quiz completo e funcional com:
 - 🔄 Botão **Restart Quiz** para começar tudo de novo
 
 !!! note "Nota — fluxo de tela vs. rotas"
-    Este exemplo usa uma **variável booleana de estado** (`finished`) para alternar entre a tela de pergunta e a tela de resultados. Não há rotas nem URLs — o tempestweb reconstrói a árvore de widgets a cada mudança de estado. Para navegação com histórico e URLs veja o exemplo [Tabs - Perfil](./tabs-profile.md).
+    Este exemplo usa uma **variável booleana de estado** (`finished`) para alternar entre a tela de pergunta e a tela de resultados. Não há rotas nem URLs — o tempestweb reconstrói a árvore de widgets a cada mudança de estado. Para navegação com histórico e URLs veja o exemplo [Tabs - Perfil](tabs-profile.md).
 
 ---
 
@@ -34,7 +34,7 @@ Leitura recomendada antes de começar (opcional):
 - [Tutorial básico](../tutorial/index.md) — primeiros passos com `App`, `view` e `set_state`
 - [Gerenciando estado](../tutorial/state.md) — como `set_state` funciona
 - [Modos de execução](../tutorial/modes.md) — WASM vs. servidor
-- [Formulários de login](./login-form.md) — outro exemplo com formulários e validação
+- [Formulários de login](login-form.md) — outro exemplo com formulários e validação
 
 ---
 
@@ -987,7 +987,7 @@ Neste tutorial você aprendeu:
 
 Experimente estender o exemplo:
 
-- 💡 Adicione um **timer por pergunta** — guarde `time_limit: int` no estado e use um tick periódico para avançar automaticamente (veja [Stopwatch](./stopwatch.md) para o padrão de timer)
+- 💡 Adicione um **timer por pergunta** — guarde `time_limit: int` no estado e use um tick periódico para avançar automaticamente (veja [Stopwatch](stopwatch.md) para o padrão de timer)
 - 💡 Adicione **embaralhamento de perguntas** — em `make_state`, sorteie a ordem e guarde-a no estado
-- 💡 Explore o exemplo [Signup Wizard](./signup-wizard.md) para um fluxo multi-passo com validação por etapa
-- 💡 Veja o [Settings Panel](./settings-panel.md) para outros exemplos de `RadioGroup` em contexto de preferências
+- 💡 Explore o exemplo [Signup Wizard](signup-wizard.md) para um fluxo multi-passo com validação por etapa
+- 💡 Veja o [Settings Panel](settings-panel.md) para outros exemplos de `RadioGroup` em contexto de preferências

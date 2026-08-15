@@ -216,7 +216,7 @@ await fetch("/webpush/subscribe", {
 
 !!! tip "Do lado Python, use o módulo nativo"
     Num app tempestweb você não escreve esse JS à mão. O
-    [guia de transpile](../transpile.md) mostra
+    [guia de transpile](../advanced/transpile.md) mostra
     `native.notifications.subscribe(vapid_public_key)` — devolve exatamente o JSON
     de assinatura que você faz `POST` para `/webpush/subscribe` — e
     `native.notifications.push_state()`, que reporta `{supported, permission}` sem
@@ -330,5 +330,5 @@ Neste guia você:
 - 💡 Troque o `InMemorySubscriptionStore` por uma implementação persistente de
   `SubscriptionStore` (SQLAlchemy, Redis) e resolva o `owner` a partir da sua
   autenticação.
-- 💡 Leia a [documentação PWA](../pwa.md) (Trilho P) para o service worker (P1) e o
+- 💡 Leia a [documentação PWA](../advanced/pwa.md) (Trilho P) para o service worker (P1) e o
   modo offline-first (P2).

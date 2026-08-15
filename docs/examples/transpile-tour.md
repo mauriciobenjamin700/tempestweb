@@ -11,7 +11,7 @@ o app inteiro é transcrito para JavaScript nativo. 🚀
     Este exemplo é o mostruário do Modo C, mas o **mesmo** `view` roda inalterado
     nos Modos A (WASM) e B (servidor). Você escreve a lógica uma vez; o compilador
     decide se ela vira JS nativo (C) ou continua Python vivo (A/B). Veja o guia
-    completo em [Modo C — transpile](../transpile.md).
+    completo em [Modo C — transpile](../advanced/transpile.md).
 
 ---
 
@@ -283,6 +283,6 @@ Neste exemplo você viu:
 
 ## Próximos passos
 
-- 💡 Leia [Modo C — transpile](../transpile.md) para o subset suportado e o pipeline de build
+- 💡 Leia [Modo C — transpile](../advanced/transpile.md) para o subset suportado e o pipeline de build
 - 💡 Veja [Fila offline](offline-queue.md) para o mergulho na `native.offline`
-- 💡 Explore [PWA e offline](../pwa.md) para instalação e WebPush ponta a ponta
+- 💡 Explore [PWA e offline](../advanced/pwa.md) para instalação e WebPush ponta a ponta

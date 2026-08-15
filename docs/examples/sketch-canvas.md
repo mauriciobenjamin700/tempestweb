@@ -1117,6 +1117,6 @@ Neste tutorial você aprendeu:
 Experimente estender o exemplo:
 
 - 💡 Adicione um **seletor de opacidade** com um terceiro `Dropdown` e use o canal `a` do `StrokeCmd`
-- 💡 Salve traços no `localStorage` via [capacidades nativas](../capabilities.md) do Modo A
-- 💡 Explore o exemplo [Image Gallery](./image-gallery.md) para ver outro uso de superfícies gráficas
-- 💡 Leia o [contrato wire](../wire-contract.md) para entender como os `DrawCommand` são serializados como JSON e enviados ao cliente
+- 💡 Salve traços no `localStorage` via [capacidades nativas](../advanced/capabilities.md) do Modo A
+- 💡 Explore o exemplo [Image Gallery](image-gallery.md) para ver outro uso de superfícies gráficas
+- 💡 Leia o [contrato wire](../advanced/wire-contract.md) para entender como os `DrawCommand` são serializados como JSON e enviados ao cliente

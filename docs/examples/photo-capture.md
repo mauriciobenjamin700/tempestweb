@@ -31,7 +31,7 @@ Leitura recomendada (opcional):
 - [Tutorial básico](../tutorial/index.md) — primeiros passos com `App`, `view` e `set_state`
 - [Gerenciando estado](../tutorial/state.md) — como `set_state` funciona
 - [Modos de execução](../tutorial/modes.md) — WASM vs. servidor
-- [Capacidades nativas](../capabilities.md) — o modelo de bridge
+- [Capacidades nativas](../advanced/capabilities.md) — o modelo de bridge
 
 ---
 
@@ -1078,5 +1078,5 @@ Experimente estender o exemplo:
 
 - 💡 Adicione um botão **Switch Camera** que alterna `facing` entre `"environment"` e `"user"`
 - 💡 Use `native.http.upload` para enviar a foto capturada para um endpoint de API
-- 💡 Explore [Clima (HTTP + geolocalização)](./weather-native.md) — outro exemplo de capability nativa com o mesmo padrão de bridge
-- 💡 Leia o [contrato de wire format](../wire-contract.md) para entender como `native_call`/`native_result` trafegam no Modo B
+- 💡 Explore [Clima (HTTP + geolocalização)](weather-native.md) — outro exemplo de capability nativa com o mesmo padrão de bridge
+- 💡 Leia o [contrato de wire format](../advanced/wire-contract.md) para entender como `native_call`/`native_result` trafegam no Modo B

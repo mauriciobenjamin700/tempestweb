@@ -30,7 +30,7 @@ all of that without crashing or showing `"nan"`.
 
 ## Prerequisites
 
-Make sure you've completed [Installation](../installation.md) and read the
+Make sure you've completed [Installation](../tutorial/installation.md) and read the
 [Counter Tutorial](../tutorial/index.md) — this example assumes you already
 know `Column`, `Row`, `Text`, `App`, `make_state`, and `view`.
 

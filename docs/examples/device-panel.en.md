@@ -1,7 +1,7 @@
 # Device panel — Tier 1 capabilities 📱
 
 A small control panel wiring **four** native capabilities from
-[Track T](../native-reference.md) to buttons: buzz the device, keep the screen
+[Track T](../advanced/native-reference.md) to buttons: buzz the device, keep the screen
 awake, go fullscreen, and read the connection state. One screen, four Web APIs, the
 **same** Python in both modes. 🚀
 
@@ -266,8 +266,8 @@ tempestweb dev --mode server  --path examples/device-panel   # Python on the ser
 - 💡 Keep the id from `wakelock.request()` in state and call `wakelock.release(id)`
   in the toggle, to actually release it.
 - 💡 Add a button that **watches** the network as a stream with
-  `native.network.watch()` — see the [native event channel](../native-events.md).
+  `native.network.watch()` — see the [native event channel](../advanced/native-events.md).
 - 💡 Explore the full catalog in the
-  [Native capability reference](../native-reference.md).
+  [Native capability reference](../advanced/native-reference.md).
 - 💡 Compare with [Copy & Share](clipboard-share.md), which injects the capabilities
   into state to test without a browser.

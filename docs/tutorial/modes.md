@@ -87,7 +87,7 @@ o cliente JS num bundle estático:
 
 !!! tip "Modo A é offline pleno"
     Depois do load inicial, tudo roda no browser — sem servidor. É o alvo natural
-    para [PWA e offline](../pwa.md). O custo é o cold-start do bundle WASM (que o
+    para [PWA e offline](../advanced/pwa.md). O custo é o cold-start do bundle WASM (que o
     service worker do Trilho P resolve via precache).
 
 ## Modo B — Python no servidor (FastAPI)
@@ -138,7 +138,7 @@ resultado é um bundle 100% estático:
 !!! tip "Modo C é o alvo perfeito para PWA e SEO"
     Como o bundle é estático e sem Python, o first-paint é imediato e o `build`
     já emite a camada **PWA instalável + offline** de fábrica. É a página
-    [Modo C — transpile](../transpile.md) que aprofunda o fluxo completo. 🚀
+    [Modo C — transpile](../advanced/transpile.md) que aprofunda o fluxo completo. 🚀
 
 ## Lado a lado
 
@@ -168,6 +168,6 @@ resultado é um bundle 100% estático:
 
 🎉 Você terminou o tutorial! Você construiu o counter e entende o contrato de
 fronteira de ponta a ponta. Para ir além, mergulhe no
-[Modo C — transpile](../transpile.md), na camada [PWA e offline](../pwa.md), nas
-[capacidades nativas](../capabilities.md) e na
-[observabilidade](../observability.md).
+[Modo C — transpile](../advanced/transpile.md), na camada [PWA e offline](../advanced/pwa.md), nas
+[capacidades nativas](../advanced/capabilities.md) e na
+[observabilidade](../advanced/observability.md).

@@ -1002,5 +1002,5 @@ Experimente estender o exemplo:
 
 - 💡 Adicione um botão **Read** que lê o texto atual do clipboard com `clipboard.read()`
 - 💡 Desabilite o botão **Share** com `is_share_supported()` quando a Web Share API não estiver disponível, em vez de mostrar mensagem após o clique
-- 💡 Explore o exemplo [PWA + WebPush](./notification-center.md) para ver outras capacidades nativas em ação
+- 💡 Explore o exemplo [PWA + WebPush](notification-center.md) para ver outras capacidades nativas em ação
 - 💡 Veja [Modos de execução](../tutorial/modes.md) para entender em profundidade como `FFIBridge` e `ProxyBridge` diferem

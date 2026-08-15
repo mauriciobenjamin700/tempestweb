@@ -1809,7 +1809,7 @@ Try extending the example:
 - 💡 Persist the chosen mode in the browser's `localStorage` (Mode A) or a server
   session (Mode B) so it survives reloads
 - 💡 Add a fourth swatch with custom colours via `Color(r=..., g=..., b=...)`
-- 💡 Explore the [Settings Panel](./settings-panel.md) example to see how to
+- 💡 Explore the [Settings Panel](settings-panel.md) example to see how to
   persist user preferences
 - 💡 Read [Execution modes](../tutorial/modes.md) to understand how the same
   `app.py` runs on both transports without any changes

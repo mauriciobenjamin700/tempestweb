@@ -47,7 +47,7 @@ filho).
 !!! note "Como o cliente distingue o tipo"
     Pela presença das chaves: `set_props` → Update, `node` + `index` → Insert, só
     `index` → Remove, `order` → Reorder, `node` sem `index` → Replace. O detalhe
-    completo está no [contrato de fronteira](../wire-contract.md).
+    completo está no [contrato de fronteira](../advanced/wire-contract.md).
 
 ## O counter, na prática
 

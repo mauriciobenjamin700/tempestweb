@@ -223,7 +223,7 @@ Options:
 | `--force` | Overwrite existing deploy files. |
 
 Then just follow the generated `DEPLOY.md`. See the full guide in
-[Deploy to production](deploy.md).
+[Deploy to production](../advanced/deploy.md).
 
 ---
 
@@ -240,7 +240,7 @@ tempestweb vapid --env     # prints VAPID_PUBLIC_KEY= / VAPID_PRIVATE_KEY= lines
 
 !!! danger "Keep the private key safe"
     Export the private one as `VAPID_PRIVATE_KEY` (a server secret) and share only
-    the public one with the client. See [PWA & offline](pwa.md).
+    the public one with the client. See [PWA & offline](../advanced/pwa.md).
 
 ### `sync` — pure-Python deps in Mode A
 
@@ -264,7 +264,7 @@ tempestweb gen api ./openapi.json --out api   # from a file
 ```
 
 One package per tag, each with `schemas.py` + `service.py`. Details in
-[Generate a client from OpenAPI](openapi.md).
+[Generate a client from OpenAPI](../advanced/openapi.md).
 
 ---
 
@@ -464,4 +464,4 @@ Every command that builds/serves takes the project **directory** via `--path`
   (lenient/standard/strict, default `standard`) adds rules on top of your config,
   never loosens it — and **`ANN401` is never enabled** (`Any` is valid).
 
-Ready? Head to the [Tutorial](tutorial/index.md) and build the counter. 🚀
+Ready? Head to the [Tutorial](index.md) and build the counter. 🚀

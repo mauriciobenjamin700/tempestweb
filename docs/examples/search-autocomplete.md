@@ -37,7 +37,7 @@ O tempestweb resolve tudo isso com estado explícito e dois eventos tipados:
 ## Pré-requisitos
 
 Antes de continuar, certifique-se de ter feito a
-[Instalação](../installation.md) e lido o
+[Instalação](../tutorial/installation.md) e lido o
 [Tutorial do Counter](../tutorial/index.md) — este exemplo assume que você já
 conhece `Column`, `Row`, `Text`, `App`, `make_state`, `view` e o ciclo de
 `set_state`.

@@ -82,7 +82,7 @@ swapping the implementation — the user's `view()` does not change.
     **Mode C (transpile)** uses no transport: a compiler transcribes the **app
     layer** (`view`/`state`/handlers) to native JavaScript at build time, so the
     `diff` runs **in JS, in the browser**. Even so, the
-    [leaf renderer](transpile.md) is the **same** `client/dom.js` / `style.js` as
+    [leaf renderer](advanced/transpile.md) is the **same** `client/dom.js` / `style.js` as
     Modes A/B — the boundary that changes is *where the `diff` runs*, not *how the
     patch is applied*. That is why Mode C inherits the shared renderer without
     rewriting anything.

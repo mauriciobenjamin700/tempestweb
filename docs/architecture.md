@@ -79,7 +79,7 @@ implementação — o `view()` do usuário não muda.
     O **Modo C (transpile)** não usa um transporte: um compilador transcreve a
     **camada de app** (`view`/`state`/handlers) para JavaScript nativo no build,
     então o `diff` roda **em JS, no browser**. Mesmo assim o
-    [renderizador-folha](transpile.md) é o **mesmo** `client/dom.js` / `style.js`
+    [renderizador-folha](advanced/transpile.md) é o **mesmo** `client/dom.js` / `style.js`
     dos Modos A/B — a fronteira que muda é *onde o `diff` roda*, não *como o
     patch é aplicado*. Por isso o Modo C herda o renderizador compartilhado sem
     reescrever nada.

@@ -145,7 +145,7 @@ nunca um arquivo `.py` posicional.
     `tempestweb.toml` — e, sem esse campo, `wasm`. Um `--mode` explícito sobrescreve.
 
 Quer o passo a passo completo de cada subcomando? Veja
-[Usando a CLI](cli.md). Ou pule direto para o [Tutorial](tutorial/index.md). 🚀
+[Usando a CLI](cli.md). Ou pule direto para o [Tutorial](index.md). 🚀
 
 ---
 
@@ -231,5 +231,5 @@ uv run mkdocs serve            # preview local em http://127.0.0.1:8000
 - Extras controlam quais modos/capacidades você habilita.
 - `make check` é o gate; `uv run mkdocs build --strict` é o gate da documentação.
 
-Pronto? Siga para a [Arquitetura](architecture.md) ou pule direto para o
-[Tutorial](tutorial/index.md). 🚀
+Pronto? Siga para a [Arquitetura](../architecture.md) ou pule direto para o
+[Tutorial](index.md). 🚀

@@ -864,5 +864,5 @@ In this tutorial you learned:
 
 - 💡 Swap `ConsoleTelemetryAdapter` for `SentryTelemetryAdapter` to see the same pattern directing crashes to Sentry
 - 💡 Add a second sink to `create_logger` that sends records to an HTTP endpoint in the background
-- 💡 Explore [Feature Flags](./feature-flags.en.md) (Track O3) to disable unstable features without a deploy
-- 💡 Explore [JWT auth gate](./auth-jwt.en.md) (Track O4) to protect routes with JWT + automatic refresh
+- 💡 Explore [Feature Flags](feature-flags.en.md) (Track O3) to disable unstable features without a deploy
+- 💡 Explore [JWT auth gate](auth-jwt.en.md) (Track O4) to protect routes with JWT + automatic refresh

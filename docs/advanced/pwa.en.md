@@ -125,7 +125,7 @@ After the first load, the app opens and runs **without a network**.
 !!! warning "Test offline with `build`/`run`, not `dev`"
     `tempestweb dev` **does not register the service worker** on purpose (it injects
     a *kill-switch* so you never see a stale cached bundle — see
-    [Using the CLI](cli.md)). So the offline behavior only exists in the production
+    [Using the CLI](../tutorial/cli.md)). So the offline behavior only exists in the production
     artifact: test it with `tempestweb build --mode transpile` (and serve the
     `dist/`) or with `tempestweb run --mode transpile`.
 
@@ -245,7 +245,7 @@ stores the subscriptions and fires the signed sends via
     real device — see [Manual verification](#manual-verification).
 
 !!! info "The full flow has a page of its own"
-    The [WebPush end-to-end (server)](examples/webpush-server.md) example walks
+    The [WebPush end-to-end (server)](../examples/webpush-server.md) example walks
     through key generation, the router, the subscription and the send, step by
     step, with a sequence diagram.
 

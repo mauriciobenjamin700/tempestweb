@@ -701,6 +701,6 @@ Neste tutorial você aprendeu:
 ## Próximos passos
 
 - 💡 Explore o [transporte SSE](../tutorial/modes.md) — a alternativa sem WebSocket para ambientes com proxies HTTP
-- 💡 Adicione [WebPush](../pwa.md) para notificações push no Modo B
+- 💡 Adicione [WebPush](../advanced/pwa.md) para notificações push no Modo B
 - 💡 Leia `docs/contract.md` para o formato completo de todos os 5 tipos de patch
 - 💡 Veja `tests/unit/test_server_ws.py` para testes de nível mais baixo do transporte WebSocket isolado

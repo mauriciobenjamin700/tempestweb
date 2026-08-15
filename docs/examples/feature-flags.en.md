@@ -1277,7 +1277,7 @@ In this tutorial you learned:
 Try extending the example:
 
 - 💡 Add a third flag `dark_mode` and use it to swap the colour palette —
-  combine with the [Theme Switcher](./theme-switcher.en.md) example
+  combine with the [Theme Switcher](theme-switcher.en.md) example
 - 💡 Implement a `GrowthBookFeatureFlagsAdapter` using the Python GrowthBook
   client and swap the adapter in `make_state` without changing `view`
 - 💡 Register a listener with `flags.on_change(lambda: app.set_state(...))` in

@@ -420,7 +420,7 @@ Agora reúna tudo na árvore de widgets retornada por `view`.
     `Edge.symmetric(vertical=v, horizontal=h)` é um atalho de `Style` para definir
     `top=v, bottom=v, left=h, right=h` de uma vez. Veja outros atalhos como
     `Edge.all(n)` e `Edge.only(top=n)` no exemplo
-    [Perfil com Abas](./tabs-profile.md).
+    [Perfil com Abas](tabs-profile.md).
 
 ---
 
@@ -743,5 +743,5 @@ Neste tutorial você construiu uma página de FAQ completa com filtro ao vivo e 
 ## Próximos passos
 
 - Veja o [tutorial central](../tutorial/index.md) para entender o ciclo de vida completo do tempestweb.
-- Explore o padrão de abas no exemplo [Perfil com Abas](./tabs-profile.md).
+- Explore o padrão de abas no exemplo [Perfil com Abas](tabs-profile.md).
 - Adicione animações de abertura/fechamento ao `Accordion` com o `AnimatedSwitcher` (em breve).

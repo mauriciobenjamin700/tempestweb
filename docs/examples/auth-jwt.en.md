@@ -44,7 +44,7 @@ logging with pluggable sinks).
 
 ## Prerequisites
 
-Make sure you have completed the [Installation](../installation.en.md) and read
+Make sure you have completed the [Installation](../tutorial/installation.en.md) and read
 the [Counter Tutorial](../tutorial/index.en.md). This example assumes you
 already know `App`, `set_state`, `make_state`, and `view`.
 
@@ -982,11 +982,11 @@ In this example you learned:
 
 ## Next steps
 
-- Read the [Login Form](./login-form.en.md) example to see three-layer validation
+- Read the [Login Form](login-form.en.md) example to see three-layer validation
   with `Form` + `FormField` + `Banner`.
-- Explore the [Dashboard Shell](./dashboard-shell.en.md) example to see how
+- Explore the [Dashboard Shell](dashboard-shell.en.md) example to see how
   `AuthStore` integrates into a layout with a sidebar and header.
-- See [Notification Center](./notification-center.en.md) to use `Logger` with a
+- See [Notification Center](notification-center.en.md) to use `Logger` with a
   sink that feeds a live notification panel.
-- Check the [`tempestweb.observability` reference](../observability.md) for
+- Check the [`tempestweb.observability` reference](../advanced/observability.md) for
   the full list of `AuthStore` and `RefreshQueue` methods.

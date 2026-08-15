@@ -47,7 +47,7 @@ root, `[0]` = first child, `[0, 1]` = second child of the first child).
 !!! note "How the client tells the type apart"
     By the presence of keys: `set_props` → Update, `node` + `index` → Insert, only
     `index` → Remove, `order` → Reorder, `node` without `index` → Replace. Full
-    detail in the [wire contract](../wire-contract.md).
+    detail in the [wire contract](../advanced/wire-contract.md).
 
 ## The counter, in practice
 

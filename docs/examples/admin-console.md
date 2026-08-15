@@ -379,9 +379,9 @@ Neste tutorial você montou um painel administrativo inteiro e aprendeu:
 
 ## Próximos passos
 
-- Leia [Telas prontas (presets)](../presets.md) para a referência dos cinco
+- Leia [Telas prontas (presets)](../tutorial/presets.md) para a referência dos cinco
   presets e de todos os registros.
 - Compare com o [Dashboard App Shell](dashboard-shell.md), o mesmo painel montado
   widget a widget.
-- Veja [Componentes prontos](../components.md) para o catálogo que você usa
+- Veja [Componentes prontos](../tutorial/components.md) para o catálogo que você usa
   dentro de uma `Section`.

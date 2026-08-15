@@ -31,7 +31,7 @@ que são a fonte da verdade.
     ---
 
     O wire format Python↔cliente, pinado por golden fixtures. O resumo didático
-    está em [Contrato de fronteira](wire-contract.md).
+    está em [Contrato de fronteira](advanced/wire-contract.md).
 
 -   :material-floor-plan: __[Arquitetura](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/arquitetura.md)__
 
@@ -48,11 +48,11 @@ Os grandes blocos de trabalho, todos compartilhados pelos três modos:
 
 | Trilho | Tema | Páginas aqui |
 |---|---|---|
-| **C** | Modo C — transpile (Python → JS nativo) | [Modo C — transpile](transpile.md) |
-| **N** | Capacidades `native/` (Web APIs tipadas) | [Capacidades](capabilities.md) |
-| **O** | Observabilidade / produção (adapter pattern) | [Observabilidade](observability.md) |
-| **P** | PWA / offline-first / WebPush | [PWA e offline](pwa.md) |
-| **B5** | Transporte SSE (alternativa ao WebSocket) | [Contrato de fronteira](wire-contract.md) |
+| **C** | Modo C — transpile (Python → JS nativo) | [Modo C — transpile](advanced/transpile.md) |
+| **N** | Capacidades `native/` (Web APIs tipadas) | [Capacidades](advanced/capabilities.md) |
+| **O** | Observabilidade / produção (adapter pattern) | [Observabilidade](advanced/observability.md) |
+| **P** | PWA / offline-first / WebPush | [PWA e offline](advanced/pwa.md) |
+| **B5** | Transporte SSE (alternativa ao WebSocket) | [Contrato de fronteira](advanced/wire-contract.md) |
 
 !!! tip "A documentação acompanha o código"
     Conforme cada trilho entrega fases, as páginas correspondentes aqui saem de
@@ -67,5 +67,5 @@ Os grandes blocos de trabalho, todos compartilhados pelos três modos:
   estáveis.
 - Os trilhos N/O/P têm páginas dedicadas aqui, atualizadas conforme entregam.
 
-Quer começar a usar? Vá para a [Instalação](installation.md) e faça o
+Quer começar a usar? Vá para a [Instalação](tutorial/installation.md) e faça o
 [Tutorial](tutorial/index.md). 🚀

@@ -226,4 +226,4 @@ In this example you saw:
 
 - 💡 The [Weather (HTTP + geolocation)](weather-native.md) chains **two** native capabilities with this same pattern
 - 💡 Back to the [To-do list](todo.md) for another use of `LazyColumn`
-- 💡 Read [native capabilities](../capabilities.md) to swap `_default_fetch` for `native.http.request`
+- 💡 Read [native capabilities](../advanced/capabilities.md) to swap `_default_fetch` for `native.http.request`

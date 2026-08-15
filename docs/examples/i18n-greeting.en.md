@@ -772,5 +772,5 @@ Try extending the example:
 
 - 💡 Add a **fourth language** (e.g. Japanese `ja-JP`, LTR) — just add entries to `TRANSLATIONS` and `LOCALES`
 - 💡 Load the catalogue from an **external JSON file** with `json.load()` to separate strings from code
-- 💡 Explore the [settings-panel](./settings-panel.md) example to see how `SegmentedControl` is used for preference persistence
+- 💡 Explore the [settings-panel](settings-panel.md) example to see how `SegmentedControl` is used for preference persistence
 - 💡 Read [Execution modes](../tutorial/modes.md) to understand how Mode B sends RTL patches to the JS client without any change to the Python code

@@ -1031,6 +1031,6 @@ Neste tutorial você construiu um formulário de cadastro BR completo. Veja o qu
 
 ## Próximos passos
 
-- Explore outros exemplos de formulário: [Conversor de Temperatura](./temperature-converter.md) mostra validação em tempo real sem submit explícito.
-- Veja a [Data Table](./data-table.md) para exibir os cadastros após persistência.
+- Explore outros exemplos de formulário: [Conversor de Temperatura](temperature-converter.md) mostra validação em tempo real sem submit explícito.
+- Veja a [Data Table](data-table.md) para exibir os cadastros após persistência.
 - Aprenda os fundamentos em [Tutorial — Introdução](../tutorial/index.md) e [Tutorial — Estado](../tutorial/state.md).

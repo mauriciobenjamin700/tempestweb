@@ -167,6 +167,8 @@ renderer is the **same** across all three modes.
     [**Client from OpenAPI**](advanced/openapi.md) ·
     [**Wire contract**](advanced/wire-contract.md) ·
     [**Example gallery**](examples/index.md) — 46 runnable apps ·
+    [**When it goes wrong**](troubleshooting.md) — diagnosis by symptom ·
+    [**FAQ**](faq.md) ·
     [**Stability**](stability.md) ·
     [**Roadmap**](design-docs.md)
 

@@ -93,6 +93,9 @@ plugins:
             "Advanced User Guide": "Guia avançado"
             Project: Projeto
             "API reference": "Referência de API"
+            Help: Ajuda
+            "When it goes wrong": "Quando dá errado"
+            FAQ: "Perguntas frequentes"
             "Generate a client from OpenAPI": "Gerar um cliente a partir de OpenAPI"
             "Tutorial — the Counter": "Tutorial — o Counter"
             "1. The view tree": "1. A árvore de view"
@@ -235,6 +238,9 @@ extra:
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Help:
+      - When it goes wrong: troubleshooting.md
+      - FAQ: faq.md
   - Tutorial - User Guide:
       - Installation: tutorial/installation.md
       - "Tutorial — the Counter": tutorial/index.md

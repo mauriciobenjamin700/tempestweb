@@ -168,6 +168,8 @@ modos.
     [**Cliente a partir de OpenAPI**](advanced/openapi.md) ·
     [**Contrato de fronteira**](advanced/wire-contract.md) ·
     [**Galeria de exemplos**](examples/index.md) — 46 apps rodáveis ·
+    [**Quando dá errado**](troubleshooting.md) — diagnóstico por sintoma ·
+    [**FAQ**](faq.md) ·
     [**Estabilidade**](stability.md) ·
     [**Roadmap**](design-docs.md)
 

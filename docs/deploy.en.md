@@ -32,6 +32,31 @@ create_app(make_state, view, security=SecurityConfig(
 ))
 ```
 
+### Infrastructure blocking WebSocket? Swap the shell for SSE
+
+The `--mode server` artifact ships **both** Mode B clients —
+`static/transport-ws.js` (the one the generated `index.html` mounts) and
+`static/transport-sse.js`. When your proxy or CDN won't let a WebSocket through,
+replace the artifact's `index.html`; the same host already answers on `/sse` and
+`/sse/{id}`, and nothing changes on the Python side:
+
+```html
+<script type="module">
+  import { mount } from "./static/tempestweb.js";
+  import { createSSETransport } from "./static/transport-sse.js";
+
+  const transport = createSSETransport({ session: crypto.randomUUID() });
+  mount(document.getElementById("app"), transport);
+</script>
+```
+
+!!! tip "The `session` is yours to choose"
+    An SSE session is keyed by the id **the client** picks — both channels
+    (`GET /sse?session=<id>` and `POST /sse/<id>`) derive from it.
+    `crypto.randomUUID()` gives one per tab; keeping it in `sessionStorage` lets
+    a reload resume the same session. Across replicas, keep sticky sessions (the
+    generated `nginx.conf` already uses `ip_hash`) or configure the Redis router.
+
 ### Generate the deploy files (`tempestweb deploy`)
 
 Instead of hand-writing the nginx config, generate it for your project:

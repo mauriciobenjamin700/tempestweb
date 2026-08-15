@@ -73,11 +73,29 @@ def test_server_artifact_wires_the_native_bridge(tmp_path: Path) -> None:
     enough on its own: the files were on disk and unused. The fallback lives in
     the transports so any shell, present or future, inherits it.
     """
-    out = build_artifact(_project(tmp_path), mode="server").out_dir
-    transport = (out / "static" / "transport-ws.js").read_text(encoding="utf-8")
-    assert "import { dispatch, subscribeDispatch" in transport
-    assert "await dispatch(envelope)" in transport
-    assert "no native handler" not in transport
+    static = build_artifact(_project(tmp_path), mode="server").out_dir / "static"
+    for name in ("transport-ws.js", "transport-sse.js"):
+        transport = (static / name).read_text(encoding="utf-8")
+        assert "import { dispatch, subscribeDispatch" in transport, name
+        assert "await dispatch(envelope)" in transport, name
+        assert "no native handler" not in transport, name
+
+
+def test_server_artifact_ships_the_sse_transport(tmp_path: Path) -> None:
+    """The server artifact must ship the client for every route its host serves.
+
+    ``create_app`` answers on ``/ws`` **and** ``/sse`` + ``/sse/{id}``, but the
+    artifact only carried ``transport-ws.js``. Infrastructure that blocks
+    WebSocket therefore had a live SSE endpoint and no client to reach it with —
+    the fallback transport had to be copied out of the installed package by
+    hand. Both transports ship now; the generated shell still mounts the
+    WebSocket one.
+    """
+    static = build_artifact(_project(tmp_path), mode="server").out_dir / "static"
+    assert (static / "transport-sse.js").is_file()
+    assert "createSSETransport" in (static / "transport-sse.js").read_text(
+        encoding="utf-8"
+    )
 
 
 def test_wasm_prod_shell_registers_service_worker(tmp_path: Path) -> None:

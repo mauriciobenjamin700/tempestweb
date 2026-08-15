@@ -4,6 +4,32 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.61.3] — 2026-08-15
+
+### Fixed
+
+- **The server artifact now ships the SSE client too.** `create_app` answers on
+  `/ws` **and** `/sse` + `/sse/{id}`, but `tempestweb build --mode server` only
+  copied `transport-ws.js` — infrastructure that blocks WebSocket had a live SSE
+  endpoint and no client to reach it with, short of copying the file out of the
+  installed package by hand. Both transports ship under `static/` now; the
+  generated shell still mounts the WebSocket one, and swapping in an SSE shell
+  is a documented four-line change (see "Deploy → Infra que bloqueia
+  WebSocket?").
+- **SSE: events raised before the stream opens are no longer lost.** The server
+  materialises a session while handling the `GET /sse` that opens the stream, so
+  any envelope POSTed before that — the router's initial `navigate`, or a click
+  on a pre-rendered control — hit `POST /sse/<id>` on an unknown id and was
+  answered `404`. In a routed app the server never learned the initial path.
+  `sendEvent` now buffers until `open` (and again across a reconnect, since the
+  browser's `EventSource` re-fires it), capped at 1000 envelopes with
+  drop-oldest, mirroring the WebSocket outbox. `native_result` frames stay
+  unbuffered: they can only follow a `native_call` on an already-open stream.
+- **SSE: a rejected POST is logged instead of swallowed.** The client-to-server
+  leg ignored the response entirely, so a `404` (unknown session), `401`
+  (unauthorized) or `413` (oversized body) dropped the envelope with no trace on
+  either side. It now warns on the console with the status.
+
 ## [0.61.2] — 2026-08-15
 
 ### Fixed

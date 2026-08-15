@@ -213,16 +213,21 @@ WASM_ARTIFACT_FILES: tuple[str, ...] = (
     "client/pwa/post-install-redirect.js",
 )
 
-# Files a server artifact must contain, relative to the artifact root. The
-# WebSocket transport imports ``native/index.js``, which eagerly loads the whole
-# native tree (+ offline queue, push and the install prompt), so the server
-# artifact must ship the same client closure the wasm artifact does — otherwise
-# the browser 404s on those modules and the app never mounts.
+# Files a server artifact must contain, relative to the artifact root. Both Mode
+# B transports ship: the shell mounts the WebSocket one, and transport-sse.js
+# covers the /sse routes the same host serves. Each imports ``native/index.js``,
+# which eagerly loads the whole native tree (+ offline queue, push and the
+# install prompt), so the server artifact must ship the same client closure the
+# wasm artifact does — otherwise the browser 404s on those modules and the app
+# never mounts.
 SERVER_ARTIFACT_FILES: tuple[str, ...] = (
     "server.py",
     "app.py",
     "index.html",
-    *(f"static/{asset}" for asset in (*_CLIENT_ASSETS, "transport-ws.js")),
+    *(
+        f"static/{asset}"
+        for asset in (*_CLIENT_ASSETS, "transport-ws.js", "transport-sse.js")
+    ),
     *(f"static/icons/{asset}" for asset in _ICON_ASSETS),
     *(f"static/native/{asset}" for asset in _NATIVE_ASSETS),
     *(f"static/offline/{asset}" for asset in _OFFLINE_ASSETS),
@@ -621,13 +626,20 @@ def _copy_client_extras(client: Path, base: Path) -> None:
         shutil.copyfile(pwa_source, pwa_dest / pwa_asset)
 
 
-def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
-    """Copy the shared client assets plus a mode-specific transport into ``dest``.
+def _copy_client(client: Path, dest: Path, *transports: str) -> list[str]:
+    """Copy the shared client assets plus the mode's transports into ``dest``.
+
+    The icon resolver and its vendored sets live in an ``icons/`` subdir, imported
+    by ``dom.js`` as ``./icons/index.js``; that layout is preserved next to the
+    flat assets.
 
     Args:
         client: The repository's ``client/`` directory.
         dest: The artifact subdirectory to copy assets into.
-        transport: The mode-specific transport filename (e.g. ``transport-wasm.js``).
+        *transports: The transport filenames the mode can mount (e.g.
+            ``transport-wasm.js``). A mode may ship more than one — a server
+            artifact carries both ``transport-ws.js`` and ``transport-sse.js``,
+            since its host answers on ``/ws`` and ``/sse`` alike.
 
     Returns:
         The asset filenames that were copied.
@@ -637,14 +649,12 @@ def _copy_client(client: Path, dest: Path, transport: str) -> list[str]:
     """
     dest.mkdir(parents=True, exist_ok=True)
     written: list[str] = []
-    for asset in (*_CLIENT_ASSETS, transport):
+    for asset in (*_CLIENT_ASSETS, *transports):
         source = client / asset
         if not source.is_file():
             raise BuildError(f"missing client asset: {source}")
         shutil.copyfile(source, dest / asset)
         written.append(asset)
-    # The icon resolver + vendored sets live in an icons/ subdir, imported by
-    # dom.js as `./icons/index.js`; preserve that layout next to the flat assets.
     icons_dest = dest / "icons"
     icons_dest.mkdir(parents=True, exist_ok=True)
     for asset in _ICON_ASSETS:
@@ -1273,6 +1283,17 @@ def _build_server(
 ) -> tuple[str, ...]:
     """Write the server (FastAPI) artifact layout into ``out``.
 
+    Both Mode B transports are shipped under ``static/``: the generated shell
+    mounts ``transport-ws.js``, while ``transport-sse.js`` covers the ``/sse``
+    routes the same host already serves — infrastructure that blocks WebSocket
+    only needs its own shell, not a second build.
+
+    Both import ``native/index.js``, which eagerly loads the whole native tree
+    (+ offline queue, push and the install prompt), so the artifact must ship
+    that closure too — otherwise the browser 404s on those modules and the app
+    never mounts. It is the same closure the wasm artifact ships, under
+    ``static/`` instead of ``client/``.
+
     Args:
         out: The artifact root.
         client: The shared ``client/`` directory.
@@ -1285,10 +1306,7 @@ def _build_server(
     (out / "server.py").write_text(_server_py(name), encoding="utf-8")
     (out / "app.py").write_text(app_source, encoding="utf-8")
     (out / "index.html").write_text(_index_html_server(name), encoding="utf-8")
-    _copy_client(client, out / "static", "transport-ws.js")
-    # transport-ws.js imports native/index.js, which pulls in the whole native
-    # tree + offline/push/pwa closure — ship it or the browser 404s and never
-    # mounts. Same closure the wasm artifact ships, under static/ instead.
+    _copy_client(client, out / "static", "transport-ws.js", "transport-sse.js")
     _copy_client_extras(client, out / "static")
     return tuple(sorted(SERVER_ARTIFACT_FILES))
 

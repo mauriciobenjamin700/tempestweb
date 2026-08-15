@@ -19,6 +19,9 @@ import { dispatch, subscribeDispatch, unsubscribeDispatch } from "./native/index
  * @typedef {import("./transport.js").TWEvent} TWEvent
  */
 
+/** Cap on outbound `event` envelopes buffered while the stream is down. */
+const MAX_OUTBOX = 1000;
+
 /**
  * Create an SSE + POST transport (Mode B, B5).
  *
@@ -62,18 +65,36 @@ export function createSSETransport(config) {
   let navigateHandler = null;
   /** @type {Patch[][]} */
   const pendingBatches = [];
+  /** Whether the stream is open — i.e. the server holds a session for this id. */
+  let streamOpen = false;
+  /** @type {Object[]} Outbound `event` envelopes buffered while the stream is down. */
+  const outbox = [];
 
   /**
    * POST one envelope back to the server (client -> server leg).
+   *
+   * A rejected POST is logged rather than swallowed: the server answers `404`
+   * for an unknown session, `401` unauthorized and `413` for an oversized body,
+   * and an envelope lost to any of those would otherwise vanish without a trace
+   * on either side.
+   *
    * @param {Object} envelope
    * @returns {Promise<void>}
    */
   async function post(envelope) {
-    await fetchImpl(postUrl, {
+    const response = await fetchImpl(postUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(envelope),
     });
+    if (response && response.ok === false) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn(
+          `tempestweb sse: POST ${postUrl} rejected (${response.status}), dropped`,
+          envelope.kind,
+        );
+      }
+    }
   }
 
   /**
@@ -134,6 +155,15 @@ export function createSSETransport(config) {
 
   source.addEventListener("ping", () => {});
 
+  source.addEventListener("open", () => {
+    streamOpen = true;
+    while (outbox.length > 0) void post(outbox.shift());
+  });
+
+  source.addEventListener("error", () => {
+    streamOpen = false;
+  });
+
   return {
     /**
      * Register the patch-batch callback; flushes any buffered batches.
@@ -156,11 +186,37 @@ export function createSSETransport(config) {
 
     /**
      * Send a user event back to the Python side (via HTTP POST).
+     *
+     * Events raised before the stream opens are buffered and flushed on `open`,
+     * never POSTed blind. The server only materialises the session when it
+     * handles the `GET /sse` that opens the stream, so an event that overtakes
+     * it — the router's initial `navigate`, or a click on a pre-rendered
+     * control — hits `POST /sse/<id>` on an id the server has never seen and is
+     * answered `404`, silently losing it. The buffer is capped at
+     * {@link MAX_OUTBOX} envelopes so a long outage cannot grow it forever;
+     * past that the oldest are dropped (and logged), as in the WebSocket
+     * transport. `native_result` frames are never buffered: they can only be
+     * produced by a `native_call` that arrived on an already-open stream.
+     *
      * @param {TWEvent} event
      * @returns {void}
      */
     sendEvent(event) {
-      void post({ kind: "event", data: event });
+      const envelope = { kind: "event", data: event };
+      if (streamOpen) {
+        void post(envelope);
+        return;
+      }
+      if (outbox.length >= MAX_OUTBOX) {
+        const dropped = outbox.shift();
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn(
+            `tempestweb sse: outbox full (${MAX_OUTBOX}), dropped oldest envelope`,
+            dropped && dropped.kind,
+          );
+        }
+      }
+      outbox.push(envelope);
     },
 
     sendNativeResult,

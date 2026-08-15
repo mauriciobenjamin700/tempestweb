@@ -30,6 +30,14 @@ class FakeEventSource {
   ping() {
     for (const fn of this._listeners.ping || []) fn({ data: "{}" });
   }
+  /** Test helper: the stream opened (the server now holds the session). */
+  open() {
+    for (const fn of this._listeners.open || []) fn({});
+  }
+  /** Test helper: the stream dropped; the browser will reconnect. */
+  fail() {
+    for (const fn of this._listeners.error || []) fn({});
+  }
 }
 
 /** A fetch double that records every POST body. */
@@ -105,12 +113,19 @@ test("sse transport routes a navigate envelope to onNavigate", () => {
 
 test("sse transport POSTs events to the per-session url", async () => {
   const posts = [];
-  const Impl = class extends FakeEventSource {};
+  let source;
+  const Impl = class extends FakeEventSource {
+    constructor(url) {
+      super(url);
+      source = this;
+    }
+  };
   const transport = createSSETransport({
     session: "abc",
     EventSourceImpl: Impl,
     fetchImpl: makeFetch(posts),
   });
+  source.open();
 
   transport.sendEvent({ type: "click", key: "inc", payload: {} });
   await new Promise((r) => setTimeout(r, 0));
@@ -121,6 +136,94 @@ test("sse transport POSTs events to the per-session url", async () => {
     kind: "event",
     data: { type: "click", key: "inc", payload: {} },
   });
+});
+
+// Regression: the server only registers the session while handling the GET /sse
+// that opens the stream, so an event POSTed first — the router's initial
+// `navigate` — was answered 404 and silently lost.
+test("sse transport buffers events raised before the stream opens", async () => {
+  const posts = [];
+  let source;
+  const Impl = class extends FakeEventSource {
+    constructor(url) {
+      super(url);
+      source = this;
+    }
+  };
+  const transport = createSSETransport({
+    session: "abc",
+    EventSourceImpl: Impl,
+    fetchImpl: makeFetch(posts),
+  });
+
+  transport.sendEvent({ type: "navigate", key: "", payload: { path: "/" } });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(posts.length, 0, "nothing may be POSTed before the stream opens");
+
+  source.open();
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.equal(posts.length, 1);
+  assert.deepEqual(posts[0].body, {
+    kind: "event",
+    data: { type: "navigate", key: "", payload: { path: "/" } },
+  });
+});
+
+test("sse transport re-buffers events while the stream is down", async () => {
+  const posts = [];
+  let source;
+  const Impl = class extends FakeEventSource {
+    constructor(url) {
+      super(url);
+      source = this;
+    }
+  };
+  const transport = createSSETransport({
+    session: "abc",
+    EventSourceImpl: Impl,
+    fetchImpl: makeFetch(posts),
+  });
+  source.open();
+  source.fail();
+
+  transport.sendEvent({ type: "click", key: "inc", payload: {} });
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(posts.length, 0);
+
+  source.open();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(posts.length, 1);
+  assert.equal(posts[0].body.data.key, "inc");
+});
+
+test("sse transport warns when a POST is rejected", async () => {
+  const warnings = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  let source;
+  const Impl = class extends FakeEventSource {
+    constructor(url) {
+      super(url);
+      source = this;
+    }
+  };
+  const transport = createSSETransport({
+    session: "abc",
+    EventSourceImpl: Impl,
+    fetchImpl: async () => ({ ok: false, status: 404 }),
+  });
+  source.open();
+
+  try {
+    transport.sendEvent({ type: "click", key: "inc", payload: {} });
+    await new Promise((r) => setTimeout(r, 0));
+  } finally {
+    console.warn = realWarn;
+  }
+
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0][0], /rejected \(404\)/);
 });
 
 test("sse transport POSTs native_result for a native_call", async () => {

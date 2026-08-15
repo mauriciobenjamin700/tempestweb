@@ -12,7 +12,7 @@ tempestweb is **pre-1.0** (`0.x`). Until then:
 - **Public surface** = what you import from `tempestweb` and its documented
   subpackages (`tempestweb.server`, `tempestweb.native`, `tempestweb.transpile`,
   `tempestweb.html`, `tempestweb.pwa`, `tempestweb.cli`) + the **wire contract**
-  ([`docs/contract.md`](contract.md)). Underscored names are private.
+  ([`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md)). Underscored names are private.
 - **Compatibility:** a `0.x` minor may carry documented behavior changes (see the
   [CHANGELOG](https://github.com/mauriciobenjamin700/tempestweb/blob/main/CHANGELOG.md)).
   Pin the version in production.
@@ -55,7 +55,7 @@ validators, and all `native/` capabilities.
 `raise ... from`, starred unpacking, arbitrary decorators (only `@dataclass`),
 and most of `tempest_core.components` (Python composition that expands at
 `build()` time — use Modes A/B, or primitives/HStack/VStack in C). Porting the
-components (a JS resolver layer) remains on the [roadmap](roadmap.md) — S11.
+components (a JS resolver layer) remains on the [roadmap](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md) — S11.
 
 !!! tip "A/B/C portability"
     A `view()` within the subset runs **identically** in all three modes.

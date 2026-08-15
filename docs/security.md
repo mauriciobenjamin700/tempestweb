@@ -151,4 +151,4 @@ Um middleware adiciona os headers a **toda** resposta HTTP.
 - **S6** `security_headers` / `hsts` / `content_security_policy` endurecem as
   respostas; o cliente é XSS-safe por construção.
 - Deploy (S5), escala (S4) e observabilidade de servidor (S8) seguem no
-  [roadmap](roadmap.md) — Trilho S.
+  [roadmap](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md) — Trilho S.

@@ -12,7 +12,7 @@ tempestweb é **pré-1.0** (`0.x`). Enquanto isso:
 - **Superfície pública** = o que é importável de `tempestweb` e seus subpacotes
   documentados (`tempestweb.server`, `tempestweb.native`, `tempestweb.transpile`,
   `tempestweb.html`, `tempestweb.pwa`, `tempestweb.cli`) + o **wire-contract**
-  ([`docs/contract.md`](contract.md)). Nomes com `_` são privados.
+  ([`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md)). Nomes com `_` são privados.
 - **Compatibilidade:** minor `0.x` pode conter mudanças de comportamento
   documentadas no [CHANGELOG](https://github.com/mauriciobenjamin700/tempestweb/blob/main/CHANGELOG.md).
   Fixe a versão em produção.
@@ -57,7 +57,7 @@ navegação/i18n/tema/animação/validators e todas as capacidades `native/`.
 `@dataclass`), e a maior parte de `tempest_core.components` (composição Python
 que expande via `build()` — use Modos A/B, ou primitivos/HStack/VStack no C). A
 decisão de portar os components (camada de resolvers em JS) segue no
-[roadmap](roadmap.md) — S11.
+[roadmap](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md) — S11.
 
 !!! tip "Portabilidade A/B/C"
     Um `view()` no subset roda **idêntico** nos três modos. O `build --mode

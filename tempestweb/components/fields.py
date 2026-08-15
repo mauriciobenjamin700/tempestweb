@@ -69,11 +69,16 @@ _ERROR_COLOR: Color = Color.from_hex("#b3261e")
 def _labelled_field(label: str, field: Widget, error: str, key: str) -> Widget:
     """Wrap an input in an optional label + optional error column.
 
+    Every child key is derived from ``key``. Keys are how the event router finds
+    the handler that fired, so a literal key here would be shared by every field
+    of this kind on the screen and edits would land on the wrong one.
+
     Args:
         label: The label text shown above the field (omitted when empty).
         field: The input widget to wrap.
         error: The validation message; the error line is hidden when empty.
-        key: The reconciler key for the wrapping column.
+        key: The reconciler key for the wrapping column, and the prefix its
+            children's keys are derived from.
 
     Returns:
         A :class:`~tempest_core.Column` of the optional label, the field and the
@@ -89,7 +94,7 @@ def _labelled_field(label: str, field: Widget, error: str, key: str) -> Widget:
                     font_weight=FontWeight.MEDIUM,
                     color=_LABEL_COLOR,
                 ),
-                key="field-label",
+                key=f"{key}-label",
             )
         )
     children.append(field)
@@ -98,7 +103,7 @@ def _labelled_field(label: str, field: Widget, error: str, key: str) -> Widget:
             Text(
                 content=error,
                 style=Style(font_size=12.0, color=_ERROR_COLOR),
-                key="field-error",
+                key=f"{key}-error",
             )
         )
     return Column(key=key, style=Style(gap=4.0), children=children)
@@ -130,6 +135,11 @@ class TextField(Component):
     def render(self) -> Widget:
         """Lower the field into a labelled column wrapping a text Input.
 
+        The inner widgets' keys are derived from this component's ``key``. They
+        used to be literals, so two fields on the same screen shared the key of
+        the ``Input`` that actually emits the events and the router could not
+        tell them apart — an edit applied to the wrong field, silently.
+
         Returns:
             A :class:`~tempest_core.Column` with the optional label, the text
             input, and the optional error line.
@@ -139,27 +149,28 @@ class TextField(Component):
         def _emit(event: TextChangeEvent) -> None:
             on_change(event.value)
 
+        base = self.key or "text-field"
         children: list[Widget] = []
         if self.label:
-            children.append(Text(content=self.label, key="text-field-label"))
+            children.append(Text(content=self.label, key=f"{base}-label"))
         children.append(
             Input(
                 value=self.value,
                 placeholder=self.placeholder,
                 on_change=_emit,
-                key="text-field-input",
+                key=f"{base}-input",
             )
         )
         if self.error:
             children.append(
                 Text(
                     content=self.error,
-                    key="text-field-error",
+                    key=f"{base}-error",
                     style=Style(color=_ERROR_COLOR),
                 )
             )
         return Column(
-            key=self.key or "text-field",
+            key=base,
             style=Style(gap=4.0, padding=Edge.symmetric(vertical=4.0)),
             children=children,
         )
@@ -205,14 +216,15 @@ class EmailField(Component):
         def _emit(event: TextChangeEvent) -> None:
             on_change(event.value)
 
+        base = self.key or "email-field"
         field = Input(
             value=self.value,
             placeholder=self.placeholder,
             keyboard=KeyboardType.EMAIL,
             on_change=_emit,
-            key="email-field-input",
+            key=f"{base}-input",
         )
-        return _labelled_field(self.label, field, self.error, self.key or "email-field")
+        return _labelled_field(self.label, field, self.error, base)
 
 
 class PasswordField(Component):
@@ -249,13 +261,12 @@ class PasswordField(Component):
         def _emit(event: TextChangeEvent) -> None:
             on_change(event.value)
 
+        base = self.key or "password-field"
         field = Input(
             value=self.value,
             placeholder=self.placeholder,
             secure=True,
             on_change=_emit,
-            key="password-field-input",
+            key=f"{base}-input",
         )
-        return _labelled_field(
-            self.label, field, self.error, self.key or "password-field"
-        )
+        return _labelled_field(self.label, field, self.error, base)

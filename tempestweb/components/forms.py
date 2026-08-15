@@ -79,27 +79,28 @@ class LoginForm(Component):
             A :class:`~tempest_core.Column` containing the optional title, the
             e-mail and password fields, and the submit button.
         """
+        base = self.key or "login"
         children: list[Widget] = []
         if self.title:
-            children.append(Text(content=self.title, key="login-title"))
+            children.append(Text(content=self.title, key=f"{base}-title"))
         children.extend(
             [
                 EmailField(
                     value=self.email,
                     on_change=self.on_email_change,
                     error=self.email_error,
-                    key="login-email",
+                    key=f"{base}-email",
                 ),
                 PasswordField(
                     value=self.password,
                     on_change=self.on_password_change,
                     error=self.password_error,
-                    key="login-password",
+                    key=f"{base}-password",
                 ),
                 Button(
                     label=self.submit_label,
                     on_click=self.on_submit,
-                    key="login-submit",
+                    key=f"{base}-submit",
                 ),
             ]
         )
@@ -161,34 +162,35 @@ class SignupForm(Component):
             A :class:`~tempest_core.Column` with the optional title, the e-mail,
             password and confirm-password fields, and the submit button.
         """
+        base = self.key or "signup"
         children: list[Widget] = []
         if self.title:
-            children.append(Text(content=self.title, key="signup-title"))
+            children.append(Text(content=self.title, key=f"{base}-title"))
         children.extend(
             [
                 EmailField(
                     value=self.email,
                     on_change=self.on_email_change,
                     error=self.email_error,
-                    key="signup-email",
+                    key=f"{base}-email",
                 ),
                 PasswordField(
                     value=self.password,
                     on_change=self.on_password_change,
                     error=self.password_error,
-                    key="signup-password",
+                    key=f"{base}-password",
                 ),
                 PasswordField(
                     value=self.confirm,
                     on_change=self.on_confirm_change,
                     error=self.confirm_error,
                     label="Confirmar senha",
-                    key="signup-confirm",
+                    key=f"{base}-confirm",
                 ),
                 Button(
                     label=self.submit_label,
                     on_click=self.on_submit,
-                    key="signup-submit",
+                    key=f"{base}-submit",
                 ),
             ]
         )

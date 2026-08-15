@@ -202,3 +202,89 @@ def test_text_button_has_no_border() -> None:
     style = node.props.get("style")
     assert style is not None
     assert getattr(style, "border", None) is None
+
+
+# --- keys are derived from the caller's, never literal (issue #63) ----------
+#
+# A key is how the event router finds the handler that fired. A literal key on
+# the inner Input meant every field of that kind on the screen shared one, so an
+# edit could apply to a different field — silently, and worst of all in a form
+# of monetary values, which is where it was found.
+
+
+def _input_key(node: Node) -> str | None:
+    """Return the key of the first Input in a built tree.
+
+    Args:
+        node: The built tree to search.
+
+    Returns:
+        The Input's key, or ``None`` when the tree has no Input.
+    """
+    for candidate in _walk(node):
+        if candidate.type == "Input":
+            return candidate.key
+    return None
+
+
+def test_two_text_fields_have_distinct_inner_keys() -> None:
+    """Regression: a shared key makes the event router pick the wrong field."""
+    discount = build(
+        TextField(key="discount", label="Deságio", error="x", on_change=lambda _v: None)
+    )
+    profit = build(
+        TextField(key="profit", label="Lucro", error="y", on_change=lambda _v: None)
+    )
+
+    assert _input_key(discount) == "discount-input"
+    assert _input_key(profit) == "profit-input"
+    assert _find(discount, key="discount-label") is not None
+    assert _find(discount, key="discount-error") is not None
+
+
+def test_two_email_fields_have_distinct_inner_keys() -> None:
+    """The same defect lived in every field that wraps an Input."""
+    work = build(EmailField(key="work-email", on_change=lambda _v: None))
+    personal = build(EmailField(key="home-email", on_change=lambda _v: None))
+
+    assert _input_key(work) == "work-email-input"
+    assert _input_key(personal) == "home-email-input"
+
+
+def test_two_password_fields_in_one_form_have_distinct_inner_keys() -> None:
+    """SignupForm renders two PasswordFields — the classic collision."""
+    node = build(
+        SignupForm(
+            email="",
+            password="",
+            confirm="",
+            on_email_change=lambda _v: None,
+            on_password_change=lambda _v: None,
+            on_confirm_change=lambda _v: None,
+            on_submit=lambda: None,
+        )
+    )
+    input_keys = [n.key for n in _walk(node) if n.type == "Input"]
+    assert len(input_keys) == len(set(input_keys)), input_keys
+
+
+def test_field_keys_are_unchanged_without_a_caller_key() -> None:
+    """Nothing moves for an app with one field per screen."""
+    node = build(TextField(label="Nome", on_change=lambda _v: None))
+    assert _input_key(node) == "text-field-input"
+    assert node.key == "text-field"
+
+
+def test_form_keys_are_unchanged_without_a_caller_key() -> None:
+    """The documented login/signup keys stay put; only the prefix is now derived."""
+    node = build(
+        LoginForm(
+            email="",
+            password="",
+            on_email_change=lambda _v: None,
+            on_password_change=lambda _v: None,
+            on_submit=lambda: None,
+        )
+    )
+    assert node.key == "login-form"
+    assert _find(node, key="login-submit") is not None

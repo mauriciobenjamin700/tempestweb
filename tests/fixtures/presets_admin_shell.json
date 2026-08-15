@@ -1,0 +1,1364 @@
+{
+  "type": "Stack",
+  "key": "tw-shell",
+  "props": {
+    "style": null,
+    "semantics": null,
+    "focusable": null,
+    "focus_order": null,
+    "attrs": {
+      "data-tw-layout": "shell"
+    }
+  },
+  "children": [
+    {
+      "type": "Stack",
+      "key": "tw-shell-sidebar",
+      "props": {
+        "style": {
+          "direction": null,
+          "justify": null,
+          "align": null,
+          "align_self": null,
+          "grow": null,
+          "gap": null,
+          "flex_wrap": null,
+          "padding": null,
+          "margin": null,
+          "border": null,
+          "radius": null,
+          "background": {
+            "r": 31,
+            "g": 41,
+            "b": 55,
+            "a": 1.0
+          },
+          "color": null,
+          "opacity": null,
+          "shadow": null,
+          "font_family": null,
+          "font_size": null,
+          "font_weight": null,
+          "font_style": null,
+          "text_align": null,
+          "text_decoration": null,
+          "letter_spacing": null,
+          "line_height": null,
+          "max_lines": null,
+          "text_overflow": null,
+          "text_scale": null,
+          "font_asset": null,
+          "width": null,
+          "height": null,
+          "min_width": null,
+          "max_width": null,
+          "min_height": null,
+          "max_height": null,
+          "aspect_ratio": null,
+          "stack_align": null,
+          "position": null,
+          "top": null,
+          "right": null,
+          "bottom": null,
+          "left": null,
+          "transition": null
+        },
+        "semantics": null,
+        "focusable": null,
+        "focus_order": null,
+        "attrs": {
+          "data-tw-open": "false",
+          "data-tw-layout": "shell-sidebar"
+        }
+      },
+      "children": [
+        {
+          "type": "Column",
+          "key": "tw-shell-brand",
+          "props": {
+            "style": {
+              "direction": null,
+              "justify": null,
+              "align": null,
+              "align_self": null,
+              "grow": null,
+              "gap": null,
+              "flex_wrap": null,
+              "padding": {
+                "top": 16.0,
+                "right": 16.0,
+                "bottom": 16.0,
+                "left": 16.0
+              },
+              "margin": null,
+              "border": null,
+              "radius": null,
+              "background": null,
+              "color": null,
+              "opacity": null,
+              "shadow": null,
+              "font_family": null,
+              "font_size": null,
+              "font_weight": null,
+              "font_style": null,
+              "text_align": null,
+              "text_decoration": null,
+              "letter_spacing": null,
+              "line_height": null,
+              "max_lines": null,
+              "text_overflow": null,
+              "text_scale": null,
+              "font_asset": null,
+              "width": null,
+              "height": null,
+              "min_width": null,
+              "max_width": null,
+              "min_height": null,
+              "max_height": null,
+              "aspect_ratio": null,
+              "stack_align": null,
+              "position": null,
+              "top": null,
+              "right": null,
+              "bottom": null,
+              "left": null,
+              "transition": null
+            },
+            "semantics": null,
+            "focusable": null,
+            "focus_order": null
+          },
+          "children": [
+            {
+              "type": "Text",
+              "key": "tw-shell-brand-text",
+              "props": {
+                "style": {
+                  "direction": null,
+                  "justify": null,
+                  "align": null,
+                  "align_self": null,
+                  "grow": null,
+                  "gap": null,
+                  "flex_wrap": null,
+                  "padding": null,
+                  "margin": null,
+                  "border": null,
+                  "radius": null,
+                  "background": null,
+                  "color": {
+                    "r": 156,
+                    "g": 163,
+                    "b": 175,
+                    "a": 1.0
+                  },
+                  "opacity": null,
+                  "shadow": null,
+                  "font_family": null,
+                  "font_size": 12.0,
+                  "font_weight": null,
+                  "font_style": null,
+                  "text_align": null,
+                  "text_decoration": null,
+                  "letter_spacing": null,
+                  "line_height": null,
+                  "max_lines": null,
+                  "text_overflow": null,
+                  "text_scale": null,
+                  "font_asset": null,
+                  "width": null,
+                  "height": null,
+                  "min_width": null,
+                  "max_width": null,
+                  "min_height": null,
+                  "max_height": null,
+                  "aspect_ratio": null,
+                  "stack_align": null,
+                  "position": null,
+                  "top": null,
+                  "right": null,
+                  "bottom": null,
+                  "left": null,
+                  "transition": null
+                },
+                "semantics": null,
+                "focusable": null,
+                "focus_order": null,
+                "content": "ACME"
+              },
+              "children": []
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "key": "tw-shell-nav",
+          "props": {
+            "style": {
+              "direction": null,
+              "justify": null,
+              "align": null,
+              "align_self": null,
+              "grow": null,
+              "gap": 4.0,
+              "flex_wrap": null,
+              "padding": {
+                "top": 8.0,
+                "right": 8.0,
+                "bottom": 8.0,
+                "left": 8.0
+              },
+              "margin": null,
+              "border": null,
+              "radius": null,
+              "background": null,
+              "color": null,
+              "opacity": null,
+              "shadow": null,
+              "font_family": null,
+              "font_size": null,
+              "font_weight": null,
+              "font_style": null,
+              "text_align": null,
+              "text_decoration": null,
+              "letter_spacing": null,
+              "line_height": null,
+              "max_lines": null,
+              "text_overflow": null,
+              "text_scale": null,
+              "font_asset": null,
+              "width": null,
+              "height": null,
+              "min_width": null,
+              "max_width": null,
+              "min_height": null,
+              "max_height": null,
+              "aspect_ratio": null,
+              "stack_align": null,
+              "position": null,
+              "top": null,
+              "right": null,
+              "bottom": null,
+              "left": null,
+              "transition": null
+            },
+            "semantics": null,
+            "focusable": null,
+            "focus_order": null
+          },
+          "children": [
+            {
+              "type": "Button",
+              "key": "tw-nav-overview",
+              "props": {
+                "style": {
+                  "direction": null,
+                  "justify": null,
+                  "align": null,
+                  "align_self": null,
+                  "grow": null,
+                  "gap": null,
+                  "flex_wrap": null,
+                  "padding": {
+                    "top": 10.0,
+                    "right": 12.0,
+                    "bottom": 10.0,
+                    "left": 12.0
+                  },
+                  "margin": null,
+                  "border": null,
+                  "radius": 8.0,
+                  "background": {
+                    "r": 0,
+                    "g": 0,
+                    "b": 0,
+                    "a": 0.0
+                  },
+                  "color": {
+                    "r": 156,
+                    "g": 163,
+                    "b": 175,
+                    "a": 1.0
+                  },
+                  "opacity": null,
+                  "shadow": null,
+                  "font_family": null,
+                  "font_size": 14.0,
+                  "font_weight": 400,
+                  "font_style": null,
+                  "text_align": null,
+                  "text_decoration": null,
+                  "letter_spacing": null,
+                  "line_height": null,
+                  "max_lines": null,
+                  "text_overflow": null,
+                  "text_scale": null,
+                  "font_asset": null,
+                  "width": null,
+                  "height": null,
+                  "min_width": null,
+                  "max_width": null,
+                  "min_height": 48.0,
+                  "max_height": null,
+                  "aspect_ratio": null,
+                  "stack_align": null,
+                  "position": null,
+                  "top": null,
+                  "right": null,
+                  "bottom": null,
+                  "left": null,
+                  "transition": null
+                },
+                "semantics": null,
+                "focusable": null,
+                "focus_order": null,
+                "attrs": {
+                  "data-tw-layout": "nav-item",
+                  "data-tw-active": "false"
+                },
+                "label": "Visão geral",
+                "on_click": null,
+                "variant": "solid",
+                "size": "md",
+                "color_scheme": "primary"
+              },
+              "children": []
+            },
+            {
+              "type": "Button",
+              "key": "tw-nav-users",
+              "props": {
+                "style": {
+                  "direction": null,
+                  "justify": null,
+                  "align": null,
+                  "align_self": null,
+                  "grow": null,
+                  "gap": null,
+                  "flex_wrap": null,
+                  "padding": {
+                    "top": 10.0,
+                    "right": 12.0,
+                    "bottom": 10.0,
+                    "left": 12.0
+                  },
+                  "margin": null,
+                  "border": null,
+                  "radius": 8.0,
+                  "background": {
+                    "r": 37,
+                    "g": 99,
+                    "b": 235,
+                    "a": 1.0
+                  },
+                  "color": {
+                    "r": 249,
+                    "g": 250,
+                    "b": 251,
+                    "a": 1.0
+                  },
+                  "opacity": null,
+                  "shadow": null,
+                  "font_family": null,
+                  "font_size": 14.0,
+                  "font_weight": 700,
+                  "font_style": null,
+                  "text_align": null,
+                  "text_decoration": null,
+                  "letter_spacing": null,
+                  "line_height": null,
+                  "max_lines": null,
+                  "text_overflow": null,
+                  "text_scale": null,
+                  "font_asset": null,
+                  "width": null,
+                  "height": null,
+                  "min_width": null,
+                  "max_width": null,
+                  "min_height": 48.0,
+                  "max_height": null,
+                  "aspect_ratio": null,
+                  "stack_align": null,
+                  "position": null,
+                  "top": null,
+                  "right": null,
+                  "bottom": null,
+                  "left": null,
+                  "transition": null
+                },
+                "semantics": null,
+                "focusable": null,
+                "focus_order": null,
+                "attrs": {
+                  "data-tw-layout": "nav-item",
+                  "data-tw-active": "true"
+                },
+                "label": "Usuários  (3)",
+                "on_click": null,
+                "variant": "solid",
+                "size": "md",
+                "color_scheme": "primary"
+              },
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Stack",
+      "key": "tw-shell-header",
+      "props": {
+        "style": null,
+        "semantics": null,
+        "focusable": null,
+        "focus_order": null,
+        "attrs": {
+          "data-tw-layout": "shell-header"
+        }
+      },
+      "children": [
+        {
+          "type": "Row",
+          "key": "tw-shell-appbar",
+          "props": {
+            "style": {
+              "direction": null,
+              "justify": null,
+              "align": "center",
+              "align_self": null,
+              "grow": null,
+              "gap": 12.0,
+              "flex_wrap": null,
+              "padding": {
+                "top": 14.0,
+                "right": 16.0,
+                "bottom": 14.0,
+                "left": 16.0
+              },
+              "margin": null,
+              "border": null,
+              "radius": 12.0,
+              "background": {
+                "r": 252,
+                "g": 252,
+                "b": 252,
+                "a": 1.0
+              },
+              "color": {
+                "r": 25,
+                "g": 25,
+                "b": 26,
+                "a": 1.0
+              },
+              "opacity": null,
+              "shadow": {
+                "color": {
+                  "r": 0,
+                  "g": 0,
+                  "b": 0,
+                  "a": 0.3
+                },
+                "blur": 3.0,
+                "offset_x": 0.0,
+                "offset_y": 1.0
+              },
+              "font_family": null,
+              "font_size": null,
+              "font_weight": null,
+              "font_style": null,
+              "text_align": null,
+              "text_decoration": null,
+              "letter_spacing": null,
+              "line_height": null,
+              "max_lines": null,
+              "text_overflow": null,
+              "text_scale": null,
+              "font_asset": null,
+              "width": null,
+              "height": null,
+              "min_width": null,
+              "max_width": null,
+              "min_height": null,
+              "max_height": null,
+              "aspect_ratio": null,
+              "stack_align": null,
+              "position": null,
+              "top": null,
+              "right": null,
+              "bottom": null,
+              "left": null,
+              "transition": null
+            },
+            "semantics": null,
+            "focusable": null,
+            "focus_order": null
+          },
+          "children": [
+            {
+              "type": "Button",
+              "key": "tw-shell-burger",
+              "props": {
+                "style": {
+                  "direction": null,
+                  "justify": null,
+                  "align": null,
+                  "align_self": null,
+                  "grow": null,
+                  "gap": null,
+                  "flex_wrap": null,
+                  "padding": {
+                    "top": 8.0,
+                    "right": 8.0,
+                    "bottom": 8.0,
+                    "left": 8.0
+                  },
+                  "margin": null,
+                  "border": null,
+                  "radius": 999.0,
+                  "background": {
+                    "r": 0,
+                    "g": 0,
+                    "b": 0,
+                    "a": 0.0
+                  },
+                  "color": {
+                    "r": 249,
+                    "g": 250,
+                    "b": 251,
+                    "a": 1.0
+                  },
+                  "opacity": null,
+                  "shadow": null,
+                  "font_family": null,
+                  "font_size": 14.0,
+                  "font_weight": 500,
+                  "font_style": null,
+                  "text_align": null,
+                  "text_decoration": null,
+                  "letter_spacing": null,
+                  "line_height": null,
+                  "max_lines": null,
+                  "text_overflow": null,
+                  "text_scale": null,
+                  "font_asset": null,
+                  "width": null,
+                  "height": null,
+                  "min_width": null,
+                  "max_width": null,
+                  "min_height": 48.0,
+                  "max_height": null,
+                  "aspect_ratio": null,
+                  "stack_align": null,
+                  "position": null,
+                  "top": null,
+                  "right": null,
+                  "bottom": null,
+                  "left": null,
+                  "transition": null
+                },
+                "semantics": null,
+                "focusable": null,
+                "focus_order": null,
+                "attrs": {
+                  "data-tw-layout": "shell-burger"
+                },
+                "label": "☰",
+                "on_click": null,
+                "variant": "solid",
+                "size": "md",
+                "color_scheme": "primary"
+              },
+              "children": []
+            },
+            {
+              "type": "Text",
+              "key": "appbar-title",
+              "props": {
+                "style": {
+                  "direction": null,
+                  "justify": null,
+                  "align": null,
+                  "align_self": null,
+                  "grow": 1.0,
+                  "gap": null,
+                  "flex_wrap": null,
+                  "padding": null,
+                  "margin": null,
+                  "border": null,
+                  "radius": null,
+                  "background": null,
+                  "color": {
+                    "r": 25,
+                    "g": 25,
+                    "b": 26,
+                    "a": 1.0
+                  },
+                  "opacity": null,
+                  "shadow": null,
+                  "font_family": null,
+                  "font_size": 20.0,
+                  "font_weight": 700,
+                  "font_style": null,
+                  "text_align": null,
+                  "text_decoration": null,
+                  "letter_spacing": null,
+                  "line_height": null,
+                  "max_lines": null,
+                  "text_overflow": null,
+                  "text_scale": null,
+                  "font_asset": null,
+                  "width": null,
+                  "height": null,
+                  "min_width": null,
+                  "max_width": null,
+                  "min_height": null,
+                  "max_height": null,
+                  "aspect_ratio": null,
+                  "stack_align": null,
+                  "position": null,
+                  "top": null,
+                  "right": null,
+                  "bottom": null,
+                  "left": null,
+                  "transition": null
+                },
+                "semantics": null,
+                "focusable": null,
+                "focus_order": null,
+                "content": "Painel"
+              },
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Stack",
+      "key": "tw-shell-main",
+      "props": {
+        "style": null,
+        "semantics": null,
+        "focusable": null,
+        "focus_order": null,
+        "attrs": {
+          "data-tw-layout": "shell-main"
+        }
+      },
+      "children": [
+        {
+          "type": "Stack",
+          "key": "tw-list",
+          "props": {
+            "style": null,
+            "semantics": null,
+            "focusable": null,
+            "focus_order": null,
+            "attrs": {
+              "data-tw-layout": "page"
+            }
+          },
+          "children": [
+            {
+              "type": "Stack",
+              "key": "tw-list-header",
+              "props": {
+                "style": null,
+                "semantics": null,
+                "focusable": null,
+                "focus_order": null,
+                "attrs": {
+                  "data-tw-layout": "page-header"
+                }
+              },
+              "children": [
+                {
+                  "type": "Column",
+                  "key": "tw-list-header-titles",
+                  "props": {
+                    "style": {
+                      "direction": null,
+                      "justify": null,
+                      "align": null,
+                      "align_self": null,
+                      "grow": null,
+                      "gap": 4.0,
+                      "flex_wrap": null,
+                      "padding": null,
+                      "margin": null,
+                      "border": null,
+                      "radius": null,
+                      "background": null,
+                      "color": null,
+                      "opacity": null,
+                      "shadow": null,
+                      "font_family": null,
+                      "font_size": null,
+                      "font_weight": null,
+                      "font_style": null,
+                      "text_align": null,
+                      "text_decoration": null,
+                      "letter_spacing": null,
+                      "line_height": null,
+                      "max_lines": null,
+                      "text_overflow": null,
+                      "text_scale": null,
+                      "font_asset": null,
+                      "width": null,
+                      "height": null,
+                      "min_width": null,
+                      "max_width": null,
+                      "min_height": null,
+                      "max_height": null,
+                      "aspect_ratio": null,
+                      "stack_align": null,
+                      "position": null,
+                      "top": null,
+                      "right": null,
+                      "bottom": null,
+                      "left": null,
+                      "transition": null
+                    },
+                    "semantics": null,
+                    "focusable": null,
+                    "focus_order": null
+                  },
+                  "children": [
+                    {
+                      "type": "Text",
+                      "key": "tw-list-header-title",
+                      "props": {
+                        "style": {
+                          "direction": null,
+                          "justify": null,
+                          "align": null,
+                          "align_self": null,
+                          "grow": null,
+                          "gap": null,
+                          "flex_wrap": null,
+                          "padding": null,
+                          "margin": null,
+                          "border": null,
+                          "radius": null,
+                          "background": null,
+                          "color": {
+                            "r": 249,
+                            "g": 250,
+                            "b": 251,
+                            "a": 1.0
+                          },
+                          "opacity": null,
+                          "shadow": null,
+                          "font_family": null,
+                          "font_size": 24.0,
+                          "font_weight": 700,
+                          "font_style": null,
+                          "text_align": null,
+                          "text_decoration": null,
+                          "letter_spacing": null,
+                          "line_height": null,
+                          "max_lines": null,
+                          "text_overflow": null,
+                          "text_scale": null,
+                          "font_asset": null,
+                          "width": null,
+                          "height": null,
+                          "min_width": null,
+                          "max_width": null,
+                          "min_height": null,
+                          "max_height": null,
+                          "aspect_ratio": null,
+                          "stack_align": null,
+                          "position": null,
+                          "top": null,
+                          "right": null,
+                          "bottom": null,
+                          "left": null,
+                          "transition": null
+                        },
+                        "semantics": null,
+                        "focusable": null,
+                        "focus_order": null,
+                        "content": "Usuários"
+                      },
+                      "children": []
+                    },
+                    {
+                      "type": "Text",
+                      "key": "tw-list-header-subtitle",
+                      "props": {
+                        "style": {
+                          "direction": null,
+                          "justify": null,
+                          "align": null,
+                          "align_self": null,
+                          "grow": null,
+                          "gap": null,
+                          "flex_wrap": null,
+                          "padding": null,
+                          "margin": null,
+                          "border": null,
+                          "radius": null,
+                          "background": null,
+                          "color": {
+                            "r": 156,
+                            "g": 163,
+                            "b": 175,
+                            "a": 1.0
+                          },
+                          "opacity": null,
+                          "shadow": null,
+                          "font_family": null,
+                          "font_size": 13.0,
+                          "font_weight": null,
+                          "font_style": null,
+                          "text_align": null,
+                          "text_decoration": null,
+                          "letter_spacing": null,
+                          "line_height": null,
+                          "max_lines": null,
+                          "text_overflow": null,
+                          "text_scale": null,
+                          "font_asset": null,
+                          "width": null,
+                          "height": null,
+                          "min_width": null,
+                          "max_width": null,
+                          "min_height": null,
+                          "max_height": null,
+                          "aspect_ratio": null,
+                          "stack_align": null,
+                          "position": null,
+                          "top": null,
+                          "right": null,
+                          "bottom": null,
+                          "left": null,
+                          "transition": null
+                        },
+                        "semantics": null,
+                        "focusable": null,
+                        "focus_order": null,
+                        "content": "12 ativos"
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "Stack",
+              "key": "tw-list-toolbar",
+              "props": {
+                "style": null,
+                "semantics": null,
+                "focusable": null,
+                "focus_order": null,
+                "attrs": {
+                  "data-tw-layout": "toolbar"
+                }
+              },
+              "children": [
+                {
+                  "type": "Row",
+                  "key": "tw-list-search",
+                  "props": {
+                    "style": {
+                      "direction": null,
+                      "justify": null,
+                      "align": "center",
+                      "align_self": null,
+                      "grow": null,
+                      "gap": 8.0,
+                      "flex_wrap": null,
+                      "padding": {
+                        "top": 8.0,
+                        "right": 8.0,
+                        "bottom": 8.0,
+                        "left": 8.0
+                      },
+                      "margin": null,
+                      "border": null,
+                      "radius": 16.0,
+                      "background": {
+                        "r": 229,
+                        "g": 229,
+                        "b": 230,
+                        "a": 1.0
+                      },
+                      "color": {
+                        "r": 25,
+                        "g": 25,
+                        "b": 26,
+                        "a": 1.0
+                      },
+                      "opacity": null,
+                      "shadow": null,
+                      "font_family": null,
+                      "font_size": null,
+                      "font_weight": null,
+                      "font_style": null,
+                      "text_align": null,
+                      "text_decoration": null,
+                      "letter_spacing": null,
+                      "line_height": null,
+                      "max_lines": null,
+                      "text_overflow": null,
+                      "text_scale": null,
+                      "font_asset": null,
+                      "width": null,
+                      "height": null,
+                      "min_width": null,
+                      "max_width": null,
+                      "min_height": null,
+                      "max_height": null,
+                      "aspect_ratio": null,
+                      "stack_align": null,
+                      "position": null,
+                      "top": null,
+                      "right": null,
+                      "bottom": null,
+                      "left": null,
+                      "transition": null
+                    },
+                    "semantics": null,
+                    "focusable": null,
+                    "focus_order": null
+                  },
+                  "children": [
+                    {
+                      "type": "Input",
+                      "key": "search-input",
+                      "props": {
+                        "style": {
+                          "direction": null,
+                          "justify": null,
+                          "align": null,
+                          "align_self": null,
+                          "grow": 1.0,
+                          "gap": null,
+                          "flex_wrap": null,
+                          "padding": {
+                            "top": 10.0,
+                            "right": 24.0,
+                            "bottom": 10.0,
+                            "left": 24.0
+                          },
+                          "margin": null,
+                          "border": {
+                            "width": 1.0,
+                            "color": {
+                              "r": 125,
+                              "g": 122,
+                              "b": 133,
+                              "a": 1.0
+                            }
+                          },
+                          "radius": 8.0,
+                          "background": {
+                            "r": 229,
+                            "g": 229,
+                            "b": 230,
+                            "a": 1.0
+                          },
+                          "color": {
+                            "r": 25,
+                            "g": 25,
+                            "b": 26,
+                            "a": 1.0
+                          },
+                          "opacity": null,
+                          "shadow": null,
+                          "font_family": null,
+                          "font_size": 14.0,
+                          "font_weight": 500,
+                          "font_style": null,
+                          "text_align": null,
+                          "text_decoration": null,
+                          "letter_spacing": null,
+                          "line_height": null,
+                          "max_lines": null,
+                          "text_overflow": null,
+                          "text_scale": null,
+                          "font_asset": null,
+                          "width": null,
+                          "height": null,
+                          "min_width": null,
+                          "max_width": null,
+                          "min_height": 48.0,
+                          "max_height": null,
+                          "aspect_ratio": null,
+                          "stack_align": null,
+                          "position": null,
+                          "top": null,
+                          "right": null,
+                          "bottom": null,
+                          "left": null,
+                          "transition": null
+                        },
+                        "semantics": null,
+                        "focusable": null,
+                        "focus_order": null,
+                        "field_variant": "outline",
+                        "size": "md",
+                        "color_scheme": "primary",
+                        "value": "",
+                        "placeholder": "Buscar…",
+                        "secure": false,
+                        "pattern": null,
+                        "error": "",
+                        "keyboard": "text",
+                        "max_length": null,
+                        "leading_icon": null,
+                        "trailing_icon": null,
+                        "on_change": null
+                      },
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "Stack",
+              "key": "tw-list-table-scroll",
+              "props": {
+                "style": null,
+                "semantics": null,
+                "focusable": null,
+                "focus_order": null,
+                "attrs": {
+                  "data-tw-layout": "table-scroll"
+                }
+              },
+              "children": [
+                {
+                  "type": "Stack",
+                  "key": "tw-list-table",
+                  "props": {
+                    "style": null,
+                    "semantics": null,
+                    "focusable": null,
+                    "focus_order": null,
+                    "attrs": {
+                      "data-tw-layout": "table"
+                    }
+                  },
+                  "children": [
+                    {
+                      "type": "Stack",
+                      "key": "tw-list-table-head",
+                      "props": {
+                        "style": null,
+                        "semantics": null,
+                        "focusable": null,
+                        "focus_order": null,
+                        "attrs": {
+                          "data-tw-layout": "table-head"
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "Stack",
+                          "key": "tw-list-table-th-0",
+                          "props": {
+                            "style": null,
+                            "semantics": null,
+                            "focusable": null,
+                            "focus_order": null,
+                            "attrs": {
+                              "data-tw-align": "start",
+                              "data-tw-layout": "table-header-cell"
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "key": "tw-list-table-th-0-text",
+                              "props": {
+                                "style": null,
+                                "semantics": null,
+                                "focusable": null,
+                                "focus_order": null,
+                                "content": "Nome"
+                              },
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Stack",
+                          "key": "tw-list-table-th-1",
+                          "props": {
+                            "style": null,
+                            "semantics": null,
+                            "focusable": null,
+                            "focus_order": null,
+                            "attrs": {
+                              "data-tw-align": "end",
+                              "data-tw-layout": "table-header-cell"
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "key": "tw-list-table-th-1-text",
+                              "props": {
+                                "style": null,
+                                "semantics": null,
+                                "focusable": null,
+                                "focus_order": null,
+                                "content": "Saldo"
+                              },
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "Stack",
+                      "key": "tw-list-table-tr-0",
+                      "props": {
+                        "style": null,
+                        "semantics": null,
+                        "focusable": null,
+                        "focus_order": null,
+                        "attrs": {
+                          "data-tw-layout": "table-row"
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "Stack",
+                          "key": "tw-list-table-td-0-0",
+                          "props": {
+                            "style": null,
+                            "semantics": null,
+                            "focusable": null,
+                            "focus_order": null,
+                            "attrs": {
+                              "data-tw-align": "start",
+                              "data-tw-layout": "table-cell"
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "key": "tw-list-table-td-0-0-text",
+                              "props": {
+                                "style": null,
+                                "semantics": null,
+                                "focusable": null,
+                                "focus_order": null,
+                                "content": "Ana"
+                              },
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Stack",
+                          "key": "tw-list-table-td-0-1",
+                          "props": {
+                            "style": null,
+                            "semantics": null,
+                            "focusable": null,
+                            "focus_order": null,
+                            "attrs": {
+                              "data-tw-align": "end",
+                              "data-tw-layout": "table-cell"
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "key": "tw-list-table-td-0-1-text",
+                              "props": {
+                                "style": null,
+                                "semantics": null,
+                                "focusable": null,
+                                "focus_order": null,
+                                "content": "R$ 10"
+                              },
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "Stack",
+                      "key": "tw-list-table-tr-1",
+                      "props": {
+                        "style": null,
+                        "semantics": null,
+                        "focusable": null,
+                        "focus_order": null,
+                        "attrs": {
+                          "data-tw-layout": "table-row"
+                        }
+                      },
+                      "children": [
+                        {
+                          "type": "Stack",
+                          "key": "tw-list-table-td-1-0",
+                          "props": {
+                            "style": null,
+                            "semantics": null,
+                            "focusable": null,
+                            "focus_order": null,
+                            "attrs": {
+                              "data-tw-align": "start",
+                              "data-tw-layout": "table-cell"
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "key": "tw-list-table-td-1-0-text",
+                              "props": {
+                                "style": null,
+                                "semantics": null,
+                                "focusable": null,
+                                "focus_order": null,
+                                "content": "Bo"
+                              },
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Stack",
+                          "key": "tw-list-table-td-1-1",
+                          "props": {
+                            "style": null,
+                            "semantics": null,
+                            "focusable": null,
+                            "focus_order": null,
+                            "attrs": {
+                              "data-tw-align": "end",
+                              "data-tw-layout": "table-cell"
+                            }
+                          },
+                          "children": [
+                            {
+                              "type": "Text",
+                              "key": "tw-list-table-td-1-1-text",
+                              "props": {
+                                "style": null,
+                                "semantics": null,
+                                "focusable": null,
+                                "focus_order": null,
+                                "content": "R$ 4"
+                              },
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Stack",
+      "key": "tw-shell-scrim",
+      "props": {
+        "style": null,
+        "semantics": null,
+        "focusable": null,
+        "focus_order": null,
+        "attrs": {
+          "data-tw-open": "false",
+          "data-tw-layout": "shell-scrim"
+        }
+      },
+      "children": [
+        {
+          "type": "Button",
+          "key": "tw-shell-scrim-close",
+          "props": {
+            "style": {
+              "direction": null,
+              "justify": null,
+              "align": null,
+              "align_self": null,
+              "grow": 1.0,
+              "gap": null,
+              "flex_wrap": null,
+              "padding": {
+                "top": 0.0,
+                "right": 0.0,
+                "bottom": 0.0,
+                "left": 0.0
+              },
+              "margin": null,
+              "border": null,
+              "radius": 0.0,
+              "background": {
+                "r": 0,
+                "g": 0,
+                "b": 0,
+                "a": 0.0
+              },
+              "color": {
+                "r": 255,
+                "g": 255,
+                "b": 255,
+                "a": 1.0
+              },
+              "opacity": null,
+              "shadow": null,
+              "font_family": null,
+              "font_size": 14.0,
+              "font_weight": 500,
+              "font_style": null,
+              "text_align": null,
+              "text_decoration": null,
+              "letter_spacing": null,
+              "line_height": null,
+              "max_lines": null,
+              "text_overflow": null,
+              "text_scale": null,
+              "font_asset": null,
+              "width": null,
+              "height": null,
+              "min_width": null,
+              "max_width": null,
+              "min_height": 48.0,
+              "max_height": null,
+              "aspect_ratio": null,
+              "stack_align": null,
+              "position": null,
+              "top": null,
+              "right": null,
+              "bottom": null,
+              "left": null,
+              "transition": null
+            },
+            "semantics": {
+              "label": "Fechar menu",
+              "role": null,
+              "hint": null
+            },
+            "focusable": null,
+            "focus_order": null,
+            "label": "",
+            "on_click": null,
+            "variant": "solid",
+            "size": "md",
+            "color_scheme": "primary"
+          },
+          "children": []
+        }
+      ]
+    }
+  ]
+}

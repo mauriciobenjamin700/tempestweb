@@ -60,6 +60,7 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "dom.js",
     "style.js",
     "theme.js",
+    "layouts.js",
     "events.js",
     "transport.js",
     "virtualize.js",

@@ -18,3 +18,6 @@ export const VIRT_STYLE_ID = "tw-virt-styles";
 
 /** Id of the injected stylesheet that carries the always-on MD3 base theme. */
 export const BASE_THEME_STYLE_ID = "tw-base-theme";
+
+/** Id of the injected stylesheet backing the layout presets (client/layouts.js). */
+export const LAYOUT_STYLE_ID = "tw-layout-styles";

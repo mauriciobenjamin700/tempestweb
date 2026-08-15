@@ -9,6 +9,7 @@
 import { applyPatches, buildElement } from "./dom.js";
 import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
+import { installLayoutStyles } from "./layouts.js";
 import { installBaseTheme } from "./theme.js";
 import { installVirtualization } from "./virtualize.js";
 
@@ -114,6 +115,7 @@ function applyTreePatches(tree, patches, mountRoot) {
  */
 export function mount(root, transport, initialNode = null) {
   installBaseTheme();
+  installLayoutStyles();
 
   /** @type {HTMLElement | null} */
   let tree = null;

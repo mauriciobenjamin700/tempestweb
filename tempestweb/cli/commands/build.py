@@ -840,9 +840,10 @@ const PY_GLUE = `
 import app
 from tempestweb.runtime.wasm_main import bootstrap
 
-def _start(on_patches, dispatch, on_navigate):
+def _start(on_patches, dispatch, on_navigate, subscribe, unsubscribe):
     return bootstrap(
-        app.make_state(), app.view, on_patches, dispatch, on_navigate
+        app.make_state(), app.view, on_patches, dispatch, on_navigate,
+        subscribe, unsubscribe,
     )
 
 _start
@@ -883,13 +884,42 @@ export async function boot() {{
   // Native capabilities (geolocation/clipboard/http/…): expose the in-process
   // dispatch on window, and bridge it to Python as a JSON-string seam (so the
   // envelope crosses the FFI cleanly, no proxy conversion).
+  //    Streaming capabilities (geolocation.watch, sensors.*, …) travel the same
+  //    seam through the subscribe/unsubscribe pair. Both wrappers are `async` on
+  //    purpose: the underlying calls are synchronous, and Python awaits whatever
+  //    comes back — an async function hands it a promise instead of `undefined`.
+  //    The `emit` argument is a BORROWED PyProxy: Pyodide destroys it when the
+  //    async call returns, and a subscription emits long after that ("This
+  //    borrowed proxy was automatically destroyed" on the first event). So copy
+  //    it into a proxy this glue owns, keyed by sub_id, and destroy that copy on
+  //    unsubscribe — otherwise every watch() leaks a proxy per subscription.
   installNativeBridge(globalThis);
   const onNative = async (envelopeJson) => {{
     const result = await globalThis.__tempestweb_native__(JSON.parse(envelopeJson));
     return JSON.stringify(result);
   }};
+  const emitProxies = new Map();
+  const onNativeSubscribe = async (envelopeJson, emit) => {{
+    const persistent = typeof emit.copy === "function" ? emit.copy() : emit;
+    emitProxies.set(JSON.parse(envelopeJson).sub_id, persistent);
+    globalThis.__tempestweb_native_subscribe__(envelopeJson, persistent);
+  }};
+  const onNativeUnsubscribe = async (subId) => {{
+    globalThis.__tempestweb_native_unsubscribe__(subId);
+    const persistent = emitProxies.get(subId);
+    emitProxies.delete(subId);
+    if (persistent && typeof persistent.destroy === "function") {{
+      persistent.destroy();
+    }}
+  }};
 
-  const handle = start(onPatches, onNative, onNavigate);
+  const handle = start(
+    onPatches,
+    onNative,
+    onNavigate,
+    onNativeSubscribe,
+    onNativeUnsubscribe,
+  );
 
   const bridge = {{
     onDeliver(handler) {{

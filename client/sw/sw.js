@@ -480,6 +480,12 @@ export function installNotificationClickHandler(opts = {}) {
  * directly; if no key is recoverable and no new subscription exists, it only
  * notifies clients (a foreground page can then re-subscribe with its own key).
  *
+ * The client message carries both halves of the outcome, because they fail
+ * independently: `ok` says the browser handed back a subscription, `synced` says
+ * the server accepted it (a rejected or unreachable POST leaves the server
+ * pushing to the dead endpoint). Reporting only `ok` made a failed re-POST look
+ * like a success to every listener.
+ *
  * @param {Object} [opts]
  * @param {ServiceWorkerRegistration} [opts.registration]  Default: self.registration.
  * @param {typeof fetch} [opts.fetch]                       Default: global fetch.
@@ -512,19 +518,21 @@ export function installPushSubscriptionChangeHandler(opts = {}) {
       }
     }
 
+    let synced = false;
     if (sub && fetchFn) {
       const body = JSON.stringify(typeof sub.toJSON === "function" ? sub.toJSON() : sub);
       try {
-        await fetchFn(subscribeUrl, {
+        const response = await fetchFn(subscribeUrl, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body,
         });
+        synced = !response || response.ok !== false;
       } catch {
-        // The server re-POST is best-effort; the client can retry on next open.
+        synced = false;
       }
     }
-    await notify({ type: "PUSH_RESUBSCRIBED", ok: Boolean(sub) });
+    await notify({ type: "PUSH_RESUBSCRIBED", ok: Boolean(sub), synced });
   };
 }
 

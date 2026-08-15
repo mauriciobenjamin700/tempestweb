@@ -94,14 +94,23 @@ SecurityConfig(
     max_connections=500,             # teto de sessões WS+SSE simultâneas
     max_message_bytes=65536,         # rejeita POST SSE maior que isso (413)
     max_connections_per_minute=60,   # flood de conexões por IP (1013/429)
+    max_events_per_minute=600,       # flood de envelopes por IP (1013/429)
 )
 ```
 
 - **`max_connections`** — conexão acima do teto é recusada (WS fecha `1013`; SSE
   `503`). O contador decrementa quando a sessão encerra.
-- **`max_message_bytes`** — um `POST /sse/{id}` com corpo maior responde `413`.
+- **`max_message_bytes`** — um `POST /sse/{id}` com corpo maior responde `413`. O
+  teto é conferido **enquanto o corpo é lido**, não só no `Content-Length` — um
+  POST com `Transfer-Encoding: chunked` não declara tamanho e antes passava reto.
 - **`max_connections_per_minute`** — janela deslizante de 60s por IP (do
   `X-Forwarded-For` ou peer); flood é recusado (WS `1013` / SSE `429`).
+- **`max_events_per_minute`** — a mesma janela, mas contando **envelopes de
+  entrada** (cliques, input, `native_result`) nas duas pernas: `POST /sse/{id}`
+  acima do teto responde `429`, e um frame de WebSocket acima do teto fecha o
+  socket com `1013`. É um knob separado porque as ordens de grandeza diferem: uma
+  conexão por cliente, mas um envelope por interação. Dimensione acima do pico
+  legítimo do seu app — sem ele, uma conexão já aceita envia sem limite.
 
 !!! note "Conexões mortas + ociosas"
     Conexão WS **morta/meio-aberta** já é ceifada pelo ping do uvicorn (~20–40s),

@@ -4,10 +4,48 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
-## [0.61.3] — 2026-08-15
+## [0.62.0] — 2026-08-15
+
+Fallout from auditing the codebase after #60, whose shape — a bridge shipped but
+never wired — repeated in the mirror mode.
 
 ### Fixed
 
+- **Mode A: the native event channel is now wired.** `wasm_main.bootstrap()`
+  built its `FFIBridge` from the single-shot dispatch alone and never received
+  the streaming pair, so **every** `watch()`/`listen()` in Mode A raised
+  `BrowserUnavailableError: mode A native event channel is not wired` —
+  `geolocation.watch`, `network.watch`, `battery.watch`, `sensors.motion`,
+  `sensors.orientation`, `speech.listen`, `nfc.scan`, `idle.watch`,
+  `gamepad.watch`, `midi.messages`, `tabs.receive`, `visibility.watch`,
+  `orientation.watch`, `sync.watch` — while the docs promised parity with Mode B
+  and `installNativeBridge` had already put `__tempestweb_native_subscribe__` on
+  the page. `bootstrap()` takes `subscribe`/`unsubscribe` and the generated
+  `bootstrap.js` passes them. The glue **copies** the `emit` PyProxy before
+  handing it to the browser and destroys the copy on unsubscribe: the proxy
+  Pyodide passes into an async call is borrowed, so a subscription that emits
+  later hit "This borrowed proxy was automatically destroyed" on its first
+  event. An app built with an earlier version needs a rebuild — the wiring lives
+  in the generated `bootstrap.js`.
+- **`max_message_bytes` is enforced while the body is read.** The gate consulted
+  `Content-Length` only, so a `POST /sse/{id}` sent with `Transfer-Encoding:
+  chunked` — which declares no length — skipped the limit entirely and had its
+  whole body read into memory. The cheap header pre-check remains; the running
+  total is now checked per chunk and the read aborts at the limit.
+
+- **`pushsubscriptionchange` no longer reports a failed re-POST as success.** The
+  handler discarded the result of the POST that hands the server the fresh
+  subscription, so the `PUSH_RESUBSCRIBED` message said `ok: true` even when the
+  server rejected it or the network was down — leaving the server pushing to a
+  dead endpoint while the page believed it was synced. The message now carries
+  `synced` alongside `ok`: `ok` is "the browser gave us a subscription",
+  `synced` is "the server accepted it".
+- **Mode A patch batches can no longer be garbage-collected mid-flight.**
+  `WasmRuntime._apply_patches` scheduled the async send with
+  `asyncio.ensure_future` and kept no reference; the loop holds only a weak one,
+  so a batch could be collected before it reached the client and the DOM would
+  silently miss that update. Pending sends are retained until they settle, the
+  pattern `runtime/session.py` already used.
 - **The server artifact now ships the SSE client too.** `create_app` answers on
   `/ws` **and** `/sse` + `/sse/{id}`, but `tempestweb build --mode server` only
   copied `transport-ws.js` — infrastructure that blocks WebSocket had a live SSE
@@ -29,6 +67,17 @@ versioning.
   leg ignored the response entirely, so a `404` (unknown session), `401`
   (unauthorized) or `413` (oversized body) dropped the envelope with no trace on
   either side. It now warns on the console with the status.
+
+### Added
+
+- **`SecurityConfig.max_events_per_minute`** — a per-IP budget on *inbound
+  envelopes*, counted across both legs: an SSE `POST /sse/{id}` over budget
+  answers `429`, and a WebSocket frame over budget closes the socket with
+  `1013`. Until now only *connections* were rate-limited, so one accepted
+  connection could send without bound. A separate knob from
+  `max_connections_per_minute` because the magnitudes differ by orders of
+  magnitude: one connection per client, but one envelope per interaction.
+  Defaults to `None` (unbounded), so no existing deployment changes behaviour.
 
 ## [0.61.2] — 2026-08-15
 

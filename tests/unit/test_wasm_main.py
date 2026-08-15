@@ -122,6 +122,55 @@ async def test_bootstrap_installs_ffi_bridge_when_dispatch_given() -> None:
 
 
 @pytest.mark.asyncio
+async def test_bootstrap_wires_the_streaming_half_of_the_bridge() -> None:
+    """A watch() must stream in Mode A, not raise BrowserUnavailableError.
+
+    Regression: ``bootstrap`` built ``FFIBridge(dispatch)`` and never passed the
+    streaming pair, so every ``watch()``/``listen()`` — geolocation, network,
+    battery, sensors, speech, nfc, … — raised "mode A native event channel is not
+    wired" even though ``installNativeBridge`` had put
+    ``__tempestweb_native_subscribe__`` on the page. The fakes here stand in for
+    the Pyodide proxies of that glue.
+    """
+    from tempestweb.native import geolocation, uninstall_bridge
+
+    uninstall_bridge()
+    torn_down: list[str] = []
+
+    async def dispatch(_envelope_json: str) -> str:
+        return json.dumps({"ok": True, "value": {}})
+
+    async def subscribe(envelope_json: str, emit: Any) -> str:
+        envelope = json.loads(envelope_json)
+        assert envelope["capability"] == "geolocation.watch"
+        emit(json.dumps({"event": {"latitude": 1.5, "longitude": -2.5}}))
+        emit(json.dumps({"done": True}))
+        return str(envelope["sub_id"])
+
+    async def unsubscribe(sub_id: str) -> None:
+        torn_down.append(sub_id)
+
+    handle: WasmAppHandle[CounterState] = bootstrap(
+        CounterState(),
+        counter_view,
+        lambda _json: None,
+        dispatch,
+        None,
+        subscribe,
+        unsubscribe,
+    )
+    try:
+        seen: list[dict[str, Any]] = []
+        async for position in geolocation.watch():
+            seen.append({"lat": position.latitude, "lon": position.longitude})
+    finally:
+        await handle.close()
+
+    assert seen == [{"lat": 1.5, "lon": -2.5}]
+    assert torn_down, "the iterator's finally must tear the subscription down"
+
+
+@pytest.mark.asyncio
 async def test_bootstrap_without_dispatch_installs_no_bridge() -> None:
     """Omitting dispatch leaves the process bridge-free (apps with no native use)."""
     from tempestweb.native import (

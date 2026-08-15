@@ -304,6 +304,26 @@ def test_wasm_bootstrap_is_live(tmp_path: Path) -> None:
     assert "provided by Track T3" not in bootstrap
 
 
+def test_wasm_bootstrap_wires_the_streaming_native_bridge(tmp_path: Path) -> None:
+    """The Mode A glue must hand Python the streaming half of the native bridge.
+
+    Regression: the glue exposed ``installNativeBridge`` (which does install
+    ``__tempestweb_native_subscribe__`` on the page) but only ever passed the
+    single-shot dispatch into ``bootstrap()``, so every ``watch()``/``listen()``
+    raised "mode A native event channel is not wired". Both wrappers must be
+    async, or Python awaits a plain ``undefined``.
+    """
+    result = build_artifact(_project(tmp_path), mode="wasm")
+    bootstrap = (result.out_dir / "bootstrap.js").read_text(encoding="utf-8")
+    assert "__tempestweb_native_subscribe__" in bootstrap
+    assert "__tempestweb_native_unsubscribe__" in bootstrap
+    assert "const onNativeSubscribe = async (" in bootstrap
+    assert "const onNativeUnsubscribe = async (" in bootstrap
+    assert "def _start(on_patches, dispatch, on_navigate, subscribe, unsubscribe):" in (
+        bootstrap
+    )
+
+
 def test_wasm_package_archive_carries_runtime(tmp_path: Path) -> None:
     """The bundled zip carries the tempestweb runtime + the tempest_core engine."""
     root = _project(tmp_path)

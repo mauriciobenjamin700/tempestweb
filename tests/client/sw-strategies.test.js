@@ -323,7 +323,44 @@ test("pushsubscriptionchange re-subscribes with the old key and re-POSTs", async
   assert.equal(subscribedWith, "KEY", "re-subscribed with the old key");
   assert.equal(posts[0].url, "/webpush/subscribe");
   assert.equal(posts[0].body.endpoint, "https://push/new");
-  assert.deepEqual(messages, [{ type: "PUSH_RESUBSCRIBED", ok: true }]);
+  assert.deepEqual(messages, [{ type: "PUSH_RESUBSCRIBED", ok: true, synced: true }]);
+});
+
+// Regression: the re-POST result was discarded, so a server that rejected the
+// fresh subscription still produced ok:true — the page believed it was synced
+// while the server kept pushing to the dead endpoint.
+test("pushsubscriptionchange reports synced:false when the server rejects", async () => {
+  const messages = [];
+  const onChange = installPushSubscriptionChangeHandler({
+    registration: {
+      pushManager: {
+        subscribe: async () => ({ toJSON: () => ({ endpoint: "https://push/new" }) }),
+      },
+    },
+    fetch: async () => ({ ok: false, status: 500 }),
+    notify: async (m) => messages.push(m),
+  });
+  await onChange({ oldSubscription: { options: { applicationServerKey: "KEY" } } });
+
+  assert.deepEqual(messages, [{ type: "PUSH_RESUBSCRIBED", ok: true, synced: false }]);
+});
+
+test("pushsubscriptionchange reports synced:false when the re-POST throws", async () => {
+  const messages = [];
+  const onChange = installPushSubscriptionChangeHandler({
+    registration: {
+      pushManager: {
+        subscribe: async () => ({ toJSON: () => ({ endpoint: "https://push/new" }) }),
+      },
+    },
+    fetch: async () => {
+      throw new Error("offline");
+    },
+    notify: async (m) => messages.push(m),
+  });
+  await onChange({ oldSubscription: { options: { applicationServerKey: "KEY" } } });
+
+  assert.deepEqual(messages, [{ type: "PUSH_RESUBSCRIBED", ok: true, synced: false }]);
 });
 
 test("pushsubscriptionchange uses newSubscription directly when provided", async () => {
@@ -347,5 +384,5 @@ test("pushsubscriptionchange with no key and no newSub only notifies (ok:false)"
   });
   await onChange({ oldSubscription: null });
   assert.equal(posted, false, "nothing to POST");
-  assert.deepEqual(messages, [{ type: "PUSH_RESUBSCRIBED", ok: false }]);
+  assert.deepEqual(messages, [{ type: "PUSH_RESUBSCRIBED", ok: false, synced: false }]);
 });

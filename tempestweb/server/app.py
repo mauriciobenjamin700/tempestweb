@@ -18,6 +18,7 @@ inbound envelopes and a dropped stream can reconnect with ``Last-Event-ID``.
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import AsyncIterator, Callable, Mapping
 from typing import Any, Generic, TypeVar
 
@@ -134,6 +135,8 @@ class TempestWebServer(Generic[S]):
         self._rejected: int = 0  # total connections refused (auth/origin/cap)
         rpm = self._security.max_connections_per_minute
         self._rate: RateLimiter | None = RateLimiter(rpm) if rpm else None
+        epm = self._security.max_events_per_minute
+        self._event_rate: RateLimiter | None = RateLimiter(epm) if epm else None
         self.api: FastAPI = FastAPI(title=title)
         self._install_cors()
         self._install_security_headers()
@@ -184,6 +187,23 @@ class TempestWebServer(Generic[S]):
         if self._rate is None:
             return True
         return self._rate.allow(credentials.client_ip or "unknown")
+
+    def _event_rate_ok(self, credentials: Credentials) -> bool:
+        """Whether the client IP is within the per-minute inbound-envelope rate (S2).
+
+        Counts every envelope the client sends on either leg — an SSE ``POST`` or
+        a WebSocket frame — against ``max_events_per_minute``. Distinct from
+        :meth:`_rate_ok`, which budgets *connections*.
+
+        Args:
+            credentials: The credentials extracted from the request or upgrade.
+
+        Returns:
+            ``True`` when the envelope is within budget (or no limit is set).
+        """
+        if self._event_rate is None:
+            return True
+        return self._event_rate.allow(credentials.client_ip or "unknown")
 
     def _install_cors(self) -> None:
         """Install CORS for the HTTP/SSE surface when an allowlist is set (S1)."""
@@ -265,7 +285,10 @@ class TempestWebServer(Generic[S]):
             await websocket.accept()
             self._live += 1
             self._opened += 1
-            transport = WebSocketTransport(websocket)
+            transport = WebSocketTransport(
+                websocket,
+                allow_inbound=lambda: self._event_rate_ok(credentials),
+            )
             session = self._new_session(transport)
             try:
                 await session.run()
@@ -293,12 +316,30 @@ class TempestWebServer(Generic[S]):
             """Receive one client envelope (event / native_result) for a session."""
             if not await self._authorize_request(request):
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
-            if self._payload_too_large(request):
+            if not self._event_rate_ok(self._request_credentials(request)):
+                self._rejected += 1
+                return JSONResponse({"error": "rate limited"}, status_code=429)
+            if self._declared_too_large(request):
                 return JSONResponse({"error": "payload too large"}, status_code=413)
-            return await self._handle_sse_post(session_id, request)
+            body = await self._read_body(request)
+            if body is None:
+                return JSONResponse({"error": "payload too large"}, status_code=413)
+            return await self._handle_sse_post(session_id, body)
 
-    def _payload_too_large(self, request: Request) -> bool:
-        """Whether the request body exceeds ``max_message_bytes`` (S2)."""
+    def _declared_too_large(self, request: Request) -> bool:
+        """Whether the *declared* body size already exceeds ``max_message_bytes``.
+
+        A cheap pre-check on ``Content-Length`` that rejects an oversized body
+        before a single byte is read. It is not sufficient on its own — the
+        header is optional under chunked transfer encoding — so
+        :meth:`_read_body` enforces the same limit while reading (S2).
+
+        Args:
+            request: The incoming request.
+
+        Returns:
+            ``True`` when the declared length is over the limit.
+        """
         limit = self._security.max_message_bytes
         if limit is None:
             return False
@@ -307,6 +348,32 @@ class TempestWebServer(Generic[S]):
             return raw is not None and int(raw) > limit
         except ValueError:
             return False
+
+    async def _read_body(self, request: Request) -> bytes | None:
+        """Read the request body, aborting past ``max_message_bytes`` (S2).
+
+        The body is consumed chunk by chunk and the running total is checked
+        against the limit, so a client that omits ``Content-Length`` (legal under
+        chunked transfer encoding) cannot stream an unbounded body into memory —
+        the read stops at the first chunk that crosses the limit.
+
+        Args:
+            request: The incoming request.
+
+        Returns:
+            The body bytes, or ``None`` when the limit was exceeded.
+        """
+        limit = self._security.max_message_bytes
+        if limit is None:
+            return await request.body()
+        chunks: list[bytes] = []
+        total = 0
+        async for chunk in request.stream():
+            total += len(chunk)
+            if total > limit:
+                return None
+            chunks.append(chunk)
+        return b"".join(chunks)
 
     def _request_credentials(self, request: Request) -> Credentials:
         """Extract credentials (incl. client IP) from an HTTP request."""
@@ -368,24 +435,28 @@ class TempestWebServer(Generic[S]):
         finally:
             await self._drop_sse(session_id)
 
-    async def _handle_sse_post(self, session_id: str, request: Request) -> Response:
+    async def _handle_sse_post(self, session_id: str, body: bytes) -> Response:
         """Route one POSTed client envelope into its SSE session.
+
+        The router feeds a local transport directly, or hands the envelope off to
+        the instance holding the stream (Redis); an unroutable session is a
+        ``404``.
 
         Args:
             session_id: The session id from the URL path.
-            request: The request whose JSON body is the wire envelope.
+            body: The raw request body, already size-checked, holding the wire
+                envelope as JSON.
 
         Returns:
-            ``204 No Content`` on success, ``404`` if the session is unknown.
+            ``204 No Content`` on success, ``400`` on malformed JSON, ``404`` if
+            the session is unknown.
         """
         try:
-            envelope: dict[str, Any] = await request.json()
+            envelope: dict[str, Any] = json.loads(body)
         except (ValueError, UnicodeDecodeError):
             return JSONResponse({"error": "invalid JSON"}, status_code=400)
         sse = self._sse_sessions.get(session_id)
         local = sse.transport if sse is not None else None
-        # The router feeds a local transport directly, or hands off to the
-        # instance holding the stream (Redis). Unroutable -> 404.
         if not await self._router.deliver(session_id, envelope, local):
             return JSONResponse({"error": "unknown session"}, status_code=404)
         return Response(status_code=204)

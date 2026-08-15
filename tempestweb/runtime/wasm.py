@@ -245,6 +245,7 @@ class WasmRuntime(Generic[S]):
         self._handlers: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
         self._on_navigate: Callable[[str], Any] | None = on_navigate
         self._last_path: str = "/"
+        self._sends: set[asyncio.Future[None]] = set()
         self._app: App[S] = App(
             state=state,
             view=view,
@@ -299,6 +300,11 @@ class WasmRuntime(Generic[S]):
         as a task on the running loop; the handler registry is refreshed eagerly
         against the now-current scene so the next event routes correctly.
 
+        The scheduled task is held in ``self._sends`` until it settles. The loop
+        keeps only a weak reference to a running task, so a batch that is
+        scheduled and immediately forgotten can be garbage-collected before it
+        ever reaches the client — the DOM would silently miss that update.
+
         Args:
             patches: The patches produced by the core's diff for this tick.
         """
@@ -306,7 +312,11 @@ class WasmRuntime(Generic[S]):
         if scene is not None:
             self._refresh_handlers(scene)
         wire = serialize_patches(patches)
-        asyncio.ensure_future(self._transport.send_patches(wire))
+        send: asyncio.Future[None] = asyncio.ensure_future(
+            self._transport.send_patches(wire)
+        )
+        self._sends.add(send)
+        send.add_done_callback(self._sends.discard)
         # View → URL: when the app navigated (top route changed), tell the client
         # so it can push the new path onto history (the reverse of the navigate
         # event). No-op when the path is unchanged or no sink is wired.

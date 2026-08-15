@@ -82,6 +82,14 @@ class SecurityConfig:
             The IP is taken from ``X-Forwarded-For`` (first hop) or the peer
             address. ``None`` = no per-IP limit (S2). Pair with a reverse-proxy
             limiter for defense in depth.
+        max_events_per_minute: Per-client-IP cap on *inbound envelopes* in a
+            rolling 60s window — clicks, input, ``native_result`` frames — counted
+            across both legs: an SSE ``POST /sse/{id}`` over budget answers
+            ``429``, and a WebSocket frame over budget closes the socket with
+            ``1013``. Separate from ``max_connections_per_minute`` because the
+            budgets differ by orders of magnitude: one connection per client, but
+            one envelope per interaction. ``None`` = unbounded (S2). Size it above
+            the busiest legitimate interaction rate of your app.
         security_headers: When ``True``, add hardening response headers
             (``X-Content-Type-Options``, ``Referrer-Policy``, ``X-Frame-Options``)
             to every HTTP response (S6).
@@ -97,6 +105,7 @@ class SecurityConfig:
     max_connections: int | None = None
     max_message_bytes: int | None = None
     max_connections_per_minute: int | None = None
+    max_events_per_minute: int | None = None
     security_headers: bool = False
     hsts: bool = False
     content_security_policy: str | None = None

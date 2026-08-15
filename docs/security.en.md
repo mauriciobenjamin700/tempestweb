@@ -94,14 +94,23 @@ SecurityConfig(
     max_connections=500,             # cap on concurrent WS+SSE sessions
     max_message_bytes=65536,         # reject an SSE POST larger than this (413)
     max_connections_per_minute=60,   # per-IP connection flood (1013/429)
+    max_events_per_minute=600,       # per-IP envelope flood (1013/429)
 )
 ```
 
 - **`max_connections`** — a connection over the cap is refused (WS close `1013`;
   SSE `503`). The counter decrements when the session ends.
 - **`max_message_bytes`** — a `POST /sse/{id}` with a larger body returns `413`.
+  The cap is enforced **while the body is read**, not from `Content-Length`
+  alone — a chunked POST declares no length and used to sail straight past it.
 - **`max_connections_per_minute`** — a rolling 60s per-IP window (from
   `X-Forwarded-For` or peer); a flood is refused (WS `1013` / SSE `429`).
+- **`max_events_per_minute`** — the same window, counting **inbound envelopes**
+  (clicks, input, `native_result`) across both legs: a `POST /sse/{id}` over
+  budget answers `429`, and a WebSocket frame over budget closes the socket with
+  `1013`. A separate knob because the magnitudes differ: one connection per
+  client, but one envelope per interaction. Size it above your app's legitimate
+  peak — without it, an already-accepted connection sends without limit.
 
 !!! note "Dead + idle connections"
     A **dead/half-open** WS is already reaped by uvicorn's ping (~20–40s) — no

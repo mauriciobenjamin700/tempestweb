@@ -45,6 +45,18 @@ S = TypeVar("S")
 #: Pyodide-free and type-checkable off-browser.
 NativeDispatch = Callable[[str], Awaitable[str]]
 
+#: The in-process FFI subscribe the JS side injects, wrapping
+#: ``window.__tempestweb_native_subscribe__``. It takes a ``native_subscribe``
+#: envelope (as a **JSON string**) plus a Python ``emit`` callable the browser
+#: invokes with each event, also as a JSON string. Awaitable so the glue can be a
+#: JS ``async`` function — the FFI hands back a promise Python can await.
+NativeSubscribe = Callable[[str, Callable[[str], None]], Awaitable[str]]
+
+#: The in-process FFI unsubscribe, wrapping
+#: ``window.__tempestweb_native_unsubscribe__``. Takes the ``sub_id`` minted by
+#: the Python side.
+NativeUnsubscribe = Callable[[str], Awaitable[None]]
+
 
 class WasmAppHandle(Generic[S]):
     """The handle JS holds onto for a running Mode A app.
@@ -123,6 +135,8 @@ def bootstrap(
     on_patches: Callable[[str], Any],
     dispatch: NativeDispatch | None = None,
     on_navigate: Callable[[str], Any] | None = None,
+    subscribe: NativeSubscribe | None = None,
+    unsubscribe: NativeUnsubscribe | None = None,
 ) -> WasmAppHandle[S]:
     """Wire an app to the JS client and start it.
 
@@ -133,6 +147,14 @@ def bootstrap(
     ``window.__tempestweb_native__`` via :func:`installNativeBridge` and passes its
     Pyodide proxy in here, so this module never imports ``pyodide`` itself and stays
     type-checkable off-browser.
+
+    ``subscribe``/``unsubscribe`` are the streaming half of that same seam
+    (``geolocation.watch``, ``network.watch``, ``sensors.*``, …). Pass them
+    together with ``dispatch``: an :class:`FFIBridge` built without them accepts
+    single-shot calls but raises
+    :class:`~tempestweb.native.dispatch.BrowserUnavailableError` on every
+    ``watch()``/``listen()``, which is exactly what Mode A did before they were
+    wired.
 
     Args:
         state: The app's initial state.
@@ -147,6 +169,11 @@ def bootstrap(
             :class:`~tempestweb.native.dispatch.BrowserUnavailableError`.
         on_navigate: Optional JS callback invoked with the new top-route path when
             the app navigates, so the client can ``history.pushState`` (view → URL).
+        subscribe: Optional in-process streaming subscribe (the Pyodide proxy of
+            the glue around ``window.__tempestweb_native_subscribe__``). Ignored
+            when ``dispatch`` is ``None``, since no bridge is installed then.
+        unsubscribe: Optional in-process streaming unsubscribe (the proxy of the
+            glue around ``window.__tempestweb_native_unsubscribe__``).
 
     Returns:
         A :class:`WasmAppHandle` the JS side drives.
@@ -160,6 +187,6 @@ def bootstrap(
     runtime: WasmRuntime[S] = WasmRuntime(state, view, transport, on_navigate)
     bridge_installed = False
     if dispatch is not None:
-        install_bridge(FFIBridge(dispatch))
+        install_bridge(FFIBridge(dispatch, subscribe, unsubscribe))
         bridge_installed = True
     return WasmAppHandle(runtime, transport, bridge_installed=bridge_installed)

@@ -50,13 +50,24 @@ class WebSocketTransport:
         websocket: The underlying Starlette WebSocket.
     """
 
-    def __init__(self, websocket: WebSocket) -> None:
+    def __init__(
+        self,
+        websocket: WebSocket,
+        *,
+        allow_inbound: Callable[[], bool] | None = None,
+    ) -> None:
         """Initialize the transport over an accepted WebSocket.
 
         Args:
             websocket: The accepted Starlette WebSocket connection.
+            allow_inbound: Optional per-frame admission check (S2). Called once
+                per inbound envelope; returning ``False`` closes the socket with
+                ``1013`` (try again later) instead of routing the frame, so a
+                flood over an already-accepted connection is bounded the same way
+                a flood of new connections is. ``None`` accepts every frame.
         """
         self.websocket: WebSocket = websocket
+        self._allow_inbound: Callable[[], bool] | None = allow_inbound
         self._events: asyncio.Queue[Event] = asyncio.Queue()
         self._native_result_handler: Callable[[NativeResult], None] | None = None
         self._native_event_handler: Callable[[NativeEvent], None] | None = None
@@ -74,10 +85,17 @@ class WebSocketTransport:
         ``event`` envelopes are queued for :meth:`recv_event`; ``native_result``
         envelopes go to the registered handler. On disconnect the transport is
         marked closed and a sentinel unblocks any pending :meth:`recv_event`.
+
+        A frame refused by ``allow_inbound`` (the per-IP event budget) ends the
+        connection with ``1013`` rather than being dropped silently, so the peer
+        learns it is over budget instead of watching its events vanish.
         """
         try:
             while not self._closed:
                 envelope: dict[str, Any] = await self.websocket.receive_json()
+                if self._allow_inbound is not None and not self._allow_inbound():
+                    await self.websocket.close(code=1013)
+                    break
                 kind = envelope.get("kind")
                 if kind == "event":
                     data = envelope.get("data")

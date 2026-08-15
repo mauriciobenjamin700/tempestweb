@@ -189,6 +189,77 @@ def test_max_message_bytes_rejects_large_sse_post() -> None:
     assert big.status_code == 413  # size gate fires before parsing
 
 
+def test_max_message_bytes_holds_without_a_content_length() -> None:
+    """The size cap must survive a chunked body, which declares no length.
+
+    Regression: the gate read ``Content-Length`` alone, so a client that streamed
+    its body under chunked transfer encoding — legal HTTP/1.1, and what an
+    attacker would reach for — sailed past the check and had the whole body read
+    into memory. The limit is now enforced while reading.
+    """
+    client = _client(max_message_bytes=50)
+
+    def chunks() -> Any:
+        for _ in range(20):
+            yield b"x" * 100
+
+    response = client.post("/sse/s1", content=chunks())
+    assert "content-length" not in {k.lower() for k in response.request.headers}
+    assert response.status_code == 413
+
+
+def test_max_events_per_minute_throttles_sse_posts() -> None:
+    """Inbound envelopes are budgeted per IP, not just new connections."""
+    client = _client(max_events_per_minute=2)
+    assert client.post("/sse/s1", json={"kind": "event"}).status_code == 404
+    assert client.post("/sse/s1", json={"kind": "event"}).status_code == 404
+    assert client.post("/sse/s1", json={"kind": "event"}).status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_websocket_transport_closes_a_flooding_peer() -> None:
+    """A frame over the inbound budget closes the socket with 1013.
+
+    The same budget applies to WebSocket frames as to SSE POSTs, so holding an
+    accepted socket open is no way around it. Driven at the transport (with a
+    socket double) rather than through the app so a regression fails instead of
+    blocking on a receive that never comes.
+    """
+    from starlette.websockets import WebSocketDisconnect
+
+    from tempestweb.transports.websocket import WebSocketTransport
+
+    class _Socket:
+        """A WebSocket double replaying canned frames, recording the close code."""
+
+        def __init__(self, frames: list[dict[str, Any]]) -> None:
+            self.frames: list[dict[str, Any]] = frames
+            self.closed_with: int | None = None
+
+        async def receive_json(self) -> dict[str, Any]:
+            if not self.frames:
+                raise WebSocketDisconnect(1000)
+            return self.frames.pop(0)
+
+        async def close(self, code: int = 1000) -> None:
+            self.closed_with = code
+
+    def event(key: str) -> dict[str, Any]:
+        return {"kind": "event", "data": {"type": "click", "key": key, "payload": {}}}
+
+    budget = iter([True, False])
+    socket = _Socket([event("a"), event("b")])
+    transport = WebSocketTransport(
+        socket,  # type: ignore[arg-type]
+        allow_inbound=lambda: next(budget),
+    )
+
+    assert (await transport.recv_event())["key"] == "a"
+    with pytest.raises(Exception, match="disconnected"):
+        await transport.recv_event()
+    assert socket.closed_with == 1013
+
+
 # -- S6: security headers -----------------------------------------------------
 
 

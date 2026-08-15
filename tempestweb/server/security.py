@@ -229,6 +229,20 @@ def jwt_authenticator(
     """
 
     def _authenticate(credentials: Credentials) -> bool:
+        """Accept the connection when its bearer token is a valid JWT.
+
+        A missing token is refused without attempting verification. Both
+        failures ``verify_jwt`` can raise — a malformed or expired token
+        (``ValueError``) and a missing signing dependency (``RuntimeError``) —
+        are answered as "not authenticated" rather than propagating, so the
+        handshake never turns into a 500 for an unauthenticated client.
+
+        Args:
+            credentials: The connection's token, origin, headers and query.
+
+        Returns:
+            ``True`` when the token verifies against the enclosing key.
+        """
         if not credentials.token:
             return False
         try:
@@ -262,6 +276,18 @@ def token_authenticator(secret: str) -> Authenticate:
     """
 
     def _authenticate(credentials: Credentials) -> bool:
+        """Accept the connection when its bearer token equals the shared secret.
+
+        The comparison is constant-time, so a rejected token leaks nothing about
+        how much of it was right. An empty enclosing secret short-circuits to
+        ``True``, which is the documented dev-only way to disable the gate.
+
+        Args:
+            credentials: The connection's token, origin, headers and query.
+
+        Returns:
+            ``True`` when the gate is disabled or the token matches.
+        """
         if not secret:
             return True
         token = credentials.token or ""

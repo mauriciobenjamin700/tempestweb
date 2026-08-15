@@ -45,6 +45,11 @@ def _nav_button(
     """
 
     def choose() -> None:
+        """Report this nav entry's ``value`` to the shell's ``on_navigate``.
+
+        The app receives the entry's value, never the widget or the label, so a
+        rename of the visible text cannot change which screen a click selects.
+        """
         on_navigate(item.value)
 
     label = f"{item.label}  ({item.badge})" if item.badge is not None else item.label

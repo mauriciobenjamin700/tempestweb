@@ -63,6 +63,11 @@ class InProcessRouter:
         """No cross-instance delivery is needed in-process."""
 
         async def _teardown() -> None:
+            """Release nothing: in-process binding acquired nothing to release.
+
+            The no-op still has to exist so callers can treat every router the
+            same way and always await a teardown.
+            """
             return None
 
         return _teardown
@@ -126,6 +131,14 @@ class RedisSessionRouter:
         await pubsub.subscribe(channel)
 
         async def _reader() -> None:
+            """Drain the session's channel into the local SSE transport, forever.
+
+            Runs as a background task for the life of the binding. Subscription
+            bookkeeping frames are skipped — only ``type == "message"`` carries
+            an envelope. A payload that is not decodable JSON is dropped rather
+            than killing the reader, since one malformed publish must not take
+            the session's inbound leg down with it.
+            """
             async for message in pubsub.listen():
                 if message.get("type") != "message":
                     continue
@@ -138,6 +151,14 @@ class RedisSessionRouter:
         task = asyncio.ensure_future(_reader())
 
         async def _teardown() -> None:
+            """Stop the reader and give the channel's pubsub connection back.
+
+            The unsubscribe is wrapped so the connection is closed even when it
+            fails — a dropped Redis link would otherwise leak the pubsub object
+            for every session that ended after the outage. ``aclose`` is
+            preferred when present, falling back to ``close`` for older redis
+            clients.
+            """
             task.cancel()
             try:
                 await pubsub.unsubscribe(channel)

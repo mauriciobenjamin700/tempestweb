@@ -85,7 +85,10 @@ target-version = "py311"
 
 [tool.ruff.lint]
 # Mirrors tempestroid / tempest-fastapi-sdk: annotations (ANN) and docstrings (D)
-# are part of the gate, not optional.
+# are part of the gate, not optional. Note what D does NOT cover: it inherits
+# pydocstyle's semantics, which exempt a function defined inside another
+# function, and there is no option to change that. Closures are covered by
+# tests/unit/test_docstrings.py instead.
 select = ["E", "W", "F", "I", "N", "UP", "B", "C4", "SIM", "Q", "ANN", "D"]
 ignore = ["D203", "D213"]
 

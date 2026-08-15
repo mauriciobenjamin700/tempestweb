@@ -417,6 +417,15 @@ async def native_events(
     queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
 
     def emit(payload: dict[str, Any]) -> None:
+        """Hand one streamed event to the async iterator draining the queue.
+
+        The bridge may call this from outside the event loop's thread, so the
+        enqueue is scheduled with ``call_soon_threadsafe`` rather than done
+        directly — a plain ``put_nowait`` here would be a data race.
+
+        Args:
+            payload: The decoded ``native_event`` payload.
+        """
         loop.call_soon_threadsafe(queue.put_nowait, payload)
 
     sub_id = await bridge.subscribe(capability, args, emit)

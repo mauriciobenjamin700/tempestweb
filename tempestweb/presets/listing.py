@@ -114,6 +114,15 @@ def _search_adapter(
     """
 
     def forward(event: TextChangeEvent) -> None:
+        """Hand the search box's new text to the page's ``on_search``.
+
+        The preset's caller receives a ``str``; the widget emits an event. This
+        adapter is the whole reason ``on_search`` can stay event-free in the
+        public signature.
+
+        Args:
+            event: The search input's change event.
+        """
         on_search(event.value)
 
     return forward
@@ -142,7 +151,26 @@ def _pagination(
     """
 
     def go(target: int) -> Callable[[], None]:
+        """Build the click handler for one pagination button.
+
+        A factory rather than a loop variable capture: both buttons are created
+        in the same scope, so binding ``target`` as a parameter is what keeps
+        "previous" and "next" from sharing the last value.
+
+        Args:
+            target: The page number this button navigates to.
+
+        Returns:
+            The button's ``on_click``.
+        """
+
         def handler() -> None:
+            """Navigate, unless the target is out of range or already current.
+
+            The buttons at the ends of the range stay rendered and simply stop
+            calling back — that is what keeps the control from changing width
+            as the reader pages through.
+            """
             if 1 <= target <= page_count and target != page:
                 on_page(target)
 

@@ -191,6 +191,17 @@ def _hoisted_names(stmts: list[ast.stmt]) -> set[str]:
     seen_top: set[str] = set()
 
     def walk(block: list[ast.stmt], *, top: bool) -> None:
+        """Visit one statement block, reporting each name it binds.
+
+        ``top`` is what distinguishes a binding in the function body from one
+        inside an ``if``/``for``/``while``/``try``; it is passed as ``False``
+        into every nested block, because such a binding is function-scoped in
+        Python but would be block-scoped in JS.
+
+        Args:
+            block: The statements to visit.
+            top: Whether this block is the function's own body.
+        """
         for stmt in block:
             if isinstance(stmt, ast.Assign):
                 for target in stmt.targets:
@@ -221,6 +232,17 @@ def _hoisted_names(stmts: list[ast.stmt]) -> set[str]:
                     walk(child, top=False)
 
     def _note(name: str, *, top: bool) -> None:
+        """Record one binding, hoisting the name when ``const`` would not do.
+
+        Two cases force a hoisted ``let``: a binding made inside a nested block,
+        which JS would scope to that block; and a second binding of a name
+        already seen at the top level, which ``const`` would reject as a
+        redeclaration. A name bound exactly once at the top level needs neither.
+
+        Args:
+            name: The bound identifier.
+            top: Whether the binding sits in the function's own body.
+        """
         if not top or name in seen_top:
             hoisted.add(name)
         seen_top.add(name)

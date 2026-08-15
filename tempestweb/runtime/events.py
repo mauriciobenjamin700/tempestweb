@@ -91,6 +91,16 @@ def _build_event_types() -> dict[str, dict[str, type[Event]]]:
     mapping: dict[str, dict[str, type[Event]]] = {}
 
     def walk(cls: type[Widget]) -> None:
+        """Recurse the widget subclass tree, recording each event schema found.
+
+        Accumulates into the enclosing ``mapping`` rather than returning, since
+        the recursion has to merge every branch of the hierarchy into one table.
+        Walking ``__subclasses__`` means a widget only appears once it has been
+        imported — which is why this runs lazily rather than at module import.
+
+        Args:
+            cls: The subtree root to descend from.
+        """
         for subclass in cls.__subclasses__():
             schemas = getattr(subclass, "event_schemas", {})
             if schemas:

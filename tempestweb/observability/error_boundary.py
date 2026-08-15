@@ -189,6 +189,15 @@ def with_error_boundary(
 
         @wraps(builder)
         def wrapped() -> ErrorBoundary:
+            """Wrap the decorated builder in an :class:`ErrorBoundary`.
+
+            The decorated function is not called here — it is handed over as
+            ``child_builder``, so the boundary owns when (and whether) the child
+            is built and can substitute the fallback if that build raises.
+
+            Returns:
+                The boundary standing in for the decorated builder.
+            """
             return ErrorBoundary(
                 child_builder=builder,
                 fallback_builder=fallback_builder,

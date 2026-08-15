@@ -227,6 +227,18 @@ def validate_installable(manifest: dict[str, Any]) -> list[str]:
     icons = manifest.get("icons") or []
 
     def has_size(size: str) -> bool:
+        """Report whether any declared icon advertises the given size.
+
+        An icon's ``sizes`` is a space-separated list, so the check splits
+        before comparing — a substring test against the raw value would let
+        ``"1512x512"`` satisfy a request for ``"512x512"``.
+
+        Args:
+            size: The size to look for, e.g. ``"192x192"``.
+
+        Returns:
+            ``True`` when at least one icon declares it.
+        """
         return any(size in str(icon.get("sizes", "")).split() for icon in icons)
 
     if not has_size("192x192"):

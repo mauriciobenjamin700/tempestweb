@@ -300,6 +300,11 @@ def _add_quality_parsers(
     """
 
     def _target(parser: argparse.ArgumentParser) -> None:
+        """Add the shared ``--path`` option to one quality subcommand.
+
+        Args:
+            parser: The subcommand's parser.
+        """
         parser.add_argument(
             "--path",
             default=".",
@@ -307,6 +312,11 @@ def _add_quality_parsers(
         )
 
     def _strictness(parser: argparse.ArgumentParser) -> None:
+        """Add the shared ``--strictness`` override to one quality subcommand.
+
+        Args:
+            parser: The subcommand's parser.
+        """
         parser.add_argument(
             "--strictness",
             choices=["lenient", "standard", "strict"],

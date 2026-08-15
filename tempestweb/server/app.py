@@ -178,6 +178,18 @@ class TempestWebServer(Generic[S]):
 
         @self.api.middleware("http")
         async def _headers(request: Request, call_next: Any) -> Response:  # noqa: ANN401
+            """Add the configured hardening headers to every HTTP response.
+
+            Uses ``setdefault`` so a route that deliberately sets its own value
+            keeps it — the middleware fills gaps rather than overriding.
+
+            Args:
+                request: The incoming request, passed through untouched.
+                call_next: The rest of the middleware chain.
+
+            Returns:
+                The downstream response, with the missing headers added.
+            """
             response: Response = await call_next(request)
             for name, value in headers.items():
                 response.headers.setdefault(name, value)

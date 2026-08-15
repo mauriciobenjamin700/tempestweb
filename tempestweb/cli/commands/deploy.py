@@ -79,6 +79,12 @@ def _nginx_conf(
         )
 
     def _proxy_location() -> str:
+        """Render the nginx ``location /`` block that fronts the app.
+
+        Returns:
+            The block, including the WebSocket upgrade headers Mode B needs to
+            survive the proxy hop.
+        """
         return (
             "    location / {\n"
             "        proxy_pass http://tempestweb;\n"
@@ -193,6 +199,14 @@ def _compose(*, port: int, tls: bool, replicas: int = 1) -> str:
     names = _app_service_names(replicas)
 
     def _app_service(name: str) -> str:
+        """Render one app replica's service block for the compose file.
+
+        Args:
+            name: The service name, one per replica.
+
+        Returns:
+            The YAML block for that replica.
+        """
         return (
             f"  {name}:\n"
             "    build:\n"

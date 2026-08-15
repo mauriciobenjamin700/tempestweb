@@ -290,6 +290,15 @@ class FFIBridge:
         envelope = native_subscribe(capability, args, sub_id)
 
         def emit_str(raw: str) -> None:
+            """Decode one streamed event and pass it to the Python subscriber.
+
+            The JS side sends a JSON **string** because strings cross
+            ``pyodide.ffi`` without proxy conversion; this is where that wire
+            form becomes the dict the caller subscribed for.
+
+            Args:
+                raw: The ``native_event`` payload, JSON-encoded.
+            """
             emit(json.loads(raw))
 
         await self.subscribe_js(json.dumps(envelope), emit_str)

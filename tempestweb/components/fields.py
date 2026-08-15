@@ -147,6 +147,16 @@ class TextField(Component):
         on_change = self.on_change
 
         def _emit(event: TextChangeEvent) -> None:
+            """Unwrap the core's change event and hand the plain string over.
+
+            The field's public ``on_change`` takes a ``str``, not an event, so
+            the component absorbs the widget-level event shape. It closes over
+            the callable captured above rather than over ``self``, so the
+            handler does not keep the component instance alive.
+
+            Args:
+                event: The input's change event, carrying the new value.
+            """
             on_change(event.value)
 
         base = self.key or "text-field"
@@ -214,6 +224,16 @@ class EmailField(Component):
         on_change = self.on_change
 
         def _emit(event: TextChangeEvent) -> None:
+            """Unwrap the core's change event and hand the plain string over.
+
+            The field's public ``on_change`` takes a ``str``, not an event, so
+            the component absorbs the widget-level event shape. It closes over
+            the callable captured above rather than over ``self``, so the
+            handler does not keep the component instance alive.
+
+            Args:
+                event: The input's change event, carrying the new value.
+            """
             on_change(event.value)
 
         base = self.key or "email-field"
@@ -259,6 +279,16 @@ class PasswordField(Component):
         on_change = self.on_change
 
         def _emit(event: TextChangeEvent) -> None:
+            """Unwrap the core's change event and hand the plain string over.
+
+            The field's public ``on_change`` takes a ``str``, not an event, so
+            the component absorbs the widget-level event shape. It closes over
+            the callable captured above rather than over ``self``, so the
+            handler does not keep the component instance alive.
+
+            Args:
+                event: The input's change event, carrying the new value.
+            """
             on_change(event.value)
 
         base = self.key or "password-field"

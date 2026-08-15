@@ -37,17 +37,17 @@ test("buildElement maps the counter tree to the expected DOM shape", () => {
   assert.equal(inc.textContent, "+");
 });
 
-test("buildElement applies the Column's style (flex column + gap + padding)", () => {
+test("buildElement styles a Column: flex column from its type, gap, padding", () => {
   withDocument();
   const node = fixture("node_initial.json");
   const el = buildElement(node);
-  // A Column is a flex container by type, so it renders display:flex +
-  // flex-direction:column even with no explicit `direction` in the style.
-  const css = el.getAttribute("style");
-  assert.match(css, /display: flex/);
-  assert.match(css, /flex-direction: column/);
-  assert.match(css, /gap: 8px/);
-  assert.match(css, /padding: 16px 16px 16px 16px/);
+  assert.equal(el.style.display, "flex");
+  assert.equal(el.style.flexDirection, "column");
+  assert.equal(el.style.gap, "8px");
+  assert.equal(el.style.paddingTop, "16px");
+  assert.equal(el.style.paddingRight, "16px");
+  assert.equal(el.style.paddingBottom, "16px");
+  assert.equal(el.style.paddingLeft, "16px");
 });
 
 test("buildElement omits data-tw-key when the node has no key", () => {

@@ -58,6 +58,33 @@ O segredo: o app **nunca nomeia um transporte**. O mesmo
     Você não decide isso no código — só na hora do `build --mode`. Comece pelo
     [Tutorial](tutorial/index.md), que roda o counter nos três modos.
 
+!!! tip "Não é desenvolvedor front-end? Comece pelas telas prontas"
+    Se o que você precisa é um **painel administrativo**, um **dashboard**, uma
+    tela de **CRUD** com busca e paginação, um **formulário** de configurações ou
+    uma tela de **login**, você não precisa aprender layout, CSS ou breakpoint
+    nenhum.
+
+    As [telas prontas (presets)](tutorial/presets.md) recebem **dados tipados** —
+    quais itens o menu tem, quais números o dashboard mostra, quais colunas a
+    tabela tem — e decidem a aparência por você. O resultado já é responsivo:
+    a sidebar vira drawer no celular, os cartões reorganizam, a tabela rola.
+
+    ```python
+    admin_shell(
+        title="Console ACME",
+        nav=[NavItem("Visão geral", "overview"), NavItem("Usuários", "users")],
+        active=app.state.tab,
+        on_navigate=ir_para,
+        body=dashboard_page(
+            title="Visão geral",
+            kpis=[Kpi("Receita", "R$ 82.400", delta="+12%", tone="success")],
+        ),
+    )
+    ```
+
+    Um painel inteiro sai em ~260 linhas de Python, sem um `Style` escrito à mão —
+    veja o [Console Administrativo](examples/admin-console.md) completo.
+
 ## Como funciona
 
 ```text
@@ -89,20 +116,62 @@ modos.
 
 ## O que você vai encontrar aqui
 
-- **[Instalação](tutorial/installation.md)** — prepare o ambiente em um minuto.
-- **[Arquitetura](architecture.md)** — as quatro camadas e por que o renderizador
-  é compartilhado.
-- **[Tutorial](tutorial/index.md)** — construa o counter, um conceito por página,
-  e rode-o nos três modos.
-- **[Modo C — transpile](advanced/transpile.md)** — Python → JavaScript nativo: bundle
-  estático, SEO e PWA turnkey.
-- **[PWA e offline](advanced/pwa.md)** — app instalável, service worker, IndexedDB, WebPush.
-- **[Capacidades](advanced/capabilities.md)** — Web APIs tipadas (geolocation, clipboard,
-  camera) como awaitables Python.
-- **[Contrato de fronteira](advanced/wire-contract.md)** — o wire format Python↔cliente.
-- **[Observabilidade](advanced/observability.md)** — telemetry, logger, feature flags, auth.
-- **[Roadmap e docs de design](design-docs.md)** — o que vem por aí e os planos
-  vivos do projeto.
+<div class="grid cards" markdown>
+
+-   :material-rocket-launch: __Comece aqui__
+
+    ---
+
+    [**Instalação**](tutorial/installation.md) — o ambiente em um minuto ·
+    [**Tutorial — o Counter**](tutorial/index.md) — quatro páginas curtas, um
+    conceito cada, e o app rodando nos três modos ·
+    [**Usando a CLI**](tutorial/cli.md) — `new`, `build`, `dev`, `deploy` ·
+    [**Arquitetura**](architecture.md) — as quatro camadas e por que o
+    renderizador é um só
+
+-   :material-palette: __Construindo a interface__
+
+    ---
+
+    [**Componentes prontos**](tutorial/components.md) — campos, formulários,
+    botões Material 3 (e os campos brasileiros) ·
+    [**Telas prontas (presets)**](tutorial/presets.md) — painel, dashboard,
+    listagem, formulário e login a partir de dados ·
+    [**Tema**](tutorial/theming.md) · [**Ícones**](tutorial/icons.md) ·
+    [**Rotas e navegação**](tutorial/routing.md) ·
+    [**Boas práticas**](tutorial/best-practices.md) — como organizar o app e o
+    que nunca pôr dentro de um handler
+
+-   :material-server-network: __Indo a produção__
+
+    ---
+
+    [**Segurança (Modo B)**](advanced/security.md) — auth, origem, limites ·
+    [**Deploy**](advanced/deploy.md) — CDN, nginx, escala, métricas ·
+    [**Observabilidade**](advanced/observability.md) — telemetria, logs, feature
+    flags ·
+    [**PWA e offline**](advanced/pwa.md) — instalável, service worker, WebPush ·
+    [**Offline + backend**](advanced/offline-sync.md) — fila e sincronização ·
+    [**Modo C — transpile**](advanced/transpile.md) — bundle estático, SEO ·
+    [**SSR estático**](advanced/ssr.md)
+
+-   :material-book-open-variant: __Consultar__
+
+    ---
+
+    [**Referência de API**](reference/presets.md) — assinatura de tudo, nos 14
+    subpacotes ·
+    [**Capacidades nativas**](advanced/capabilities.md) e sua
+    [**referência**](advanced/native-reference.md) ·
+    [**Canal de eventos**](advanced/native-events.md) ·
+    [**Visão computacional**](advanced/vision.md) ·
+    [**Cliente a partir de OpenAPI**](advanced/openapi.md) ·
+    [**Contrato de fronteira**](advanced/wire-contract.md) ·
+    [**Galeria de exemplos**](examples/index.md) — 46 apps rodáveis ·
+    [**Estabilidade**](stability.md) ·
+    [**Roadmap**](design-docs.md)
+
+</div>
 
 !!! info "Idioma"
     Esta documentação é **bilíngue**. Use o seletor de idioma no topo da página
@@ -121,6 +190,15 @@ tempestweb **reexporta** em `tempestweb.components` — veja
 o tempestweb renderiza para o DOM. Se você já conhece um, o modelo mental transfere direto —
 mas **não é preciso conhecer o tempestroid** para usar o tempestweb.
 
+## Próximo passo
+
+1. **[Instale](tutorial/installation.md)** — um comando.
+2. **[Faça o counter](tutorial/index.md)** — quatro páginas, e você entende o
+   ciclo inteiro.
+3. Depois disso, siga por onde o seu problema estiver: monte a tela com
+   [presets](tutorial/presets.md), ou vá direto para
+   [segurança e deploy](advanced/deploy.md) se o app já existe.
+
 ## Convenções do projeto
 
 Python: aspas duplas, tipagem completa (`mypy --strict`), docstrings Google em
@@ -128,8 +206,8 @@ inglês, async-first. Cliente: **JavaScript puro** — sem TypeScript, sem
 framework, sem passo de build.
 
 !!! note "Estado do projeto"
-    Os três modos estão **funcionais hoje** — o counter e os 50 exemplos rodam e
-    passam no gate completo. Os planos de design vivos continuam
+    Os três modos estão **funcionais hoje** — o counter e os mais de 40 exemplos
+    da galeria rodam e passam no gate completo. Os planos de design vivos continuam
     versionados no repositório: [plan.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/plan.md),
     [roadmap.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md)
     e [contract.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md).

@@ -93,6 +93,7 @@ plugins:
             "Advanced User Guide": "Guia avançado"
             Project: Projeto
             "API reference": "Referência de API"
+            "Generate a client from OpenAPI": "Gerar um cliente a partir de OpenAPI"
             "Tutorial — the Counter": "Tutorial — o Counter"
             "1. The view tree": "1. A árvore de view"
             "2. State and handlers": "2. Estado e handlers"

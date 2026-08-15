@@ -40,11 +40,19 @@ docs:
 - [`docs/agents/MANIFEST.md`](docs/agents/MANIFEST.md) — parallel agent task plan.
 
 Want runnable apps? Browse the **[Example Gallery](https://mauriciobenjamin700.github.io/tempestweb/en/examples/)**
-([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 50+
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 46
 single-concept demos (stopwatch, forms, data table/grid, kanban, chat, theming,
 i18n, canvas charts, app shells, native capabilities, observability, PWA/WebPush,
 a Mode C tour, and a server-mode walkthrough), each running unchanged across the
 execution modes.
+
+Not a front-end developer? The
+**[ready-made screens](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/presets/)**
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/tutorial/presets/))
+build an admin panel, dashboard, CRUD listing, settings form or login screen
+from typed data — no `Style`, no font size, no breakpoint. A whole panel in ~260
+lines: see the
+**[Admin Console](https://mauriciobenjamin700.github.io/tempestweb/en/examples/admin-console/)**.
 
 Building an admin panel? Skip the chrome with **[ready-made screens](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/presets/)**
 ([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/tutorial/presets/)) — an admin

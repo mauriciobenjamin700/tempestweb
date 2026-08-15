@@ -81,6 +81,7 @@ plugins:
             "3. Patches on the wire": "3. Patches na rede"
             "4. Running the modes": "4. Rodando os modos"
             "Ready-made components": "Componentes prontos"
+            "Ready-made screens (presets)": "Telas prontas (presets)"
             "Theming (Material 3)": "Tema (Material 3)"
             "Icons (Material + Lucide)": "Ícones (Material + Lucide)"
             "Best practices": "Boas práticas"
@@ -205,6 +206,7 @@ nav:
   - Native event channel: native-events.md
   - Computer vision (ONNX): vision.md
   - Ready-made components: components.md
+  - Ready-made screens (presets): presets.md
   - Theming (Material 3): theming.md
   - Icons (Material + Lucide): icons.md
   - Best practices: best-practices.md

@@ -4,6 +4,42 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.63.0] — 2026-08-15
+
+### Added
+
+- **`tempestweb.presets` — ready-made screens for panels and internal tools.**
+  `admin_shell`, `dashboard_page`, `list_page`, `form_page`/`settings_page` and
+  `auth_page`, each taking typed records (`NavItem`, `Kpi`, `Section`,
+  `TableColumn`, `FormField`, `FormSection`) instead of an assembled widget
+  tree. The dashboard example in this repo spends 716 lines building that chrome
+  by hand; the same screens are now a description. New guide: "Telas prontas
+  (presets)" / "Ready-made screens (presets)", and a runnable
+  `examples/admin-console`.
+- **`client/layouts.js` — the responsive stylesheet behind them.** Injected once
+  at mount (right after the base theme), it supplies what inline `Style` cannot
+  express at all: the sidebar collapsing to an overlay drawer with a scrim under
+  1024px, KPI and section grids reflowing by available width, a table scrolling
+  sideways under a sticky header with zebra rows, forms dropping to one column
+  on a phone, a print mode without the chrome, and `prefers-reduced-motion`
+  support. Until now the client fed no `MediaQueryData` and inline style has no
+  media query, so **every** hand-built layout was fixed-width by construction.
+  Presets tag their containers with `data-tw-layout` (a closed vocabulary in
+  `presets/roles.py`, guarded against drift by tests) for the sheet to find.
+  Tunable through `--tw-layout-*` custom properties; nothing uses `!important`,
+  so an app's inline `Style` still wins.
+
+### Fixed
+
+- **The core's `attrs` escape hatch now works in the DOM renderer.** Every widget
+  carries an `attrs` dict and the SSR renderer has always emitted it, but
+  `client/dom.js` dropped it — the same tree gained `id`/`class`/`data-*` when
+  server-rendered and lost them in Modes A, B and C. Attributes are applied on
+  build and on update (keys removed from the dict are removed from the element),
+  names are validated as in SSR but an invalid one is skipped with a warning
+  rather than throwing mid-render, and the renderer's own attributes are never
+  overwritten.
+
 ## [0.62.0] — 2026-08-15
 
 Fallout from auditing the codebase after #60, whose shape — a bridge shipped but

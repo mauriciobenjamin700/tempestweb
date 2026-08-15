@@ -41,6 +41,14 @@ i18n, canvas charts, app shells, native capabilities, observability, PWA/WebPush
 a Mode C tour, and a server-mode walkthrough), each running unchanged across the
 execution modes.
 
+Building an admin panel? Skip the chrome with **[ready-made screens](https://mauriciobenjamin700.github.io/tempestweb/en/presets/)**
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/presets/)) — an admin
+shell, a KPI dashboard, a searchable list, forms and an auth screen, described
+with typed records instead of assembled widget by widget. They come with the
+responsive behaviour inline styles cannot express: a sidebar that collapses to a
+drawer, grids that reflow, a table that scrolls under a sticky header, and a
+print layout without the chrome. No CSS, no breakpoints of your own.
+
 Building something real? Read the **[App architecture & best practices](https://mauriciobenjamin700.github.io/tempestweb/best-practices/)**
 guide ([EN](https://mauriciobenjamin700.github.io/tempestweb/en/best-practices/)) —
 the ideal layered structure (routes · pages · components · styles · controllers ·

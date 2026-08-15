@@ -231,3 +231,71 @@ test("focus_order sets an explicit tabindex; focusable=false excludes", () => {
   const excluded = buildElement({ type: "Container", key: "y", props: { focusable: false }, children: [] });
   assert.equal(excluded.getAttribute("tabindex"), "-1");
 });
+
+// --- the `attrs` escape hatch (parity with the SSR renderer) ---------------
+//
+// Every core widget carries an `attrs` dict and the SSR renderer has always
+// emitted it; the DOM renderer dropped it, so the same tree gained attributes
+// server-rendered and lost them in Modes A/B/C. The layout presets tag their
+// subtrees through it (`data-tw-layout`), so client/layouts.js can style them.
+
+test("attrs are applied to the element (id/class/data-*)", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Container",
+    key: "c",
+    props: { attrs: { id: "main", class: "wide", "data-tw-layout": "shell" } },
+    children: [],
+  });
+  assert.equal(el.getAttribute("id"), "main");
+  assert.equal(el.getAttribute("class"), "wide");
+  assert.equal(el.getAttribute("data-tw-layout"), "shell");
+});
+
+test("attrs never overwrite the renderer's own attributes", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Container",
+    key: "c",
+    props: { attrs: { "data-tw-type": "Evil", "data-tw-key": "evil", style: "color:red" } },
+    children: [],
+  });
+  assert.equal(el.getAttribute(TYPE_ATTR), "Container");
+  assert.equal(el.getAttribute(KEY_ATTR), "c");
+  assert.equal(el.getAttribute("style"), null);
+});
+
+test("an invalid attribute name is skipped, not thrown", () => {
+  withDocument();
+  const warnings = [];
+  const realWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  try {
+    const el = buildElement({
+      type: "Container",
+      key: "c",
+      props: { attrs: { "a>b": "x", "onload x": "y", id: "kept" } },
+      children: [],
+    });
+    assert.equal(el.getAttribute("id"), "kept");
+    assert.equal(el.hasAttribute("a>b"), false);
+  } finally {
+    console.warn = realWarn;
+  }
+  assert.equal(warnings.length, 2);
+});
+
+test("an Update that drops an attrs key removes it from the element", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Container",
+    key: "c",
+    props: { attrs: { "data-tw-layout": "shell", "data-tw-open": "true" } },
+    children: [],
+  });
+  applyPatches(el, [
+    { op: "update", path: [], set_props: { attrs: { "data-tw-layout": "shell" } } },
+  ]);
+  assert.equal(el.getAttribute("data-tw-layout"), "shell");
+  assert.equal(el.hasAttribute("data-tw-open"), false);
+});

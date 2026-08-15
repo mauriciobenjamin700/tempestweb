@@ -123,7 +123,58 @@ function applyProps(el, props) {
   }
   applyControlProps(el, type, props);
   applyA11yProps(el, props);
+  applyEscapeHatchAttrs(el, props);
   applyLazyProps(el, type, props);
+}
+
+/** Valid HTML attribute name — mirrors `_ATTR_KEY_RE` in the SSR renderer. */
+const ATTR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9:_-]*$/;
+
+/** Attributes this renderer owns; `attrs` may never overwrite them. */
+const RESERVED_ATTRS = new Set([TYPE_ATTR, KEY_ATTR, "style"]);
+
+/**
+ * Apply the core's `attrs` escape hatch (`id`, `class`, `data-*`, `hx-*`, …).
+ *
+ * Every widget carries an `attrs` dict, and the SSR renderer has always emitted
+ * it; the DOM renderer used to drop it, so the same tree gained attributes when
+ * server-rendered and lost them in Modes A/B/C. This closes that gap, which is
+ * also what lets the layout presets tag their subtrees (`data-tw-layout`) for
+ * `client/layouts.js` to style responsively.
+ *
+ * Attributes previously set from `attrs` and absent from the new dict are
+ * removed, so an Update that drops a key does not leave it stranded on the
+ * element. Names are validated against the same pattern the SSR renderer
+ * enforces — an invalid name is skipped with a warning rather than throwing,
+ * since a bad key must not take down a live re-render — and the renderer's own
+ * attributes are never overwritten.
+ *
+ * @param {HTMLElement} el   The target element.
+ * @param {Object} props     The props to apply.
+ * @returns {void}
+ */
+function applyEscapeHatchAttrs(el, props) {
+  if (!("attrs" in props)) return;
+  const attrs = props.attrs || {};
+  const previous = el.__twAttrs;
+  const applied = new Set();
+  for (const [name, value] of Object.entries(attrs)) {
+    if (!ATTR_NAME_RE.test(name)) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn(`tempestweb: ignoring invalid attribute name in attrs: ${name}`);
+      }
+      continue;
+    }
+    if (RESERVED_ATTRS.has(name)) continue;
+    el.setAttribute(name, value == null ? "" : String(value));
+    applied.add(name);
+  }
+  if (previous) {
+    for (const name of previous) {
+      if (!applied.has(name)) el.removeAttribute(name);
+    }
+  }
+  el.__twAttrs = applied;
 }
 
 /**

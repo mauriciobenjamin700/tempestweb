@@ -231,6 +231,54 @@ def view(app: App[State]) -> Widget:
     have their own page in [Ready-made components](components.md). Here the focus is
     only on how the theme makes them look finished without styling anything.
 
+## Progress indicators
+
+`ProgressBar` and `Spinner` have no intrinsic size: with no stylesheet both
+render as an empty zero-height `div` — present in the tree, invisible on screen,
+which is worse than absent, because the app claims to be showing progress and
+the user sees nothing. The base theme draws them, and `color_scheme` picks the
+accent from the families the core names (`primary`, `secondary`, `tertiary`,
+`error`, `success`, `warning`, `info`, `neutral`).
+
+```python
+from tempest_core import App, Column, Widget
+from tempest_core.widgets import ProgressBar, Spinner
+
+
+def view(app: App[State]) -> Widget:
+    return Column(
+        children=[
+            ProgressBar(value=0.42, key="reading"),
+            ProgressBar(indeterminate=True, key="queued"),
+            ProgressBar(value=1.0, color_scheme="success", key="done"),
+            Spinner(size=24.0, key="busy"),
+        ],
+    )
+```
+
+A **determinate** bar is a track with a percentage-width fill, and the theme's
+transition makes the width glide to each new value. An **indeterminate** one
+declares no value — neither in CSS nor to a screen reader, which gets
+`role="progressbar"` without `aria-valuenow`, because a number about work nobody
+is measuring would be read out as fact.
+
+!!! tip "Rebrand like everything else"
+    The accent comes from `--tw-indicator`, which reads the family's token.
+    Override `--tw-success` (or any other) and every bar in that family follows,
+    without touching a single widget.
+
+!!! info "Motion is decoration; state is not"
+    Under `prefers-reduced-motion: reduce` the animation stops and the
+    indeterminate bar stays a static band — a reader who asked for less motion
+    still sees that something is running.
+
+!!! warning "SSR draws inline"
+    `render_to_html` ships no base stylesheet, only a reset, so there both
+    widgets carry self-contained inline style: a translucent track and a
+    `currentColor` fill, meaning the bar takes the colour of the text around it.
+    That is what makes a static page show progress without depending on any CSS
+    of yours.
+
 ## Recap
 
 - The **Material 3 base theme is always on** — typography, spacing and accented
@@ -245,4 +293,7 @@ def view(app: App[State]) -> Widget:
   `text_button` are the five MD3 variants, one line each.
 - `TextField` / `EmailField` / `PasswordField` inherit the outlined field from the
   theme.
+- `ProgressBar` and `Spinner` are only on screen because the theme draws them;
+  `color_scheme` picks the accent and SSR emits them with inline style of
+  their own.
 - Everything renders the same in Mode A (WASM) and Mode B (server).

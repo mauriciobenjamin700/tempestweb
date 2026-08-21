@@ -42,6 +42,14 @@ export const BASE_THEME_CSS = `
   --tw-on-surface-variant: #49454f;
   --tw-outline: #79747e;
   --tw-error: #b3261e;
+  /* Status families the core's "color_scheme" vocabulary names but the M3
+     baseline palette does not: success, warning, info and neutral. A widget
+     tinted by family reads these, so an app rebrands its statuses the same way
+     it rebrands "--tw-primary". */
+  --tw-success: #146c2e;
+  --tw-warning: #8a5300;
+  --tw-info: #0b57d0;
+  --tw-neutral: #5f5f66;
 
   /* MD3 elevation levels (umbra + penumbra). */
   --tw-elevation-1: 0 1px 2px rgba(0,0,0,0.30), 0 1px 3px 1px rgba(0,0,0,0.15);
@@ -151,6 +159,71 @@ export const BASE_THEME_CSS = `
 
 /* ── Text: inherit the modern font instead of the UA serif default ─────────── */
 [data-tw-type="Text"] { font-family: var(--tw-font); }
+
+/* ── Progress indicators ───────────────────────────────────────────────────────
+   A ProgressBar and a Spinner have no intrinsic size, so without a sheet they
+   render as empty zero-height divs — present in the DOM, invisible on screen,
+   which is worse than absent: the tree says the app is showing progress and the
+   user sees nothing. The accent is picked from the widget's "data-tw-scheme"
+   family (dom.js writes it), defaulting to primary. */
+[data-tw-type="ProgressBar"] {
+  --tw-indicator: var(--tw-primary);
+  display: block;
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--tw-radius-full);
+  background: var(--tw-primary-container);
+}
+[data-tw-type="ProgressBar"] > [data-tw-part="fill"] {
+  display: block;
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--tw-indicator);
+  transition: width var(--tw-motion);
+}
+[data-tw-type="ProgressBar"][data-tw-indeterminate] > [data-tw-part="fill"] {
+  width: 40%;
+  transition: none;
+  animation: tw-progress-slide 1200ms ease-in-out infinite;
+}
+[data-tw-type="Spinner"] {
+  --tw-indicator: var(--tw-primary);
+  display: inline-block;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--tw-primary-container);
+  border-top-color: var(--tw-indicator);
+  border-radius: var(--tw-radius-full);
+  animation: tw-spin 900ms linear infinite;
+}
+[data-tw-scheme="secondary"] { --tw-indicator: var(--tw-secondary-container); }
+[data-tw-scheme="error"] { --tw-indicator: var(--tw-error); }
+[data-tw-scheme="success"] { --tw-indicator: var(--tw-success); }
+[data-tw-scheme="warning"] { --tw-indicator: var(--tw-warning); }
+[data-tw-scheme="info"] { --tw-indicator: var(--tw-info); }
+[data-tw-scheme="neutral"] { --tw-indicator: var(--tw-neutral); }
+
+@keyframes tw-progress-slide {
+  0% { margin-inline-start: -40%; }
+  100% { margin-inline-start: 100%; }
+}
+@keyframes tw-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* A moving bar is decoration; the reader who asked for less motion still needs
+   to see that something is running, so the animation stops and the
+   indeterminate fill stays as a static band. */
+@media (prefers-reduced-motion: reduce) {
+  [data-tw-type="ProgressBar"] > [data-tw-part="fill"],
+  [data-tw-type="Spinner"] {
+    animation: none;
+    transition: none;
+  }
+}
 `;
 
 /**

@@ -4,6 +4,52 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.65.0] — 2026-08-21
+
+Um widget que existia na árvore e não existia na tela.
+
+### Fixed
+
+- **`ProgressBar` e `Spinner` agora são desenhados.** Os dois estão no
+  `tempest-core` e sempre atravessaram a IR corretamente, mas o renderizador do
+  DOM não tinha entrada para eles em `TAG_BY_TYPE`: caíam no `div` genérico do
+  fallback, sem trilho, sem preenchimento, sem altura. Medido num app real
+  (Mode B, Chrome DevTools) antes da correção:
+
+  ```html
+  <div data-tw-type="ProgressBar" data-tw-key="job-bar-0"></div>
+  <!-- width: 397px · height: 0 · children: 0 · background: transparent -->
+  ```
+
+  O texto ao lado dizia "65%" e a barra não estava lá. É o pior modo de falha
+  disponível: a árvore afirma que o app está mostrando progresso, o teste que
+  conta nós de `ProgressBar` passa, e o usuário não vê nada.
+
+  Agora `client/dom.js` monta o trilho com um elemento de preenchimento próprio
+  (renderer-owned, como o `input` dentro do `Checkbox`), escreve a família de cor
+  em `data-tw-scheme` e mantém o trio ARIA — `role="progressbar"`,
+  `aria-valuemin`/`aria-valuemax`, e `aria-valuenow` **só** quando há valor a
+  reportar; uma barra indeterminada que afirmasse um número seria lida como
+  progresso medido. Um patch `Update` reposiciona o preenchimento sem
+  reconstruir o elemento, que é o caminho de toda barra que anda.
+
+  A folha base (`client/theme.js`) desenha os dois e ganha os tokens das famílias
+  de status que faltavam (`--tw-success`, `--tw-warning`, `--tw-info`,
+  `--tw-neutral`), então um rebrand por token alcança as barras como alcança o
+  resto. Sob `prefers-reduced-motion: reduce` a animação para e a barra
+  indeterminada vira faixa estática.
+
+  No SSR (`tempestweb.html.render_to_html`) a escolha é outra e está documentada:
+  aquela saída não embarca folha de estilo nenhuma, só um reset, então os dois
+  widgets saem com estilo inline autossuficiente — trilho translúcido,
+  preenchimento em `currentColor` — e uma página estática mostra progresso sem
+  depender de CSS do consumidor.
+
+### Added
+
+- Tokens `--tw-success`, `--tw-warning`, `--tw-info` e `--tw-neutral` na folha
+  base, completando o vocabulário de `color_scheme` que o core já validava.
+
 ## [0.64.0] — 2026-08-15
 
 Four reported defects, three of them silent and one of them the reason another

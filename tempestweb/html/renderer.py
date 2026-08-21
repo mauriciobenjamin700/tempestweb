@@ -52,7 +52,13 @@ _TAG_BY_TYPE: dict[str, str] = {
     "Checkbox": "label",
     "Image": "img",
     "Canvas": "canvas",
+    "ProgressBar": "div",
+    "Spinner": "div",
 }
+
+# Widget types the base stylesheet paints as progress indicators. A port of
+# ``INDICATOR_TYPES`` in ``client/dom.js``.
+_INDICATOR_TYPES: frozenset[str] = frozenset({"ProgressBar", "Spinner"})
 
 # HTML void elements: they never have children and are written self-closing.
 _VOID_ELEMENTS: frozenset[str] = frozenset({"img", "input", "br", "hr", "meta", "link"})
@@ -107,9 +113,45 @@ def _style_attribute(node: Node) -> list[str]:
     """
     style = _dump(node.props.get("style"))
     css = style_to_css(style, node.type)
+    if node.type in _INDICATOR_TYPES:
+        css = f"{_indicator_css(node)}{css}"
     if not css:
         return []
     return [f'style="{escape_attr(css)}"']
+
+
+def _indicator_css(node: Node) -> str:
+    """Build the inline CSS that makes an indicator visible with no stylesheet.
+
+    This is where the SSR renderer parts company with the client. In the DOM the
+    look comes from the base theme, which an app rebrands through its
+    ``--tw-*`` tokens; a server-rendered page ships no stylesheet at all — only
+    a reset — so a bar that relied on one would be the empty zero-height div
+    this whole thing exists to fix. The inline rules are therefore
+    palette-agnostic: the track is a translucent black, the fill is
+    ``currentColor``, so the bar takes the colour of the text around it and
+    looks deliberate on any background.
+
+    A caller's own ``style`` is appended after these and wins, since the later
+    declaration in a CSS body is the one that applies.
+
+    Args:
+        node: The ``ProgressBar`` or ``Spinner`` node.
+
+    Returns:
+        The CSS body, ending in ``;`` so a caller's style can follow it.
+    """
+    if node.type == "Spinner":
+        size = float(node.props.get("size") or 20)
+        return (
+            f"display: inline-block; box-sizing: border-box; width: {size:g}px; "
+            f"height: {size:g}px; border: 2px solid rgba(0, 0, 0, 0.12); "
+            "border-top-color: currentColor; border-radius: 9999px;"
+        )
+    return (
+        "display: block; width: 100%; height: 4px; overflow: hidden; "
+        "border-radius: 9999px; background: rgba(0, 0, 0, 0.12);"
+    )
 
 
 def _a11y_attributes(node: Node) -> list[str]:
@@ -181,7 +223,55 @@ def _control_attributes(node: Node) -> list[str]:
             attributes.append(f'src="{escape_attr(props["src"])}"')
         if props.get("alt") is not None:
             attributes.append(f'alt="{escape_attr(props["alt"])}"')
+    elif node.type in _INDICATOR_TYPES:
+        attributes.extend(_indicator_attributes(node))
     return attributes
+
+
+def _indicator_attributes(node: Node) -> list[str]:
+    """Build the attributes that make a progress indicator visible and audible.
+
+    Mirrors ``applyIndicatorProps`` in the client. The ``color_scheme`` family
+    travels as ``data-tw-scheme``, which is what the base stylesheet keys the
+    accent off, and the ARIA trio makes the bar a real ``progressbar`` to a
+    screen reader. ``aria-valuenow`` is written only for a determinate bar: a
+    number on work whose progress nobody is measuring would be read out as fact.
+
+    Args:
+        node: The ``ProgressBar`` or ``Spinner`` node.
+
+    Returns:
+        The attribute strings, in the client's order.
+    """
+    props = node.props
+    attributes: list[str] = ['role="progressbar"']
+    scheme = props.get("color_scheme")
+    if scheme is not None:
+        attributes.append(f'data-tw-scheme="{escape_attr(scheme)}"')
+    if node.type == "Spinner":
+        return attributes
+    attributes.extend(('aria-valuemin="0"', 'aria-valuemax="1"'))
+    if props.get("indeterminate"):
+        attributes.append("data-tw-indeterminate")
+        return attributes
+    attributes.append(f'aria-valuenow="{escape_attr(_bar_value(node))}"')
+    return attributes
+
+
+def _bar_value(node: Node) -> float:
+    """Read a determinate bar's fraction, clamped to what it can mean.
+
+    Args:
+        node: The ``ProgressBar`` node.
+
+    Returns:
+        The completed fraction, within ``[0, 1]``.
+    """
+    try:
+        value = float(node.props.get("value", 0.0))
+    except (TypeError, ValueError):
+        return 0.0
+    return min(max(value, 0.0), 1.0)
 
 
 def _escape_hatch_attributes(node: Node) -> list[str]:
@@ -241,8 +331,9 @@ def _inner_html(node: Node) -> str:
 
     Mirrors the client: ``Text.content`` and ``Button.label`` become escaped
     text; a ``Checkbox`` wraps a real ``<input type="checkbox">`` plus its escaped
-    caption; ``Icon``/``Canvas`` have no static inner content; every other type
-    recurses into its children.
+    caption; a ``ProgressBar`` owns one fill element sized by its value;
+    ``Icon``/``Canvas``/``Spinner`` have no static inner content; every other
+    type recurses into its children.
 
     Args:
         node: The IR node to render the inner HTML for.
@@ -258,8 +349,17 @@ def _inner_html(node: Node) -> str:
         checked = " checked" if node.props.get("checked") else ""
         caption = escape_text(node.props.get("label"))
         return f'<input type="checkbox"{checked}>{caption}'
-    if node.type in ("Icon", "Canvas"):
+    if node.type in ("Icon", "Canvas", "Spinner"):
         return ""
+    if node.type == "ProgressBar":
+        fill = (
+            "display: block; height: 100%; border-radius: inherit; "
+            "background: currentColor;"
+        )
+        if node.props.get("indeterminate"):
+            return f'<div data-tw-part="fill" style="{fill} width: 40%"></div>'
+        width = _bar_value(node) * 100
+        return f'<div data-tw-part="fill" style="{fill} width: {width:g}%"></div>'
     return "".join(_node_to_html(child) for child in node.children)
 
 

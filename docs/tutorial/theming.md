@@ -231,6 +231,54 @@ def view(app: App[State]) -> Widget:
     têm página própria em [Componentes prontos](components.md). Aqui o foco é só
     como o tema os deixa bonitos sem você estilizar nada.
 
+## Indicadores de progresso
+
+`ProgressBar` e `Spinner` não têm tamanho próprio: sem folha de estilo, os dois
+renderizam como `div` vazia de altura zero — presentes na árvore, invisíveis na
+tela, que é pior que ausentes, porque o app diz que está mostrando progresso e o
+usuário não vê nada. O tema base os desenha, e o `color_scheme` escolhe o acento
+entre as famílias que o core nomeia (`primary`, `secondary`, `tertiary`, `error`,
+`success`, `warning`, `info`, `neutral`).
+
+```python
+from tempest_core import App, Column, Widget
+from tempest_core.widgets import ProgressBar, Spinner
+
+
+def view(app: App[State]) -> Widget:
+    return Column(
+        children=[
+            ProgressBar(value=0.42, key="leitura"),
+            ProgressBar(indeterminate=True, key="na-fila"),
+            ProgressBar(value=1.0, color_scheme="success", key="pronto"),
+            Spinner(size=24.0, key="girando"),
+        ],
+    )
+```
+
+Uma barra **determinada** é um trilho com um preenchimento em porcentagem, e a
+transição do tema faz a largura andar suave a cada valor novo. Uma barra
+**indeterminada** não declara valor — nem no CSS nem para o leitor de tela, que
+recebe `role="progressbar"` sem `aria-valuenow`, porque um número sobre trabalho
+que ninguém está medindo seria lido como fato.
+
+!!! tip "Rebrand igual ao resto"
+    O acento sai de `--tw-indicator`, que por sua vez vem do token da família.
+    Sobrescreva `--tw-success` (ou qualquer outro) e as barras daquela família
+    acompanham, sem tocar em widget nenhum.
+
+!!! info "Movimento é decoração; o estado não é"
+    Sob `prefers-reduced-motion: reduce` a animação para e a barra
+    indeterminada fica como uma faixa estática — quem pediu menos movimento
+    continua vendo que há algo rodando.
+
+!!! warning "No SSR o desenho é inline"
+    `render_to_html` não embarca a folha base, só um reset, então lá os dois
+    saem com estilo inline autossuficiente: trilho translúcido e preenchimento
+    em `currentColor`, ou seja, a barra assume a cor do texto ao redor. É a
+    escolha que faz uma página estática mostrar progresso sem depender de
+    nenhum CSS seu.
+
 ## Recapitulando
 
 - O **tema base Material 3 está sempre ligado** — tipografia, espaçamento e
@@ -243,4 +291,6 @@ def view(app: App[State]) -> Widget:
 - `filled_button` / `tonal_button` / `elevated_button` / `outlined_button` /
   `text_button` são as cinco variantes MD3 em uma linha cada.
 - `TextField` / `EmailField` / `PasswordField` herdam o campo outlined do tema.
+- `ProgressBar` e `Spinner` só existem na tela porque o tema os desenha; o
+  `color_scheme` escolhe o acento e o SSR os emite com estilo inline próprio.
 - Tudo renderiza igual no Modo A (WASM) e no Modo B (servidor).

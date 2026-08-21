@@ -129,3 +129,41 @@ def test_ws_unknown_key_is_ignored() -> None:
         ws.send_json({"kind": "event", "data": {"type": "click", "key": "inc"}})
         update = ws.receive_json()
         assert _label_update(update["data"])["set_props"] == {"content": "Count: 1"}
+
+
+def test_ws_survives_a_frame_that_is_not_json() -> None:
+    """A junk text frame is dropped; the session keeps serving events."""
+    with (
+        TestClient(create_app(make_state, view)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        ws.receive_json()
+        ws.send_text("nao-json")
+        ws.send_json({"kind": "event", "data": {"type": "click", "key": "inc"}})
+        update = ws.receive_json()
+        assert _label_update(update["data"])["set_props"] == {"content": "Count: 1"}
+
+
+def test_ws_accepts_a_binary_frame() -> None:
+    """A binary frame carries the same JSON envelope and is routed normally."""
+    with (
+        TestClient(create_app(make_state, view)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        ws.receive_json()
+        ws.send_bytes(b'{"kind": "event", "data": {"type": "click", "key": "inc"}}')
+        update = ws.receive_json()
+        assert _label_update(update["data"])["set_props"] == {"content": "Count: 1"}
+
+
+def test_ws_survives_a_frame_that_is_not_a_json_object() -> None:
+    """A bare JSON scalar is not an envelope; it is dropped, not fatal."""
+    with (
+        TestClient(create_app(make_state, view)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        ws.receive_json()
+        ws.send_text("[1, 2, 3]")
+        ws.send_json({"kind": "event", "data": {"type": "click", "key": "inc"}})
+        update = ws.receive_json()
+        assert _label_update(update["data"])["set_props"] == {"content": "Count: 1"}

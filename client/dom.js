@@ -140,6 +140,16 @@ const ATTR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9:_-]*$/;
 const RESERVED_ATTRS = new Set([TYPE_ATTR, KEY_ATTR, "style"]);
 
 /**
+ * Inline event-handler attributes (`onclick`, `onerror`, …), refused by `attrs`.
+ *
+ * `attrs` is an escape hatch for markup an app owns — `id`, `class`, `data-*`,
+ * `hx-*`. An `on*` value is *code*, so a widget built from data the app did not
+ * write (a row label, a remote field) would execute it. The SSR renderer refuses
+ * the same names, so a tree behaves identically whichever renderer draws it.
+ */
+const EVENT_HANDLER_ATTR_RE = /^on/i;
+
+/**
  * Apply the core's `attrs` escape hatch (`id`, `class`, `data-*`, `hx-*`, …).
  *
  * Every widget carries an `attrs` dict, and the SSR renderer has always emitted
@@ -171,6 +181,14 @@ function applyEscapeHatchAttrs(el, props) {
       }
       continue;
     }
+    if (EVENT_HANDLER_ATTR_RE.test(name)) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn(
+          `tempestweb: ignoring inline event-handler attribute in attrs: ${name}`,
+        );
+      }
+      continue;
+    }
     if (RESERVED_ATTRS.has(name)) continue;
     el.setAttribute(name, value == null ? "" : String(value));
     applied.add(name);
@@ -196,24 +214,44 @@ function applyEscapeHatchAttrs(el, props) {
  * @returns {void}
  */
 function applyA11yProps(el, props) {
-  const sem = props.semantics;
-  if (sem != null && typeof sem === "object") {
-    if (sem.label != null) {
-      el.setAttribute("aria-label", String(sem.label));
-    }
-    if (sem.role != null) {
-      el.setAttribute("role", String(sem.role));
-    }
-    if (sem.hint != null) {
-      el.setAttribute("aria-description", String(sem.hint));
-    }
+  if ("semantics" in props) {
+    const sem = props.semantics;
+    const semantics = sem != null && typeof sem === "object" ? sem : {};
+    setOrRemove(el, "aria-label", semantics.label);
+    setOrRemove(el, "role", semantics.role);
+    setOrRemove(el, "aria-description", semantics.hint);
   }
+  if (!("focus_order" in props) && !("focusable" in props)) return;
   if (props.focus_order != null) {
     el.setAttribute("tabindex", String(props.focus_order));
   } else if (props.focusable === true) {
     el.setAttribute("tabindex", "0");
   } else if (props.focusable === false) {
     el.setAttribute("tabindex", "-1");
+  } else {
+    el.removeAttribute("tabindex");
+  }
+}
+
+/**
+ * Set an attribute, or remove it when the value is `null`/`undefined`.
+ *
+ * The IR keeps a widget's prop set fixed, so a prop the app stops passing comes
+ * across as `null` rather than disappearing. Treating that as "leave the old
+ * value alone" is what let a cleared `semantics` keep announcing a stale
+ * `aria-label`, and a cleared `max_length` keep capping an input — the DOM held
+ * state the tree no longer described.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {string} name        The attribute name.
+ * @param {*} value            The value, or null/undefined to remove it.
+ * @returns {void}
+ */
+function setOrRemove(el, name, value) {
+  if (value == null) {
+    el.removeAttribute(name);
+  } else {
+    el.setAttribute(name, String(value));
   }
 }
 
@@ -257,11 +295,11 @@ function applyLazyProps(el, type, props) {
   el.style.overflowY = horizontal ? "hidden" : "auto";
   el.style.overflowX = horizontal ? "auto" : "hidden";
   el.style.minHeight = "0";
-  if ("item_count" in props && props.item_count != null) {
-    el.setAttribute("data-tw-item-count", String(props.item_count));
+  if ("item_count" in props) {
+    setOrRemove(el, "data-tw-item-count", props.item_count);
   }
-  if ("window_size" in props && props.window_size != null) {
-    el.setAttribute("data-tw-window-size", String(props.window_size));
+  if ("window_size" in props) {
+    setOrRemove(el, "data-tw-window-size", props.window_size);
   }
   const start = Array.isArray(props.window) ? props.window[0] : 0;
   el.setAttribute("data-tw-window-start", String(start ?? 0));
@@ -315,8 +353,8 @@ function applyIndicatorProps(el, type, props) {
   if (type == null || !INDICATOR_TYPES.includes(type)) {
     return;
   }
-  if ("color_scheme" in props && props.color_scheme != null) {
-    el.setAttribute("data-tw-scheme", String(props.color_scheme));
+  if ("color_scheme" in props) {
+    setOrRemove(el, "data-tw-scheme", props.color_scheme);
   }
   if (type === "Spinner") {
     if ("size" in props) {
@@ -513,11 +551,11 @@ function applyControlProps(el, type, props) {
     if ("value" in props) {
       el.value = props.value == null ? "" : String(props.value);
     }
-    if ("placeholder" in props && props.placeholder != null) {
-      el.setAttribute("placeholder", String(props.placeholder));
+    if ("placeholder" in props) {
+      setOrRemove(el, "placeholder", props.placeholder);
     }
-    if (props.max_length != null) {
-      el.setAttribute("maxlength", String(props.max_length));
+    if ("max_length" in props) {
+      setOrRemove(el, "maxlength", props.max_length);
     }
   } else if (type === "Checkbox") {
     const input = ensureCheckboxInput(el);
@@ -537,11 +575,11 @@ function applyControlProps(el, type, props) {
       el.style.width = "fit-content";
     }
   } else if (type === "Image") {
-    if ("src" in props && props.src != null) {
-      el.setAttribute("src", String(props.src));
+    if ("src" in props) {
+      setOrRemove(el, "src", props.src);
     }
-    if ("alt" in props && props.alt != null) {
-      el.setAttribute("alt", String(props.alt));
+    if ("alt" in props) {
+      setOrRemove(el, "alt", props.alt);
     }
   }
 }
@@ -589,6 +627,12 @@ function resolvePath(root, path) {
 
 /**
  * Apply a single Update patch: set/unset props on the node at `path`.
+ *
+ * An unset prop is applied as `null`, which every prop applier reads as "clear
+ * whatever a previous value put on the element". Handling the two cases
+ * separately is what let `unset_props` cover only `style`/`content`/`label`
+ * while `src`, `value`, `attrs` and the a11y attributes stayed behind.
+ *
  * @param {HTMLElement} root  The root element.
  * @param {{path:number[], set_props?:Object, unset_props?:string[]}} patch  The patch.
  * @returns {void}
@@ -598,14 +642,9 @@ function applyUpdate(root, patch) {
   if (patch.set_props) {
     applyProps(el, patch.set_props);
   }
-  for (const key of patch.unset_props ?? []) {
-    if (key === "style") {
-      el.removeAttribute("style");
-    } else if (key === "label" && el.getAttribute(TYPE_ATTR) === "Checkbox") {
-      setCheckboxLabel(el, "");
-    } else if (key === "content" || key === "label") {
-      el.textContent = "";
-    }
+  const unset = patch.unset_props ?? [];
+  if (unset.length > 0) {
+    applyProps(el, Object.fromEntries(unset.map((name) => [name, null])));
   }
 }
 
@@ -702,12 +741,27 @@ function applyPatch(root, patch) {
  * order the core emitted them — so index-relative ops (insert/remove/reorder)
  * stay consistent.
  *
+ * A patch that cannot be applied means the tree here no longer matches the one
+ * the patch was computed against, and every later patch is index-relative to
+ * that tree — so the batch **stops** at the failure and `onError` is called.
+ * Carrying on would keep mutating a tree that is already wrong. Without an
+ * `onError` the error is rethrown, which is the old behaviour.
+ *
  * @param {HTMLElement} root                       The mounted root element.
  * @param {import("./transport.js").Patch[]} patches  The tick's patch batch.
+ * @param {(error: Error, patch: import("./transport.js").Patch) => void} [onError]
+ *        Called with the first patch that failed; the rest of the batch is
+ *        skipped. Omit to have the error propagate.
  * @returns {void}
  */
-export function applyPatches(root, patches) {
+export function applyPatches(root, patches, onError) {
   for (const patch of patches) {
-    applyPatch(root, patch);
+    try {
+      applyPatch(root, patch);
+    } catch (error) {
+      if (!onError) throw error;
+      onError(/** @type {Error} */ (error), patch);
+      return;
+    }
   }
 }

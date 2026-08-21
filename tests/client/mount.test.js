@@ -178,3 +178,28 @@ test("unmount removes the tree and stops events", () => {
   inc.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   assert.equal(transport.events.length, 0);
 });
+
+test("mount asks for a resync when a patch cannot be applied", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const transport = mockTransport();
+  let resyncs = 0;
+  transport.requestResync = () => {
+    resyncs += 1;
+  };
+  mount(dom.root, transport, fixture("node_initial.json"));
+
+  // A path that does not exist in the mounted tree: the tree here no longer
+  // matches the one the patch was computed against.
+  transport.push([{ path: [99], set_props: { content: "nope" } }]);
+  assert.equal(resyncs, 1);
+
+  // Still broken and not yet repaired: no second request piles up.
+  transport.push([{ path: [99], set_props: { content: "nope" } }]);
+  assert.equal(resyncs, 1);
+
+  // The resync lands as a root replace; a later failure may ask again.
+  transport.push([{ path: [], node: fixture("node_initial.json") }]);
+  transport.push([{ path: [99], set_props: { content: "nope" } }]);
+  assert.equal(resyncs, 2);
+});

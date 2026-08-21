@@ -1,4 +1,308 @@
 {
+  "cleared_props": {
+    "final": {
+      "children": [
+        {
+          "children": [],
+          "key": "label",
+          "props": {
+            "attrs": {},
+            "content": "hello",
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "style": null,
+            "tag": null
+          },
+          "type": "Text"
+        },
+        {
+          "children": [],
+          "key": "field",
+          "props": {
+            "attrs": {},
+            "color_scheme": "primary",
+            "error": "",
+            "field_variant": "outline",
+            "focus_order": null,
+            "focusable": null,
+            "keyboard": "text",
+            "leading_icon": null,
+            "max_length": null,
+            "on_change": null,
+            "pattern": null,
+            "placeholder": "",
+            "secure": false,
+            "semantics": null,
+            "size": "md",
+            "style": {
+              "align": null,
+              "align_self": null,
+              "aspect_ratio": null,
+              "background": null,
+              "border": {
+                "color": {
+                  "a": 1.0,
+                  "b": 133,
+                  "g": 122,
+                  "r": 125
+                },
+                "width": 1.0
+              },
+              "bottom": null,
+              "color": {
+                "a": 1.0,
+                "b": 26,
+                "g": 25,
+                "r": 25
+              },
+              "direction": null,
+              "flex_wrap": null,
+              "font_asset": null,
+              "font_family": null,
+              "font_size": 14.0,
+              "font_style": null,
+              "font_weight": 500,
+              "gap": null,
+              "grow": null,
+              "height": null,
+              "justify": null,
+              "left": null,
+              "letter_spacing": null,
+              "line_height": null,
+              "margin": null,
+              "max_height": null,
+              "max_lines": null,
+              "max_width": null,
+              "min_height": 48.0,
+              "min_width": null,
+              "opacity": null,
+              "padding": {
+                "bottom": 10.0,
+                "left": 24.0,
+                "right": 24.0,
+                "top": 10.0
+              },
+              "position": null,
+              "radius": 8.0,
+              "right": null,
+              "shadow": null,
+              "stack_align": null,
+              "text_align": null,
+              "text_decoration": null,
+              "text_overflow": null,
+              "text_scale": null,
+              "top": null,
+              "transition": null,
+              "width": null
+            },
+            "tag": null,
+            "trailing_icon": null,
+            "value": "typed"
+          },
+          "type": "Input"
+        },
+        {
+          "children": [],
+          "key": "pic",
+          "props": {
+            "alt": "a",
+            "attrs": {},
+            "fit": "contain",
+            "focus_order": null,
+            "focusable": null,
+            "semantics": null,
+            "src": "/a.png",
+            "style": null,
+            "tag": null
+          },
+          "type": "Image"
+        }
+      ],
+      "key": "root",
+      "props": {
+        "attrs": {},
+        "focus_order": null,
+        "focusable": null,
+        "semantics": null,
+        "style": null,
+        "tag": null
+      },
+      "type": "Column"
+    },
+    "initial": {
+      "children": [
+        {
+          "children": [],
+          "key": "label",
+          "props": {
+            "attrs": {},
+            "content": "hello",
+            "focus_order": 3,
+            "focusable": null,
+            "semantics": {
+              "hint": null,
+              "label": "greeting",
+              "role": "status"
+            },
+            "style": null,
+            "tag": null
+          },
+          "type": "Text"
+        },
+        {
+          "children": [],
+          "key": "field",
+          "props": {
+            "attrs": {
+              "data-role": "primary",
+              "id": "the-field"
+            },
+            "color_scheme": "primary",
+            "error": "",
+            "field_variant": "outline",
+            "focus_order": null,
+            "focusable": null,
+            "keyboard": "text",
+            "leading_icon": null,
+            "max_length": 10,
+            "on_change": null,
+            "pattern": null,
+            "placeholder": "type here",
+            "secure": false,
+            "semantics": null,
+            "size": "md",
+            "style": {
+              "align": null,
+              "align_self": null,
+              "aspect_ratio": null,
+              "background": null,
+              "border": {
+                "color": {
+                  "a": 1.0,
+                  "b": 133,
+                  "g": 122,
+                  "r": 125
+                },
+                "width": 1.0
+              },
+              "bottom": null,
+              "color": {
+                "a": 1.0,
+                "b": 26,
+                "g": 25,
+                "r": 25
+              },
+              "direction": null,
+              "flex_wrap": null,
+              "font_asset": null,
+              "font_family": null,
+              "font_size": 14.0,
+              "font_style": null,
+              "font_weight": 500,
+              "gap": null,
+              "grow": null,
+              "height": null,
+              "justify": null,
+              "left": null,
+              "letter_spacing": null,
+              "line_height": null,
+              "margin": null,
+              "max_height": null,
+              "max_lines": null,
+              "max_width": null,
+              "min_height": 48.0,
+              "min_width": null,
+              "opacity": null,
+              "padding": {
+                "bottom": 10.0,
+                "left": 24.0,
+                "right": 24.0,
+                "top": 10.0
+              },
+              "position": null,
+              "radius": 8.0,
+              "right": null,
+              "shadow": null,
+              "stack_align": null,
+              "text_align": null,
+              "text_decoration": null,
+              "text_overflow": null,
+              "text_scale": null,
+              "top": null,
+              "transition": null,
+              "width": null
+            },
+            "tag": null,
+            "trailing_icon": null,
+            "value": "typed"
+          },
+          "type": "Input"
+        },
+        {
+          "children": [],
+          "key": "pic",
+          "props": {
+            "alt": "a",
+            "attrs": {},
+            "fit": "contain",
+            "focus_order": null,
+            "focusable": true,
+            "semantics": null,
+            "src": "/a.png",
+            "style": null,
+            "tag": null
+          },
+          "type": "Image"
+        }
+      ],
+      "key": "root",
+      "props": {
+        "attrs": {},
+        "focus_order": null,
+        "focusable": null,
+        "semantics": null,
+        "style": null,
+        "tag": null
+      },
+      "type": "Column"
+    },
+    "name": "cleared_props",
+    "ticks": [
+      [
+        {
+          "path": [
+            0
+          ],
+          "set_props": {
+            "focus_order": null,
+            "semantics": null
+          },
+          "unset_props": []
+        },
+        {
+          "path": [
+            1
+          ],
+          "set_props": {
+            "attrs": {},
+            "max_length": null,
+            "placeholder": ""
+          },
+          "unset_props": []
+        },
+        {
+          "path": [
+            2
+          ],
+          "set_props": {
+            "focusable": null
+          },
+          "unset_props": []
+        }
+      ]
+    ]
+  },
   "counter": {
     "final": {
       "children": [

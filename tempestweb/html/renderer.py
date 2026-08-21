@@ -69,6 +69,14 @@ _VOID_ELEMENTS: frozenset[str] = frozenset({"img", "input", "br", "hr", "meta", 
 # could otherwise inject markup or a new attribute despite value escaping).
 _ATTR_KEY_RE: re.Pattern[str] = re.compile(r"^[a-zA-Z][a-zA-Z0-9:_-]*$")
 
+#: Inline event-handler attribute names (``onclick``, ``onerror``, ...), which the
+#: ``attrs`` escape hatch refuses. ``attrs`` carries markup an app owns — ``id``,
+#: ``class``, ``data-*``, ``hx-*`` — whereas an ``on*`` value is *code*: a widget
+#: built from data the app did not write (a row label, a remote field) would ship
+#: it into the page as a script. The DOM renderer refuses the same names, so a
+#: tree behaves identically whichever renderer draws it.
+_EVENT_HANDLER_ATTR_RE: re.Pattern[str] = re.compile(r"^on", re.IGNORECASE)
+
 # A minimal CSS reset injected by ``render_document`` when ``css_reset`` is set:
 # box-sizing + zeroed body margin, so the rendered fragment fills the viewport
 # predictably regardless of the browser's UA stylesheet.
@@ -281,7 +289,8 @@ def _escape_hatch_attributes(node: Node) -> list[str]:
     ``aria-*``, ...) is emitted verbatim, every value escaped. Each key is
     validated against :data:`_ATTR_KEY_RE`; an invalid key raises — an
     attribute-injection guard, since a crafted key could otherwise smuggle markup
-    past value escaping.
+    past value escaping. An inline event-handler name (:data:`_EVENT_HANDLER_ATTR_RE`)
+    raises as well: its value is script, which escaping cannot make safe.
 
     Args:
         node: The IR node whose ``attrs`` prop to emit.
@@ -290,7 +299,8 @@ def _escape_hatch_attributes(node: Node) -> list[str]:
         The escaped attribute strings, in insertion order.
 
     Raises:
-        ValueError: If any ``attrs`` key is not a valid HTML attribute name.
+        ValueError: If any ``attrs`` key is not a valid HTML attribute name, or
+            names an inline event handler.
     """
     attrs = node.props.get("attrs") or {}
     attributes: list[str] = []
@@ -299,6 +309,11 @@ def _escape_hatch_attributes(node: Node) -> list[str]:
             raise ValueError(
                 f"tempestweb.html: invalid HTML attribute name {key!r} in attrs "
                 "(must match ^[a-zA-Z][a-zA-Z0-9:_-]*$)"
+            )
+        if _EVENT_HANDLER_ATTR_RE.match(key):
+            raise ValueError(
+                f"tempestweb.html: inline event-handler attribute {key!r} is not "
+                "allowed in attrs (its value would be executed as script)"
             )
         attributes.append(f'{key}="{escape_attr(value)}"')
     return attributes

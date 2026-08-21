@@ -43,12 +43,19 @@ function isRootReplace(patch) {
  * root itself and returns the current root so the mount can keep tracking it;
  * all non-root patches apply in place.
  *
+ * A patch that cannot be applied stops the batch: the remaining patches are
+ * index-relative to a tree that no longer matches, so applying them would only
+ * mutate the wrong nodes. `onError` decides what happens next (the mount asks
+ * for a resync).
+ *
  * @param {HTMLElement} tree       The current root element.
  * @param {import("./transport.js").Patch[]} patches  The tree patch batch.
  * @param {HTMLElement} mountRoot  The mount host (insertion parent fallback).
+ * @param {(error: Error, patch: import("./transport.js").Patch) => void} onError
+ *        Called with the first patch that failed.
  * @returns {HTMLElement}          The current root element after the batch.
  */
-function applyTreePatches(tree, patches, mountRoot) {
+function applyTreePatches(tree, patches, mountRoot, onError) {
   let current = tree;
   for (const patch of patches) {
     if (isRootReplace(patch)) {
@@ -60,7 +67,12 @@ function applyTreePatches(tree, patches, mountRoot) {
       }
       current = fresh;
     } else {
-      applyPatches(current, [patch]);
+      let failed = false;
+      applyPatches(current, [patch], (error, badPatch) => {
+        failed = true;
+        onError(error, badPatch);
+      });
+      if (failed) break;
     }
   }
   return current;
@@ -97,6 +109,13 @@ function applyTreePatches(tree, patches, mountRoot) {
  * `root`, so the delegated event binding covers them too. The overlay host is
  * created lazily on the first overlay patch, so an app with no overlays adds no
  * extra DOM.
+ *
+ * **Broken stream (resync).** A patch the renderer cannot apply means the tree
+ * here no longer matches the one the patches were computed against. The batch
+ * stops there and, when the transport supports it (Mode B), a resync is
+ * requested: the server answers with the whole scene as a root replace. Without
+ * it the mount would keep applying index-relative patches to a tree it knows is
+ * wrong, and the screen would drift further with every tick.
  *
  * **Runtime wiring.** On mount the MD3 base stylesheet is injected once (it styles
  * bare Button/Input/Checkbox widgets and their interaction states, while an app's
@@ -142,8 +161,34 @@ export function mount(root, transport, initialNode = null) {
   }
   scheduleFrame(virtualization.refresh);
 
+  let resyncPending = false;
+
+  /**
+   * Handle a patch the renderer could not apply: ask for a whole fresh scene.
+   *
+   * The DOM is only correct while every patch has applied in order, so once one
+   * fails the tree cannot be repaired by the patches that follow — they are
+   * index-relative to a tree that no longer exists. A resync (one root replace)
+   * is the only repair, and it is requested once until it arrives, so a broken
+   * stream cannot turn into a request flood.
+   *
+   * @param {Error} error   The failure the patch raised.
+   * @param {import("./transport.js").Patch} patch  The patch that failed.
+   * @returns {void}
+   */
+  const onPatchFailure = (error, patch) => {
+    if (typeof console !== "undefined" && console.error) {
+      console.error("tempestweb: patch could not be applied", error, patch);
+    }
+    if (resyncPending) return;
+    if (typeof transport.requestResync !== "function") return;
+    resyncPending = true;
+    transport.requestResync();
+  };
+
   transport.onPatches((patches) => {
     let batch = patches;
+    if (patches.some(isRootReplace)) resyncPending = false;
     if (tree == null) {
       const first = patches[0];
       if (first == null || !("node" in first)) {
@@ -166,10 +211,10 @@ export function mount(root, transport, initialNode = null) {
       }
     }
     if (treePatches.length > 0) {
-      tree = applyTreePatches(tree, treePatches, root);
+      tree = applyTreePatches(tree, treePatches, root, onPatchFailure);
     }
     if (overlayPatches.length > 0) {
-      applyPatches(overlayHost(), overlayPatches);
+      applyPatches(overlayHost(), overlayPatches, onPatchFailure);
     }
     scheduleFrame(virtualization.refresh);
   });

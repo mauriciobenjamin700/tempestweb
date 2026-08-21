@@ -182,6 +182,74 @@ def test_rate_limiter_windowing() -> None:
     assert limiter.allow("other", now=100.0) is True  # per-key
 
 
+def test_a_forged_forwarded_for_cannot_buy_a_fresh_rate_budget() -> None:
+    """X-Forwarded-For is client data: untrusted, it must not reset the per-IP budget.
+
+    Regression: the header was believed unconditionally, so a flood only had to
+    vary it per request — every connection looked like a brand-new client, and
+    the limit never fired. It also left one limiter entry per forged value.
+    """
+    client = _client(max_connections_per_minute=2)
+    assert _ws_ok(client, "/ws", {"X-Forwarded-For": "9.9.9.1"}) is True
+    assert _ws_ok(client, "/ws", {"X-Forwarded-For": "9.9.9.2"}) is True
+    assert _ws_ok(client, "/ws", {"X-Forwarded-For": "9.9.9.3"}) is False
+    assert _ws_ok(client, "/ws", {"X-Forwarded-For": "9.9.9.4"}) is False
+
+
+def test_forwarded_for_is_honored_behind_a_declared_proxy() -> None:
+    """With the peer declared trusted, each forwarded client gets its own budget."""
+    client = _client(max_connections_per_minute=1, trusted_proxies=["*"])
+    assert _ws_ok(client, "/ws", {"X-Forwarded-For": "9.9.9.1"}) is True
+    assert _ws_ok(client, "/ws", {"X-Forwarded-For": "9.9.9.1"}) is False
+    assert _ws_ok(client, "/ws", {"X-Forwarded-For": "9.9.9.2"}) is True
+
+
+def test_resolve_client_ip_reads_the_chain_from_the_right() -> None:
+    """Only hops a trusted proxy vouches for count; prepended ones are ignored."""
+    from tempestweb.server.security import resolve_client_ip
+
+    headers = {"x-forwarded-for": "1.1.1.1, 203.0.113.7, 10.0.0.2"}
+
+    # No trust configured: the header is ignored entirely.
+    assert resolve_client_ip(headers, "10.0.0.1", None) == "10.0.0.1"
+
+    # The peer is not a declared proxy: still ignored.
+    assert resolve_client_ip(headers, "10.0.0.1", ["10.0.0.9"]) == "10.0.0.1"
+
+    # Declared proxies: the right-most hop that is not itself a proxy wins, so a
+    # client-prepended "1.1.1.1" cannot impersonate anyone.
+    assert (
+        resolve_client_ip(headers, "10.0.0.1", ["10.0.0.1", "10.0.0.2"])
+        == "203.0.113.7"
+    )
+
+    # The wildcard trusts any peer and takes the left-most (classic) hop.
+    assert resolve_client_ip(headers, "10.0.0.1", ["*"]) == "1.1.1.1"
+
+    # Nothing forwarded: fall back to the peer.
+    assert resolve_client_ip({}, "10.0.0.1", ["*"]) == "10.0.0.1"
+
+
+def test_rate_limiter_sweeps_keys_that_went_quiet() -> None:
+    """The limiter must not keep one entry per address it has ever seen.
+
+    Regression: buckets were only pruned when their own key was touched again, so
+    a flood of distinct (or forged) addresses grew the map without bound — and the
+    docstring claimed the opposite.
+    """
+    from tempestweb.server.security import RateLimiter
+
+    limiter = RateLimiter(5, window=60.0, sweep_every=8)
+    for index in range(64):
+        limiter.allow(f"10.0.0.{index}", now=100.0)
+    assert limiter.tracked_keys() > 0
+
+    # Every window has long passed; the next sweep must clear them out.
+    for _ in range(8):
+        limiter.allow("current", now=10_000.0)
+    assert limiter.tracked_keys() == 1
+
+
 def test_max_message_bytes_rejects_large_sse_post() -> None:
     client = _client(max_message_bytes=50)
     small = client.post("/sse/s1", json={"type": "x"})  # valid JSON under the limit

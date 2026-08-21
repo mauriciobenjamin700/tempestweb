@@ -44,6 +44,7 @@ from tempestweb.server.security import (
     RateLimiter,
     SecurityConfig,
     _bearer_token,
+    resolve_client_ip,
 )
 from tempestweb.server.sessions import InProcessRouter, SessionRouter, Teardown
 from tempestweb.transports.base import PatchTransport
@@ -83,21 +84,31 @@ def _credentials_from_headers(
     headers: Mapping[str, str],
     query: Mapping[str, str],
     peer: str | None = None,
+    trusted_proxies: list[str] | None = None,
 ) -> Credentials:
     """Build :class:`Credentials` from request headers + query params.
 
-    ``client_ip`` is the first ``X-Forwarded-For`` hop (set by the reverse proxy)
-    or the direct peer address.
+    ``client_ip`` is the socket's peer address unless ``trusted_proxies`` says
+    this peer's ``X-Forwarded-For`` may be believed — the header is client-supplied,
+    and honoring it unconditionally hands every per-IP limit a fresh identity per
+    request (see :func:`~tempestweb.server.security.resolve_client_ip`).
+
+    Args:
+        headers: The request (or upgrade) headers.
+        query: The request query parameters.
+        peer: The socket's peer address, if known.
+        trusted_proxies: The configured trusted-proxy list, or ``None``.
+
+    Returns:
+        The credentials for this connection.
     """
     lowered = {k.lower(): v for k, v in headers.items()}
-    forwarded = lowered.get("x-forwarded-for")
-    client_ip = forwarded.split(",")[0].strip() if forwarded else peer
     return Credentials(
         token=_bearer_token(lowered, query),
         origin=lowered.get("origin"),
         headers=lowered,
         query=dict(query),
-        client_ip=client_ip,
+        client_ip=resolve_client_ip(lowered, peer, trusted_proxies),
     )
 
 
@@ -322,7 +333,10 @@ class TempestWebServer(Generic[S]):
             """
             peer = websocket.client.host if websocket.client else None
             credentials = _credentials_from_headers(
-                websocket.headers, websocket.query_params, peer
+                websocket.headers,
+                websocket.query_params,
+                peer,
+                self._security.trusted_proxies,
             )
             if not self._rate_ok(credentials):
                 self._rejected += 1
@@ -440,7 +454,12 @@ class TempestWebServer(Generic[S]):
     def _request_credentials(self, request: Request) -> Credentials:
         """Extract credentials (incl. client IP) from an HTTP request."""
         peer = request.client.host if request.client else None
-        return _credentials_from_headers(request.headers, request.query_params, peer)
+        return _credentials_from_headers(
+            request.headers,
+            request.query_params,
+            peer,
+            self._security.trusted_proxies,
+        )
 
     async def _authorize_request(self, request: Request) -> bool:
         """Run the Track-S auth gate for an HTTP (SSE) request."""

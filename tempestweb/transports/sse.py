@@ -15,6 +15,15 @@ SSE is unidirectional (server → client), so this transport splits the duplex
 Reconnection: the client reconnects with a ``Last-Event-ID`` header; the stream
 replays every buffered envelope newer than that id before resuming live output,
 so no tick is lost across a dropped connection.
+
+The buffer is the **single** source of outbound envelopes: a stream is a cursor
+over it, not a consumer of a queue. That is what makes a reconnect correct —
+two streams (the dropped one and its replacement) would otherwise split one
+queue between them, each getting half the ticks, and the replay would re-deliver
+what the queue still held. A cursor also lets :meth:`SSETransport.missed_since`
+report that the buffer no longer covers a client's gap, so the caller can push a
+full resync instead of letting index-relative patches land on a stale tree. A
+new stream takes over: the previous one is retired at its next wake-up.
 """
 
 from __future__ import annotations
@@ -76,8 +85,9 @@ class SSETransport:
         """
         self.ping_interval: float = ping_interval
         self._replay_buffer: int = replay_buffer
-        self._outbound: asyncio.Queue[tuple[int, Envelope]] = asyncio.Queue()
         self._history: list[tuple[int, Envelope]] = []
+        self._waiters: set[asyncio.Event] = set()
+        self._stream_generation: int = 0
         self._events: asyncio.Queue[Event] = asyncio.Queue()
         self._native_result_handler: Callable[[NativeResult], None] | None = None
         self._native_event_handler: Callable[[NativeEvent], None] | None = None
@@ -150,7 +160,11 @@ class SSETransport:
         self._enqueue(encode_native_unsubscribe(sub_id))
 
     def _enqueue(self, envelope: Envelope) -> None:
-        """Assign a tick id, buffer for replay, and queue an envelope.
+        """Assign a tick id, append to the replay buffer, and wake the stream.
+
+        The buffer is the only place an outbound envelope lives; the open stream
+        reads it through its own cursor. Appending (rather than also pushing to a
+        queue) is what keeps a reconnect from seeing a tick twice.
 
         Args:
             envelope: The JSON-able envelope to send to the client.
@@ -161,11 +175,42 @@ class SSETransport:
         if self._closed:
             raise TransportClosedError("sse transport is closed")
         self._next_id += 1
-        item = (self._next_id, envelope)
-        self._history.append(item)
+        self._history.append((self._next_id, envelope))
         if len(self._history) > self._replay_buffer:
-            self._history = self._history[-self._replay_buffer :]
-        self._outbound.put_nowait(item)
+            del self._history[: -self._replay_buffer]
+        self._notify()
+
+    def _notify(self) -> None:
+        """Wake every open stream so it drains the envelopes it has not seen."""
+        for waiter in self._waiters:
+            waiter.set()
+
+    @property
+    def last_id(self) -> int:
+        """The id of the most recently queued envelope (``0`` before the first)."""
+        return self._next_id
+
+    def missed_since(self, last_event_id: int) -> bool:
+        """Whether the replay buffer no longer covers everything after an id.
+
+        A reconnecting client asks to resume after the last tick it applied. When
+        the buffer has since dropped one of the ticks in between, resuming would
+        silently skip it — and patches are index-relative, so the client would
+        keep applying to a tree that no longer matches. The caller answers a
+        ``True`` here by pushing a full resync.
+
+        Args:
+            last_event_id: The client's ``Last-Event-ID`` (the last tick it saw).
+
+        Returns:
+            ``True`` when at least one envelope after ``last_event_id`` has been
+            evicted from the buffer.
+        """
+        if last_event_id >= self._next_id:
+            return False
+        if not self._history:
+            return True
+        return self._history[0][0] > last_event_id + 1
 
     def feed_inbound(self, envelope: Envelope) -> None:
         """Route one inbound envelope POSTed by the client.
@@ -224,9 +269,18 @@ class SSETransport:
     async def stream(self, last_event_id: int | None = None) -> AsyncIterator[str]:
         """Yield SSE-framed text for the ``text/event-stream`` response.
 
-        Replays any buffered envelope with an id greater than ``last_event_id``
-        (reconnect), then yields live envelopes as they are queued, emitting a
-        named ``ping`` heartbeat whenever the queue is idle for ``ping_interval``.
+        Walks the replay buffer with a cursor: every buffered envelope past
+        ``last_event_id`` is emitted in id order, then the stream waits for new
+        ones, emitting a named ``ping`` heartbeat whenever it idles for
+        ``ping_interval``. A fresh connection (``None``) starts at the beginning
+        of the buffer, so envelopes queued before the stream opened — the initial
+        mount, most importantly — are not lost.
+
+        Opening a stream **retires** any earlier one on this transport: the
+        previous cursor stops at its next wake-up. Two live streams would
+        otherwise both be told about every envelope while the client that owns
+        the session sees only its own, and (before the cursor rewrite) would have
+        split one queue between them.
 
         Args:
             last_event_id: The client's ``Last-Event-ID`` (the last tick it saw),
@@ -236,21 +290,27 @@ class SSETransport:
             SSE wire chunks (``id:``/``event:``/``data:`` blocks terminated by a
             blank line), ready to write to the response body.
         """
-        if last_event_id is not None:
-            for tick_id, envelope in self._history:
-                if tick_id > last_event_id:
-                    yield _frame(tick_id, envelope)
-        while not self._closed:
-            try:
-                tick_id, envelope = await asyncio.wait_for(
-                    self._outbound.get(), timeout=self.ping_interval
-                )
-            except TimeoutError:
-                yield ": ping\nevent: ping\ndata: {}\n\n"
-                continue
-            if tick_id == 0:
-                break  # close() sentinel
-            yield _frame(tick_id, envelope)
+        self._stream_generation += 1
+        generation = self._stream_generation
+        self._notify()
+        waiter = asyncio.Event()
+        self._waiters.add(waiter)
+        cursor = 0 if last_event_id is None else last_event_id
+        try:
+            while not self._closed and generation == self._stream_generation:
+                waiter.clear()
+                pending = [item for item in self._history if item[0] > cursor]
+                if pending:
+                    for tick_id, envelope in pending:
+                        yield _frame(tick_id, envelope)
+                        cursor = tick_id
+                    continue
+                try:
+                    await asyncio.wait_for(waiter.wait(), timeout=self.ping_interval)
+                except TimeoutError:
+                    yield ": ping\nevent: ping\ndata: {}\n\n"
+        finally:
+            self._waiters.discard(waiter)
 
     async def close(self) -> None:
         """Tear down the transport, unblocking the stream and event pump."""
@@ -258,7 +318,7 @@ class SSETransport:
             return
         self._closed = True
         self._events.put_nowait({})
-        self._outbound.put_nowait((0, {}))  # sentinel to wake the stream
+        self._notify()  # wake every open stream so it observes the close
 
 
 def _frame(tick_id: int, envelope: Envelope) -> str:

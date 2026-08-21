@@ -246,7 +246,11 @@ class AppSession(Generic[S]):
         coalesced rebuild that pushes the resulting patches back to the client.
 
         Unknown keys / missing handlers are silently ignored (a stale event from a
-        widget that no longer exists is not an error).
+        widget that no longer exists is not an error). Three event types are
+        handled by the runtime instead of an app handler: ``scroll`` slides a
+        virtualized window, ``navigate`` applies a URL change, and ``resync``
+        re-sends the whole scene (the client asks for it when it could not apply
+        a batch).
 
         Args:
             event: The JSON-able client event ``{"type", "key", "payload"}``.
@@ -259,6 +263,9 @@ class AppSession(Generic[S]):
         key = event.get("key")
         event_type = event.get("type")
         if not isinstance(key, str) or not isinstance(event_type, str):
+            return
+        if event_type == "resync":
+            await self.resync()
             return
         if event_type == "scroll":
             apply_scroll(self.app, key, event.get("payload", {}))
@@ -274,6 +281,24 @@ class AppSession(Generic[S]):
         result = handler(arg) if handler_accepts_event(handler) else handler()
         if asyncio.iscoroutine(result):
             await result
+
+    async def resync(self) -> None:
+        """Re-send the current scene as a full initial patch batch.
+
+        The client's tree is only correct while it has applied *every* patch in
+        order. When that chain breaks — a batch it could not apply, or an SSE
+        reconnect whose gap the replay buffer no longer covers — no further
+        index-relative patch can be trusted, and a resync is the only repair: one
+        root replace carrying the scene as it stands now.
+
+        A no-op before the session has mounted or after it closed.
+        """
+        if self._closed or self.app is None:
+            return
+        scene = self.app.current_tree
+        if scene is None:
+            return
+        await self.transport.send_patches(scene_to_initial_patches(scene))
 
     async def native_call(self, capability: str, args: dict[str, Any]) -> Any:  # noqa: ANN401 — value type depends on the capability
         """Proxy a native Web API capability to the client and await its result.

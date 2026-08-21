@@ -21,6 +21,7 @@ from tempest_core import (
     build,
 )
 from tempest_core.style import Color, Edge
+from tempest_core.widgets.indicators import ProgressBar, Spinner
 from tempest_core.widgets.inputs import Checkbox, Input
 from tempest_core.widgets.layout import Stack
 from tempest_core.widgets.media import Canvas, Icon, Image
@@ -292,3 +293,53 @@ def test_render_document_injects_head_markup() -> None:
         Text(content="x"), title="t", head='<meta name="author" content="me">'
     )
     assert '<meta name="author" content="me">' in doc
+
+
+# ---------------------------------------------------------------------------
+# Unit — progress indicators
+# ---------------------------------------------------------------------------
+
+
+def test_determinate_bar_ships_a_sized_fill() -> None:
+    """A server-rendered bar shows its fraction before any JavaScript runs."""
+    html = render_to_html(ProgressBar(value=0.42))
+
+    assert "height: 4px" in html
+    assert 'data-tw-part="fill"' in html
+    assert "width: 42%" in html
+
+
+def test_determinate_bar_reports_its_value_to_a_screen_reader() -> None:
+    """The ARIA trio is what makes the div a progressbar rather than a box."""
+    html = render_to_html(ProgressBar(value=0.5))
+
+    assert 'role="progressbar"' in html
+    assert 'aria-valuemin="0"' in html
+    assert 'aria-valuemax="1"' in html
+    assert 'aria-valuenow="0.5"' in html
+
+
+def test_indeterminate_bar_claims_no_value() -> None:
+    """Work whose progress nobody measures must not report a number."""
+    html = render_to_html(ProgressBar(indeterminate=True))
+
+    assert "data-tw-indeterminate" in html
+    assert "aria-valuenow" not in html
+    assert "width: 40%" in html
+
+
+def test_the_color_family_travels_as_the_attribute_the_sheet_keys_off() -> None:
+    """The renderer resolves ``color_scheme``; the core leaves it unresolved."""
+    html = render_to_html(ProgressBar(value=0.1, color_scheme="error"))
+
+    assert 'data-tw-scheme="error"' in html
+
+
+def test_spinner_is_an_empty_themed_box() -> None:
+    """A spinner has no inner content — the stylesheet draws the ring."""
+    html = render_to_html(Spinner(size=32.0))
+
+    assert "width: 32px" in html
+    assert "border-top-color: currentColor" in html
+    assert 'role="progressbar"' in html
+    assert "data-tw-part" not in html

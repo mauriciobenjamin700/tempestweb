@@ -43,6 +43,11 @@ const TAG_BY_TYPE = Object.freeze({
   // A Canvas renders to a real <canvas>; its draw-command list is executed onto
   // the 2D context by paintCanvas (charts, overlays, the sketch pad).
   Canvas: "canvas",
+  // A ProgressBar is a <div> track holding one renderer-owned fill element; a
+  // Spinner is a <div> the base theme paints as a ring. Both are IR leaves, so
+  // no patch path ever descends into what the renderer puts inside them.
+  ProgressBar: "div",
+  Spinner: "div",
 });
 
 // Font stack for Canvas draw_text commands (a literal, since a 2D context cannot
@@ -121,6 +126,7 @@ function applyProps(el, props) {
   if (type === "Icon" && ("name" in props || "size" in props)) {
     renderIcon(/** @type {any} */ (el), props);
   }
+  applyIndicatorProps(el, type, props);
   applyControlProps(el, type, props);
   applyA11yProps(el, props);
   applyEscapeHatchAttrs(el, props);
@@ -259,6 +265,99 @@ function applyLazyProps(el, type, props) {
   }
   const start = Array.isArray(props.window) ? props.window[0] : 0;
   el.setAttribute("data-tw-window-start", String(start ?? 0));
+}
+
+/** Widget types the base theme paints as progress indicators. */
+const INDICATOR_TYPES = ["ProgressBar", "Spinner"];
+
+/**
+ * Get (or lazily create) the fill element inside a ProgressBar's track.
+ *
+ * The track is the keyed, path-addressed element; this fill is
+ * renderer-owned, exactly like the input nested in a Checkbox's label.
+ * A ProgressBar is an IR leaf, so no patch path descends into it and nothing
+ * upstream can collide with what lives here.
+ *
+ * @param {HTMLElement} el  The ProgressBar track element.
+ * @returns {HTMLElement}   The fill element.
+ */
+function ensureProgressFill(el) {
+  let fill = /** @type {HTMLElement|null} */ (el.querySelector("[data-tw-part=\"fill\"]"));
+  if (fill == null) {
+    fill = document.createElement("div");
+    fill.setAttribute("data-tw-part", "fill");
+    el.appendChild(fill);
+  }
+  return fill;
+}
+
+/**
+ * Paint a ProgressBar or a Spinner from its props.
+ *
+ * Both widgets carry a ``color_scheme`` the core leaves unresolved — the
+ * renderer decides what the family means. Here it becomes a
+ * ``data-tw-scheme`` attribute the base theme keys its accent off, so a change
+ * of family is a CSS variable swap rather than an inline color the app's own
+ * Style could not override.
+ *
+ * A determinate bar's fill is sized by percentage width, which is what makes it
+ * animate smoothly under the theme's transition; an indeterminate one drops the
+ * width entirely and is animated by the sheet. ``aria-valuenow`` is written only
+ * when there is a value to report — an indeterminate bar that claimed a number
+ * would be read out as progress that is not being measured.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyIndicatorProps(el, type, props) {
+  if (type == null || !INDICATOR_TYPES.includes(type)) {
+    return;
+  }
+  if ("color_scheme" in props && props.color_scheme != null) {
+    el.setAttribute("data-tw-scheme", String(props.color_scheme));
+  }
+  if (type === "Spinner") {
+    if ("size" in props) {
+      const size = props.size;
+      if (size == null) {
+        el.style.removeProperty("width");
+        el.style.removeProperty("height");
+      } else {
+        el.style.width = `${Number(size)}px`;
+        el.style.height = `${Number(size)}px`;
+      }
+    }
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "progressbar");
+    }
+    return;
+  }
+  const indeterminate = Boolean(props.indeterminate);
+  if ("indeterminate" in props) {
+    if (indeterminate) {
+      el.setAttribute("data-tw-indeterminate", "");
+    } else {
+      el.removeAttribute("data-tw-indeterminate");
+    }
+  }
+  if (!el.hasAttribute("role")) {
+    el.setAttribute("role", "progressbar");
+    el.setAttribute("aria-valuemin", "0");
+    el.setAttribute("aria-valuemax", "1");
+  }
+  const fill = ensureProgressFill(el);
+  if (el.hasAttribute("data-tw-indeterminate")) {
+    el.removeAttribute("aria-valuenow");
+    fill.style.removeProperty("width");
+    return;
+  }
+  if ("value" in props) {
+    const value = Math.min(Math.max(Number(props.value) || 0, 0), 1);
+    el.setAttribute("aria-valuenow", String(value));
+    fill.style.width = `${value * 100}%`;
+  }
 }
 
 /**

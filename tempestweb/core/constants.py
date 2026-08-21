@@ -31,12 +31,20 @@ DEFAULT_SSE_PING_INTERVAL: float = 15.0
 #: How many recent envelopes to retain for SSE ``Last-Event-ID`` replay.
 DEFAULT_SSE_REPLAY_BUFFER: int = 256
 
+#: How long a Mode B ``native_call`` waits for the browser's ``native_result``
+#: before failing with the ``timeout`` error code. The browser may legitimately
+#: take seconds (a permission prompt, a file picker), but never forever: a client
+#: that never answers — a closed tab, a capability that threw before replying —
+#: would otherwise leave the awaiting handler suspended for the session's life.
+DEFAULT_NATIVE_CALL_TIMEOUT: float = 30.0
+
 #: File suffixes whose changes trigger a dev-loop reload (editors write swap/temp
 #: files constantly; restricting suffixes keeps the loop quiet).
 DEFAULT_WATCH_SUFFIXES: tuple[str, ...] = (".py", ".html", ".css", ".js")
 
 __all__ = [
     "DEFAULT_MODE",
+    "DEFAULT_NATIVE_CALL_TIMEOUT",
     "DEFAULT_SSE_PING_INTERVAL",
     "DEFAULT_SSE_REPLAY_BUFFER",
     "DEFAULT_WATCH_SUFFIXES",

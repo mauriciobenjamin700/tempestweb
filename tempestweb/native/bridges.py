@@ -24,8 +24,10 @@ import json
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from tempestweb.core.constants import DEFAULT_NATIVE_CALL_TIMEOUT
 from tempestweb.native.dispatch import (
     BrowserUnavailableError,
+    NativeError,
     _next_sub_id,
     native_subscribe,
     native_unsubscribe,
@@ -48,17 +50,29 @@ class ProxyBridge:
     Attributes:
         send_frame: Injected callable that ships a JSON-able frame to the client
             (the server session wires this to the patch transport's send path).
+        timeout: Seconds to wait for a ``native_result`` before giving up.
     """
 
-    def __init__(self, send_frame: Callable[[dict[str, Any]], None]) -> None:
+    def __init__(
+        self,
+        send_frame: Callable[[dict[str, Any]], None],
+        *,
+        timeout: float | None = DEFAULT_NATIVE_CALL_TIMEOUT,
+    ) -> None:
         """Initialize the proxy bridge.
 
         Args:
             send_frame: Callable shipping a ``native_call`` frame to the client over
                 the transport. The client later posts a ``native_result`` frame
                 back, which :meth:`resolve` matches to the pending future.
+            timeout: How long to wait for the matching ``native_result``. ``None``
+                waits forever, which is what the bridge used to do unconditionally:
+                a client that never answers (a closed tab, a capability that threw
+                before replying) left the awaiting handler suspended until the
+                session ended.
         """
         self.send_frame: Callable[[dict[str, Any]], None] = send_frame
+        self.timeout: float | None = timeout
         self._pending: dict[str, asyncio.Future[dict[str, Any]]] = {}
         #: Open event-channel subscriptions (T-EV): ``sub_id -> emit`` callback.
         self._subscriptions: dict[str, Callable[[dict[str, Any]], None]] = {}
@@ -75,6 +89,7 @@ class ProxyBridge:
 
         Raises:
             BrowserUnavailableError: If the bridge has been closed.
+            NativeError: With code ``timeout`` if no result arrives in time.
         """
         if self._closed:
             raise BrowserUnavailableError("proxy bridge is closed")
@@ -84,7 +99,16 @@ class ProxyBridge:
         self._pending[call_id] = future
         try:
             self.send_frame(envelope)
-            return await future
+            if self.timeout is None:
+                return await future
+            try:
+                return await asyncio.wait_for(future, self.timeout)
+            except TimeoutError as exc:
+                raise NativeError(
+                    "timeout",
+                    f"{envelope.get('capability', 'native call')} did not answer "
+                    f"within {self.timeout}s",
+                ) from exc
         finally:
             self._pending.pop(call_id, None)
 

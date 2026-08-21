@@ -25,7 +25,6 @@ import asyncio
 import logging
 from collections.abc import Callable, Coroutine
 from contextlib import suppress
-from itertools import count
 from typing import Any, Generic, TypeVar
 
 from tempest_core import App, Widget
@@ -33,6 +32,7 @@ from tempest_core import Patch as CorePatch
 from tempest_core.widgets import handler_accepts_event
 from tempestweb.native.bridges import ProxyBridge
 from tempestweb.native.dispatch import (
+    _next_call_id,
     install_bridge,
     native_call,
     uninstall_bridge,
@@ -108,8 +108,8 @@ class AppSession(Generic[S]):
         self._tasks: set[asyncio.Task[None]] = set()
         self._concurrent_dispatch: bool = concurrent_dispatch
         self._key_locks: dict[str, asyncio.Lock] = {}
+        self._key_lock_users: dict[str, int] = {}
         self._closed: bool = False
-        self._native_seq: count[int] = count(1)
         # The Mode-B native bridge: it owns the call_id -> Future registry and
         # proxies each native_call down the transport. Its send_frame spawns the
         # async transport send as a tracked task; its resolve() is fed by the
@@ -318,9 +318,10 @@ class AppSession(Generic[S]):
 
         Raises:
             NativeCallError: If the client reports the capability failed.
+            NativeError: With code ``timeout`` if the client never answers.
             TransportClosedError: If the connection drops before a result.
         """
-        call_id = f"c{next(self._native_seq)}"
+        call_id = _next_call_id()
         result = await self._bridge.call(native_call(capability, args, call_id))
         if not result.get("ok", False):
             raise NativeCallError(str(result.get("error")))
@@ -395,16 +396,32 @@ class AppSession(Generic[S]):
         other events — and an unretrieved task exception would vanish into the
         event loop's warning instead of the app's log.
 
+        The lock is reference-counted and dropped once nobody is queued behind
+        it: a long session over a list whose rows carry per-item keys would
+        otherwise accumulate one lock per key it ever saw, released only at
+        teardown.
+
         Args:
             event: The JSON-able client event.
         """
         key = str(event.get("key") or "")
-        lock = self._key_locks.setdefault(key, asyncio.Lock())
-        async with lock:
-            try:
-                await self.dispatch(event)
-            except Exception:  # noqa: BLE001 - one bad handler must not end the session
-                _LOGGER.exception("tempestweb: handler for %r raised", key)
+        lock = self._key_locks.get(key)
+        if lock is None:
+            lock = self._key_locks[key] = asyncio.Lock()
+        self._key_lock_users[key] = self._key_lock_users.get(key, 0) + 1
+        try:
+            async with lock:
+                try:
+                    await self.dispatch(event)
+                except Exception:  # noqa: BLE001 - one bad handler must not end the session
+                    _LOGGER.exception("tempestweb: handler for %r raised", key)
+        finally:
+            remaining = self._key_lock_users[key] - 1
+            if remaining > 0:
+                self._key_lock_users[key] = remaining
+            else:
+                del self._key_lock_users[key]
+                self._key_locks.pop(key, None)
 
     async def close(self) -> None:
         """Unmount the session: cancel orphan tasks and tear down the transport.
@@ -428,6 +445,7 @@ class AppSession(Generic[S]):
             uninstall_spawner()
             self._bridge_installed = False
         self._key_locks.clear()
+        self._key_lock_users.clear()
         tasks = list(self._tasks)
         for task in tasks:
             task.cancel()

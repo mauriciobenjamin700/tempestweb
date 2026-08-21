@@ -167,3 +167,49 @@ def test_ws_survives_a_frame_that_is_not_a_json_object() -> None:
         ws.send_json({"kind": "event", "data": {"type": "click", "key": "inc"}})
         update = ws.receive_json()
         assert _label_update(update["data"])["set_props"] == {"content": "Count: 1"}
+
+
+def _raising_view(app: App[CounterState]) -> Widget:
+    """Render a counter whose click handler raises on the second press."""
+
+    def boom() -> None:
+        app.set_state(lambda s: setattr(s, "value", s.value + 1))
+        if app.state.value == 2:
+            raise RuntimeError("handler blew up")
+
+    return Column(
+        children=[
+            Text(content=f"Count: {app.state.value}", key="label"),
+            Button(label="+", on_click=boom, key="inc"),
+        ]
+    )
+
+
+def test_ws_survives_a_handler_that_raises() -> None:
+    """A handler error is logged and the session keeps serving.
+
+    In Mode B the connection is the session, so ending it on a handler error
+    threw away the client's whole state; the client reconnected onto a fresh
+    session and the screen jumped back to its initial view.
+    """
+    click = {"kind": "event", "data": {"type": "click", "key": "inc"}}
+    with (
+        TestClient(create_app(make_state, _raising_view)) as client,
+        client.websocket_connect("/ws") as ws,
+    ):
+        ws.receive_json()
+        ws.send_json(click)
+        assert _label_update(ws.receive_json()["data"])["set_props"] == {
+            "content": "Count: 1"
+        }
+
+        ws.send_json(click)  # this one raises inside the handler
+        assert _label_update(ws.receive_json()["data"])["set_props"] == {
+            "content": "Count: 2"
+        }
+
+        # The session is still live and its state was kept, not reset.
+        ws.send_json(click)
+        assert _label_update(ws.receive_json()["data"])["set_props"] == {
+            "content": "Count: 3"
+        }

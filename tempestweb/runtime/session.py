@@ -368,6 +368,13 @@ class AppSession(Generic[S]):
 
         Mounts (if not already) then loops: await the next event, dispatch it, let
         the rebuild loop flush patches. Returns cleanly when the transport closes.
+
+        A handler that raises is logged and the loop carries on, exactly as in
+        concurrent mode. It used to end the connection instead — and in Mode B the
+        connection *is* the session, so one buggy handler (a validation error in a
+        rebuilt widget, say) dropped the client's whole state; the client silently
+        reconnected onto a fresh session and the screen jumped back to its initial
+        view with nothing in the server log to explain it.
         """
         if self.app is None:
             await self.start()
@@ -377,7 +384,12 @@ class AppSession(Generic[S]):
                 if self._concurrent_dispatch:
                     self._spawn(self._dispatch_ordered_by_key(event))
                 else:
-                    await self.dispatch(event)
+                    try:
+                        await self.dispatch(event)
+                    except Exception:  # noqa: BLE001 - a bad handler must not end the session
+                        _LOGGER.exception(
+                            "tempestweb: handler for %r raised", event.get("key")
+                        )
         except TransportClosedError:
             return
         finally:
@@ -390,11 +402,10 @@ class AppSession(Generic[S]):
         order — two quick edits of the same field cannot apply out of order —
         while handlers for different widgets overlap.
 
-        A handler that raises is logged and dropped. In serial mode the exception
-        propagates out of :meth:`run` and ends the connection; here it must not,
-        or one failing handler would take down a session that is still serving
-        other events — and an unretrieved task exception would vanish into the
-        event loop's warning instead of the app's log.
+        A handler that raises is logged and dropped, as it is in serial mode: one
+        failing handler must not take down a session that is still serving other
+        events, and an unretrieved task exception would vanish into the event
+        loop's warning instead of the app's log.
 
         The lock is reference-counted and dropped once nobody is queued behind
         it: a long session over a list whose rows carry per-item keys would

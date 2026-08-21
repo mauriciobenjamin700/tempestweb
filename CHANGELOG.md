@@ -4,6 +4,177 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.66.0] — 2026-08-21
+
+Uma auditoria da perna do Modo B: catorze defeitos, quase todos silenciosos.
+
+### Fixed
+
+- **Um frame de WebSocket inválido matava a sessão inteira — sem log.** O demux
+  de entrada capturava apenas `(WebSocketDisconnect, RuntimeError)`, mas o
+  `receive_json` do Starlette levanta `KeyError` num frame **binário** (ele lê
+  `message["text"]`) e `JSONDecodeError` num texto que não é JSON. Nenhum dos
+  dois era capturado, então um único frame ruim encerrava o pump — e no Modo B a
+  conexão **é** a sessão: o cliente perdia todo o estado da aplicação, reconectava
+  numa sessão nova e a tela voltava ao início. Medido contra um uvicorn real:
+
+  ```text
+  baseline                  -> sessão VIVA
+  frame texto "nao-json"    -> sessão MORTA (sem close frame)
+  frame binário JSON-válido -> sessão MORTA
+  ```
+
+  Pior: o `close()` aguardava a task morta sob `suppress(Exception)`, então o log
+  do servidor ficava **vazio** enquanto o app do usuário reiniciava. Agora os
+  frames passam por um decoder que aceita os dois opcodes (o wire format é JSON
+  de qualquer jeito) e **descarta** um frame indecifrável com um aviso, em vez de
+  encerrar o pump; um pump que ainda quebre é logado.
+
+- **Patches podiam chegar fora de ordem no WebSocket.** A sessão dispara uma task
+  de envio por tick (a reconstrução coalescida do core não pode `await`), então
+  dois batches podiam estar dentro do `send_json` ao mesmo tempo e, sob
+  backpressure, alcançar a rede trocados. Patch é relativo a índice: um par
+  invertido corrompe a árvore do cliente. Os envios agora passam por um lock FIFO.
+
+- **O replay do SSE reentregava, duplicava e perdia ticks.** Cada envelope era
+  escrito no buffer de replay **e** numa `asyncio.Queue`; o `stream()` replayava o
+  buffer e depois drenava a fila. Um cliente reconectando com `Last-Event-ID: 1`
+  contra um buffer de 3 e 6 ticks enfileirados recebia `4, 5, 6, 1, 2, 3, 4, 5, 6`
+  — fora de ordem e com três duplicatas. Pior, a fila fazia dois streams no mesmo
+  transporte **dividirem** o stream de ticks entre si: cada um recebia metade dos
+  envelopes e nenhum tinha a árvore inteira. O stream agora é um cursor sobre o
+  buffer, que é a única fonte de envelopes de saída, e abrir um stream **retira** o
+  anterior.
+
+- **O `session` da URL do SSE autorizava qualquer um.** O id é escolhido pelo
+  cliente, mas o `_open_sse` anexava quem o apresentasse à sessão já registrada
+  sob aquele id. Um segundo requisitante lia então o stream de patches da vítima —
+  o estado renderizado da tela dela — e podia postar eventos na sessão dela;
+  reusar um id vivo também pulava o rate limit e o teto de conexões, que são
+  condicionados ao id ser novo. Reproduzido contra um servidor real:
+
+  ```text
+  sessions vivas: 1          <- o atacante entrou na sessão da vítima
+  VITIMA    patches n=1
+  ATACANTE  patches n=2      <- leu o estado da vítima
+  VITIMA    patches n=3
+  ```
+
+  A sessão agora grava a impressão digital de quem a abriu (o token de auth
+  quando o host autentica, senão o endereço do cliente) e todo `GET`/`POST`
+  posterior naquele id precisa casar, ou responde `403`. Reabrir o stream é um
+  **takeover**: só o dono do token de stream mais novo pode desmontar a sessão —
+  a limpeza anterior derrubava a sessão que o cliente tinha acabado de retomar.
+
+- **`X-Forwarded-For` do cliente contornava todo limite por IP.** O header é dado
+  enviado pelo cliente; variá-lo por request comprava uma identidade nova, então
+  contra `max_connections_per_minute=3` oito conexões forjadas foram todas
+  aceitas. Agora ele só é lido quando `SecurityConfig.trusted_proxies` declara o
+  peer como proxy, e então **da direita para a esquerda** — um proxy anexa o
+  endereço que viu, então o hop mais à direita que não é proxy é o mais distante
+  de que o deploy pode dar fé. Default: o peer do socket.
+
+- **O `RateLimiter` guardava uma entrada por endereço já visto.** Os buckets só
+  eram podados quando a própria chave voltava, então 10 mil endereços distintos
+  deixavam 10 mil entradas — memória que um flood de valores forjados crescia à
+  vontade — enquanto a docstring afirmava o contrário. Chaves cuja janela passou
+  agora são varridas periodicamente.
+
+- **Dois espaços de `call_id` colidiam no mesmo registro.** `AppSession.native_call`
+  cunhava ids de um contador por sessão enquanto toda capacidade (`await native.*`)
+  usava o global do módulo de dispatch — e ambos caem no mesmo
+  `ProxyBridge._pending`. Dois chamadores podiam entregar o mesmo `"c1"`: o
+  segundo registro substituía o future do primeiro, então um `await` ficava
+  pendurado pela vida da sessão e a única resposta do cliente resolvia a chamada
+  que ainda detinha o id — a leitura de clipboard podia ser entregue a quem
+  esperava uma posição de GPS.
+
+- **`native_call` esperava para sempre.** Uma aba fechada no meio, ou uma
+  capacidade que quebrou antes de responder, suspendia o handler até a sessão
+  terminar. Agora falha com o código `timeout` documentado após
+  `DEFAULT_NATIVE_CALL_TIMEOUT` (30s).
+
+- **Uma prop `null` não limpava o DOM que ela mesma tinha escrito.** O conjunto
+  de props de um widget é fixo, então uma prop que o app deixa de passar chega
+  como `set_props: {"<nome>": null}` — e todo aplicador testava `!= null`, lendo
+  isso como "não mexa". Verificado com os patches que o core realmente emite: ao
+  limpar o `semantics` de um `Text`, o elemento continuava com
+  `aria-label="rotulo"` e `role="alert"`; um `max_length` limpo continuava
+  limitando o input. O `unset_props` tinha o mesmo buraco pelo outro lado, cobrindo
+  só `style`/`content`/`label` enquanto `src`, `value`, `attrs` e os atributos de
+  acessibilidade ficavam para trás. Confirmado em browser real (Mode B): a árvore
+  de acessibilidade ia de `status "the greeting"` para `generic` só depois da
+  correção.
+
+- **Um patch que não aplicava deixava a tela derivando.** O `applyPatches`
+  abortava o batch no meio com um `RangeError` e nenhum reparo: a árvore ficava
+  meio-atualizada e cada tick seguinte aplicava mais patches relativos a índice
+  sobre ela. Agora o batch para na primeira falha e o mount pede um **resync**.
+
+- **`RedisSessionRouter.deliver` mentia.** Retornava `True` houvesse ou não
+  instância assinando o canal, então um POST para uma sessão já encerrada
+  respondia `204` e o evento evaporava. Agora usa a contagem de assinantes que o
+  `PUBLISH` devolve, e o chamador responde `404` como o contrato do
+  `SessionRouter` manda.
+
+- **Um handler que levantava encerrava a sessão do Modo B.** No despacho serial a
+  exceção subia pelo `run()` e fechava a conexão — e a conexão é a sessão, então
+  um handler com bug jogava fora todo o estado do cliente, que reconectava numa
+  sessão nova e voltava à tela inicial sem nada no log explicando. Agora é logado
+  e o laço segue, como o despacho concorrente já fazia. (Encontrado ao verificar
+  as correções do DOM num browser.)
+
+- **Os locks de ordenação por key cresciam sem limite.** Um deles era guardado
+  para cada key já despachada, liberados só no teardown; agora são contados por
+  referência e descartados quando ninguém está na fila.
+
+- **Os wheels do Pyodide eram gravados sem conferência.** O `vendor_pyodide`
+  escrevia no artefato o que o CDN devolvesse, ignorando o `sha256` que cada
+  entrada do `pyodide-lock.json` publica. Os digests agora são verificados, então
+  um wheel truncado ou trocado quebra o build em vez de ser distribuído. Não
+  defende contra um lock errado — ele vem do mesmo host — e os arquivos de
+  runtime, que o lock não cobre, seguem sem verificação.
+
+### Changed
+
+- **`verify_jwt` passa a exigir o claim `exp`.** A função prometia validar
+  "assinatura e expiração", mas o PyJWT só confere uma expiração que existe: um
+  token emitido sem `exp` era aceito para sempre. Passe `require_expiry=False`
+  (em `verify_jwt` e `jwt_authenticator`) para um token cuja vida outra coisa
+  limita.
+- **`attrs` recusa atributo de evento inline** (`onclick`, `onerror`, …) nos dois
+  renderizadores. É um escape hatch para markup que o app possui (`id`, `class`,
+  `data-*`, `hx-*`); um valor `on*` é **código**, então um widget construído com
+  dado que o app não escreveu embarcaria um script na página. O SSR levanta, o
+  renderizador de DOM ignora com aviso.
+- **Servir sem `SecurityConfig` agora loga um `WARNING`** dizendo o que está
+  desligado: sem auth, sem allowlist de origem (qualquer site abre um WebSocket —
+  o CORS não protege o upgrade) e sem limites.
+
+### Added
+
+- `SecurityConfig.trusted_proxies` — de quais peers o `X-Forwarded-For` pode ser
+  acreditado (`None` ignora o header; `["*"]` confia em qualquer peer).
+- `AppSession.resync()` e o tipo de evento reservado `resync` no contrato: o
+  cliente que não conseguiu aplicar um batch pede a cena inteira, e a perna SSE
+  emite o mesmo reparo quando o gap do `Last-Event-ID` já saiu do buffer.
+- `SSETransport.missed_since()` / `last_id`, `RateLimiter.tracked_keys()`,
+  `package_digests()` e o `timeout` do `ProxyBridge`.
+- `applyPatches(root, patches, onError)` e `Transport.requestResync` no cliente.
+
+### Tests
+
+- Os cenários de conformidade eram checados contra um aplicador de referência
+  escrito em Python, então o `client/dom.js` — o renderizador que de fato pinta
+  todos os modos — nunca era confrontado com os patches do próprio core. Foi por
+  aí que o caso `null` passou. Um cenário novo limpa props e um teste em jsdom faz
+  o round-trip de **todos** os cenários pelo renderizador real, afirmando que a
+  árvore patcheada é igual à construída.
+- A perna SSE ganhou testes ponta a ponta contra um servidor de verdade em porta
+  efêmera: o `TestClient` síncrono trava a thread num `GET` streaming (era por
+  isso que o teste do round-trip estava `skip`) e o transporte ASGI do httpx
+  bufferiza um corpo que nunca termina.
+
 ## [0.65.0] — 2026-08-21
 
 Um widget que existia na árvore e não existia na tela.

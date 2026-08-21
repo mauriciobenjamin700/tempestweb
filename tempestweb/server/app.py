@@ -30,6 +30,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import logging
 from collections.abc import AsyncIterator, Callable, Mapping
 from typing import Any, Generic, TypeVar
 
@@ -52,6 +53,8 @@ from tempestweb.transports.sse import SSETransport
 from tempestweb.transports.websocket import WebSocketTransport
 
 __all__ = ["TempestWebServer", "create_app"]
+
+_LOGGER = logging.getLogger("tempestweb.server")
 
 S = TypeVar("S")
 
@@ -159,7 +162,8 @@ class TempestWebServer(Generic[S]):
             view: The shared ``view`` function rendered for each session.
             title: OpenAPI title for the FastAPI app.
             security: Opt-in auth + origin controls (Track S). ``None`` leaves
-                the host open (dev).
+                the host open (dev) and logs a warning saying so — an open host
+                accepts a WebSocket from any origin, which CORS does not guard.
             metrics: When ``True``, mount ``GET /metrics`` (Prometheus text) with
                 connection counters (Track S — S8).
             sse_backend: Router for SSE inbound events (Track S — S4). ``None``
@@ -171,6 +175,13 @@ class TempestWebServer(Generic[S]):
                 overlap, so one slow handler no longer freezes the connection.
                 Off by default — see :class:`~tempestweb.runtime.AppSession`.
         """
+        if security is None:
+            _LOGGER.warning(
+                "tempestweb: serving without a SecurityConfig — no auth, no origin "
+                "allowlist (so any site can open a WebSocket to this host), and no "
+                "connection or message limits. Intended for local development; pass "
+                "security=SecurityConfig(...) before exposing the host."
+            )
         self._router: SessionRouter = sse_backend or InProcessRouter()
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view

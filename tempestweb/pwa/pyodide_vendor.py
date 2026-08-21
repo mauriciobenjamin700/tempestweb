@@ -12,10 +12,17 @@ package contributes its wheel plus, transitively, every package it ``depends`` o
 (names normalized so ``pydantic_core`` and ``pydantic-core`` match). Downloads go
 through an injectable ``fetch`` so the resolver and layout are unit-testable
 without the network.
+
+Every wheel is checked against the ``sha256`` its lock entry declares — the lock
+publishes those digests and ignoring them means writing whatever bytes came back
+into the artifact and shipping them to users. It bounds what a truncated
+download or a swapped file can do; it is not a defence against a lock that is
+itself wrong, since the lock comes from the same host.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -25,6 +32,7 @@ from urllib.request import urlopen
 __all__ = [
     "PYODIDE_CORE_FILES",
     "Fetcher",
+    "package_digests",
     "pyodide_cdn_base",
     "resolve_package_files",
     "vendor_pyodide",
@@ -69,6 +77,42 @@ def _default_fetch(url: str) -> bytes:
     """
     with urlopen(url, timeout=120) as response:  # noqa: S310 - fixed https CDN host
         return bytes(response.read())
+
+
+def package_digests(lock: dict[str, Any]) -> dict[str, str]:
+    """Map each wheel file name in the lock to the ``sha256`` it declares.
+
+    Args:
+        lock: The parsed ``pyodide-lock.json`` document.
+
+    Returns:
+        ``{file_name: sha256}`` for every entry that publishes a digest.
+    """
+    packages: dict[str, Any] = lock.get("packages", {})
+    return {
+        str(entry["file_name"]): str(entry["sha256"])
+        for entry in packages.values()
+        if entry.get("file_name") and entry.get("sha256")
+    }
+
+
+def _verify_digest(file_name: str, payload: bytes, expected: str) -> None:
+    """Check downloaded bytes against the digest the lock declares.
+
+    Args:
+        file_name: The file being vendored (for the error message).
+        payload: The downloaded bytes.
+        expected: The ``sha256`` hex digest from the lock entry.
+
+    Raises:
+        ValueError: If the bytes do not hash to ``expected``.
+    """
+    actual = hashlib.sha256(payload).hexdigest()
+    if actual != expected.lower():
+        raise ValueError(
+            f"tempestweb: checksum mismatch vendoring {file_name} "
+            f"(lock declares {expected}, downloaded {actual})"
+        )
 
 
 def _normalize(name: str) -> str:
@@ -141,6 +185,10 @@ def vendor_pyodide(
     Returns:
         The file names written, in fetch order (lock first, then the remaining
         core files, then the wheels).
+
+    Raises:
+        ValueError: If a downloaded wheel does not match the ``sha256`` its lock
+            entry declares.
     """
     downloader: Fetcher = fetch or _default_fetch
     base = pyodide_cdn_base(version)
@@ -152,8 +200,13 @@ def vendor_pyodide(
     lock = json.loads(lock_bytes.decode("utf-8"))
 
     wheels = resolve_package_files(lock, packages)
+    digests = package_digests(lock)
     remaining = [f for f in PYODIDE_CORE_FILES if f != "pyodide-lock.json"] + wheels
     for file_name in remaining:
-        (dest / file_name).write_bytes(downloader(base + file_name))
+        payload = downloader(base + file_name)
+        expected = digests.get(file_name)
+        if expected is not None:
+            _verify_digest(file_name, payload, expected)
+        (dest / file_name).write_bytes(payload)
 
     return ["pyodide-lock.json", *remaining]

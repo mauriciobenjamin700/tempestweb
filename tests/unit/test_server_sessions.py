@@ -61,18 +61,37 @@ class _FakeRedis:
     def pubsub(self) -> _FakePubSub:
         return _FakePubSub(self.channels)
 
-    async def publish(self, channel: str, data: str) -> None:
+    async def publish(self, channel: str, data: str) -> int:
+        """Publish to a channel, answering with the subscriber count like Redis."""
         self.published.append((channel, data))
-        for sub in self.channels.get(channel, []):
+        subscribers = self.channels.get(channel, [])
+        for sub in subscribers:
             sub.deliver(data)
+        return len(subscribers)
 
 
 async def test_redis_router_publishes_when_remote() -> None:
+    """A session held by another instance is reached over the channel."""
     client = _FakeRedis()
     router = RedisSessionRouter(client, prefix="tw:sse:")
-    # No local transport -> publish to the channel.
+    transport = SSETransport()
+    teardown = await router.bind("abc", transport)  # the "other instance"
+
     assert await router.deliver("abc", {"type": "click"}, None) is True
     assert client.published == [("tw:sse:abc", json.dumps({"type": "click"}))]
+    await teardown()
+
+
+async def test_redis_router_reports_a_session_nobody_holds() -> None:
+    """An unroutable post must fail, so the caller can answer 404.
+
+    Regression: deliver() returned True whether or not any instance was
+    subscribed, so posting to a session that had already ended answered 204 and
+    the event vanished — the client had no way to know its click was lost.
+    """
+    client = _FakeRedis()
+    router = RedisSessionRouter(client, prefix="tw:sse:")
+    assert await router.deliver("gone", {"type": "click"}, None) is False
 
 
 async def test_redis_router_feeds_local_without_publish() -> None:

@@ -7,6 +7,7 @@ the network.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pytest
 
 from tempestweb.pwa import (
     PYODIDE_CORE_FILES,
+    package_digests,
     pyodide_cdn_base,
     resolve_package_files,
     vendor_pyodide,
@@ -107,3 +109,77 @@ def test_vendor_pyodide_writes_runtime_and_wheels(tmp_path: Path) -> None:
 
     # The wasm binary content came straight from the fetcher.
     assert (dest / "pyodide.asm.wasm").read_bytes() == b"BYTES:pyodide.asm.wasm"
+
+
+def test_vendor_verifies_the_digest_the_lock_declares(tmp_path: Path) -> None:
+    """A wheel whose bytes do not match the lock's sha256 is refused.
+
+    Regression: the downloader wrote whatever came back from the CDN into the
+    artifact, ignoring the sha256 the lock publishes for every package — so a
+    truncated or swapped wheel shipped to users unnoticed.
+    """
+    lock = {
+        "packages": {
+            "one": {
+                "name": "one",
+                "file_name": "one-1.0.whl",
+                "depends": [],
+                "sha256": hashlib.sha256(b"the real wheel").hexdigest(),
+            }
+        }
+    }
+
+    def tampering_fetch(url: str) -> bytes:
+        if url.endswith("pyodide-lock.json"):
+            return json.dumps(lock).encode("utf-8")
+        if url.endswith("one-1.0.whl"):
+            return b"a different wheel"
+        return b"core"
+
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        vendor_pyodide(
+            tmp_path / "pyodide",
+            version="v314.0.0",
+            packages=("one",),
+            fetch=tampering_fetch,
+        )
+
+
+def test_vendor_accepts_a_wheel_matching_the_lock(tmp_path: Path) -> None:
+    """The happy path writes the wheel whose digest matches."""
+    payload = b"the real wheel"
+    lock = {
+        "packages": {
+            "one": {
+                "name": "one",
+                "file_name": "one-1.0.whl",
+                "depends": [],
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        }
+    }
+
+    def honest_fetch(url: str) -> bytes:
+        if url.endswith("pyodide-lock.json"):
+            return json.dumps(lock).encode("utf-8")
+        if url.endswith("one-1.0.whl"):
+            return payload
+        return b"core"
+
+    dest = tmp_path / "pyodide"
+    vendor_pyodide(dest, version="v314.0.0", packages=("one",), fetch=honest_fetch)
+    assert (dest / "one-1.0.whl").read_bytes() == payload
+
+
+def test_package_digests_maps_wheels_to_their_declared_hash() -> None:
+    """Only entries that publish both a file name and a digest are mapped."""
+    digests = package_digests(
+        {
+            "packages": {
+                "a": {"file_name": "a.whl", "sha256": "aa"},
+                "b": {"file_name": "b.whl"},
+                "c": {"sha256": "cc"},
+            }
+        }
+    )
+    assert digests == {"a.whl": "aa"}

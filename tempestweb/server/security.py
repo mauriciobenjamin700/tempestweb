@@ -219,6 +219,7 @@ def verify_jwt(
     algorithms: tuple[str, ...] = ("HS256",),
     audience: str | None = None,
     issuer: str | None = None,
+    require_expiry: bool = True,
 ) -> dict[str, Any]:
     """Verify a JWT's signature and expiry, returning its claims.
 
@@ -231,13 +232,19 @@ def verify_jwt(
         algorithms: Accepted signing algorithms.
         audience: Expected ``aud`` claim, if any.
         issuer: Expected ``iss`` claim, if any.
+        require_expiry: Refuse a token that carries no ``exp`` claim. PyJWT only
+            checks an expiry that is *present*, so without this a token minted
+            without ``exp`` is accepted forever — which is not what "verifies
+            the expiry" can mean. Set ``False`` only for a token whose lifetime
+            something else bounds.
 
     Returns:
         The verified claims.
 
     Raises:
         RuntimeError: If PyJWT is not installed.
-        ValueError: If the token is invalid, expired, or fails a claim check.
+        ValueError: If the token is invalid, expired, missing a required claim,
+            or fails a claim check.
     """
     try:
         import jwt  # type: ignore[import-not-found]  # optional [auth] extra
@@ -246,6 +253,7 @@ def verify_jwt(
             "PyJWT is required for verify_jwt; install "
             'tempest-fastapi-sdk[auth] or "pyjwt".'
         ) from exc
+    required: list[str] = ["exp"] if require_expiry else []
     try:
         return dict(
             jwt.decode(
@@ -254,6 +262,7 @@ def verify_jwt(
                 algorithms=list(algorithms),
                 audience=audience,
                 issuer=issuer,
+                options={"require": required},
             )
         )
     except jwt.PyJWTError as exc:
@@ -266,6 +275,7 @@ def jwt_authenticator(
     algorithms: tuple[str, ...] = ("HS256",),
     audience: str | None = None,
     issuer: str | None = None,
+    require_expiry: bool = True,
 ) -> Authenticate:
     """Build an ``authenticate`` callable that verifies a bearer JWT (S3).
 
@@ -274,6 +284,8 @@ def jwt_authenticator(
         algorithms: Accepted signing algorithms.
         audience: Expected ``aud`` claim, if any.
         issuer: Expected ``iss`` claim, if any.
+        require_expiry: Refuse a token with no ``exp`` claim (see
+            :func:`verify_jwt`).
 
     Returns:
         A predicate that accepts a connection with a valid, unexpired JWT.
@@ -303,6 +315,7 @@ def jwt_authenticator(
                 algorithms=algorithms,
                 audience=audience,
                 issuer=issuer,
+                require_expiry=require_expiry,
             )
         except (ValueError, RuntimeError):
             return False

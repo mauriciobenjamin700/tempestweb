@@ -406,3 +406,22 @@ def test_metrics_counters() -> None:
     assert "tempestweb_sessions_opened_total 1" in body
     assert "tempestweb_connections_rejected_total 1" in body
     assert "tempestweb_sessions_live 0" in body
+
+
+def test_open_host_warns_that_it_is_open(caplog: pytest.LogCaptureFixture) -> None:
+    """Serving with no SecurityConfig says so, rather than looking configured.
+
+    An open host takes a WebSocket from any origin (CORS does not guard the
+    upgrade), authenticates nobody and caps nothing. That is the right default
+    for `tempestweb dev`, and a dangerous one to reach production silently.
+    """
+    with caplog.at_level("WARNING", logger="tempestweb.server"):
+        create_app(lambda: _State(), _view)
+    assert "without a SecurityConfig" in caplog.text
+
+
+def test_configured_host_does_not_warn(caplog: pytest.LogCaptureFixture) -> None:
+    """A host given a SecurityConfig stays quiet."""
+    with caplog.at_level("WARNING", logger="tempestweb.server"):
+        create_app(lambda: _State(), _view, security=SecurityConfig())
+    assert "without a SecurityConfig" not in caplog.text

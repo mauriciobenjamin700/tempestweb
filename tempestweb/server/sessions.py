@@ -171,9 +171,19 @@ class RedisSessionRouter:
     async def deliver(
         self, session_id: str, envelope: dict[str, Any], local: SSETransport | None
     ) -> bool:
-        """Feed a local transport directly, else publish for the holding instance."""
+        """Feed a local transport directly, else publish for the holding instance.
+
+        ``PUBLISH`` answers with the number of subscribers that received the
+        message, and that is the only evidence available that some instance still
+        holds the session. Reporting success unconditionally (as this used to)
+        turned every post for a session that had already ended into a silent
+        ``204``: the client believed its click had been delivered and the event
+        was gone.
+        """
         if local is not None:
             local.feed_inbound(envelope)
             return True
-        await self._client.publish(self._prefix + session_id, json.dumps(envelope))
-        return True
+        receivers = await self._client.publish(
+            self._prefix + session_id, json.dumps(envelope)
+        )
+        return bool(receivers)

@@ -8,6 +8,7 @@ optional; the JWT paths assert graceful degradation when it is absent.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -225,21 +226,28 @@ async def test_websocket_transport_closes_a_flooding_peer() -> None:
     socket double) rather than through the app so a regression fails instead of
     blocking on a receive that never comes.
     """
-    from starlette.websockets import WebSocketDisconnect
-
     from tempestweb.transports.websocket import WebSocketTransport
 
     class _Socket:
-        """A WebSocket double replaying canned frames, recording the close code."""
+        """A WebSocket double replaying canned frames, recording the close code.
+
+        Mirrors Starlette's ``receive`` contract (an ASGI message dict, with
+        disconnect as a message rather than an exception), which is what the
+        transport reads so it can accept a binary frame and drop an undecodable
+        one without ending the connection.
+        """
 
         def __init__(self, frames: list[dict[str, Any]]) -> None:
             self.frames: list[dict[str, Any]] = frames
             self.closed_with: int | None = None
 
-        async def receive_json(self) -> dict[str, Any]:
+        async def receive(self) -> dict[str, Any]:
             if not self.frames:
-                raise WebSocketDisconnect(1000)
-            return self.frames.pop(0)
+                return {"type": "websocket.disconnect", "code": 1000}
+            return {
+                "type": "websocket.receive",
+                "text": json.dumps(self.frames.pop(0)),
+            }
 
         async def close(self, code: int = 1000) -> None:
             self.closed_with = code

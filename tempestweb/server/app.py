@@ -13,11 +13,22 @@ Each connection drives its own :class:`~tempestweb.runtime.session.AppSession`,
 so state is fully isolated between clients. For SSE, sessions are tracked in a
 registry keyed by the client-chosen ``session`` id so the POST endpoint can route
 inbound envelopes and a dropped stream can reconnect with ``Last-Event-ID``.
+
+Because that id is chosen by the client, it is **not** on its own proof of who
+may use the session: whoever presents the id would otherwise read the session's
+patch stream (its rendered state) and post events into it. So the first request
+that materializes an SSE session records a fingerprint of its opener — the
+bearer token when the host is authenticated, the client address otherwise — and
+every later ``GET``/``POST`` for that id must match it (``403`` if it does not).
+Reopening the stream is a *takeover*: the newest stream owns the session and the
+one it replaced can no longer tear it down.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 from collections.abc import AsyncIterator, Callable, Mapping
 from typing import Any, Generic, TypeVar
@@ -88,6 +99,26 @@ def _credentials_from_headers(
         query=dict(query),
         client_ip=client_ip,
     )
+
+
+def _session_fingerprint(credentials: Credentials) -> str:
+    """Derive the stable owner fingerprint for an SSE session.
+
+    The bearer token identifies the principal when the host is authenticated, so
+    it wins: the same user reconnecting from a new address keeps their session.
+    Without auth there is nothing to bind to but the peer address, which is
+    weaker (it moves with the network) yet still stops a third party who merely
+    learned the session id from attaching to it.
+
+    Args:
+        credentials: The credentials extracted from the request.
+
+    Returns:
+        A hex digest of the identifying material (never the material itself, so
+        it is safe to keep in memory and compare).
+    """
+    material = credentials.token or f"ip:{credentials.client_ip or ''}"
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
 class TempestWebServer(Generic[S]):
@@ -332,14 +363,22 @@ class TempestWebServer(Generic[S]):
             if new_session and self._at_capacity():
                 self._rejected += 1
                 return JSONResponse({"error": "at capacity"}, status_code=503)
-            return await self._open_sse(request, session)
+            return await self._open_sse(request, session, credentials)
 
         @self.api.post("/sse/{session_id}")
         async def sse_post(session_id: str, request: Request) -> Response:
-            """Receive one client envelope (event / native_result) for a session."""
+            """Receive one client envelope (event / native_result) for a session.
+
+            The session id alone does not authorize the post: it must come from
+            the same principal that opened the session, or the envelope would let
+            a third party drive somebody else's screen.
+            """
+            credentials = self._request_credentials(request)
             if not await self._authorize_request(request):
                 return JSONResponse({"error": "unauthorized"}, status_code=401)
-            if not self._event_rate_ok(self._request_credentials(request)):
+            if not self._owns_sse(session_id, credentials):
+                return JSONResponse({"error": "forbidden"}, status_code=403)
+            if not self._event_rate_ok(credentials):
                 self._rejected += 1
                 return JSONResponse({"error": "rate limited"}, status_code=429)
             if self._declared_too_large(request):
@@ -407,21 +446,66 @@ class TempestWebServer(Generic[S]):
         """Run the Track-S auth gate for an HTTP (SSE) request."""
         return await _authorize(self._security, self._request_credentials(request))
 
-    async def _open_sse(self, request: Request, session_id: str) -> Response:
-        """Open or resume an SSE session and return the streaming response.
+    def _owns_sse(self, session_id: str, credentials: Credentials) -> bool:
+        """Whether these credentials may act on the SSE session under this id.
+
+        An id the server holds no session for is *not* refused here: the ``GET``
+        that opens a stream is what materializes a session, and a ``POST`` for an
+        unknown id is already answered ``404`` by the router. Only a live session
+        with a different owner is refused.
+
+        Args:
+            session_id: The session id from the URL.
+            credentials: The credentials extracted from the request.
+
+        Returns:
+            ``True`` when the session is unknown or owned by this principal.
+        """
+        sse = self._sse_sessions.get(session_id)
+        if sse is None:
+            return True
+        return hmac.compare_digest(sse.owner, _session_fingerprint(credentials))
+
+    async def _open_sse(
+        self, request: Request, session_id: str, credentials: Credentials
+    ) -> Response:
+        """Open, resume, or take over an SSE session and return its stream.
+
+        A session id the server already holds may only be resumed by the
+        principal that opened it (``403`` otherwise) — the id travels in a URL,
+        so on its own it authorizes nothing.
+
+        Resuming is a **takeover**: the new stream becomes the session's owner of
+        record, so the stream it replaced can no longer tear the session down when
+        its own response finally unwinds. That race used to drop a session the
+        client had just successfully reconnected to.
+
+        When the client resumes past a gap the replay buffer has evicted, the
+        missed ticks cannot be replayed and no later index-relative patch would
+        apply to the tree the client still holds; the session pushes a full
+        resync instead and the stream starts from it.
 
         Args:
             request: The incoming request (for ``Last-Event-ID``).
             session_id: The client-chosen stable session id.
+            credentials: The credentials extracted from the request.
 
         Returns:
-            A ``text/event-stream`` streaming response.
+            A ``text/event-stream`` streaming response, or ``403`` when the id
+            belongs to another principal.
         """
         sse = self._sse_sessions.get(session_id)
+        if sse is not None and not self._owns_sse(session_id, credentials):
+            self._rejected += 1
+            return JSONResponse({"error": "forbidden"}, status_code=403)
         if sse is None:
             transport = SSETransport()
             app_session = self._new_session(transport)
-            sse = _SSESession(transport=transport, session=app_session)
+            sse = _SSESession(
+                transport=transport,
+                session=app_session,
+                owner=_session_fingerprint(credentials),
+            )
             self._sse_sessions[session_id] = sse
             self._live += 1
             self._opened += 1
@@ -431,14 +515,20 @@ class TempestWebServer(Generic[S]):
             sse.task = asyncio.ensure_future(self._run_sse(session_id, app_session))
 
         last_event_id = _parse_last_event_id(request.headers.get("last-event-id"))
+        if last_event_id is not None and sse.transport.missed_since(last_event_id):
+            last_event_id = sse.transport.last_id
+            await sse.session.resync()
+        sse.stream_token += 1
+        stream_token = sse.stream_token
+        session = sse
 
         async def body() -> AsyncIterator[str]:
-            """Stream SSE frames, cleaning up the session when the client leaves."""
+            """Stream SSE frames, releasing the session when this stream ends."""
             try:
-                async for chunk in sse.transport.stream(last_event_id):
+                async for chunk in session.transport.stream(last_event_id):
                     yield chunk
             finally:
-                await self._drop_sse(session_id)
+                await self._release_sse(session_id, stream_token)
 
         return StreamingResponse(
             body(),
@@ -484,6 +574,18 @@ class TempestWebServer(Generic[S]):
             return JSONResponse({"error": "unknown session"}, status_code=404)
         return Response(status_code=204)
 
+    async def _release_sse(self, session_id: str, stream_token: int) -> None:
+        """Drop an SSE session, unless a newer stream has taken it over.
+
+        Args:
+            session_id: The session id whose stream ended.
+            stream_token: The token the ending stream was opened with.
+        """
+        sse = self._sse_sessions.get(session_id)
+        if sse is not None and sse.stream_token != stream_token:
+            return
+        await self._drop_sse(session_id)
+
     async def _drop_sse(self, session_id: str) -> None:
         """Close and forget an SSE session.
 
@@ -500,19 +602,32 @@ class TempestWebServer(Generic[S]):
 
 
 class _SSESession(Generic[S]):
-    """Bookkeeping for one live SSE session (transport + session + task)."""
+    """Bookkeeping for one live SSE session (transport + session + task).
 
-    def __init__(self, transport: SSETransport, session: AppSession[S]) -> None:
-        """Bind the transport, session, and (later) the driving task.
+    Attributes:
+        owner: Fingerprint of the principal that opened the session; every later
+            request for its id must match it.
+        stream_token: Monotonic token of the stream that currently owns the
+            session. Only the holder of the newest token may tear it down, so a
+            reconnect's takeover survives the old response unwinding.
+    """
+
+    def __init__(
+        self, transport: SSETransport, session: AppSession[S], owner: str = ""
+    ) -> None:
+        """Bind the transport, session, owner, and (later) the driving task.
 
         Args:
             transport: The SSE transport for this session.
             session: The app session driven over the transport.
+            owner: Fingerprint of the principal that opened the session.
         """
         self.transport: SSETransport = transport
         self.session: AppSession[S] = session
         self.task: asyncio.Task[None] | None = None
         self.teardown: Teardown | None = None
+        self.owner: str = owner
+        self.stream_token: int = 0
 
 
 def _parse_last_event_id(raw: str | None) -> int | None:

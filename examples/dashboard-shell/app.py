@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import partial
 
 from tempest_core import App, Style, Widget
 from tempest_core.components import (
@@ -180,7 +181,10 @@ def _overview_body(app: App[DashState]) -> Widget:
         def _make_dismiss(bound_i: int) -> Widget:
             return Button(
                 label="✕",
-                on_click=lambda _i=bound_i: dismiss(_i),
+                # `partial`, not `lambda _i=bound_i:` — a lambda with a default
+                # accepts a positional argument, so the runtime would pass the
+                # event into it instead of the index.
+                on_click=partial(dismiss, bound_i),
                 key=f"dismiss-{bound_i}",
                 style=Style(
                     padding=Edge.symmetric(vertical=4.0, horizontal=8.0),

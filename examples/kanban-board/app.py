@@ -15,6 +15,7 @@ Both modes run the exact same ``view`` — the application never names a transpo
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import partial
 
 from tempest_core import App, Style, Widget
 from tempest_core.style import (
@@ -323,11 +324,15 @@ def view(app: App[KanbanState]) -> Widget:
             ),
         )
 
-        # The "add to this column" shortcut button
+        # The "add to this column" shortcut button. `partial` binds the column
+        # without giving the handler a parameter: a `lambda c=col: ...` *accepts*
+        # a positional argument, and the runtime passes the event to any handler
+        # that does — the event would land in `c` and the label would read
+        # "New card in [x=None y=None]".
         add_here_btn = Button(
             key=f"add-to-{col}",
             label=f"+ Add to {col}",
-            on_click=lambda c=col: set_draft_column(c),
+            on_click=partial(set_draft_column, col),
         )
 
         return Container(

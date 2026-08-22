@@ -29,6 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from functools import partial
 from uuid import uuid4
 
 from tempest_core import App, Style, Widget
@@ -271,7 +272,10 @@ def view(app: App[NotificationState]) -> Widget:
             n = items_snapshot[index]
             dismiss_btn: Widget = Button(
                 label="✕",
-                on_click=lambda _nid=n.id: dismiss_one(_nid),
+                # `partial`, not `lambda _nid=n.id:` — a lambda with a default
+                # accepts a positional argument, so the runtime would pass the
+                # event into it instead of the notification id.
+                on_click=partial(dismiss_one, n.id),
                 key=f"dismiss-{n.id}",
             )
             return Banner(

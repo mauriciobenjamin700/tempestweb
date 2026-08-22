@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Breakpoints, MediaQueryData, Theme, ThemeMode } from "../../client/transpile/theme.js";
-import { installMedia } from "../../client/transpile/media.js";
+import { installMedia } from "../../client/media.js";
 
 test("Theme.is_dark resolves LIGHT/DARK absolutely, SYSTEM by platform", () => {
   assert.equal(new Theme({ mode: ThemeMode.DARK }).is_dark(), true);

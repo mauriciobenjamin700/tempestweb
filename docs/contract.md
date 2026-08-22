@@ -108,13 +108,27 @@ O lado Python resolve a `key` → handler do nó na árvore atual, valida o `pay
 
 ### Tipos reservados (tratados pelo runtime, não por um handler)
 
-Três `type` não chegam a um handler do app — o runtime os intercepta antes:
+Quatro `type` não chegam a um handler do app — o runtime os intercepta antes:
 
 | `type` | Significa | Efeito |
 | --- | --- | --- |
 | `scroll` | a janela de uma lista virtualizada deslizou | `app.slide_window(...)` |
 | `navigate` | a URL mudou (load, `popstate`) | reseta a pilha para a rota |
+| `media` | o viewport, a densidade, o dark mode do OS ou a orientação mudou | `app._update_media(...)` |
 | `resync` | o cliente **não conseguiu aplicar** um batch | reenvia a cena inteira |
+
+```json
+{ "type": "media", "key": "", "payload": {
+  "width": 390, "height": 844, "device_pixel_ratio": 3,
+  "platform_dark_mode": false, "orientation": "portrait" } }
+```
+
+O `media` é reportado na montagem e a cada mudança, nos **três** modos, por
+`client/media.js`. Campo ausente mantém o default do `MediaQueryData`; payload
+com tipo errado é ignorado inteiro, em vez de gravar um snapshot parcial que a
+view usaria para escolher layout. Rajada de `resize` colapsa em um report por
+frame, e um frame cujo snapshot não mudou não reporta nada — em Modo B cada
+report é ida-e-volta no socket mais rebuild e diff.
 
 ```json
 { "type": "resync", "key": "", "payload": {} }

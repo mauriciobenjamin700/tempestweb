@@ -38,7 +38,12 @@ from tempestweb.native.dispatch import (
     uninstall_bridge,
 )
 from tempestweb.runtime.background import install_spawner, uninstall_spawner
-from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
+from tempestweb.runtime.events import (
+    apply_media,
+    apply_navigate,
+    apply_scroll,
+    coerce_event,
+)
 from tempestweb.runtime.routing import route_to_path
 from tempestweb.runtime.serialize import (
     find_node_type,
@@ -290,6 +295,9 @@ class AppSession(Generic[S]):
             return
         if event_type == "navigate":
             apply_navigate(self.app, event.get("payload", {}))
+            return
+        if event_type == "media":
+            apply_media(self.app, event.get("payload", {}))
             return
         handler = resolve_handler(scene, key, event_type)
         if handler is None:

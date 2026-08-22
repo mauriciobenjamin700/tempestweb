@@ -67,6 +67,7 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "transport.js",
     "virtualize.js",
     "router.js",
+    "media.js",
     "constants.js",
 )
 
@@ -87,7 +88,6 @@ _TRANSPILE_ASSETS: tuple[str, ...] = (
     "nav.js",
     "i18n.js",
     "theme.js",
-    "media.js",
     "motion.js",
     "animation.js",
 )

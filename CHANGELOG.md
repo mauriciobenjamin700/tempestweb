@@ -4,6 +4,41 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.70.0] — 2026-08-22
+
+### Added
+
+- **`app.media` passa a valer nos Modos A e B** (#74). O docstring do
+  `MediaQueryData` prometia que o renderizador o mantinha atualizado, e o
+  cliente já sabia reportar o viewport desde o Modo C — mas nada neste pacote
+  chamava `App._update_media`. Um app server-side rodava para sempre no snapshot
+  default, `width` e `height` em `0.0`: uma `view` responsiva não tinha largura
+  para decidir, e `Scaffold(scroll=True)` não tinha altura para limitar a
+  moldura, porque `Style` não tem `100vh`.
+
+  Três peças fecham o circuito:
+
+  - `client/media.js` saiu de `client/transpile/` para o diretório
+    compartilhado — é um módulo dos três modos, e o artefato Modo C já copia
+    `client/*.js`. Entra em `_CLIENT_ASSETS`, sai de `_TRANSPILE_ASSETS`.
+  - `mount()` em `client/tempestweb.js` instala o reporting, então Modo A e B
+    passam a emitir o evento `media` que o Modo C já emitia.
+  - `apply_media` em `tempestweb/runtime/events.py`, com o branch
+    correspondente em `AppSession.dispatch` (Modo B) e
+    `WasmRuntime.dispatch_event` (Modo A), ao lado de `scroll` e `navigate`.
+
+  Payload parcial mantém os defaults; payload com tipo errado é ignorado
+  inteiro, em vez de gravar um snapshot pela metade que a `view` usaria para
+  escolher layout.
+
+### Changed
+
+- **O reporting de viewport passa a ser coalescido.** `resize` dispara
+  continuamente enquanto se arrasta a borda da janela, e em Modo B cada report é
+  ida-e-volta no socket mais rebuild e diff — o fluxo que era grátis no Modo C
+  não é grátis lá. Rajada colapsa em um report por frame, e um frame cujo
+  snapshot não mudou não reporta nada. `dispose()` cancela o frame pendente.
+
 ## [0.69.0] — 2026-08-22
 
 Uma auditoria da perna do Modo B, e depois um browser em cima dela.

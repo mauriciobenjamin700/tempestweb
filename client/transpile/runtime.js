@@ -24,7 +24,7 @@ import { mount } from "../tempestweb.js";
 import { diff } from "./diff.js";
 import { NavStack, Route, pathToRoutes, routeToPath } from "./nav.js";
 import { MediaQueryData, Theme } from "./theme.js";
-import { installMedia } from "./media.js";
+import { installMedia } from "../media.js";
 
 /**
  * @typedef {import("../transport.js").Node} Node

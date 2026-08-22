@@ -107,6 +107,43 @@ This produces the tree (IR) that the reconciler serializes to the client — the
 exact format is pinned in
 [`tests/fixtures/node_initial.json`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/tests/fixtures/node_initial.json).
 
+## Responsiveness: `app.media`
+
+The browser owns the viewport; the `view` reads it from `app.media`. The client
+reports size, density, OS dark mode and orientation on mount and on every
+change, in **all three** modes — so picking a layout by width is just an `if`:
+
+```python
+from tempest_core import App, Column, Row, Text, Widget
+
+
+def view(app: App[object]) -> Widget:
+    """One row on a desktop, one column on a phone."""
+    fields = [
+        Text(content="Name", key="label-name"),
+        Text(content="Email", key="label-email"),
+    ]
+    if app.media.width >= 768:
+        return Row(style=None, children=fields)
+    return Column(style=None, children=fields)
+```
+
+`app.media` carries `width`, `height`, `device_pixel_ratio`,
+`text_scale_factor`, `platform_dark_mode` and `orientation`. A change requests a
+rebuild like any state mutation — the `view` re-runs and the reconciler emits the
+minimal patches.
+
+!!! tip "`height` is the only way to bound a frame to the viewport"
+    `Style` has no `100vh`. A `Scaffold(scroll=True)` only really scrolls when
+    the column around it is bounded, and the only measure available to bound it
+    is `app.media.height`. Without it the whole page scrolls and the `app_bar` /
+    `bottom_bar` scroll away — exactly what a scaffold exists to prevent.
+
+!!! note "Before the first report, everything is zero"
+    `MediaQueryData` defaults `width` and `height` to `0.0`. The first report
+    arrives on mount, so the first paint is already responsive — but a `view`
+    that divides by `width` has to handle the zero.
+
 ## Recap
 
 - `view(app) -> Widget` is a **pure function of state**.

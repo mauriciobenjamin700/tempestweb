@@ -117,11 +117,23 @@ async def submit_order(payload: dict[str, object]) -> dict[str, object]:
         "POST",
         "/api/orders",
         json=payload,
-        retry=RetryOptions(attempts=3, backoff=0.5),
+        retry=RetryOptions(attempts=3, base_delay=0.5),
         idempotency_key=key,
     )
-    return response.json()
+    return dict(response.json_body)
 ```
+
+!!! info "Os botões do `RetryOptions`"
+    `attempts` conta a primeira tentativa (`1` desliga o retry), `base_delay`
+    é a espera antes do primeiro retry, `factor` multiplica a espera a cada
+    falha, `max_delay` limita cada espera e `retry_statuses` diz quais status
+    merecem nova tentativa. O modelo **ignora** kwarg que não declara, então um
+    nome errado não levanta erro — ele simplesmente não configura nada.
+
+!!! tip "O corpo decodificado é `json_body`"
+    `HttpResponse` é um modelo Pydantic com `status`, `ok`, `headers`, `text` e
+    `json_body`. O corpo já parseado é o **campo** `json_body` — `response.json()`
+    é o serializador do Pydantic (devolve string do modelo inteiro), não o corpo.
 
 !!! tip "Idempotency key evita duplicar efeito"
     Se o retry reentrega a mesma requisição, a `idempotency_key` garante que o
@@ -130,7 +142,7 @@ async def submit_order(payload: dict[str, object]) -> dict[str, object]:
 
 !!! warning "Capacidade lenta dentro do handler trava a sessão"
     A sessão despacha **um evento por vez**. Um `http.request` com
-    `RetryOptions(attempts=3, backoff=0.5)` que bate em timeout gasta segundos —
+    `RetryOptions(attempts=3, base_delay=0.5)` que bate em timeout gasta segundos —
     e durante todos eles nenhum outro botão daquele usuário responde. O mesmo
     vale para `file.pick` num arquivo grande, upload, e qualquer `onnx.*`.
 

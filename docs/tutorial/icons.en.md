@@ -102,22 +102,39 @@ material_icon(MaterialIcons.STAR)
 
 ## Icons inside fields
 
-The ready-made fields (see [Ready-made components](components.md)) accept icons in
-their slots by **raw name** — and an unprefixed name stays **Lucide**, for
+The core's input widgets carry icon slots: `Input`, `Dropdown` and `Autocomplete`
+accept `leading_icon` and `trailing_icon`; `IconButton` and `MenuItem` accept
+`icon`. The name goes in **raw** — unprefixed it resolves to **Lucide**, for
 compatibility with the core's `Icon`:
 
-```python
-from tempestweb.components import EmailField, PasswordField
+```python hl_lines="7 8"
+from tempest_core import Input
 
-EmailField(value="", on_change=..., leading_icon="mail")     # Lucide
-PasswordField(value="", on_change=..., leading_icon="lock")  # Lucide
+
+def email_input(value: str) -> Input:
+    """Build an e-mail input with a leading mail glyph."""
+    return Input(
+        key="email",
+        value=value,
+        placeholder="you@example.com",
+        leading_icon="mail",              # Lucide
+        trailing_icon="material:check",   # Material, via the prefix
+        on_change=lambda event: None,
+    )
 ```
+
+!!! warning "The ready-made fields do not expose the slot"
+    `EmailField` and `PasswordField` (from `tempestweb.components`) wrap an
+    `Input` but do **not** publish `leading_icon`/`trailing_icon` — passing the
+    kwarg raises `ValidationError` naming the field, because the core rejects a
+    kwarg it does not declare. Need an icon in the field? Use the core's `Input`
+    directly, as above.
 
 !!! note "The name grammar"
     Under the hood, the set is encoded as a **prefix** on the `Icon` name:
     `"material:home"`, `"lucide:mail"`. The `material_icon`/`lucide_icon` helpers
     add the prefix for you. An **unprefixed** name (`"mail"`) resolves to Lucide —
-    which is why the field slots only ask for the bare name.
+    which is why the icon slots only ask for the bare name.
 
 ## Custom icon (raw SVG) { #custom-icon-raw-svg }
 

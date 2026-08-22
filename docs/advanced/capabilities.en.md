@@ -117,11 +117,24 @@ async def submit_order(payload: dict[str, object]) -> dict[str, object]:
         "POST",
         "/api/orders",
         json=payload,
-        retry=RetryOptions(attempts=3, backoff=0.5),
+        retry=RetryOptions(attempts=3, base_delay=0.5),
         idempotency_key=key,
     )
-    return response.json()
+    return dict(response.json_body)
 ```
+
+!!! info "The `RetryOptions` knobs"
+    `attempts` counts the first try (`1` disables retry), `base_delay` is the
+    wait before the first retry, `factor` multiplies the wait after each
+    failure, `max_delay` caps any single wait and `retry_statuses` says which
+    statuses deserve another try. The model **ignores** a kwarg it does not
+    declare, so a wrong name raises nothing — it just configures nothing.
+
+!!! tip "The decoded body is `json_body`"
+    `HttpResponse` is a Pydantic model with `status`, `ok`, `headers`, `text`
+    and `json_body`. The parsed body is the **field** `json_body` —
+    `response.json()` is Pydantic's serializer (it returns a string of the
+    whole model), not the body.
 
 !!! tip "Idempotency key avoids duplicating effects"
     If retry re-delivers the same request, the `idempotency_key` guarantees the
@@ -130,7 +143,7 @@ async def submit_order(payload: dict[str, object]) -> dict[str, object]:
 
 !!! warning "A slow capability inside a handler freezes the session"
     A session dispatches **one event at a time**. An `http.request` with
-    `RetryOptions(attempts=3, backoff=0.5)` that hits a timeout burns seconds —
+    `RetryOptions(attempts=3, base_delay=0.5)` that hits a timeout burns seconds —
     and for all of them no other button of that user responds. The same goes for
     `file.pick` on a large file, uploads, and any `onnx.*`.
 

@@ -152,7 +152,6 @@ def view(app: App[TourState]) -> Widget:
                         radius=8.0,
                         transition=None,
                     ),
-                    children=[],
                 ),
                 Button(label="grow", on_click=grow, key="grow"),
                 Button(label="install", on_click=do_install, key="install"),

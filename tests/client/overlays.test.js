@@ -384,3 +384,71 @@ test("the base sheet lays an item out as glyph plus label", () => {
   assert.match(BASE_THEME_CSS, /\[data-tw-part="item"\] > svg/);
   assert.match(BASE_THEME_CSS, /\[data-tw-type="Menu"\] > \[data-tw-part="item"\],/);
 });
+
+test("an icon-less item keeps the slot, so the labels line up", () => {
+  withDocument();
+  const menu = buildElement({
+    type: "Menu",
+    key: "m",
+    props: {
+      items: [
+        { label: "Delete", value: "del", icon: "trash" },
+        { label: "Rename", value: "ren", icon: null },
+      ],
+    },
+    children: [],
+  });
+
+  const [withIcon, withoutIcon] = menu.querySelectorAll('[data-tw-part="item"]');
+  assert.ok(withIcon.querySelector("svg path"), "the item that named an icon drew one");
+  const slot = withoutIcon.querySelector("svg");
+  assert.ok(slot != null, "the icon-less item keeps the slot");
+  assert.equal(slot.querySelector("path"), null, "and the slot is empty");
+  // Without the slot, this item's label starts a glyph's width to the left of
+  // the other one, which reads as a broken menu rather than as a menu with some
+  // icons.
+  assert.equal(withoutIcon.textContent, "Rename", "the empty slot adds no text");
+});
+
+test("an unknown icon name leaves the box and the label alone", () => {
+  withDocument();
+  const menu = buildElement({
+    type: "Menu",
+    key: "m",
+    props: { items: [{ label: "Mystery", value: "m", icon: "not-a-real-icon" }] },
+    children: [],
+  });
+
+  const item = menu.querySelector('[data-tw-part="item"]');
+  const svg = item.querySelector("svg");
+  assert.ok(svg != null, "the box is still there, so the layout does not jump");
+  assert.equal(svg.querySelector("path"), null);
+  assert.equal(item.textContent, "Mystery");
+});
+
+test("clicking the glyph selects the item it belongs to", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { bindEvents } = await import("../../client/events.js");
+  /** @type {import("../../client/transport.js").TWEvent[]} */
+  const events = [];
+  const transport = { onPatches() {}, sendEvent: (e) => events.push(e), async close() {} };
+
+  const menu = buildElement({
+    type: "Menu",
+    key: "row-menu",
+    props: { items: [{ label: "Delete", value: "delete", icon: "trash" }] },
+    children: [],
+  });
+  dom.root.appendChild(menu);
+  bindEvents(dom.root, transport);
+
+  // The pointer lands on the glyph, which the IR knows nothing about; the
+  // listener has to walk up to the item that owns it.
+  const glyph = menu.querySelector('[data-tw-part="item"] svg path');
+  glyph.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+
+  assert.deepEqual(events, [
+    { type: "select", key: "row-menu", payload: { value: "delete", label: "Delete" } },
+  ]);
+});

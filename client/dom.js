@@ -189,6 +189,11 @@ export const ANCHOR_ATTR = "data-tw-anchor";
  * inserted before the label, which lives in its own span so the click listener
  * can read the label back without the glyph's markup in the way.
  *
+ * Once any item names an icon, every item gets the slot — an empty one where
+ * there is no icon. Otherwise the labels of the icon-less items start a glyph's
+ * width to the left of the others, which reads as a broken menu rather than as a
+ * menu with some icons.
+ *
  * @param {HTMLElement} el     The Menu/ActionSheet element.
  * @param {*} items            The `items` prop (anything else is treated empty).
  * @returns {void}
@@ -198,15 +203,16 @@ function renderMenuItems(el, items) {
   for (const existing of Array.from(el.querySelectorAll(`[${ITEM_ATTR}="item"]`))) {
     existing.remove();
   }
+  const anyIcon = list.some((item) => item?.icon != null && String(item.icon) !== "");
   for (const item of list) {
     const button = document.createElement("button");
     button.setAttribute("type", "button");
     button.setAttribute(ITEM_ATTR, "item");
     button.setAttribute("role", "menuitem");
     button.setAttribute(ITEM_VALUE_ATTR, item?.value == null ? "" : String(item.value));
-    if (item?.icon != null && item.icon !== "") {
+    if (anyIcon) {
       const svg = createIconSvg();
-      renderIcon(svg, { name: item.icon });
+      renderIcon(svg, { name: item?.icon == null ? "" : String(item.icon) });
       button.appendChild(svg);
     }
     const label = document.createElement("span");

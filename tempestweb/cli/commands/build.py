@@ -176,6 +176,11 @@ _OFFLINE_ASSETS: tuple[str, ...] = (
 # alongside (see :func:`_zip_package`).
 _WASM_PACKAGE_PARTS: tuple[str, ...] = (
     "__init__.py",
+    # Shared constants (SSE/native-call defaults) the runtime and native layers
+    # import. Left out, the artifact booted as far as `import app` and then died
+    # on `No module named 'tempestweb.core'` — a browser-only failure no Python
+    # test could see, since the test process has the whole package installed.
+    "core",
     "runtime",
     "transports",
     "native",

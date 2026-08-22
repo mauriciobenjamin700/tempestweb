@@ -616,3 +616,39 @@ def test_out_of_subset_fails_loud(name: str) -> None:
     with pytest.raises(TranspileError) as exc:
         transpile_source(_UNSUPPORTED[name], filename="app.py")
     assert "app.py:" in str(exc.value), name
+
+
+def test_annotated_local_keeps_its_value() -> None:
+    """A typed local emits its assignment (regression: it emitted nothing).
+
+    ``ast.AnnAssign`` was grouped with ``pass``, so a local written the way this
+    repo's style rules ask for — annotated — vanished from the generated module.
+    Nothing failed at transpile time; the browser raised
+    ``ReferenceError: <name> is not defined`` when the view ran.
+    """
+    js = gen("def view(app):\n    total: int = 1 + 2\n    return total\n")
+    assert "const total = (1 + 2);" in js
+
+
+def test_annotated_local_holding_a_conditional() -> None:
+    """The shape that exposed the bug: a typed local built by a ternary."""
+    js = gen(
+        "def view(app):\n"
+        "    wide: bool = app.media.width >= 700\n"
+        "    layout: str = 'row' if wide else 'column'\n"
+        "    return layout\n"
+    )
+    assert "const wide = app.media.width >= 700;" in js
+    assert 'const layout = (wide ? "row" : "column");' in js
+
+
+def test_annotated_attribute_assignment() -> None:
+    """An annotated attribute target assigns, like its unannotated twin."""
+    js = gen("def view(app):\n    app.state.count: int = 3\n    return app\n")
+    assert "app.state.count = 3;" in js
+
+
+def test_bare_annotation_emits_nothing() -> None:
+    """A declaration with no value is a type statement; there is nothing to run."""
+    js = gen("def view(app):\n    total: int\n    return 0\n")
+    assert "total" not in js

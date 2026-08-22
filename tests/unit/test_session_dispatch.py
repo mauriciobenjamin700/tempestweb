@@ -15,7 +15,8 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Button, Column, Widget
+from tempest_core import App, Button, Column, Theme, ThemeMode, Widget
+from tempest_core.style import Color
 from tempest_core.widgets import Input
 from tempestweb.runtime import AppSession, NoSessionError, spawn
 from tempestweb.runtime.background import install_spawner, uninstall_spawner
@@ -378,3 +379,55 @@ async def test_installed_spawner_is_used() -> None:
         uninstall_spawner()
 
     assert seen == ["scheduled", "ran"]
+
+
+def _bare_view(app: App[_State]) -> Widget:
+    """Render the smallest tree a session can start with.
+
+    Args:
+        app (App[_State]): The session's application handle.
+
+    Returns:
+        Widget: A column with nothing in it.
+    """
+    return Column(children=[])
+
+
+class TestTheThemeTheSessionBuildsWith:
+    """A rebranded page still needs the tree to know the palette.
+
+    Components resolve their colors in **Python** — a filled button carries
+    its fill as an inline style — so overriding the CSS custom properties
+    rebrands what the base stylesheet paints and leaves every component
+    baseline-purple. The session is where the palette reaches the tree.
+    """
+
+    async def test_the_session_hands_its_theme_to_the_app(self) -> None:
+        theme = Theme.from_seed(Color(r=39, g=58, b=79), mode=ThemeMode.LIGHT)
+        session: AppSession[_State] = AppSession(
+            _State,
+            _bare_view,
+            _ScriptedTransport([]),
+            theme=theme,
+        )
+
+        await session.start()
+
+        assert session.app is not None
+        assert session.app.theme is theme
+
+    async def test_a_session_without_a_theme_invents_nothing(self) -> None:
+        session: AppSession[_State] = AppSession(
+            _State,
+            _bare_view,
+            _ScriptedTransport([]),
+        )
+
+        await session.start()
+
+        assert session.app is not None
+        assert session.app.theme.tokens.schemes.light.primary != Color(
+            r=72,
+            g=100,
+            b=132,
+        )

@@ -28,7 +28,7 @@ from contextlib import suppress
 from itertools import count
 from typing import Any, Generic, TypeVar
 
-from tempest_core import App, Widget
+from tempest_core import App, Theme, Widget
 from tempest_core import Patch as CorePatch
 from tempest_core.widgets import handler_accepts_event
 from tempestweb.native.bridges import ProxyBridge
@@ -84,6 +84,7 @@ class AppSession(Generic[S]):
         transport: PatchTransport,
         *,
         concurrent_dispatch: bool = False,
+        theme: Theme | None = None,
     ) -> None:
         """Initialize the session.
 
@@ -100,9 +101,17 @@ class AppSession(Generic[S]):
                 the state concurrently, which an app must be written for. Prefer
                 :func:`tempestweb.runtime.spawn` inside the slow handler when only
                 one screen is affected.
+            theme: The palette every component resolves its colors against.
+                ``None`` keeps the Material baseline. It belongs here rather
+                than only in CSS because components resolve their colors in
+                **Python** — a filled button carries its fill as an inline
+                style — so a page whose custom properties were rebranded
+                still rendered baseline-purple buttons until the session
+                handed the theme to the tree building them.
         """
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
+        self._theme: Theme | None = theme
         self.transport: PatchTransport = transport
         self.app: App[S] | None = None
         self._tasks: set[asyncio.Task[None]] = set()
@@ -225,10 +234,19 @@ class AppSession(Generic[S]):
             ``await native.*`` through their **own** bridge, never clobbering one
             another. :meth:`native_call` also uses this session's bridge directly.
         """
-        self.app = App(
-            state=self._state_factory(),
-            view=self._view,
-            apply_patches=self._apply_patches,
+        self.app = (
+            App(
+                state=self._state_factory(),
+                view=self._view,
+                apply_patches=self._apply_patches,
+            )
+            if self._theme is None
+            else App(
+                state=self._state_factory(),
+                view=self._view,
+                apply_patches=self._apply_patches,
+                theme=self._theme,
+            )
         )
         install_bridge(self._bridge)
         install_spawner(self._spawn)

@@ -4,6 +4,35 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.66.0] — 2026-08-21
+
+Um app podia montar a própria paleta e não tinha como usá-la.
+
+### Added
+
+- **`tempestweb.html.theme_css(theme)`** — o tema de um app como as custom
+  properties `--tw-*` que a folha base lê. A folha sempre disse que um app
+  retematiza sobrescrevendo esses tokens, e nada os emitia: quem montava
+  uma paleta com `Theme.from_seed` — 39 papéis Material 3, claro e escuro —
+  não tinha como levá-la à página, então todo app tempestweb shippava o
+  roxo baseline. Modo escuro vem junto e vem honesto: tema em `SYSTEM` emite
+  o esquema claro no `:root` e o escuro em
+  `@media (prefers-color-scheme: dark)`; tema fixado emite um só e nenhuma
+  media query.
+
+- **`theme=` em `create_app`, `TempestWebServer` e `AppSession`** — a outra
+  metade, e a que o CSS não alcança. Componentes resolvem cor em **Python**:
+  um botão preenchido carrega o fill como estilo inline, resolvido contra o
+  tema com que o `App` foi construído. Como a sessão não recebia nenhum, a
+  página rebrandeada continuava com botões roxos sobre fundo novo. Medido
+  num app real antes e depois.
+
+### Changed
+
+- Tokens de status (`--tw-success`, `--tw-warning`, `--tw-info`,
+  `--tw-neutral`) agora saem também do tema do app, e não só dos valores
+  fixos da folha.
+
 ## [0.65.0] — 2026-08-21
 
 Um widget que existia na árvore e não existia na tela.

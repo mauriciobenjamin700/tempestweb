@@ -26,7 +26,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.websockets import WebSocket
 
-from tempest_core import App, Widget
+from tempest_core import App, Theme, Widget
 from tempestweb.runtime.session import AppSession
 from tempestweb.server.security import (
     Credentials,
@@ -109,6 +109,7 @@ class TempestWebServer(Generic[S]):
         metrics: bool = False,
         sse_backend: SessionRouter | None = None,
         concurrent_dispatch: bool = False,
+        theme: Theme | None = None,
     ) -> None:
         """Build the server and register the WebSocket and SSE routes.
 
@@ -123,6 +124,9 @@ class TempestWebServer(Generic[S]):
             sse_backend: Router for SSE inbound events (Track S — S4). ``None``
                 uses the in-process router (needs sticky sessions across
                 instances); a :class:`RedisSessionRouter` drops that requirement.
+            theme: The palette every component resolves its colors against,
+                forwarded to each session's ``App``. ``None`` keeps the
+                Material baseline.
             concurrent_dispatch: Run each event's handler as its own task instead
                 of awaiting it before the next event is read. Events for the same
                 widget key keep their arrival order; handlers for different keys
@@ -134,6 +138,7 @@ class TempestWebServer(Generic[S]):
         self._view: Callable[[App[S]], Widget] = view
         self._sse_sessions: dict[str, _SSESession[S]] = {}
         self._concurrent_dispatch: bool = concurrent_dispatch
+        self._theme: Theme | None = theme
         self._security: SecurityConfig = security or SecurityConfig()
         self._live: int = 0  # concurrent live sessions (S2 cap)
         self._metrics_enabled: bool = metrics
@@ -252,6 +257,7 @@ class TempestWebServer(Generic[S]):
             self._view,
             transport,
             concurrent_dispatch=self._concurrent_dispatch,
+            theme=self._theme,
         )
 
     def _register_routes(self) -> None:
@@ -541,6 +547,7 @@ def create_app(
     metrics: bool = False,
     sse_backend: SessionRouter | None = None,
     concurrent_dispatch: bool = False,
+    theme: Theme | None = None,
 ) -> FastAPI:
     """Build a Mode B FastAPI app for a ``view`` and state factory.
 
@@ -558,6 +565,11 @@ def create_app(
             widget key) instead of one at a time, so a slow handler cannot freeze
             the connection. Off by default; ``tempestweb.runtime.spawn`` handles
             the common case without changing dispatch semantics.
+        theme: The palette every component resolves its colors against.
+            ``None`` keeps the Material baseline. Pair it with
+            :func:`~tempestweb.html.theme_css` in the page head: the CSS
+            variables cover what the base stylesheet paints, and this covers
+            what components resolve in Python.
 
     Returns:
         The configured FastAPI application with WS and SSE routes mounted.
@@ -570,4 +582,5 @@ def create_app(
         metrics=metrics,
         sse_backend=sse_backend,
         concurrent_dispatch=concurrent_dispatch,
+        theme=theme,
     ).api

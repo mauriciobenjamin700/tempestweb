@@ -17,8 +17,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import ValidationError
-
 from tempest_core import App, MediaQueryData, Widget
 from tempest_core.widgets.events import Event, EventValidationError, parse_event
 from tempestweb.runtime.routing import path_to_routes
@@ -47,37 +45,6 @@ def apply_navigate(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wir
         app.reset(path_to_routes(path))
 
 
-def apply_media(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload
-    """Refresh the app's media-query snapshot from a ``media`` wire event.
-
-    The browser owns the viewport, so a responsive ``view`` — one that branches
-    on ``media.width`` or bounds a frame by ``media.height`` — is only correct
-    while ``App.media`` is current. The client reports a snapshot on mount and on
-    every resize / color-scheme change; this validates it into a
-    :class:`~tempest_core.MediaQueryData` and hands it to
-    ``App._update_media``, which records it and requests the coalesced rebuild.
-
-    Absent fields keep their defaults rather than failing, since the payload is
-    the browser's report and not every renderer knows every field (no browser
-    reports ``text_scale_factor`` today). A payload that is not a mapping, or
-    whose values do not validate, is ignored: a malformed resize must not take
-    down the event loop.
-
-    Args:
-        app: The application whose media snapshot to refresh.
-        payload: The wire payload, expected to carry the viewport fields.
-    """
-    if not isinstance(payload, dict):
-        return
-    fields = set(MediaQueryData.model_fields)
-    known = {name: value for name, value in payload.items() if name in fields}
-    try:
-        data = MediaQueryData(**known)
-    except ValidationError:
-        return
-    app._update_media(data)  # noqa: SLF001 — the renderer's half of the core's contract
-
-
 def apply_scroll(app: App[Any], key: str, payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload
     """Slide a virtualized list's visible window from a ``scroll`` wire event.
 
@@ -97,6 +64,50 @@ def apply_scroll(app: App[Any], key: str, payload: Any) -> None:  # noqa: ANN401
     end = payload.get("end")
     if isinstance(start, int) and isinstance(end, int) and end >= start:
         app.slide_window(key, start, end)
+
+
+def apply_media(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload
+    """Refresh the viewport context from a ``media`` wire event.
+
+    The browser owns the viewport, so the client reports it on mount and whenever
+    size, density, OS dark mode or orientation changes; this drives
+    :meth:`~tempest_core.core.state.App._update_media`, which records the snapshot
+    and requests a coalesced rebuild so a responsive ``view`` re-runs against the
+    new environment. Without this a server-side app runs forever on the default
+    ``MediaQueryData`` — ``width`` and ``height`` both ``0.0`` — so it can neither
+    switch layout at a breakpoint nor bound a frame to the viewport height.
+
+    Every field is optional and validated: a payload missing a key keeps that
+    field's default, and one carrying a wrong type is ignored entirely rather than
+    poisoning the context with a partial snapshot.
+
+    Args:
+        app: The application whose media context to refresh.
+        payload: The wire payload, expected to carry any of ``width``, ``height``,
+            ``device_pixel_ratio``, ``text_scale_factor`` (numbers),
+            ``platform_dark_mode`` (bool) and ``orientation`` (str).
+    """
+    if not isinstance(payload, dict):
+        return
+    fields: dict[str, Any] = {}
+    for name in ("width", "height", "device_pixel_ratio", "text_scale_factor"):
+        value = payload.get(name)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            if value is not None:
+                return
+            continue
+        fields[name] = float(value)
+    dark = payload.get("platform_dark_mode")
+    if dark is not None:
+        if not isinstance(dark, bool):
+            return
+        fields["platform_dark_mode"] = dark
+    orientation = payload.get("orientation")
+    if orientation is not None:
+        if not isinstance(orientation, str):
+            return
+        fields["orientation"] = orientation
+    app._update_media(MediaQueryData(**fields))  # noqa: SLF001 — renderer-side hook
 
 
 def _build_event_types() -> dict[str, dict[str, type[Event]]]:

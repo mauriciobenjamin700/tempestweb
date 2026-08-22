@@ -4,6 +4,27 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.77.2] — 2026-08-22
+
+### Fixed
+
+- **Um reporte de viewport por frame, e nenhum quando nada mudou.** `resize`
+  dispara continuamente enquanto a borda da janela é arrastada, e no Modo B cada
+  reporte é ida-e-volta no socket mais rebuild e diff — o fluxo que sai de graça
+  no Modo C não sai lá. Os reportes passam a colapsar num por animation frame, e
+  um frame cujo snapshot é igual ao último enviado não reporta nada.
+
+- **`apply_media` recusa booleano em campo numérico.** `isinstance(True, int)` é
+  verdadeiro em Python, então o Pydantic aceita `{"width": true}` como
+  `width=1.0` — medido. A validação passou a ser campo a campo: número que não é
+  número, ou tipo errado em qualquer campo, descarta o payload inteiro em vez de
+  envenenar o contexto com um snapshot parcial.
+
+  Os dois vêm do PR paralelo #84, que resolveu a issue #74 por outro caminho;
+  ficou a estrutura desta base com o throttle e a validação de lá, mais os testes
+  que os cobrem (rajada de resize, frame sem mudança, payload parcial e
+  malformado).
+
 ## [0.77.1] — 2026-08-22
 
 ### Fixed

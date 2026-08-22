@@ -204,7 +204,7 @@ test("mount asks for a resync when a patch cannot be applied", () => {
   assert.equal(resyncs, 2);
 });
 
-test("mount reports the viewport, so a responsive view sees a real width", () => {
+test("mount reports the viewport, so a responsive view sees a real width", async () => {
   const dom = freshDom();
   globalThis.document = dom.document;
   const hadWindow = "window" in globalThis;
@@ -222,8 +222,19 @@ test("mount reports the viewport, so a responsive view sees a real width", () =>
     assert.equal(first.payload.height, dom.window.innerHeight);
     assert.equal(typeof first.payload.orientation, "string");
 
+    // A resize that changes the viewport reports again — after a frame, because
+    // dragging a window edge fires resize continuously and in Mode B each report
+    // is a round trip plus a rebuild.
+    Object.defineProperty(dom.window, "innerWidth", { value: 480, configurable: true });
     dom.window.dispatchEvent(new dom.window.Event("resize"));
-    assert.equal(reports().length, 2, "and again on every resize");
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(reports().length, 2, "and again once the frame lands");
+    assert.equal(reports()[1].payload.width, 480);
+
+    // A resize that changes nothing reports nothing: the snapshot is equal.
+    dom.window.dispatchEvent(new dom.window.Event("resize"));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(reports().length, 2, "an unchanged viewport is not news");
   } finally {
     if (hadWindow) {
       globalThis.window = previous;

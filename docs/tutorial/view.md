@@ -107,6 +107,42 @@ Isso produz a árvore (IR) que o reconciliador serializa para o cliente — o
 formato exato está fixado em
 [`tests/fixtures/node_initial.json`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/tests/fixtures/node_initial.json).
 
+## Responsividade: `app.media`
+
+O browser é dono do viewport; a `view` lê ele em `app.media`. O cliente reporta
+tamanho, densidade, dark mode do OS e orientação na montagem e a cada mudança,
+nos **três** modos — então escolher layout por largura é só um `if`:
+
+```python
+from tempest_core import App, Column, Row, Text, Widget
+
+
+def view(app: App[object]) -> Widget:
+    """Uma linha no desktop, uma coluna no telefone."""
+    campos = [
+        Text(content="Nome", key="rotulo-nome"),
+        Text(content="E-mail", key="rotulo-email"),
+    ]
+    if app.media.width >= 768:
+        return Row(style=None, children=campos)
+    return Column(style=None, children=campos)
+```
+
+`app.media` traz `width`, `height`, `device_pixel_ratio`, `text_scale_factor`,
+`platform_dark_mode` e `orientation`. Mudança dispara rebuild como qualquer
+mutação de estado — a `view` re-roda e o reconciliador emite os patches mínimos.
+
+!!! tip "`height` é o único jeito de limitar uma moldura ao viewport"
+    `Style` não tem `100vh`. Um `Scaffold(scroll=True)` só rola de verdade
+    quando a coluna em volta dele é limitada, e a única medida disponível para
+    limitar é `app.media.height`. Sem ela a página inteira rola e a `app_bar` /
+    `bottom_bar` rolam junto — exatamente o que um scaffold existe para evitar.
+
+!!! note "Antes do primeiro report, tudo é zero"
+    O default de `MediaQueryData` tem `width` e `height` em `0.0`. O primeiro
+    report chega na montagem, então a primeira pintura já é responsiva — mas um
+    `view` que divide por `width` precisa tratar o zero.
+
 ## Recap
 
 - `view(app) -> Widget` é uma **função pura do estado**.

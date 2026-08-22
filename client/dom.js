@@ -104,7 +104,8 @@ function applyNodeShape(el, type, key, props) {
  *
  * For text-bearing props, a Checkbox is a <label> wrapping an <input>, so its
  * caption is set as a trailing text node (see setCheckboxLabel) rather than
- * overwriting textContent, which would drop the nested input. An Icon is an inline
+ * overwriting textContent, which would drop the nested input. A `label` is drawn
+ * only for the widget types it actually names (see LABEL_AS_TEXT_TYPES). An Icon is an inline
  * <svg> whose glyph is (re)drawn when its name or size changes; a style-only
  * update leaves the existing glyph untouched.
  *
@@ -128,7 +129,7 @@ function applyProps(el, props) {
   if ("label" in props) {
     if (type === "Checkbox") {
       setCheckboxLabel(el, props.label == null ? "" : String(props.label));
-    } else {
+    } else if (type != null && LABEL_AS_TEXT_TYPES.has(type)) {
       el.textContent = props.label == null ? "" : String(props.label);
     }
   }
@@ -246,6 +247,25 @@ function applyDragProps(el, type, props) {
     el.setAttribute(DROP_TARGET_ATTR, "");
   }
 }
+
+/**
+ * Widget types whose `label` prop *is* their text content.
+ *
+ * Not every widget with a label wants it drawn: a `FormField` is a container
+ * whose label is metadata (the core renders its own `Text` child for it, and the
+ * SSR renderer ignores the prop). Writing it as text content painted an
+ * unstyled, duplicate label — Times New Roman next to the themed one — and an
+ * Update carrying `label` would have wiped the field's children along with it,
+ * since textContent replaces everything.
+ */
+const LABEL_AS_TEXT_TYPES = new Set([
+  "Button",
+  "IconButton",
+  "Switch",
+  "DatePicker",
+  "TimePicker",
+  "FilePicker",
+]);
 
 /** Valid HTML attribute name — mirrors `_ATTR_KEY_RE` in the SSR renderer. */
 const ATTR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9:_-]*$/;
@@ -693,7 +713,15 @@ function applyControlProps(el, type, props) {
   if (type === "Canvas") {
     paintCanvas(el, props);
   } else if (type === "Input") {
-    el.setAttribute("type", props.secure ? "password" : "text");
+    // Only when the patch carries `secure`. Deriving the type from every props
+    // bag turned a password field back into a visible text field on the first
+    // update that did not mention it — which is every keystroke, since typing
+    // patches `value` alone. The password was masked until the user typed.
+    if ("secure" in props) {
+      el.setAttribute("type", props.secure ? "password" : "text");
+    } else if (!el.hasAttribute("type")) {
+      el.setAttribute("type", "text");
+    }
     if ("value" in props) {
       el.value = props.value == null ? "" : String(props.value);
     }

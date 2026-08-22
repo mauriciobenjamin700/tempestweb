@@ -399,3 +399,59 @@ test("applyPatches still throws when no error handler is given", () => {
   const el = buildElement({ type: "Column", key: "r", props: {}, children: [] });
   assert.throws(() => applyPatches(el, [{ path: [5], set_props: {} }]), RangeError);
 });
+
+test("a value-only update leaves a secure Input masked", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { value: "hunter2", secure: true, placeholder: "p" },
+    children: [],
+  });
+  assert.equal(el.getAttribute("type"), "password");
+
+  // Typing patches `value` alone; the type must not be re-derived from a props
+  // bag that never mentioned `secure`.
+  applyPatches(el, [{ path: [], set_props: { value: "hunter22" } }]);
+  assert.equal(el.getAttribute("type"), "password");
+
+  // Turning secure off is still honoured when the patch says so.
+  applyPatches(el, [{ path: [], set_props: { secure: false } }]);
+  assert.equal(el.getAttribute("type"), "text");
+});
+
+test("a container's label prop is metadata, not its text content", () => {
+  withDocument();
+  const el = buildElement({
+    type: "FormField",
+    key: "f",
+    props: { name: "email", label: "E-mail" },
+    children: [
+      { type: "Text", key: "field-label", props: { content: "E-mail" }, children: [] },
+      { type: "Input", key: "email-field", props: { value: "" }, children: [] },
+    ],
+  });
+
+  // The core renders its own label child; painting the prop too produced an
+  // unstyled duplicate (and the SSR renderer never drew it).
+  assert.equal(el.childNodes.length, 2);
+  assert.equal(el.children[0].getAttribute("data-tw-key"), "field-label");
+
+  // An Update carrying `label` must not wipe the field's children.
+  applyPatches(el, [{ path: [], set_props: { label: "Correo" } }]);
+  assert.equal(el.children.length, 2);
+  assert.equal(el.children[1].getAttribute("data-tw-key"), "email-field");
+});
+
+test("a Button's label is still its text", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Button",
+    key: "b",
+    props: { label: "Save" },
+    children: [],
+  });
+  assert.equal(el.textContent, "Save");
+  applyPatches(el, [{ path: [], set_props: { label: "Saved" } }]);
+  assert.equal(el.textContent, "Saved");
+});

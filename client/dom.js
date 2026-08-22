@@ -135,11 +135,17 @@ function applyProps(el, props) {
   if (type === "Icon" && ("name" in props || "size" in props)) {
     renderIcon(/** @type {any} */ (el), props);
   }
+  // The app's own semantics are applied FIRST, then each widget's defaults fill
+  // what is still missing. The other order looks equivalent and is not: a widget
+  // with no semantics sends `semantics: null`, which clears role/aria-label — so
+  // running it last stripped the role every widget had just set, leaving a
+  // ProgressBar with aria-valuemin and no role at all, and a Toast that
+  // announced nothing.
+  applyA11yProps(el, props);
   applyIndicatorProps(el, type, props);
   applyControlProps(el, type, props);
   applyDragProps(el, type, props);
   applyOverlayProps(el, type, props);
-  applyA11yProps(el, props);
   applyEscapeHatchAttrs(el, props);
   applyLazyProps(el, type, props);
 }
@@ -176,7 +182,13 @@ function applyOverlayProps(el, type, props) {
     if ("title" in props) {
       const title = props.title;
       setOrRemove(el, TITLE_ATTR, title === "" ? null : title);
-      setOrRemove(el, "aria-label", title === "" ? null : title);
+      // An explicit semantics.label is the app naming the dialog on purpose; the
+      // title only supplies a name when the app did not.
+      const sem = props.semantics;
+      const named = sem != null && typeof sem === "object" && sem.label != null;
+      if (!named) {
+        setOrRemove(el, "aria-label", title === "" ? null : title);
+      }
     }
   } else if (type === "BottomSheet") {
     if (!el.hasAttribute("role")) {

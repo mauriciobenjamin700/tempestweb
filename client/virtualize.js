@@ -104,8 +104,14 @@ export function installVirtualization(root, transport) {
           ? globalThis.CSS.escape(key)
           : key.replace(/["\\]/g, "\\$&");
       const sel = `[${LAZY_ATTR}][data-tw-key="${escaped}"]`;
-      rules.push(`${sel}::before{content:"";display:block;height:${before}px}`);
-      rules.push(`${sel}::after{content:"";display:block;height:${after}px}`);
+      // `flex:0 0 auto` is load-bearing: a lazy viewport is a flex column, so
+      // these spacers are flex items and the default `flex-shrink:1` collapsed
+      // them to zero inside the viewport's bounded height. The rules were there
+      // and computed to 0px, so a 1000-item list scrolled as if it held only the
+      // 60 materialized rows — the scrollbar lied about the list's size.
+      const box = "content:\"\";display:block;flex:0 0 auto";
+      rules.push(`${sel}::before{${box};height:${before}px}`);
+      rules.push(`${sel}::after{${box};height:${after}px}`);
     }
     sheet.textContent = rules.join("\n");
   };

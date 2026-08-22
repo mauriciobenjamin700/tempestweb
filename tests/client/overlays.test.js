@@ -91,3 +91,42 @@ test("the base sheet positions the overlay host and its widgets", () => {
   // A scrim behind a dialog, and none behind a toast (a toast is not modal).
   assert.match(BASE_THEME_CSS, /:has\(\[data-tw-type="Dialog"\]\)::before/);
 });
+
+test("a widget's default role survives the semantics the core always sends", () => {
+  withDocument();
+  // Every declared prop is on the wire, so a widget with no semantics sends
+  // `semantics: null`. Clearing role/aria from that must not strip the role the
+  // widget itself sets — a ProgressBar left with aria-valuemin and no role, or a
+  // Toast that announces nothing, is worse than either alone.
+  const probe = (type, props) =>
+    buildElement({
+      type,
+      key: "k",
+      props: { semantics: null, ...props },
+      children: [],
+    });
+
+  assert.equal(probe("ProgressBar", { value: 0.5 }).getAttribute("role"), "progressbar");
+  assert.equal(probe("Spinner", { size: 24 }).getAttribute("role"), "progressbar");
+  assert.equal(probe("Toast", { message: "hi" }).getAttribute("role"), "status");
+  assert.equal(probe("Dialog", { title: "Hi" }).getAttribute("role"), "dialog");
+  assert.equal(probe("BottomSheet", {}).getAttribute("role"), "dialog");
+  assert.equal(probe("Dialog", { title: "Hi" }).getAttribute("aria-label"), "Hi");
+});
+
+test("an explicit semantics.role and label win over the widget default", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Dialog",
+    key: "d",
+    props: {
+      title: "Delete?",
+      semantics: { role: "alertdialog", label: "Confirm deletion" },
+    },
+    children: [],
+  });
+  assert.equal(el.getAttribute("role"), "alertdialog");
+  assert.equal(el.getAttribute("aria-label"), "Confirm deletion");
+  // The title is still painted; only the accessible name deferred to the app.
+  assert.equal(el.getAttribute(TITLE_ATTR), "Delete?");
+});

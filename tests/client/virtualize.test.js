@@ -86,8 +86,13 @@ test("refresh writes proportional spacer rules for the full item_count", () => {
   const sheet = dom.document.getElementById("tw-virt-styles");
   assert.ok(sheet, "stylesheet created");
   // before = start*extent = 40*20 = 800; after = (1000-40-30)*20 = 18600.
-  assert.match(sheet.textContent, /::before\{content:"";display:block;height:800px\}/);
-  assert.match(sheet.textContent, /::after\{content:"";display:block;height:18600px\}/);
+  assert.match(sheet.textContent, /::before\{[^}]*height:800px\}/);
+  assert.match(sheet.textContent, /::after\{[^}]*height:18600px\}/);
+  // A viewport is a flex column, so the spacers are flex items: without
+  // flex-shrink pinned they collapse to zero inside its bounded height and the
+  // scrollbar reflects only the materialized window.
+  assert.match(sheet.textContent, /::before\{[^}]*flex:0 0 auto/);
+  assert.match(sheet.textContent, /::after\{[^}]*flex:0 0 auto/);
 });
 
 function transportNoop() {

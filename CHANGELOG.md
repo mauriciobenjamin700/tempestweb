@@ -4,6 +4,58 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.73.0] — 2026-08-22
+
+Um campo de código que não existia, e um formulário que só falava no fim.
+
+### Fixed
+
+- **`PinInput` renderizava como uma `div` vazia** (issue #77, item 1). O widget
+  declara `length`, `value`, `secure`, `on_change` e `on_complete`, e o
+  renderizador DOM não o conhecia: não havia o que digitar, então nenhum dos
+  dois handlers era alcançável. Agora é um `<input>` de verdade com
+  `maxlength`, `inputmode="numeric"` e `autocomplete="one-time-code"` — um
+  campo, não `length` caixinhas, porque é isso que a plataforma recompensa: o
+  browser (e o iOS/Android) oferece preencher o código do SMS, o teclado
+  numérico aparece, e colar o código inteiro funciona. A folha base espaça os
+  caracteres para continuar lendo como campo de código.
+
+- **`on_complete` funciona.** O cliente reporta `complete` na **transição** para
+  cheio — uma tecla num campo já cheio não reporta de novo, e limpar rearma —
+  junto do `change` de sempre, porque a app ainda quer cada tecla.
+
+- **`on_validate` funciona** (issue #77, item 1). Um `FormField` não levava o
+  próprio `name` para o DOM, então o cliente não tinha o que reportar e a
+  validação só podia acontecer no submit: o leitor descobria o e-mail errado
+  depois de preencher seis campos. O cliente agora reporta a **ocasião** — este
+  campo, este valor — no `focusout` (que borbulha, ao contrário do `blur`), e o
+  handler roda os validadores de verdade. Ele não pode validar sozinho: os
+  validadores de um campo são callables Python que nunca atravessam o fio.
+
+- **O `error` de um `FormField` era prop que ninguém desenhava.** Ele não pode
+  virar filho sem deslocar o índice pelo qual o filho do campo é endereçado, então
+  vira atributo e a folha base o pinta sob o controle via `::after` — o mesmo
+  truque do título de um `Dialog` —, com `aria-invalid` no campo para a mensagem
+  ser anunciada e não apenas exibida.
+
+### Added
+
+- **Guard contra o backtick no `client/theme.js`.** O CSS base vive dentro de um
+  template literal, então um backtick num comentário é `SyntaxError` que derruba
+  o cliente inteiro — e a mensagem aponta para o comentário, não para o que
+  quebrou. Aconteceu três vezes escrevendo as seções novas desta leva; agora um
+  teste lê o arquivo como texto (importar o módulo seria a própria falha) e
+  falha explicando onde está o backtick.
+
+### Changed
+
+- **`examples/form`** ganhou o terceiro campo (código de convite, com
+  `PinInput` + `on_complete`) e `on_validate` nos dois primeiros, então o exemplo
+  passou a demonstrar validação ao sair do campo em vez de só no submit.
+  Verificado em Chrome real: sair do e-mail vazio pinta "Email is required" com
+  `aria-invalid=true` e `content` do `::after` medido; corrigir e sair limpa;
+  digitar `12` mantém "pending" e completar `1234` vira "accepted".
+
 ## [0.72.1] — 2026-08-22
 
 ### Fixed

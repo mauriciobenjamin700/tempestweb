@@ -224,6 +224,90 @@ BarChart(series=[ChartSeries(points=[3.0, 7.0, 2.0, 9.0, 5.0], label="vendas")])
     saídas de um modelo — combinam com a inferência no cliente da
     [Visão computacional (ONNX)](../advanced/vision.md).
 
+## Validar quando o leitor sai do campo
+
+Um formulário que só valida no submit conta a verdade tarde: o leitor descobre
+que o e-mail está errado depois de preencher seis campos. `FormField` declara
+`on_validate` para isso — o cliente reporta a **ocasião** (este campo, este
+valor, confira agora) quando o controle perde o foco, e o handler roda os
+validadores de verdade:
+
+```python
+from tempest_core.widgets import FormField, Input, Validator
+from tempest_core.widgets.events import ValidationEvent
+
+rules: dict[str, list[Validator]] = {"email": [_require("Email é obrigatório")]}
+
+
+def validate_field(event: ValidationEvent) -> None:
+    """Run one field's rules when the reader leaves it."""
+    message = ""
+    for rule in rules.get(event.field, []):
+        failed = rule(event.value)
+        if failed is not None:
+            message = failed
+            break
+    app.set_state(lambda state: state.errors.update({event.field: message}))
+
+
+FormField(
+    key="field-email",
+    name="email",
+    label="E-mail",
+    validators=rules["email"],
+    error=app.state.errors.get("email", ""),
+    on_validate=validate_field,
+    child=Input(key="email-input", value=app.state.email, on_change=edit_email),
+)
+```
+
+Três coisas que valem saber:
+
+* **`key` e `name` são obrigatórios** para isso funcionar: o `key` é o que o
+  cliente usa para reportar, e o `name` é o que chega em `event.field`.
+* **Os validadores não atravessam o fio** — são callables Python. É por isso que
+  o cliente reporta a ocasião em vez de tentar validar sozinho.
+* **`error` é `str`, não `str | None`**: string vazia significa "sem erro", e é
+  isso que apaga a mensagem.
+
+O erro é desenhado pela folha base sob o controle, e o campo ganha
+`aria-invalid`, então a mensagem é anunciada e não apenas exibida.
+
+## Código de uso único (`PinInput`)
+
+`PinInput` é o campo de código: `length` dígitos, `secure` para mascarar, e
+`on_complete` disparando no instante em que o último dígito entra — sem botão:
+
+```python
+from tempest_core.widgets.events import SubmitEvent
+from tempest_core.widgets.inputs import PinInput
+
+
+def code_completed(event: SubmitEvent) -> None:
+    """Accept the code as soon as its last digit lands."""
+    app.set_state(lambda state: setattr(state, "code_done", True))
+
+
+PinInput(
+    key="code-input",
+    length=4,
+    value=app.state.code,
+    on_change=edit_code,
+    on_complete=code_completed,
+)
+```
+
+Ele renderiza como **um** `<input>` com `autocomplete="one-time-code"` e
+`inputmode="numeric"`, não como quatro caixinhas: assim o browser (e o
+iOS/Android) oferece preencher o código do SMS, o teclado numérico aparece no
+celular, e colar o código inteiro funciona — três coisas que caixas separadas
+jogam fora. A folha base espaça os caracteres para ainda parecer um campo de
+código.
+
+!!! note "`on_complete` dispara na transição"
+    Ele avisa quando o campo *fica* completo, não a cada tecla depois disso.
+    Apagar e preencher de novo arma o próximo aviso.
+
 ## Recapitulando
 
 - Importe de `tempestweb.components` — campos, formulários **e** a biblioteca
@@ -233,6 +317,8 @@ BarChart(series=[ChartSeries(points=[3.0, 7.0, 2.0, 9.0, 5.0], label="vendas")])
 - Campos são **controlados**: `value` + `on_change` (+ `error` opcional).
 - `LoginForm` é um formulário inteiro numa chamada; você só liga ao seu estado.
 - Validadores (`validate_email`, `validate_phone`, …) devolvem `None` quando OK.
+- `on_validate` num `FormField` valida ao sair do campo; `on_complete` num
+  `PinInput` dispara quando o código fica completo.
 - Os componentes do core (incl. `BarChart`/`LineChart` via `Canvas`) renderizam
   igual no Modo A (WASM) e no Modo B (servidor).
 

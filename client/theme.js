@@ -448,6 +448,46 @@ export const BASE_THEME_CSS = `
   cursor: grabbing;
 }
 
+/* ── PinInput: a code field that looks like one ────────────────────────────
+   One input, spaced out: the platform fills a one-time-code field from an SMS
+   and pastes a whole code into it, which N separate boxes throw away. The width
+   follows the cap, so the box is the size of the code it takes. */
+[data-tw-type="PinInput"] {
+  font-family: var(--tw-font);
+  font-size: 20px;
+  letter-spacing: 0.5em;
+  text-align: center;
+  padding: 10px 12px;
+  width: 100%;
+  max-width: 12ch;
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+}
+[data-tw-type="PinInput"]:focus,
+[data-tw-type="PinInput"]:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--tw-primary);
+}
+
+/* ── FormField: the error the widget declared and nobody drew ───────────────
+   The error is a prop, so the renderer cannot make it a child without shifting
+   the index the field's own child is addressed by. It arrives as an attribute and is
+   painted here, under the control, in the error colour — and the invalid state
+   outlines the control itself so the two read as one thing. */
+[data-tw-field][aria-invalid="true"]::after {
+  content: attr(data-tw-error);
+  display: block;
+  margin-top: 4px;
+  font-family: var(--tw-font);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--tw-error);
+}
+[data-tw-field][aria-invalid="true"] [data-tw-type="Input"],
+[data-tw-field][aria-invalid="true"] [data-tw-type="PinInput"] {
+  box-shadow: inset 0 0 0 1px var(--tw-error);
+}
+
 @keyframes tw-progress-slide {
   0% { margin-inline-start: -40%; }
   100% { margin-inline-start: 100%; }

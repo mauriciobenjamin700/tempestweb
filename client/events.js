@@ -17,11 +17,13 @@ import { GESTURE_TYPE, LONG_PRESS_MS, SWIPE_MIN_PX } from "./constants.js";
 import {
   DRAG_DATA_ATTR,
   DROP_TARGET_ATTR,
+  FIELD_ATTR,
   ITEM_ATTR,
   ITEM_VALUE_ATTR,
   KEY_ATTR,
-  TYPE_ATTR,
+  PIN_LENGTH_ATTR,
   REORDER_ATTR,
+  TYPE_ATTR,
 } from "./dom.js";
 
 // The DOM event names captured and their corresponding TWEvent `type`. Identity
@@ -131,6 +133,83 @@ function sendMenuSelection(event, root, transport) {
     },
   });
   return true;
+}
+
+/**
+ * Report a filled-in `PinInput` as a `complete` event, if it just filled up.
+ *
+ * `on_complete` is what a code screen wants: it submits the moment the last digit
+ * lands, without a button. The widget declares it and it never fired, because a
+ * PinInput used to render as an empty div — there was nothing to type into.
+ *
+ * Reported alongside the ordinary `change`, not instead of it: the app still
+ * wants each keystroke (that is what holds the value in state), and the extra
+ * event is the "and now it is complete" signal. It fires only on the transition
+ * *to* full — a keystroke inside an already-full field (a paste replacing it, a
+ * digit typed after the cap) does not report again.
+ *
+ * @param {EventTarget|null} target  The input that changed.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {void}
+ */
+function reportPinComplete(target, transport) {
+  const el = /** @type {HTMLInputElement|null} */ (target);
+  if (el == null || typeof el.getAttribute !== "function") {
+    return;
+  }
+  if (el.getAttribute(TYPE_ATTR) !== "PinInput") {
+    return;
+  }
+  const key = el.getAttribute(KEY_ATTR);
+  const length = Number.parseInt(el.getAttribute(PIN_LENGTH_ATTR) ?? "", 10);
+  const value = typeof el.value === "string" ? el.value : "";
+  if (key == null || !Number.isFinite(length) || length <= 0) {
+    return;
+  }
+  const full = value.length >= length;
+  const wasFull = el.__twPinFull === true;
+  el.__twPinFull = full;
+  if (!full || wasFull) {
+    return;
+  }
+  transport.sendEvent({ type: "complete", key, payload: { values: { value } } });
+}
+
+/**
+ * Report that a `FormField` should be validated, when its control loses focus.
+ *
+ * `on_validate` was declared and inert: the app could only validate on submit,
+ * so a form told the reader about a bad email after they had filled in six more
+ * fields. The client cannot validate by itself — a field's `validators` are
+ * Python callables that never cross the wire — so what it reports is the
+ * *occasion*: this field, this value, please check it. The handler runs the real
+ * validators and puts the message on the field's `error`.
+ *
+ * `focusout` and not `blur`, because only the former bubbles to the delegation
+ * root; and leaving a field is the moment that does not interrupt typing.
+ *
+ * @param {EventTarget|null} target  The control that lost focus.
+ * @param {HTMLElement} root         The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {void}
+ */
+function reportFieldValidation(target, root, transport) {
+  const field = closestWithAttr(target, root, FIELD_ATTR);
+  if (field == null) {
+    return;
+  }
+  const key = field.getAttribute(KEY_ATTR);
+  const name = field.getAttribute(FIELD_ATTR);
+  if (key == null || name == null || name === "") {
+    return;
+  }
+  const control = /** @type {HTMLInputElement|null} */ (target);
+  const value = control != null && typeof control.value === "string" ? control.value : "";
+  transport.sendEvent({
+    type: "validate",
+    key,
+    payload: { field: name, value },
+  });
 }
 
 /** The dataTransfer type carrying the dragged item's position within its list. */
@@ -402,10 +481,20 @@ export function bindEvents(root, transport) {
         key,
         payload: payloadFor(domType, event.target),
       });
+      if (domType === "input" || domType === "change") {
+        reportPinComplete(event.target, transport);
+      }
     };
     root.addEventListener(domType, handler);
     bound.push([domType, handler]);
   }
+
+  /** @param {FocusEvent} event */
+  const onFocusOut = (event) => {
+    reportFieldValidation(event.target, root, transport);
+  };
+  root.addEventListener("focusout", onFocusOut);
+  bound.push(["focusout", onFocusOut]);
 
   const bindDrag = () => {
     /** @param {DragEvent} event */

@@ -15,6 +15,7 @@ import {
 import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
+import { installFocusTrap } from "./focus.js";
 import { installListEvents } from "./lists.js";
 import { installMedia } from "./media.js";
 import { installBaseTheme } from "./theme.js";
@@ -164,6 +165,7 @@ export function mount(root, transport, initialNode = null) {
   const unbind = bindEvents(root, transport);
   const virtualization = installVirtualization(root, transport);
   const listEvents = installListEvents(root, transport);
+  const focusTrap = installFocusTrap(root);
   const router = installRouter(transport);
   if (typeof transport.onNavigate === "function") {
     transport.onNavigate((path) => router.navigateTo(path));
@@ -179,6 +181,7 @@ export function mount(root, transport, initialNode = null) {
     virtualization.refresh();
     repaintCanvases(root);
     positionAnchoredOverlays(root);
+    focusTrap.sync();
   };
   scheduleFrame(afterLayout);
 
@@ -263,6 +266,7 @@ export function mount(root, transport, initialNode = null) {
       unbind();
       virtualization.dispose();
       listEvents.dispose();
+      focusTrap.dispose();
       media.dispose();
       router.dispose();
       if (tree != null && tree.parentNode === root) {

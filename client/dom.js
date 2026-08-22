@@ -177,6 +177,12 @@ export const ANCHOR_ATTR = "data-tw-anchor";
  * a changed menu looks like. Each button carries its value for the click
  * listener, and `role=menuitem` so the menu reads as a menu.
  *
+ * A `MenuItem` declares three things — `label`, `value` and `icon` — and the
+ * icon used to be dropped, so a menu the app drew with icons came out as plain
+ * text. It is resolved through the same registry the `Icon` widget uses and
+ * inserted before the label, which lives in its own span so the click listener
+ * can read the label back without the glyph's markup in the way.
+ *
  * @param {HTMLElement} el     The Menu/ActionSheet element.
  * @param {*} items            The `items` prop (anything else is treated empty).
  * @returns {void}
@@ -192,7 +198,15 @@ function renderMenuItems(el, items) {
     button.setAttribute(ITEM_ATTR, "item");
     button.setAttribute("role", "menuitem");
     button.setAttribute(ITEM_VALUE_ATTR, item?.value == null ? "" : String(item.value));
-    button.textContent = item?.label == null ? "" : String(item.label);
+    if (item?.icon != null && item.icon !== "") {
+      const svg = createIconSvg();
+      renderIcon(svg, { name: item.icon });
+      button.appendChild(svg);
+    }
+    const label = document.createElement("span");
+    label.setAttribute(ITEM_ATTR, "item-label");
+    label.textContent = item?.label == null ? "" : String(item.label);
+    button.appendChild(label);
     el.appendChild(button);
   }
 }

@@ -4,6 +4,46 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.71.0] — 2026-08-22
+
+O resto do contrato de modal, e o ícone que um item de menu declarava.
+
+### Fixed
+
+- **Nenhum overlay prendia o foco** (issue #77, item 4). Um modal pintava sobre
+  a app com scrim e `Escape`, e o teclado continuava na página **atrás** dele:
+  `Tab` passeava por formulários que o leitor não podia ver, e fechar deixava o
+  foco em lugar nenhum. `client/focus.js` fecha as três obrigações — foco entra
+  ao abrir (primeiro controle, ou o próprio overlay quando não há nenhum),
+  `Tab`/`Shift+Tab` circulam dentro e embrulham nas pontas, e ao fechar o foco
+  volta para o elemento que abriu. Overlay não-modal (`Menu`, `Popover`,
+  `Toast`) é deixado em paz, porque roubar o foco quebraria o widget que o
+  abriu.
+
+  Medido em Chrome real no `examples/overlay_demo`: foco `open` → `close` do
+  diálogo ao abrir, `Tab` preso, `Escape` devolvendo para `open`; e na action
+  sheet, `Shift+Tab` do primeiro item embrulhando para o último.
+
+- **`Menu` e `ActionSheet` descartavam o `icon` do `MenuItem`** (issue #77,
+  item 2). `MenuItem` declara `label`, `value` e `icon`; o renderizador
+  desenhava os dois primeiros. Agora o ícone é resolvido pelos mesmos dois
+  registros do widget `Icon` (nome puro = Lucide, prefixo `material:` =
+  Material) e inserido antes do rótulo, que passou a viver num span próprio para
+  o `select` continuar lendo o rótulo limpo. O item virou uma linha flex com
+  gap, e o glifo tem tamanho fixo.
+
+### Added
+
+- **Nova página de tutorial bilíngue "Overlays e modais" / "Overlays and
+  modals"** (`docs/tutorial/overlays.md`): abrir e fechar pelo id, o que
+  `barrier=True` significa, o contrato de teclado, menu com ícone, overlay
+  ancorado e toast — mais o aviso de que um modal sem `on_dismiss` nem botão de
+  fechar prende o usuário.
+
+- **`examples/overlay_demo`** ganhou um `ActionSheet` com ícones e um handler de
+  seleção, então o exemplo cobre as duas metades que faltavam ao contrato de
+  modal.
+
 ## [0.70.0] — 2026-08-22
 
 Um app em Modo A ou B não sabia o tamanho da própria janela.

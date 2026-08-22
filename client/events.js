@@ -120,12 +120,13 @@ function sendMenuSelection(event, root, transport) {
   if (key == null) {
     return false;
   }
+  const labelEl = item.querySelector(`[${ITEM_ATTR}="item-label"]`);
   transport.sendEvent({
     type: "select",
     key,
     payload: {
       value: item.getAttribute(ITEM_VALUE_ATTR) ?? "",
-      label: item.textContent ?? "",
+      label: (labelEl ?? item).textContent ?? "",
     },
   });
   return true;

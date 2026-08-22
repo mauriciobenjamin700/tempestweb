@@ -1,4 +1,4 @@
-// Tests for client/transpile/theme.js + media.js — theme + responsiveness.
+// Tests for client/transpile/theme.js + client/media.js — theme + responsiveness.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Breakpoints, MediaQueryData, Theme, ThemeMode } from "../../client/transpile/theme.js";

@@ -203,3 +203,66 @@ test("mount asks for a resync when a patch cannot be applied", () => {
   transport.push([{ path: [99], set_props: { content: "nope" } }]);
   assert.equal(resyncs, 2);
 });
+
+test("mount reports the viewport, so a responsive view sees a real width", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const hadWindow = "window" in globalThis;
+  const previous = globalThis.window;
+  globalThis.window = dom.window;
+  try {
+    const transport = mockTransport();
+    mount(dom.root, transport, fixture("node_initial.json"));
+
+    const reports = () => transport.events.filter((event) => event.type === "media");
+    assert.equal(reports().length, 1, "reported once on mount");
+    const first = reports()[0];
+    assert.equal(first.key, "", "media is app-wide, not a widget event");
+    assert.equal(first.payload.width, dom.window.innerWidth);
+    assert.equal(first.payload.height, dom.window.innerHeight);
+    assert.equal(typeof first.payload.orientation, "string");
+
+    // A resize that changes the viewport reports again — after a frame, because
+    // dragging a window edge fires resize continuously and in Mode B each report
+    // is a round trip plus a rebuild.
+    Object.defineProperty(dom.window, "innerWidth", { value: 480, configurable: true });
+    dom.window.dispatchEvent(new dom.window.Event("resize"));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(reports().length, 2, "and again once the frame lands");
+    assert.equal(reports()[1].payload.width, 480);
+
+    // A resize that changes nothing reports nothing: the snapshot is equal.
+    dom.window.dispatchEvent(new dom.window.Event("resize"));
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(reports().length, 2, "an unchanged viewport is not news");
+  } finally {
+    if (hadWindow) {
+      globalThis.window = previous;
+    } else {
+      delete globalThis.window;
+    }
+  }
+});
+
+test("unmount stops the viewport reporting", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const hadWindow = "window" in globalThis;
+  const previous = globalThis.window;
+  globalThis.window = dom.window;
+  try {
+    const transport = mockTransport();
+    const handle = mount(dom.root, transport, fixture("node_initial.json"));
+    handle.unmount();
+    const before = transport.events.length;
+
+    dom.window.dispatchEvent(new dom.window.Event("resize"));
+    assert.equal(transport.events.length, before);
+  } finally {
+    if (hadWindow) {
+      globalThis.window = previous;
+    } else {
+      delete globalThis.window;
+    }
+  }
+});

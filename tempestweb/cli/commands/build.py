@@ -63,11 +63,15 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "theme.js",
     "layouts.js",
     "events.js",
+    "focus.js",
+    "gestures.js",
     "lists.js",
+    "media.js",
+    "pages.js",
     "transport.js",
     "virtualize.js",
     "router.js",
-    "media.js",
+    "camera-widgets.js",
     "constants.js",
 )
 
@@ -187,6 +191,11 @@ _WASM_PACKAGE_PARTS: tuple[str, ...] = (
     "transports",
     "native",
     "components",
+    # The theme → CSS emitter. Mode B puts those custom properties in the page
+    # head at render time; Mode A's page is static, so the app's palette can only
+    # reach the sheet from inside the browser — which means this module has to be
+    # in the bundle. Pure Python over the core's tokens, no extra dependency.
+    "html",
 )
 
 #: The single icon a Mode B artifact emits, purely so the tab has a favicon (the
@@ -852,6 +861,9 @@ import {{ installNativeBridge }} from "./client/native/index.js";
 const PYODIDE_BASE = "{pyodide_base}";
 
 // Python entry: build the app and hand back a _start(on_patches, dispatch) hook.
+// `app.THEME` is optional: an app that declares one gets its palette into the
+// tree (components resolve their colours in Python) and into the page (the CSS
+// tokens the base sheet reads).
 const PY_GLUE = `
 import app
 from tempestweb.runtime.wasm_main import bootstrap
@@ -859,7 +871,7 @@ from tempestweb.runtime.wasm_main import bootstrap
 def _start(on_patches, dispatch, on_navigate, subscribe, unsubscribe):
     return bootstrap(
         app.make_state(), app.view, on_patches, dispatch, on_navigate,
-        subscribe, unsubscribe,
+        subscribe, unsubscribe, getattr(app, "THEME", None),
     )
 
 _start
@@ -948,6 +960,18 @@ export async function boot() {{
       handle.close();
     }},
   }};
+
+  // The app's palette, as the `--tw-*` tokens the base sheet reads. Injected
+  // before the mount so the first paint is already themed — Mode B puts these in
+  // the page head at render time, but this page is static and the app only exists
+  // once Pyodide is up. Empty when the app declares no THEME.
+  const themeCss = handle.theme_css();
+  if (themeCss) {{
+    const style = document.createElement("style");
+    style.id = "tw-app-theme";
+    style.textContent = themeCss;
+    document.head.appendChild(style);
+  }}
 
   const transport = createWasmTransport(bridge);
   const initialNode = JSON.parse(handle.initial_node_json());
@@ -1046,7 +1070,14 @@ def build() -> FastAPI:
     Returns:
         The configured FastAPI application.
     """
-    api = create_app(_project.make_state, _project.view, title="{name}")
+    api = create_app(
+        _project.make_state,
+        _project.view,
+        title="{name}",
+        # Optional: an app that declares a palette gets it into every component
+        # (they resolve colours in Python) and into the page's CSS tokens.
+        theme=getattr(_project, "THEME", None),
+    )
     api.mount(
         "/static",
         StaticFiles(directory=str(_HERE / "static")),
@@ -1372,6 +1403,12 @@ def _index_html_transpile(
     links the Web App Manifest and registers the cache-first service worker, so
     the static bundle is an installable, offline-capable PWA.
 
+    The tab icon is linked explicitly. The manifest names icons, but a browser
+    does not read it for the tab: without ``rel="icon"`` it probes
+    ``/favicon.ico`` and a static bundle has no route to answer, so every load of
+    every Mode C deployment opened its console with a 404 nobody can act on. The
+    other two modes were fixed for this; this one was missed.
+
     Args:
         name: The project name (page title).
         theme_color: The manifest theme color, mirrored into the ``theme-color``
@@ -1392,6 +1429,7 @@ def _index_html_transpile(
     <title>{name}</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="{theme_color}" />
+    <link rel="icon" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   </head>
   <body>

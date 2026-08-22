@@ -1,14 +1,22 @@
-// media.js — viewport → app reporting, shared by all three modes.
+// media.js — viewport → app reporting, shared by every mode.
 //
-// The browser owns the viewport; the app reads it via `app.media`. This reports
-// the current size, density, dark-mode preference and orientation to the runtime
-// as a `media` event on mount and whenever any of them changes, so the view
-// re-renders responsively (breakpoints, viewport-height frames, dark/light).
-// No-op without a window.
+// The browser owns the viewport; the app reads it via `app.media`, and a `view`
+// that branches on `media.width` (a column on a phone, a row on a laptop) or
+// bounds itself by `media.height` (a Scaffold whose bars must not scroll away) is
+// only correct while that snapshot is current. This reports the size, pixel
+// ratio, dark-mode preference and orientation on mount and on every resize /
+// color-scheme change. No-op without a window.
 //
 // Reported as `{ type: "media", key: "", payload: {width, height,
-// device_pixel_ratio, platform_dark_mode, orientation} }`, handled by every
-// runtime before handler resolution (like the `navigate` event).
+// device_pixel_ratio, platform_dark_mode, orientation} }` and handled before
+// handler resolution (like `navigate`): in Mode C by the JS runtime, in Modes A
+// and B by `apply_media`, which builds a `MediaQueryData` and hands it to
+// `App._update_media` — the same call the docstring of `MediaQueryData` always
+// promised a renderer would make.
+//
+// It lived under client/transpile/ and was installed by the Mode C runtime alone,
+// which is why a Mode B app ran forever with width = height = 0 (#74). mount()
+// installs it now, so all three modes report.
 //
 // Reports are coalesced to one per animation frame and dropped when the snapshot
 // is unchanged. `resize` fires continuously while a window edge is dragged, and

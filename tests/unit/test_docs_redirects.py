@@ -113,7 +113,17 @@ def test_every_moved_page_kept_its_old_url() -> None:
         if not page.name.endswith(".en.md")
         and page.relative_to(DOCS).as_posix() not in mapped
         and page.name != "index.md"
-        and page.stem not in {"view", "state", "patches", "modes", "lists"}
+        and page.stem
+        not in {
+            "view",
+            "state",
+            "patches",
+            "modes",
+            "lists",
+            "responsive",
+            "overlays",
+            "gestures",
+        }
     )
     assert not unmapped, (
         "pages in tutorial/ or advanced/ with no redirect from their old URL "

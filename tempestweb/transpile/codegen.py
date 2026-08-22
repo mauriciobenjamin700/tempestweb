@@ -919,7 +919,9 @@ class _Generator:
             return self._assign(node, indent)
         if isinstance(node, ast.AugAssign):
             return self._augassign(node, indent)
-        if isinstance(node, (ast.Pass, ast.AnnAssign)):
+        if isinstance(node, ast.AnnAssign):
+            return self._annassign(node, indent)
+        if isinstance(node, ast.Pass):
             return []
         raise TranspileError(
             f"statement {type(node).__name__} is not supported", node, self.filename
@@ -1262,6 +1264,30 @@ class _Generator:
             target,
             self.filename,
         )
+
+    def _annassign(self, node: ast.AnnAssign, indent: int) -> list[str]:
+        """Emit an annotated assignment (``total: int = 0`` → ``const total = 0;``).
+
+        The annotation itself has no JS counterpart and is dropped; the *value*
+        must not be. This used to be grouped with ``pass`` and emitted nothing at
+        all, so a typed local — which this repo's own style rules ask for — was
+        silently deleted from the generated module and only surfaced in the
+        browser as ``ReferenceError: <name> is not defined``.
+
+        A bare declaration with no value (``total: int``) is a type statement
+        with nothing to run, so it still emits nothing.
+
+        Args:
+            node: The annotated assignment.
+            indent: The current indentation depth.
+
+        Returns:
+            The emitted JS lines (empty for a value-less declaration).
+        """
+        if node.value is None:
+            return []
+        value = self.expr(node.value, indent)
+        return self._assign_target(node.target, value, _INDENT * indent, indent)
 
     def _augassign(self, node: ast.AugAssign, indent: int) -> list[str]:
         """Emit an augmented assignment (``x += 1`` → ``x += 1;``)."""

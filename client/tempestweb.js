@@ -9,14 +9,18 @@
 import {
   applyPatches,
   buildElement,
+  syncContainerGestures,
   positionAnchoredOverlays,
   repaintCanvases,
 } from "./dom.js";
 import { bindEvents } from "./events.js";
-import { installMedia } from "./media.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
+import { installCameras } from "./camera-widgets.js";
+import { installFocusTrap } from "./focus.js";
 import { installListEvents } from "./lists.js";
+import { installPageViews } from "./pages.js";
+import { installMedia } from "./media.js";
 import { installBaseTheme } from "./theme.js";
 import { installVirtualization } from "./virtualize.js";
 
@@ -164,8 +168,10 @@ export function mount(root, transport, initialNode = null) {
   const unbind = bindEvents(root, transport);
   const virtualization = installVirtualization(root, transport);
   const listEvents = installListEvents(root, transport);
+  const focusTrap = installFocusTrap(root);
+  const cameras = installCameras(root, transport);
+  const pageViews = installPageViews(root, transport);
   const router = installRouter(transport);
-  const media = installMedia(transport);
   if (typeof transport.onNavigate === "function") {
     transport.onNavigate((path) => router.navigateTo(path));
   }
@@ -180,6 +186,9 @@ export function mount(root, transport, initialNode = null) {
     virtualization.refresh();
     repaintCanvases(root);
     positionAnchoredOverlays(root);
+    syncContainerGestures(root);
+    focusTrap.sync();
+    cameras.sync();
   };
   scheduleFrame(afterLayout);
 
@@ -247,6 +256,14 @@ export function mount(root, transport, initialNode = null) {
     scheduleFrame(afterLayout);
   });
 
+  // Installed last, and deliberately: installMedia reports the viewport
+  // immediately, and in Mode C that report rebuilds the tree in-process. With no
+  // patch sink registered yet those patches were dropped while the runtime's own
+  // tree advanced — the DOM stayed at the pre-report render (measured: a Mode C
+  // app painted `0 x 0` until the first resize) and every later diff was
+  // computed against a tree the DOM did not have.
+  const media = installMedia(transport);
+
   return {
     root,
     unmount() {
@@ -256,8 +273,11 @@ export function mount(root, transport, initialNode = null) {
       unbind();
       virtualization.dispose();
       listEvents.dispose();
-      router.dispose();
+      focusTrap.dispose();
+      cameras.dispose();
+      pageViews.dispose();
       media.dispose();
+      router.dispose();
       if (tree != null && tree.parentNode === root) {
         root.removeChild(tree);
       }

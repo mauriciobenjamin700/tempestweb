@@ -324,3 +324,63 @@ test("a Menu is not dismissed by the scrim path (it has no scrim)", async () => 
   host.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   assert.deepEqual(events, []);
 });
+
+test("a MenuItem's icon is drawn before its label", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { bindEvents } = await import("../../client/events.js");
+  /** @type {import("../../client/transport.js").TWEvent[]} */
+  const events = [];
+  const transport = { onPatches() {}, sendEvent: (e) => events.push(e), async close() {} };
+
+  const menu = buildElement({
+    type: "Menu",
+    key: "row-menu",
+    props: {
+      items: [
+        { label: "Copy", value: "copy", icon: "check" },
+        { label: "Delete", value: "delete", icon: "delete" },
+      ],
+    },
+    children: [],
+  });
+  dom.root.appendChild(menu);
+  bindEvents(dom.root, transport);
+
+  // MenuItem declares three fields; the icon used to be dropped on the floor.
+  const items = menu.querySelectorAll('[data-tw-part="item"]');
+  const glyphs = menu.querySelectorAll('[data-tw-part="item"] > svg');
+  assert.equal(glyphs.length, 2);
+  assert.equal(glyphs[0].getAttribute("data-tw-icon"), "check");
+  assert.equal(glyphs[0].getAttribute("aria-hidden"), "true", "the label carries the meaning");
+  assert.ok(glyphs[0].querySelector("path,circle,rect,line,polyline"), "a real glyph, not an empty box");
+  assert.equal(
+    items[0].firstElementChild.tagName.toLowerCase(),
+    "svg",
+    "the glyph comes before the label",
+  );
+
+  // The label still reads back cleanly for the select event.
+  items[1].dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  assert.deepEqual(events, [
+    { type: "select", key: "row-menu", payload: { value: "delete", label: "Delete" } },
+  ]);
+});
+
+test("an item with no icon renders no glyph", () => {
+  withDocument();
+  const menu = buildElement({
+    type: "Menu",
+    key: "m",
+    props: { items: [{ label: "Plain", value: "p" }, { label: "Empty", value: "e", icon: "" }] },
+    children: [],
+  });
+
+  assert.equal(menu.querySelectorAll('[data-tw-part="item"] > svg').length, 0);
+  assert.equal(menu.querySelectorAll('[data-tw-part="item"]')[0].textContent, "Plain");
+});
+
+test("the base sheet lays an item out as glyph plus label", () => {
+  assert.match(BASE_THEME_CSS, /\[data-tw-part="item"\] > svg/);
+  assert.match(BASE_THEME_CSS, /\[data-tw-type="Menu"\] > \[data-tw-part="item"\],/);
+});

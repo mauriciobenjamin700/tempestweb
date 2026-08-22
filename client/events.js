@@ -11,15 +11,21 @@
 // dataTransfer and emits `drag`, and a `DragTarget`'s drop emits `drop` with the
 // payload it received.
 //
+// Pointer gestures live in client/gestures.js; `bindEvents` installs that
+// recognizer so a mount still has a single entry point for input.
+//
 // Verify in tests/client/ with a mock transport (jsdom dispatchEvent).
 
-import { GESTURE_TYPE, LONG_PRESS_MS, SWIPE_MIN_PX } from "./constants.js";
+import { installGestures } from "./gestures.js";
 import {
   DRAG_DATA_ATTR,
   DROP_TARGET_ATTR,
+  FIELD_ATTR,
   ITEM_ATTR,
   ITEM_VALUE_ATTR,
   KEY_ATTR,
+  PIN_LENGTH_ATTR,
+  REORDER_ATTR,
   TYPE_ATTR,
 } from "./dom.js";
 
@@ -120,15 +126,169 @@ function sendMenuSelection(event, root, transport) {
   if (key == null) {
     return false;
   }
+  const labelEl = item.querySelector(`[${ITEM_ATTR}="item-label"]`);
   transport.sendEvent({
     type: "select",
     key,
     payload: {
       value: item.getAttribute(ITEM_VALUE_ATTR) ?? "",
-      label: item.textContent ?? "",
+      label: (labelEl ?? item).textContent ?? "",
     },
   });
   return true;
+}
+
+/**
+ * Report a filled-in `PinInput` as a `complete` event, if it just filled up.
+ *
+ * `on_complete` is what a code screen wants: it submits the moment the last digit
+ * lands, without a button. The widget declares it and it never fired, because a
+ * PinInput used to render as an empty div — there was nothing to type into.
+ *
+ * Reported alongside the ordinary `change`, not instead of it: the app still
+ * wants each keystroke (that is what holds the value in state), and the extra
+ * event is the "and now it is complete" signal. It fires only on the transition
+ * *to* full — a keystroke inside an already-full field (a paste replacing it, a
+ * digit typed after the cap) does not report again.
+ *
+ * @param {EventTarget|null} target  The input that changed.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {void}
+ */
+function reportPinComplete(target, transport) {
+  const el = /** @type {HTMLInputElement|null} */ (target);
+  if (el == null || typeof el.getAttribute !== "function") {
+    return;
+  }
+  if (el.getAttribute(TYPE_ATTR) !== "PinInput") {
+    return;
+  }
+  const key = el.getAttribute(KEY_ATTR);
+  const length = Number.parseInt(el.getAttribute(PIN_LENGTH_ATTR) ?? "", 10);
+  const value = typeof el.value === "string" ? el.value : "";
+  if (key == null || !Number.isFinite(length) || length <= 0) {
+    return;
+  }
+  const full = value.length >= length;
+  const wasFull = el.__twPinFull === true;
+  el.__twPinFull = full;
+  if (!full || wasFull) {
+    return;
+  }
+  transport.sendEvent({ type: "complete", key, payload: { values: { value } } });
+}
+
+/**
+ * Report that a `FormField` should be validated, when its control loses focus.
+ *
+ * `on_validate` was declared and inert: the app could only validate on submit,
+ * so a form told the reader about a bad email after they had filled in six more
+ * fields. The client cannot validate by itself — a field's `validators` are
+ * Python callables that never cross the wire — so what it reports is the
+ * *occasion*: this field, this value, please check it. The handler runs the real
+ * validators and puts the message on the field's `error`.
+ *
+ * `focusout` and not `blur`, because only the former bubbles to the delegation
+ * root; and leaving a field is the moment that does not interrupt typing.
+ *
+ * @param {EventTarget|null} target  The control that lost focus.
+ * @param {HTMLElement} root         The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {void}
+ */
+function reportFieldValidation(target, root, transport) {
+  const field = closestWithAttr(target, root, FIELD_ATTR);
+  if (field == null) {
+    return;
+  }
+  const key = field.getAttribute(KEY_ATTR);
+  const name = field.getAttribute(FIELD_ATTR);
+  if (key == null || name == null || name === "") {
+    return;
+  }
+  const control = /** @type {HTMLInputElement|null} */ (target);
+  const value = control != null && typeof control.value === "string" ? control.value : "";
+  transport.sendEvent({
+    type: "validate",
+    key,
+    payload: { field: name, value },
+  });
+}
+
+/** The dataTransfer type carrying the dragged item's position within its list. */
+const REORDER_MIME = "text/x-tw-reorder";
+
+/**
+ * Read a drag between a `ReorderableList`'s children as a reorder, if it is one.
+ *
+ * `on_reorder` was declared by the core and never fired: the HTML5 drag contract
+ * existed for `Draggable`/`DragTarget`, but a reorderable list's children are
+ * plain items — the list, not the item, is what declares the handler, and the
+ * event it wants is a pair of positions.
+ *
+ * Positions are computed from the DOM at event time rather than stamped onto the
+ * children: items arrive and leave through Insert/Remove patches, so any index
+ * written onto a child goes stale the moment the list changes.
+ *
+ * @param {DragEvent} event  The dragstart / drop event.
+ * @param {HTMLElement} root The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @param {"start"|"drop"} phase  Which half of the gesture this is.
+ * @returns {boolean}        True when the event belonged to a reorderable list.
+ */
+function handleReorder(event, root, transport, phase) {
+  const item = closestChildOfReorderable(event.target, root);
+  if (item == null) {
+    return false;
+  }
+  const list = /** @type {HTMLElement} */ (item.parentElement);
+  const index = Array.prototype.indexOf.call(list.children, item);
+  if (phase === "start") {
+    if (event.dataTransfer) {
+      event.dataTransfer.setData(REORDER_MIME, String(index));
+      event.dataTransfer.effectAllowed = "move";
+    }
+    return true;
+  }
+  event.preventDefault();
+  const raw = event.dataTransfer ? event.dataTransfer.getData(REORDER_MIME) : "";
+  const from = Number.parseInt(raw, 10);
+  const key = list.getAttribute(KEY_ATTR);
+  if (key == null || !Number.isFinite(from) || from === index) {
+    return true;
+  }
+  transport.sendEvent({
+    type: "reorder",
+    key,
+    payload: { from_index: from, to_index: index },
+  });
+  return true;
+}
+
+/**
+ * Find the direct child of a `ReorderableList` containing `target`.
+ *
+ * The pointer is usually over something nested inside the item, and the item is
+ * whatever child of the list that subtree hangs from.
+ *
+ * @param {EventTarget|null} target  The event's target.
+ * @param {HTMLElement} root         The delegation root.
+ * @returns {?HTMLElement}           The list item, or null.
+ */
+function closestChildOfReorderable(target, root) {
+  let node = /** @type {Node|null} */ (target);
+  while (node != null && node.nodeType !== 1) {
+    node = node.parentNode;
+  }
+  let el = /** @type {HTMLElement|null} */ (node);
+  while (el != null && el !== root) {
+    const parent = el.parentElement;
+    if (parent != null && parent.hasAttribute?.(REORDER_ATTR)) {
+      return el;
+    }
+    el = parent;
+  }
+  return null;
 }
 
 /** The dataTransfer type carrying a `Draggable`'s payload across a drag. */
@@ -205,67 +365,6 @@ function keyedAncestor(target, root) {
 }
 
 /**
- * Find the nearest ancestor-or-self GestureDetector element (keyed + typed).
- *
- * @param {EventTarget|null} target  The event's target node.
- * @param {HTMLElement} root         The delegation root.
- * @returns {?string}                The gesture widget's key, or null.
- */
-function gestureAncestor(target, root) {
-  let node = /** @type {Node|null} */ (target);
-  while (node != null && node.nodeType !== 1) {
-    node = node.parentNode;
-  }
-  let el = /** @type {HTMLElement|null} */ (node);
-  while (el != null) {
-    if (
-      el.getAttribute &&
-      el.getAttribute(TYPE_ATTR) === GESTURE_TYPE &&
-      el.hasAttribute(KEY_ATTR)
-    ) {
-      return el.getAttribute(KEY_ATTR);
-    }
-    if (el === root) {
-      break;
-    }
-    el = el.parentElement;
-  }
-  return null;
-}
-
-/**
- * Classify a completed pointer interaction into a gesture TWEvent.
- *
- * Swipe wins when travel crosses `SWIPE_MIN_PX` (direction from the dominant
- * axis); otherwise a hold past `LONG_PRESS_MS` is a long press, and a quick
- * release is a tap. Coordinates are the press origin.
- *
- * @param {{x:number, y:number, t:number}} start  The pointerdown origin.
- * @param {{x:number, y:number, t:number}} end    The pointerup point.
- * @returns {{type:string, payload:Object}}        The gesture type + payload.
- */
-function classifyGesture(start, end) {
-  const dx = Math.round(end.x - start.x);
-  const dy = Math.round(end.y - start.y);
-  const dist = Math.hypot(dx, dy);
-  if (dist >= SWIPE_MIN_PX) {
-    const horizontal = Math.abs(dx) >= Math.abs(dy);
-    const direction = horizontal
-      ? dx > 0
-        ? "right"
-        : "left"
-      : dy > 0
-        ? "down"
-        : "up";
-    return { type: "swipe", payload: { direction, dx, dy } };
-  }
-  if (end.t - start.t >= LONG_PRESS_MS) {
-    return { type: "long_press", payload: { x: Math.round(start.x), y: Math.round(start.y) } };
-  }
-  return { type: "tap", payload: { x: Math.round(start.x), y: Math.round(start.y) } };
-}
-
-/**
  * Build the TWEvent payload for a captured DOM event.
  *
  * `input`/`change` carry the control's current `value`; other event types carry an
@@ -324,14 +423,27 @@ export function bindEvents(root, transport) {
         key,
         payload: payloadFor(domType, event.target),
       });
+      if (domType === "input" || domType === "change") {
+        reportPinComplete(event.target, transport);
+      }
     };
     root.addEventListener(domType, handler);
     bound.push([domType, handler]);
   }
 
+  /** @param {FocusEvent} event */
+  const onFocusOut = (event) => {
+    reportFieldValidation(event.target, root, transport);
+  };
+  root.addEventListener("focusout", onFocusOut);
+  bound.push(["focusout", onFocusOut]);
+
   const bindDrag = () => {
     /** @param {DragEvent} event */
     const onDragStart = (event) => {
+      if (handleReorder(event, root, transport, "start")) {
+        return;
+      }
       const source = closestWithAttr(event.target, root, DRAG_DATA_ATTR);
       if (source == null) {
         return;
@@ -349,7 +461,8 @@ export function bindEvents(root, transport) {
 
     /** @param {DragEvent} event */
     const onDragOver = (event) => {
-      if (closestWithAttr(event.target, root, DROP_TARGET_ATTR) == null) {
+      const overItem = closestChildOfReorderable(event.target, root) != null;
+      if (!overItem && closestWithAttr(event.target, root, DROP_TARGET_ATTR) == null) {
         return;
       }
       // Without this the browser refuses the drop and no `drop` ever fires.
@@ -361,6 +474,9 @@ export function bindEvents(root, transport) {
 
     /** @param {DragEvent} event */
     const onDrop = (event) => {
+      if (handleReorder(event, root, transport, "drop")) {
+        return;
+      }
       const target = closestWithAttr(event.target, root, DROP_TARGET_ATTR);
       if (target == null) {
         return;
@@ -384,35 +500,12 @@ export function bindEvents(root, transport) {
   };
   bindDrag();
 
-  /** @type {Map<number, {key: string, x: number, y: number, t: number}>} */
-  const pending = new Map();
-  const now = () => (globalThis.performance?.now?.() ?? 0);
-
-  /** @param {PointerEvent} event */
-  const onPointerDown = (event) => {
-    const key = gestureAncestor(event.target, root);
-    if (key == null) {
-      return;
-    }
-    pending.set(event.pointerId, { key, x: event.clientX, y: event.clientY, t: now() });
-  };
-  /** @param {PointerEvent} event */
-  const onPointerUp = (event) => {
-    const start = pending.get(event.pointerId);
-    if (start === undefined) {
-      return;
-    }
-    pending.delete(event.pointerId);
-    const { type, payload } = classifyGesture(start, {
-      x: event.clientX,
-      y: event.clientY,
-      t: now(),
-    });
-    transport.sendEvent({ type, key: start.key, payload });
-  };
-  root.addEventListener("pointerdown", onPointerDown);
-  root.addEventListener("pointerup", onPointerUp);
-  bound.push(["pointerdown", onPointerDown], ["pointerup", onPointerUp]);
+  // Pointer gestures — tap / swipe / long press / double tap / pan / pinch — are
+  // one recognizer in client/gestures.js, because they share one state machine:
+  // the same pointerdown may become any of them, and only the pointers still
+  // down decide which. Installed from here so `bindEvents` stays the single
+  // entry point a mount needs.
+  const gestures = installGestures(root, transport);
 
   /**
    * Dismiss the top-most modal overlay on Escape.
@@ -435,6 +528,7 @@ export function bindEvents(root, transport) {
     for (const [domType, handler] of bound) {
       root.removeEventListener(domType, handler);
     }
+    gestures.dispose();
     if (doc != null) {
       doc.removeEventListener("keydown", onKeyDown);
     }

@@ -17,13 +17,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from tempest_core import App, Widget
-from tempest_core.theme import MediaQueryData
+from tempest_core import App, MediaQueryData, Widget
 from tempest_core.widgets.events import Event, EventValidationError, parse_event
 from tempestweb.runtime.routing import path_to_routes
 from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS
 
-__all__ = ["coerce_event", "apply_scroll", "apply_navigate", "apply_media"]
+__all__ = ["coerce_event", "apply_media", "apply_scroll", "apply_navigate"]
 
 
 def apply_navigate(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload

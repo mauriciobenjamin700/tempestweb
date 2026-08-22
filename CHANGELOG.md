@@ -4,40 +4,392 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
-## [0.70.0] — 2026-08-22
+## [0.77.2] — 2026-08-22
+
+### Fixed
+
+- **Um reporte de viewport por frame, e nenhum quando nada mudou.** `resize`
+  dispara continuamente enquanto a borda da janela é arrastada, e no Modo B cada
+  reporte é ida-e-volta no socket mais rebuild e diff — o fluxo que sai de graça
+  no Modo C não sai lá. Os reportes passam a colapsar num por animation frame, e
+  um frame cujo snapshot é igual ao último enviado não reporta nada.
+
+- **`apply_media` recusa booleano em campo numérico.** `isinstance(True, int)` é
+  verdadeiro em Python, então o Pydantic aceita `{"width": true}` como
+  `width=1.0` — medido. A validação passou a ser campo a campo: número que não é
+  número, ou tipo errado em qualquer campo, descarta o payload inteiro em vez de
+  envenenar o contexto com um snapshot parcial.
+
+  Os dois vêm do PR paralelo #84, que resolveu a issue #74 por outro caminho;
+  ficou a estrutura desta base com o throttle e a validação de lá, mais os testes
+  que os cobrem (rajada de resize, frame sem mudança, payload parcial e
+  malformado).
+
+## [0.76.0] — 2026-08-22
+
+Os dois últimos handlers inertes: a câmera.
+
+### Fixed
+
+- **`CameraPreview` e `QrScanner` renderizavam caixas vazias** (issue #77,
+  item 1 — o último). Os dois declaram handler (`on_frame`, `on_scan`) e o
+  renderizador DOM não os conhecia: nenhum stream, nenhum preview, nada para
+  amostrar ou decodificar. Ambos são folhas da IR, então o renderizador é dono do
+  que vai dentro — um `<video>` tocando o stream, como um `ProgressBar` é dono do
+  próprio fill.
+
+  O stream abre quando o widget aparece e **fecha quando ele sai**, o que aqui
+  importa mais que na maioria dos recursos: câmera aberta é luz acesa no celular
+  de alguém.
+
+- **`on_frame` funciona.** O preview amostra o vídeo num canvas a cada
+  `frame_interval_ms` e reporta `{width, height, data, rotation}` com o frame em
+  base64 — o `CameraFrameEvent` do core. `facing` vira o `facingMode` do
+  `getUserMedia`.
+
+- **`on_scan` funciona**, usando o `BarcodeDetector` do próprio navegador, e
+  reporta a **mudança** de código, não a presença: um QR fica no enquadramento
+  por dezenas de frames, e reportar cada um transformaria uma leitura em dezenas
+  de chamadas de handler.
+
+  Onde o `BarcodeDetector` não existe (hoje, tudo fora de Chrome/Android) o
+  widget mostra a câmera e **avisa no console**, uma vez. Não há decoder de
+  reserva de propósito: este cliente não embute dependência de runtime, e a
+  alternativa honesta é `CameraPreview` + decodificação própria sobre os frames.
+
+- **Permissão negada e API ausente falham alto.** `getUserMedia` que rejeita
+  avisa com a mensagem do browser e não deixa `<video>` órfão; página sem
+  `mediaDevices` (contexto inseguro) avisa uma vez para a página, não uma por
+  widget.
 
 ### Added
 
-- **`app.media` passa a valer nos Modos A e B** (#74). O docstring do
-  `MediaQueryData` prometia que o renderizador o mantinha atualizado, e o
-  cliente já sabia reportar o viewport desde o Modo C — mas nada neste pacote
-  chamava `App._update_media`. Um app server-side rodava para sempre no snapshot
-  default, `width` e `height` em `0.0`: uma `view` responsiva não tinha largura
-  para decidir, e `Scaffold(scroll=True)` não tinha altura para limitar a
-  moldura, porque `Style` não tem `100vh`.
+- **`examples/camera_demo`** — preview com contador de frames e tamanho do último,
+  mais um leitor de QR com histórico. Verificado em Chrome real com um stream de
+  `canvas.captureStream()` e um `BarcodeDetector` stub (não há câmera neste
+  ambiente): 4 frames em 2,5s no intervalo de 500ms, último `320 × 240` com 2064
+  caracteres base64, dois códigos deduplicados na ordem certa, `<video>` com
+  `object-fit: cover`.
 
-  Três peças fecham o circuito:
+### Docs
 
-  - `client/media.js` saiu de `client/transpile/` para o diretório
-    compartilhado — é um módulo dos três modos, e o artefato Modo C já copia
-    `client/*.js`. Entra em `_CLIENT_ASSETS`, sai de `_TRANSPILE_ASSETS`.
-  - `mount()` em `client/tempestweb.js` instala o reporting, então Modo A e B
-    passam a emitir o evento `media` que o Modo C já emitia.
-  - `apply_media` em `tempestweb/runtime/events.py`, com o branch
-    correspondente em `AppSession.dispatch` (Modo B) e
-    `WasmRuntime.dispatch_event` (Modo A), ao lado de `scroll` e `navigate`.
+- A página de capacidades (PT + EN) ganhou "Preview ao vivo e leitor de QR",
+  separando a **capacidade** (`camera.capture()`, uma foto) dos **widgets** (a
+  câmera ligada), com o orçamento de rede do `frame_interval_ms` e o aviso sobre
+  o `BarcodeDetector`.
 
-  Payload parcial mantém os defaults; payload com tipo errado é ignorado
-  inteiro, em vez de gravar um snapshot pela metade que a `view` usaria para
-  escolher layout.
+## [0.75.0] — 2026-08-22
+
+A paleta que um app declara agora chega aos componentes — nos dois modos Python.
+
+### Fixed
+
+- **O Modo A não tinha como receber tema nenhum** (issue #77, item 3). O
+  `AppSession` aceita `theme=` desde a 0.66.0 e o `WasmRuntime` não aceitava
+  nada: um app em Modo A renderizava botões roxos-baseline por construção, sem
+  caminho para a própria paleta. `WasmRuntime(..., theme=)` fecha isso, e
+  `bootstrap` o repassa.
+
+- **Os artefatos gerados ignoravam a paleta do app.** O `server.py` do Modo B
+  chamava `create_app(make_state, view, title=...)` e o `bootstrap.js` do Modo A
+  chamava `bootstrap(make_state(), view, ...)`, os dois sem tema — então
+  declarar uma paleta não tinha efeito. Ambos passam a ler `app.THEME` (opcional)
+  e entregá-la nas duas pontas: à árvore (componente resolve cor em **Python**) e
+  à página (os tokens `--tw-*` que a folha base lê). No Modo A a página é
+  estática e o app só existe depois do Pyodide, então o CSS vem do
+  `WasmAppHandle.theme_css()` e é injetado antes do primeiro mount.
+
+- **`examples/theme-switcher` mostrava botões roxos com accent teal.** A causa
+  não era o caminho do tema: um `Theme` carrega um **conjunto de tokens** e
+  alguns campos soltos de conveniência (`primary`, `background`, …), e os
+  componentes leem os tokens. O exemplo montava o tema preenchendo só os campos
+  soltos, então a árvore inteira ficava na paleta baseline. Passou a usar
+  `Theme.from_seed`. Medido em Chrome: escolher o swatch teal leva o botão de
+  `rgb(88, 71, 133)` para `rgb(28, 176, 163)`.
+
+### Added
+
+- **Convenção `THEME`**: um módulo de app que expõe `THEME: Theme` tem a paleta
+  entregue pelo host, sem configurar nada no artefato. `examples/theme-switcher`
+  declara a sua, então o Modo A abre já no azul da marca (medido:
+  `--tw-primary: #1c4ab0` e botão `rgb(28, 74, 176)` no primeiro paint, com o
+  `<style id="tw-app-theme">` presente).
+
+- **`tempestweb/html` entrou no bundle do Modo A**, porque é de lá que sai o
+  emissor de tokens de tema. Python puro sobre o core, nenhuma dependência nova;
+  o guard de fechamento do bundle (0.67.0) pegou a falta na hora.
+
+### Docs
+
+- A página de temas ganhou "Declare o tema, e o host o entrega" (PT + EN), com
+  os dois avisos que custam tempo: `Theme(primary=...)` **não** é
+  `Theme.from_seed(...)` (campo solto não é token, e é o token que pinta), e tema
+  trocado em runtime repinta os componentes mas não reescreve os tokens da
+  página.
+
+## [0.74.0] — 2026-08-22
+
+Os gestos multi-ponteiro que o core declarava e o cliente nunca reconheceu.
+
+### Fixed
+
+- **`on_pan`, `on_scale`, `on_double_tap` e `on_interaction` funcionam**
+  (issue #77, item 1 — o último bloco de gestos). O cliente rastreava **um**
+  ponteiro e só classificava tap / swipe / long press: um `PanHandler` era uma
+  caixa inerte, uma pinça não existia, e o duplo toque — o atalho que toda
+  superfície de zoom precisa — não era detectado em nenhum widget.
+
+  Agora é **um** reconhecedor (`client/gestures.js`), porque os gestos
+  compartilham uma máquina de estado: o mesmo `pointerdown` pode virar tap, pan,
+  pinça ou a segunda metade de um duplo toque, e só os ponteiros ainda em contato
+  decidem qual. Dois reconhecedores no mesmo root veriam metade da história cada.
+  O reconhecimento de tap/swipe/long-press saiu de dentro do `events.js` para lá,
+  sem mudança de comportamento — `bindEvents` continua sendo a única porta de
+  entrada de input que um mount usa.
+
+- **Gesto contínuo custava uma ida e volta por `pointermove`.** `pan`,
+  `scale` e `interaction` passam a ser reportados no máximo uma vez por frame,
+  mantendo o **último** valor: reportar o primeiro faria o gesto atrasar e depois
+  pular.
+
+- **Largar uma pinça deixava a app um passo atrás.** O pendente do frame é
+  descarregado quando um ponteiro sai. Medido no Chrome com dois dedos de
+  verdade (via CDP): uma pinça de 100px → 200px assentava em **1,5×** antes, e
+  fecha em **2,00×** agora.
+
+- **Uma superfície de gesto não recebia `pointermove` no celular.** Um browser
+  não manda nada enquanto está ocupado rolando a própria página; a folha base
+  agora tira o `touch-action` de `PanHandler`, `ScaleHandler` e
+  `InteractiveViewer` — e **só** desses. `GestureDetector` fica de fora de
+  propósito: tap, swipe e long press convivem com a rolagem, e tirar o
+  `touch-action` dele quebraria o scroll de qualquer lista que envolva as linhas
+  num detector.
 
 ### Changed
 
-- **O reporting de viewport passa a ser coalescido.** `resize` dispara
-  continuamente enquanto se arrasta a borda da janela, e em Modo B cada report é
-  ida-e-volta no socket mais rebuild e diff — o fluxo que era grátis no Modo C
-  não é grátis lá. Rajada colapsa em um report por frame, e um frame cujo
-  snapshot não mudou não reporta nada. `dispose()` cancela o frame pendente.
+- **`examples/gesture_demo`** passou a ter as três superfícies (discreta, pan e
+  viewer) com o estado de cada uma na tela. Verificado em Chrome real: arrastar
+  o `PanHandler` com o mouse acumula exatamente o deslocamento aplicado
+  (`offset 100, 30`), dois cliques rápidos no pad viram `tap` → `double tap`, e
+  no viewer a pinça de dois dedos fecha em 2,00× enquanto um dedo reporta
+  `scale=1` com o foco onde o dedo está.
+
+### Docs
+
+- A página "Arrastar, reordenar, paginar" ganhou a seção de gestos de ponteiro,
+  com a tabela widget → handler → evento e as três coisas que decidem se o gesto
+  fica bom: `on_pan` é relativo, `on_interaction` é `ScaleEvent` mesmo no pan, e
+  `touch-action` sai só das superfícies contínuas.
+
+## [0.73.0] — 2026-08-22
+
+Um campo de código que não existia, e um formulário que só falava no fim.
+
+### Fixed
+
+- **`PinInput` renderizava como uma `div` vazia** (issue #77, item 1). O widget
+  declara `length`, `value`, `secure`, `on_change` e `on_complete`, e o
+  renderizador DOM não o conhecia: não havia o que digitar, então nenhum dos
+  dois handlers era alcançável. Agora é um `<input>` de verdade com
+  `maxlength`, `inputmode="numeric"` e `autocomplete="one-time-code"` — um
+  campo, não `length` caixinhas, porque é isso que a plataforma recompensa: o
+  browser (e o iOS/Android) oferece preencher o código do SMS, o teclado
+  numérico aparece, e colar o código inteiro funciona. A folha base espaça os
+  caracteres para continuar lendo como campo de código.
+
+- **`on_complete` funciona.** O cliente reporta `complete` na **transição** para
+  cheio — uma tecla num campo já cheio não reporta de novo, e limpar rearma —
+  junto do `change` de sempre, porque a app ainda quer cada tecla.
+
+- **`on_validate` funciona** (issue #77, item 1). Um `FormField` não levava o
+  próprio `name` para o DOM, então o cliente não tinha o que reportar e a
+  validação só podia acontecer no submit: o leitor descobria o e-mail errado
+  depois de preencher seis campos. O cliente agora reporta a **ocasião** — este
+  campo, este valor — no `focusout` (que borbulha, ao contrário do `blur`), e o
+  handler roda os validadores de verdade. Ele não pode validar sozinho: os
+  validadores de um campo são callables Python que nunca atravessam o fio.
+
+- **O `error` de um `FormField` era prop que ninguém desenhava.** Ele não pode
+  virar filho sem deslocar o índice pelo qual o filho do campo é endereçado, então
+  vira atributo e a folha base o pinta sob o controle via `::after` — o mesmo
+  truque do título de um `Dialog` —, com `aria-invalid` no campo para a mensagem
+  ser anunciada e não apenas exibida.
+
+### Added
+
+- **Guard contra o backtick no `client/theme.js`.** O CSS base vive dentro de um
+  template literal, então um backtick num comentário é `SyntaxError` que derruba
+  o cliente inteiro — e a mensagem aponta para o comentário, não para o que
+  quebrou. Aconteceu três vezes escrevendo as seções novas desta leva; agora um
+  teste lê o arquivo como texto (importar o módulo seria a própria falha) e
+  falha explicando onde está o backtick.
+
+### Changed
+
+- **`examples/form`** ganhou o terceiro campo (código de convite, com
+  `PinInput` + `on_complete`) e `on_validate` nos dois primeiros, então o exemplo
+  passou a demonstrar validação ao sair do campo em vez de só no submit.
+  Verificado em Chrome real: sair do e-mail vazio pinta "Email is required" com
+  `aria-invalid=true` e `content` do `::after` medido; corrigir e sair limpa;
+  digitar `12` mantém "pending" e completar `1234` vira "accepted".
+
+## [0.72.1] — 2026-08-22
+
+### Fixed
+
+- **O artefato do Modo C não linkava ícone de aba.** Um browser não lê o
+  manifest para o ícone da aba: sem `rel="icon"` ele sonda `/favicon.ico`, e um
+  bundle estático não tem rota para responder — então todo carregamento de todo
+  deploy em Modo C abria o console com um 404 que ninguém pode resolver. A
+  0.67.0 corrigiu isso nos Modos A e B e passou reto pelo C. Agora um teste
+  parametrizado cobre os três shells: cada um linka `rel="icon"` e o arquivo
+  apontado existe no artefato.
+
+### Docs
+
+- A skill `validate-implementation` e o `CLAUDE.md` ganharam as armadilhas que
+  esta rodada de validação custou: **limpar service worker e caches antes de
+  medir** (um SW servia o build anterior — e, numa porta reusada, outro app
+  inteiro), verificar durante o gesto e não só no fim (posição intermediária de
+  scroll reportada faz a app desfazer o próprio movimento), e que um widget do
+  core **ignora kwarg que não declara** (`Container(on_click=...)` é aceito e
+  descartado, sem erro).
+
+## [0.72.0] — 2026-08-22
+
+Dois gestos de container que o core declarava e o DOM não tinha.
+
+### Fixed
+
+- **`on_reorder` funciona: uma `ReorderableList` pode ser ordenada arrastando**
+  (issue #77, item 1). O contrato HTML5 de drag existia para
+  `Draggable`/`DragTarget`, mas as linhas de uma lista reordenável são widgets
+  comuns — quem declara o handler é a **lista**, e o evento que ela quer é um
+  par de posições. O cliente marca as linhas arrastáveis depois de cada batch
+  (uma linha entra e sai por patch no *pai*, que nunca passa pelos props do
+  próprio pai) e lê um arrasto entre duas delas como
+  `{from_index, to_index}`. As posições são calculadas do DOM no momento do
+  evento: índice gravado na linha ficaria velho no primeiro remanejamento.
+
+- **`on_page_change` funciona: um `PageView` é um carrossel** (issue #77,
+  item 1). O widget renderizava como caixa comum — não havia página para
+  arrastar nem o que reportar. A folha base o transforma num scroller
+  horizontal com snap (um filho por largura de viewport), o que traz swipe de
+  touch, trackpad e `shift`+roda do próprio navegador; `client/pages.js` reporta
+  em qual página o scroll assentou, e `dom.js` rola até a página que a app
+  pediu, então o caminho é de mão dupla.
+
+  O reporte **espera o scroll parar**, e isso não é refinamento: uma rolagem é
+  um fluxo de eventos cujas posições intermediárias arredondam para a página que
+  está sendo deixada. Medido no Chrome: apertar "Next" enviava o clique e, no
+  mesmo instante, um `page_change` dizendo "voltei para a página anterior" — a
+  app desfazia o próprio movimento. Com o assentamento, `Next` leva 0 → 1 → 2
+  (scrollLeft 0 → 452 → 904) e o swipe de volta leva 2 → 1.
+
+### Added
+
+- **`examples/reorder_demo`** — uma lista de tarefas ordenada por arrasto, com
+  log dos movimentos. Verificado em Chrome real: arrastar a primeira linha sobre
+  a última reordena de fato (`Write the spec: 0 → 3`).
+
+- **Nova página de tutorial bilíngue "Gestos: arrastar, reordenar, paginar" /
+  "Gestures: drag, reorder, paginate"** (`docs/tutorial/gestures.md`), que
+  também documenta o par `Draggable`/`DragTarget`, que não tinha página.
+
+## [0.71.0] — 2026-08-22
+
+O resto do contrato de modal, e o ícone que um item de menu declarava.
+
+### Fixed
+
+- **Nenhum overlay prendia o foco** (issue #77, item 4). Um modal pintava sobre
+  a app com scrim e `Escape`, e o teclado continuava na página **atrás** dele:
+  `Tab` passeava por formulários que o leitor não podia ver, e fechar deixava o
+  foco em lugar nenhum. `client/focus.js` fecha as três obrigações — foco entra
+  ao abrir (primeiro controle, ou o próprio overlay quando não há nenhum),
+  `Tab`/`Shift+Tab` circulam dentro e embrulham nas pontas, e ao fechar o foco
+  volta para o elemento que abriu. Overlay não-modal (`Menu`, `Popover`,
+  `Toast`) é deixado em paz, porque roubar o foco quebraria o widget que o
+  abriu.
+
+  Medido em Chrome real no `examples/overlay_demo`: foco `open` → `close` do
+  diálogo ao abrir, `Tab` preso, `Escape` devolvendo para `open`; e na action
+  sheet, `Shift+Tab` do primeiro item embrulhando para o último.
+
+- **`Menu` e `ActionSheet` descartavam o `icon` do `MenuItem`** (issue #77,
+  item 2). `MenuItem` declara `label`, `value` e `icon`; o renderizador
+  desenhava os dois primeiros. Agora o ícone é resolvido pelos mesmos dois
+  registros do widget `Icon` (nome puro = Lucide, prefixo `material:` =
+  Material) e inserido antes do rótulo, que passou a viver num span próprio para
+  o `select` continuar lendo o rótulo limpo. O item virou uma linha flex com
+  gap, e o glifo tem tamanho fixo.
+
+### Added
+
+- **Nova página de tutorial bilíngue "Overlays e modais" / "Overlays and
+  modals"** (`docs/tutorial/overlays.md`): abrir e fechar pelo id, o que
+  `barrier=True` significa, o contrato de teclado, menu com ícone, overlay
+  ancorado e toast — mais o aviso de que um modal sem `on_dismiss` nem botão de
+  fechar prende o usuário.
+
+- **`examples/overlay_demo`** ganhou um `ActionSheet` com ícones e um handler de
+  seleção, então o exemplo cobre as duas metades que faltavam ao contrato de
+  modal.
+
+## [0.70.0] — 2026-08-22
+
+Um app em Modo A ou B não sabia o tamanho da própria janela.
+
+### Fixed
+
+- **`App.media` agora segue o browser nos três modos** (issue #74). A docstring
+  do `MediaQueryData` sempre prometeu que "o renderizador mantém isso
+  atualizado via `App._update_media` em resize / mudança de configuração", e
+  nada neste pacote chamava: o reporter (`media.js`) morava em
+  `client/transpile/` e só o runtime do Modo C o instalava. Um app em Modo A ou
+  B rodava para sempre com `width = height = 0`, então:
+
+  - uma `view` que escolhe layout por breakpoint escolhia sempre o mesmo ramo;
+  - um frame que se limita pela altura do viewport (`Scaffold(scroll=True)`, que
+    só segura `app_bar`/`bottom_bar` se a coluna em volta for limitada, e
+    `Style` não tem `100vh`) não tinha limite nenhum — a página inteira rolava e
+    as ações iam para o fim do documento.
+
+  O módulo sempre foi genérico (depende só do `transport`), então virou
+  `client/media.js` e o `mount()` compartilhado o instala. `apply_media` faz a
+  metade Python: valida o payload num `MediaQueryData` e entrega ao
+  `App._update_media`, que já pede o rebuild coalescido. Campo ausente mantém o
+  default (nenhum browser reporta `text_scale_factor`); payload malformado é
+  ignorado.
+
+  Medido nos três modos com Chrome real, no novo `examples/responsive_demo`:
+  1200×850 monta em `Row`, estreitar para 430px vira `Column`, e o snapshot
+  impresso na tela acompanha resize, orientação e `prefers-color-scheme`.
+
+- **O reporte inicial de viewport era descartado no Modo C.** O `installMedia`
+  reporta na hora, e no Modo C esse reporte reconstrói a árvore em processo —
+  mas ele era instalado antes de `transport.onPatches`, então os patches iam
+  para um sink inexistente **enquanto a árvore do runtime avançava**: o DOM
+  ficava no render anterior (`0 × 0` até o primeiro resize) e todo diff seguinte
+  era calculado contra uma árvore que o DOM não tinha. A instalação agora é a
+  última coisa que o `mount()` faz.
+
+- **Variável local tipada não era emitida pelo transpiler (Modo C).**
+  `ast.AnnAssign` estava agrupado com `pass` no dispatcher de statements, então
+  `layout: Widget = Row(...) if wide else Column(...)` — a forma que as regras
+  de estilo deste repo pedem — desaparecia do módulo gerado. Nada falhava no
+  transpile; o browser levantava `ReferenceError: layout is not defined`.
+  Declaração sem valor (`total: int`) segue emitindo nada.
+
+### Added
+
+- **`examples/responsive_demo`** — a mesma `view` em dois layouts, com a foto do
+  viewport impressa na tela, rodando nos três modos.
+
+- **Nova página de tutorial bilíngue "Layout responsivo" / "Responsive layout"**
+  (`docs/tutorial/responsive.md`): os seis campos de `app.media`, breakpoint por
+  conteúdo, frames com altura de viewport, tema do sistema, e como o evento
+  `media` chega em cada modo.
 
 ## [0.69.0] — 2026-08-22
 

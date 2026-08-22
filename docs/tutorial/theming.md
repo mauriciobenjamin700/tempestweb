@@ -272,6 +272,68 @@ depois.
     Variável que ninguém consome parece zelo e é dívida: o próximo leitor
     tem que ir ao CSS descobrir se ela faz algo.
 
+## Declare o tema, e o host o entrega
+
+O trecho acima monta o CSS à mão porque era o único caminho. Hoje há um mais
+curto, e ele cobre as duas metades: **declare `THEME` ao lado da sua `view`**.
+
+```python
+# app.py
+from dataclasses import dataclass
+
+from tempest_core import App, Theme, Widget
+from tempest_core.style import Color
+
+
+@dataclass
+class State:
+    """The app's state."""
+
+
+def make_state() -> State:
+    """Build the initial state."""
+    return State()
+
+
+def view(app: App[State]) -> Widget:
+    """Build the screen."""
+    ...
+
+
+#: A paleta da marca. O artefato a lê e entrega às duas pontas.
+THEME: Theme = Theme.from_seed(seed=Color(r=39, g=58, b=79))
+```
+
+O artefato gerado — tanto o do Modo B quanto o do Modo A — passa esse `THEME`
+para o app quando o constrói, e isso importa porque **componente resolve cor em
+Python**: um botão preenchido carrega o próprio fill como estilo inline. Tema que
+não chega na árvore é tema que não pinta, por mais tokens que a página tenha.
+
+As duas pontas que o host cobre:
+
+* **A árvore** — o tema vai para o `App`, então cada componente nasce com a sua
+  paleta.
+* **A página** — os tokens `--tw-*` que a folha base lê. No Modo B eles são
+  escritos no `<head>` na renderização; no Modo A a página é estática e o app só
+  existe depois do Pyodide subir, então o CSS é injetado no boot, antes do
+  primeiro mount.
+
+!!! warning "`Theme(primary=...)` não é a mesma coisa que `Theme.from_seed(...)`"
+    Um `Theme` carrega um **conjunto de tokens** (`tokens`) e alguns campos soltos
+    de conveniência (`primary`, `background`, …). **Os componentes leem os
+    tokens.** Montar um tema preenchendo só os campos soltos deixa a árvore
+    inteira na paleta baseline — foi exatamente esse o bug do exemplo
+    `theme-switcher`, cujos botões ficavam roxos enquanto o swatch dizia teal.
+    Use `Theme.from_seed`, ou construa o `TokenSet` explicitamente.
+
+!!! note "Tema dinâmico repinta os componentes, não os tokens da página"
+    `app.set_theme(...)` reconstrói a árvore, então tudo que resolve cor em Python
+    acompanha na hora. Os tokens `--tw-*`, porém, são escritos uma vez — eles
+    seguem o `THEME` declarado. Na prática: as cores dos widgets trocam, e os
+    estados que só a folha expressa (hover, foco) continuam na paleta declarada.
+    Se a troca em runtime é o coração do seu app, declare `THEME` com a paleta que
+    ele abre.
+
 ## Indicadores de progresso
 
 `ProgressBar` e `Spinner` não têm tamanho próprio: sem folha de estilo, os dois

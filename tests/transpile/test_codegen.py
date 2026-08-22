@@ -709,3 +709,112 @@ def test_dataclass_inheriting_a_state_named_base_uses_the_local_class() -> None:
     )
     assert "export class State extends State$ {" in js
     assert "export class Extra extends State {" in js
+
+
+def test_a_widget_refuses_a_kwarg_the_core_does_not_declare() -> None:
+    """Mode C answers what the core would answer, at build time.
+
+    Nothing revalidates the call at runtime — the generated builder destructures
+    the object and ignores what it does not name — so an undeclared kwarg would
+    be silence in Mode C and a ``ValidationError`` in Modes A and B.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from tempest_core import Container, Text\n\n\n"
+            "def panel() -> Container:\n"
+            '    return Container(key="box", children=[Text(content="x")])\n'
+        )
+    message = str(excinfo.value)
+    assert "does not accept `children`" in message
+    assert "its child slot is `child`" in message
+
+
+def test_the_child_slot_transpiles_and_reaches_the_builder() -> None:
+    """The form the core demands is the form that survives to the JS call."""
+    js = gen(
+        "from tempest_core import Container, Text\n\n\n"
+        "def panel() -> Container:\n"
+        '    return Container(key="box", child=Text(content="x"))\n'
+    )
+    assert 'Container({ key: "box", child: Text({ content: "x" }) })' in js
+
+
+def test_a_value_object_is_checked_too() -> None:
+    """The check is about core models, not only widgets."""
+    with pytest.raises(TranspileError, match="`Style` does not accept `padding_x`"):
+        gen(
+            "from tempest_core import Style\n\n\n"
+            "def style() -> Style:\n    return Style(padding_x=8.0)\n"
+        )
+
+
+def test_an_aliased_import_is_still_checked() -> None:
+    """The model is resolved by its core name, not by the local alias."""
+    with pytest.raises(TranspileError, match="`Box` does not accept `children`"):
+        gen(
+            "from tempest_core import Container as Box, Text\n\n\n"
+            "def panel() -> Box:\n"
+            '    return Box(children=[Text(content="x")])\n'
+        )
+
+
+def test_a_local_class_shadowing_a_widget_keeps_its_own_fields() -> None:
+    """A module that declares ``Container`` means its own, so nothing is checked."""
+    js = gen(
+        '@dataclass\nclass Container:\n    label: str = ""\n\n\n'
+        'def make() -> Container:\n    return Container(label="x")\n'
+    )
+    assert 'new Container({ label: "x" })' in js
+
+
+def test_a_core_helper_call_is_left_alone() -> None:
+    """Only a model with declared fields is checked; a function is not."""
+    js = gen(
+        "from tempest_core import t\n\n\n"
+        "def label() -> str:\n"
+        '    return t("hello", locale="pt-BR", translations={})\n'
+    )
+    assert 'return t("hello", { locale: "pt-BR", translations: {} });' in js
+
+
+def test_a_renamed_list_slot_passes_the_check() -> None:
+    """``Form`` declares ``fields``, and the builder now takes that name.
+
+    The builder used to have no child parameter at all, so every field of a
+    transpiled form was dropped on the floor.
+    """
+    js = gen(
+        "from tempest_core import Form, FormField\n\n\n"
+        "def signup() -> Form:\n"
+        '    return Form(key="signup", fields=[FormField(name="email")])\n'
+    )
+    assert "fields: [" in js
+    assert 'FormField({ name: "email" }),' in js
+
+
+def test_a_widget_prop_is_camelized_by_rule_not_by_table() -> None:
+    """Every multi-word widget field has to reach its builder's parameter.
+
+    A hand-kept rename table covered ``on_click``/``on_change`` and silently
+    dropped the rest: ``on_drop``, ``on_submit``, ``drag_data``, ``min_value``
+    and 30-odd more were emitted as snake_case into an object whose builder
+    destructures camelCase, so the prop simply did not exist at runtime.
+    """
+    js = gen(
+        "from tempest_core import Draggable, Text\n\n\n"
+        "def card() -> Draggable:\n"
+        '    return Draggable(key="c", drag_data="c7", child=Text(content="x"))\n'
+    )
+    assert 'dragData: "c7"' in js
+    assert "drag_data" not in js
+
+
+def test_a_style_keeps_the_wire_snake_case_keys() -> None:
+    """``Style`` is the wire shape itself, so its keys must not be camelized."""
+    js = gen(
+        "from tempest_core import Style\n\n\n"
+        "def styled() -> Style:\n    return Style(font_size=14.0, max_width=200.0)\n"
+    )
+    assert "font_size: 14.0" in js
+    assert "max_width: 200.0" in js
+    assert "fontSize" not in js

@@ -91,6 +91,34 @@ def _variant_axis(spec: WidgetSpec) -> str | None:
     return None
 
 
+def _children_expr(spec: WidgetSpec) -> str:
+    """Emit the expression that folds the widget's child slots into the IR array.
+
+    A node always carries one flat ``children`` list, but the Python slot it
+    comes from varies: ``Column`` declares ``children`` (already a list),
+    ``Container`` declares ``child`` (one widget or ``None``), ``Form`` declares
+    ``fields``, and ``RouteDrawer`` declares ``child`` then ``drawer``. The
+    builder therefore takes the *Python* names and folds them here, in
+    declaration order, so a view written against the core builds the same tree
+    in Mode C as in Modes A and B.
+
+    Args:
+        spec: The widget's spec.
+
+    Returns:
+        A JS expression evaluating to the node's ``children`` array.
+    """
+    parts = [
+        _camel(name) if is_list else f"({_camel(name)} == null ? [] : [{_camel(name)}])"
+        for name, is_list in spec.child_fields
+    ]
+    if not parts:
+        return "[]"
+    if len(parts) == 1:
+        return parts[0]
+    return f"{parts[0]}.concat({', '.join(parts[1:])})"
+
+
 def _builder(spec: WidgetSpec) -> str:
     """Emit the JS source for one widget's builder function."""
     # All wire prop names the builder writes through (required + defaulted).
@@ -104,8 +132,8 @@ def _builder(spec: WidgetSpec) -> str:
         args.append(f"{_camel(prop)} = {_lit(spec.props[prop])}")
     args.append("attrs = {}")
     args.append("style = null")
-    if spec.has_children:
-        args.append("children = []")
+    for name, is_list in spec.child_fields:
+        args.append(f"{_camel(name)} = {'[]' if is_list else 'null'}")
     for handler in spec.handlers:
         args.append(f"{_camel(handler)} = null")
 
@@ -131,7 +159,7 @@ def _builder(spec: WidgetSpec) -> str:
     lines.append(f"      style: {style_expr},")
     props_block = "\n".join(sorted(lines))
 
-    children_expr = "children" if spec.has_children else "[]"
+    children_expr = _children_expr(spec)
 
     # Non-wire handler map: DOM event type -> the live closure.
     handler_entries: list[str] = []

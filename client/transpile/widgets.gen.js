@@ -98,7 +98,7 @@ export function Autocomplete({ key = null, colorScheme = "primary", fieldVariant
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function BackdropFilter({ key = null, focusOrder = null, focusable = null, radius = 8.0, semantics = null, tag = null, attrs = {}, style = null, children = [] } = {}) {
+export function BackdropFilter({ key = null, focusOrder = null, focusable = null, radius = 8.0, semantics = null, tag = null, attrs = {}, style = null, child = null } = {}) {
   return {
     type: "BackdropFilter",
     key,
@@ -111,7 +111,7 @@ export function BackdropFilter({ key = null, focusOrder = null, focusable = null
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
   };
 }
 
@@ -120,7 +120,7 @@ export function BackdropFilter({ key = null, focusOrder = null, focusable = null
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Blur({ key = null, focusOrder = null, focusable = null, radius = 8.0, semantics = null, tag = null, attrs = {}, style = null, children = [] } = {}) {
+export function Blur({ key = null, focusOrder = null, focusable = null, radius = 8.0, semantics = null, tag = null, attrs = {}, style = null, child = null } = {}) {
   return {
     type: "Blur",
     key,
@@ -133,7 +133,7 @@ export function Blur({ key = null, focusOrder = null, focusable = null, radius =
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
   };
 }
 
@@ -268,7 +268,7 @@ export function Checkbox({ key = null, checked = false, colorScheme = "primary",
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function ClipPath({ key = null, focusOrder = null, focusable = null, radius = 8.0, semantics = null, shape = "rounded_rect", tag = null, attrs = {}, style = null, children = [] } = {}) {
+export function ClipPath({ key = null, focusOrder = null, focusable = null, radius = 8.0, semantics = null, shape = "rounded_rect", tag = null, attrs = {}, style = null, child = null } = {}) {
   return {
     type: "ClipPath",
     key,
@@ -282,7 +282,7 @@ export function ClipPath({ key = null, focusOrder = null, focusable = null, radi
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
   };
 }
 
@@ -312,7 +312,7 @@ export function Column({ key = null, focusOrder = null, focusable = null, semant
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Container({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [] } = {}) {
+export function Container({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null } = {}) {
   return {
     type: "Container",
     key,
@@ -324,7 +324,7 @@ export function Container({ key = null, focusOrder = null, focusable = null, sem
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
   };
 }
 
@@ -385,7 +385,7 @@ export function Dialog({ key = null, focusOrder = null, focusable = null, semant
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Dismissible({ key = null, direction = "left", focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onDismiss = null } = {}) {
+export function Dismissible({ key = null, direction = "left", focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onDismiss = null } = {}) {
   return {
     type: "Dismissible",
     key,
@@ -399,7 +399,7 @@ export function Dismissible({ key = null, direction = "left", focusOrder = null,
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "dismiss": onDismiss },
   };
 }
@@ -409,7 +409,7 @@ export function Dismissible({ key = null, direction = "left", focusOrder = null,
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function DoubleTapHandler({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onDoubleTap = null } = {}) {
+export function DoubleTapHandler({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onDoubleTap = null } = {}) {
   return {
     type: "DoubleTapHandler",
     key,
@@ -422,7 +422,7 @@ export function DoubleTapHandler({ key = null, focusOrder = null, focusable = nu
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "double_tap": onDoubleTap },
   };
 }
@@ -432,7 +432,7 @@ export function DoubleTapHandler({ key = null, focusOrder = null, focusable = nu
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function DragTarget({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onDrop = null } = {}) {
+export function DragTarget({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onDrop = null } = {}) {
   return {
     type: "DragTarget",
     key,
@@ -445,7 +445,7 @@ export function DragTarget({ key = null, focusOrder = null, focusable = null, se
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "drop": onDrop },
   };
 }
@@ -455,7 +455,7 @@ export function DragTarget({ key = null, focusOrder = null, focusable = null, se
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Draggable({ key = null, dragData = "", focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onDrag = null } = {}) {
+export function Draggable({ key = null, dragData = "", focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onDrag = null } = {}) {
   return {
     type: "Draggable",
     key,
@@ -469,7 +469,7 @@ export function Draggable({ key = null, dragData = "", focusOrder = null, focusa
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "drag": onDrag },
   };
 }
@@ -538,7 +538,7 @@ export function FilePicker({ key = null, colorScheme = "primary", fieldVariant =
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Form({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, onSubmit = null } = {}) {
+export function Form({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, fields = [], onSubmit = null } = {}) {
   return {
     type: "Form",
     key,
@@ -551,7 +551,7 @@ export function Form({ key = null, focusOrder = null, focusable = null, semantic
       style: style,
       tag: tag,
     },
-    children: [],
+    children: fields,
     __handlers: { "submit": onSubmit },
   };
 }
@@ -561,7 +561,7 @@ export function Form({ key = null, focusOrder = null, focusable = null, semantic
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function FormField({ name, key = null, error = "", focusOrder = null, focusable = null, label = "", semantics = null, tag = null, validators = [], attrs = {}, style = null, children = [], onValidate = null } = {}) {
+export function FormField({ name, key = null, error = "", focusOrder = null, focusable = null, label = "", semantics = null, tag = null, validators = [], attrs = {}, style = null, child = null, onValidate = null } = {}) {
   return {
     type: "FormField",
     key,
@@ -578,7 +578,7 @@ export function FormField({ name, key = null, error = "", focusOrder = null, foc
       tag: tag,
       validators: validators,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "validate": onValidate },
   };
 }
@@ -588,7 +588,7 @@ export function FormField({ name, key = null, error = "", focusOrder = null, foc
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function GestureDetector({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onTap = null, onDoubleTap = null, onLongPress = null, onSwipe = null } = {}) {
+export function GestureDetector({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onTap = null, onDoubleTap = null, onLongPress = null, onSwipe = null } = {}) {
   return {
     type: "GestureDetector",
     key,
@@ -604,7 +604,7 @@ export function GestureDetector({ key = null, focusOrder = null, focusable = nul
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "tap": onTap, "double_tap": onDoubleTap, "long_press": onLongPress, "swipe": onSwipe },
   };
 }
@@ -696,7 +696,7 @@ export function Input({ key = null, colorScheme = "primary", error = "", fieldVa
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function InteractiveViewer({ key = null, focusOrder = null, focusable = null, maxScale = 4.0, minScale = 0.5, semantics = null, tag = null, attrs = {}, style = null, children = [], onInteraction = null } = {}) {
+export function InteractiveViewer({ key = null, focusOrder = null, focusable = null, maxScale = 4.0, minScale = 0.5, semantics = null, tag = null, attrs = {}, style = null, child = null, onInteraction = null } = {}) {
   return {
     type: "InteractiveViewer",
     key,
@@ -711,7 +711,7 @@ export function InteractiveViewer({ key = null, focusOrder = null, focusable = n
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "interaction": onInteraction },
   };
 }
@@ -846,7 +846,7 @@ export function PageView({ key = null, focusOrder = null, focusable = null, page
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function PanHandler({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onPan = null } = {}) {
+export function PanHandler({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onPan = null } = {}) {
   return {
     type: "PanHandler",
     key,
@@ -859,7 +859,7 @@ export function PanHandler({ key = null, focusOrder = null, focusable = null, se
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "pan": onPan },
   };
 }
@@ -869,7 +869,7 @@ export function PanHandler({ key = null, focusOrder = null, focusable = null, se
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function PanHandlerWidget({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onPan = null } = {}) {
+export function PanHandlerWidget({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onPan = null } = {}) {
   return {
     type: "PanHandler",
     key,
@@ -882,7 +882,7 @@ export function PanHandlerWidget({ key = null, focusOrder = null, focusable = nu
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "pan": onPan },
   };
 }
@@ -922,7 +922,7 @@ export function PinInput({ key = null, colorScheme = "primary", fieldVariant = "
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Popover({ key = null, anchor = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onDismiss = null } = {}) {
+export function Popover({ key = null, anchor = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onDismiss = null } = {}) {
   return {
     type: "Popover",
     key,
@@ -936,7 +936,7 @@ export function Popover({ key = null, anchor = null, focusOrder = null, focusabl
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "dismiss": onDismiss },
   };
 }
@@ -1091,7 +1091,7 @@ export function Row({ key = null, focusOrder = null, focusable = null, semantics
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function SafeArea({ key = null, edges = ["top", "right", "bottom", "left"], focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [] } = {}) {
+export function SafeArea({ key = null, edges = ["top", "right", "bottom", "left"], focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null } = {}) {
   return {
     type: "SafeArea",
     key,
@@ -1104,7 +1104,7 @@ export function SafeArea({ key = null, edges = ["top", "right", "bottom", "left"
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
   };
 }
 
@@ -1113,7 +1113,7 @@ export function SafeArea({ key = null, edges = ["top", "right", "bottom", "left"
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function ScaleHandler({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onScale = null, onDoubleTap = null } = {}) {
+export function ScaleHandler({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onScale = null, onDoubleTap = null } = {}) {
   return {
     type: "ScaleHandler",
     key,
@@ -1127,7 +1127,7 @@ export function ScaleHandler({ key = null, focusOrder = null, focusable = null, 
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "scale": onScale, "double_tap": onDoubleTap },
   };
 }
@@ -1137,7 +1137,7 @@ export function ScaleHandler({ key = null, focusOrder = null, focusable = null, 
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function ScaleHandlerWidget({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [], onScale = null, onDoubleTap = null } = {}) {
+export function ScaleHandlerWidget({ key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onScale = null, onDoubleTap = null } = {}) {
   return {
     type: "ScaleHandler",
     key,
@@ -1151,7 +1151,7 @@ export function ScaleHandlerWidget({ key = null, focusOrder = null, focusable = 
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
     __handlers: { "scale": onScale, "double_tap": onDoubleTap },
   };
 }
@@ -1510,7 +1510,7 @@ export function Toast({ message, key = null, durationS = 2.5, focusOrder = null,
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Tooltip({ message, key = null, colorScheme = "neutral", focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, children = [] } = {}) {
+export function Tooltip({ message, key = null, colorScheme = "neutral", focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null } = {}) {
   return {
     type: "Tooltip",
     key,
@@ -1524,7 +1524,7 @@ export function Tooltip({ message, key = null, colorScheme = "neutral", focusOrd
       style: style,
       tag: tag,
     },
-    children: children,
+    children: (child == null ? [] : [child]),
   };
 }
 

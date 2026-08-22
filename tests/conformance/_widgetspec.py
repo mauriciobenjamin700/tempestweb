@@ -68,7 +68,12 @@ class WidgetSpec:
             builder must not fabricate a default (the caller passes them).
         handlers: The ``on_*`` prop names the widget declares.
         styled: Whether a bare build resolves a non-null ``style``.
-        has_children: Whether the widget accepts a ``children`` argument.
+        child_fields: The widget's child slots, in declaration order, each
+            paired with whether it holds a list. The IR node always carries a
+            flat ``children`` array, but the *Python* slot may be named
+            ``child`` (one widget), ``children``/``fields`` (a list), or several
+            at once (``RouteDrawer``: ``child`` then ``drawer``) — a builder
+            that only accepted ``children`` silently dropped every other form.
         build_args: The candidate kwargs used to build a bare instance.
     """
 
@@ -79,8 +84,32 @@ class WidgetSpec:
     required: tuple[str, ...]
     handlers: tuple[str, ...]
     styled: bool
-    has_children: bool
+    child_fields: tuple[tuple[str, bool], ...]
     build_args: dict[str, Any] = field(default_factory=dict)
+
+
+def _child_fields(
+    cls: type[WidgetBase], instance: WidgetBase
+) -> tuple[tuple[str, bool], ...]:
+    """The widget's child slots, in declaration order, with their arity.
+
+    ``child_field_names`` is a frozenset, so the order comes from
+    ``model_fields`` — the same order ``Widget.child_nodes()`` walks, which is
+    the order the slots must land in the IR's flat ``children`` array
+    (``RouteDrawer`` builds ``[child, drawer]``, never the reverse).
+
+    Args:
+        cls: The widget class.
+        instance: A bare-built instance, used to read each slot's arity.
+
+    Returns:
+        One ``(field name, holds a list)`` pair per child slot.
+    """
+    return tuple(
+        (name, isinstance(getattr(instance, name, None), list))
+        for name in cls.model_fields
+        if name in cls.child_field_names
+    )
 
 
 def _spec_for(name: str, cls: type[WidgetBase]) -> WidgetSpec | None:
@@ -101,7 +130,8 @@ def _spec_for(name: str, cls: type[WidgetBase]) -> WidgetSpec | None:
         if p in _CANDIDATE_ARGS and p in required_fields
     }
     try:
-        node = build(cls(**build_args))
+        instance = cls(**build_args)
+        node = build(instance)
     except Exception:  # noqa: BLE001 - unbuildable widgets are simply skipped
         return None
     wire = node.model_dump(mode="json")["props"]
@@ -123,10 +153,7 @@ def _spec_for(name: str, cls: type[WidgetBase]) -> WidgetSpec | None:
         required=required,
         handlers=handlers,
         styled=styled,
-        # The IR node always uses a `children` list; a widget is a container if
-        # it accepts children (`children`) or a single `child` (wrapped into the
-        # list by the core). Either way the JS builder takes a `children` array.
-        has_children="children" in params or "child" in params,
+        child_fields=_child_fields(cls, instance),
         build_args=build_args,
     )
 

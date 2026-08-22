@@ -4,6 +4,66 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.79.0] — 2026-08-22
+
+### Changed
+
+- **O Modo C passou a validar kwarg de widget no build, e o builder passou a
+  aceitar o slot de filho do core.** As duas metades do mesmo defeito: o Modo C
+  não tem Python em runtime, então o builder gerado desestrutura o objeto que
+  recebe e ignora toda chave que não nomeia. Enquanto todo builder aceitava
+  apenas `children`, `Container(child=...)` — a forma que o core exige —
+  **perdia a subárvore em silêncio**, e `Container(children=[...])` — que o core
+  recusa desde 0.14.0 — funcionava. `Form` era o caso extremo: seu slot é
+  `fields`, nenhum builder o declarava, então todo campo de formulário
+  transpilado ia para o chão. Agora cada builder declara o nome do próprio core
+  (`child`, `children`, `fields`, e `child` + `drawer` no `RouteDrawer`, nessa
+  ordem) e dobra os slots no array `children` da IR, enquanto o compilador
+  confere cada chamada de modelo do core contra os campos reais e falha com
+  `arquivo:linha`.
+- **Prop de widget passou a ser camelizada por regra, não por tabela.** O
+  transpiler mantinha uma lista de 9 renomeações à mão (`on_click`, `on_change`,
+  `max_length`, …) e emitia todo o resto em snake_case dentro de um objeto cujo
+  builder desestrutura camelCase — então a prop simplesmente não existia em
+  runtime. Eram **38 campos do core em 64 widgets**: `on_drop`, `on_drag`,
+  `on_tap`, `on_swipe`, `on_long_press`, `on_submit`, `on_validate`,
+  `on_reorder`, `on_page_change`, `drag_data`, `min_value`/`max_value` do
+  `Slider`, `focus_order` de todo widget, e mais. `Style`/`Color` continuam com a
+  chave snake_case do fio, que é o formato que eles próprios são.
+- **`RetryOptions` recusa kwarg que não declara** (`extra="forbid"`). Era
+  `ConfigDict(frozen=True)`, logo `extra="ignore"`: `RetryOptions(backoff=0.5)`
+  deixava a política nos defaults enquanto o código lia como se estivesse
+  ajustada — foi o que deixou a doc mentir por releases. A regra que fica: modelo
+  de **opção escrita pelo desenvolvedor** recusa nome desconhecido; modelo de
+  **payload lido do browser** continua ignorando extras, senão uma chave nova de
+  cliente novo quebra um Python antigo.
+
+### Migração
+
+- `Container(children=[...])`, `Draggable(children=[...])` e afins **falham no
+  build** do Modo C, com o slot certo na mensagem: troque para `child=`. Nos
+  Modos A e B essas chamadas já levantavam `ValidationError` — o Modo C só parou
+  de discordar.
+- `Container(child=...)` e `Form(fields=[...])` **passaram a renderizar** no Modo
+  C. Se você contornou o bug duplicando a árvore por modo, o contorno pode sair.
+- Handler de gesto e prop multi-palavra **passaram a chegar** no widget em Modo C
+  (`on_drop`, `drag_data`, `min_value`, `on_submit`, …). Se você duplicava lógica
+  por modo por causa disso, dá para unificar.
+- `RetryOptions(backoff=...)` levanta `ValidationError` nomeando o campo. O botão
+  equivalente é `base_delay` (espera antes do primeiro retry) ou `factor`
+  (multiplicador por tentativa).
+
+### Added
+
+- **Conformance de alcance**: um teste afirma que todo campo do core é um
+  parâmetro do builder gerado (exceto `theme`/`media`, que alimentam a resolução
+  de estilo MD3 dentro do próprio builder) — então campo novo no core que ninguém
+  regenerou falha em vez de virar prop morta.
+- **Conformance dos slots**: dois testes afirmam, contra o core vivo, que todo
+  builder gerado declara o nome de slot do core e o dobra no `children` da IR na
+  ordem de declaração (`RouteDrawer` constrói `[child, drawer]`, nunca o
+  contrário).
+
 ## [0.78.1] — 2026-08-22
 
 ### Fixed

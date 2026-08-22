@@ -127,8 +127,9 @@ async def submit_order(payload: dict[str, object]) -> dict[str, object]:
     `attempts` conta a primeira tentativa (`1` desliga o retry), `base_delay`
     é a espera antes do primeiro retry, `factor` multiplica a espera a cada
     falha, `max_delay` limita cada espera e `retry_statuses` diz quais status
-    merecem nova tentativa. O modelo **ignora** kwarg que não declara, então um
-    nome errado não levanta erro — ele simplesmente não configura nada.
+    merecem nova tentativa. Kwarg que o modelo não declara é **recusado** com
+    `ValidationError` nomeando o campo — a mesma resposta que um widget dá, para
+    nome errado não passar por configuração que não aconteceu.
 
 !!! tip "O corpo decodificado é `json_body`"
     `HttpResponse` é um modelo Pydantic com `status`, `ok`, `headers`, `text` e

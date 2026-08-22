@@ -140,6 +140,16 @@ Armadilhas já pagas neste repo:
   (`Container(on_click=...)` levanta `ValidationError` com o nome do campo). Antes
   era aceito e descartado em silêncio — se você vê o erro, ele está dizendo a
   verdade: use o widget que declara aquele handler.
+- **Slot de filho usa o nome do core, e o Modo C confere no build.** `child` no
+  `Container`/`Draggable`, `children` no `Column`/`Row`, `fields` no `Form`. O
+  builder JS gerado desestrutura e ignora chave que não nomeia, então kwarg
+  errado era silêncio no Modo C e `ValidationError` nos Modos A/B — desde 0.79.0
+  o compilador recusa com `arquivo:linha`. Builder novo sai de
+  `python -m tests.conformance._transpile_widgets`, nunca da mão.
+- **Modelo de opção do desenvolvedor recusa kwarg desconhecido; payload do
+  browser ignora.** `RetryOptions` é `extra="forbid"` (nome errado é bug e tem
+  que doer); `HttpResponse`, `Photo`, `Position` e afins continuam ignorando
+  extras, senão chave nova de cliente novo quebra Python antigo.
 - Golden de transpile compara **texto**, não validade: JS que o browser recusa a
   carregar passa a suíte inteira. Mudança no codegen fecha em
   `tests/transpile/test_generated_js_parses.py` (`node --check`), que cobre os dois

@@ -122,13 +122,35 @@ test("Container is a layout box with the semantic-tag escape hatch", () => {
     key: "nav",
     tag: "nav",
     attrs: { "hx-get": "/x" },
-    children: [Text({ content: "a" })],
+    child: Text({ content: "a" }),
   });
   assert.equal(node.type, "Container");
   assert.equal(node.props.tag, "nav");
   assert.deepEqual(node.props.attrs, { "hx-get": "/x" });
   assert.equal(node.props.style, null); // pure layout, no baked style
   assert.equal(node.children.length, 1);
+});
+
+test("a builder takes the core's own child slot, whatever it is named", () => {
+  const single = widgets.Container({ child: Text({ content: "a" }) });
+  assert.equal(single.children.length, 1, "Container folds `child` into children");
+  assert.equal(widgets.Container({}).children.length, 0, "no child means no children");
+
+  const wrapped = widgets.Draggable({
+    key: "card",
+    dragData: "card-7",
+    child: Text({ content: "task" }),
+  });
+  assert.equal(wrapped.children.length, 1, "Draggable declares `child`, not `children`");
+
+  const form = widgets.Form({
+    key: "signup",
+    fields: [widgets.FormField({ name: "email" }), widgets.FormField({ name: "pw" })],
+  });
+  assert.equal(form.children.length, 2, "Form's slot is `fields`");
+
+  const list = widgets.Column({ children: [Text({ content: "a" })] });
+  assert.equal(list.children.length, 1, "a `children` slot keeps its name");
 });
 
 test("Style fills the full shape with nulls; only set fields differ", () => {

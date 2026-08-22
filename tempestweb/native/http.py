@@ -58,6 +58,14 @@ _DEFAULT_RETRY_STATUSES: Final[frozenset[int]] = frozenset(
 class RetryOptions(BaseModel):
     """Retry / exponential-backoff policy for :func:`request`.
 
+    An unknown keyword is an error, not a silent no-op: this is a policy the
+    developer writes by hand, so ``RetryOptions(backoff=0.5)`` naming a field
+    that does not exist means the request runs with the defaults while the code
+    reads as if it were configured. Every widget in the tree already refuses a
+    kwarg it does not declare — a policy object gets the same answer. Payload
+    models parsed *from* the browser keep ignoring extras, because there a new
+    client key must not break an older Python.
+
     Attributes:
         attempts: Total attempts including the first try. ``1`` disables retry.
         base_delay: Seconds to wait before the first retry.
@@ -66,7 +74,7 @@ class RetryOptions(BaseModel):
         retry_statuses: HTTP status codes that should trigger a retry.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     attempts: int = Field(default=3, ge=1)
     base_delay: float = Field(default=0.2, ge=0.0)

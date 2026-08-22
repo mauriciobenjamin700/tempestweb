@@ -10,8 +10,10 @@ reviewed — the same regenerable-golden guarantee the wire fixtures use.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
+from tempestweb.transpile.codegen import _camel_name
 from tests.conformance import _transpile_components as components_gen
 from tests.conformance import _transpile_spacing as spacing_gen
 from tests.conformance import _transpile_widget_styles as styles_gen
@@ -94,3 +96,75 @@ def test_layout_components_are_available() -> None:
     )
     assert "HStack" in widgets_js
     assert "VStack" in widgets_js
+
+
+def test_every_builder_takes_the_core_child_slot() -> None:
+    """A builder's child parameter is the core's field name, not always ``children``.
+
+    The IR node carries one flat ``children`` array, which is why every builder
+    used to *accept* only ``children`` — and why a view written the way the core
+    demands (``Container(child=...)``, ``Form(fields=...)``) silently lost its
+    subtree in Mode C while working in Modes A and B. The parameter list is the
+    contract with the transpiler, so it is asserted against the live core.
+    """
+    source = widgets_gen.WIDGETS_MODULE.read_text(encoding="utf-8")
+    missing: list[str] = []
+    for name, spec in buildable_widgets().items():
+        signature = source.split(f"export function {name}({{", 1)
+        if len(signature) < 2:
+            continue
+        params = signature[1].split("} = {}) {", 1)[0]
+        for field_name, is_list in spec.child_fields:
+            camel = widgets_gen._camel(field_name)
+            default = "[]" if is_list else "null"
+            if f"{camel} = {default}" not in params:
+                missing.append(f"{name} does not take `{camel} = {default}`")
+    assert not missing, "\n".join(missing)
+
+
+def test_the_child_slot_lands_in_the_ir_children_array() -> None:
+    """Whatever the slot is called, the emitted node folds it into ``children``.
+
+    ``RouteDrawer`` is the case that pins the order: the core builds
+    ``[child, drawer]``, so a builder that concatenated them the other way would
+    render a drawer where the body belongs.
+    """
+    source = widgets_gen.WIDGETS_MODULE.read_text(encoding="utf-8")
+    for name, spec in buildable_widgets().items():
+        if not spec.child_fields:
+            continue
+        body = source.split(f"export function {name}({{", 1)
+        if len(body) < 2:
+            continue
+        emitted = body[1].split("\n}", 1)[0]
+        expected = f"children: {widgets_gen._children_expr(spec)},"
+        assert expected in emitted, f"{name} does not fold its slots as {expected}"
+
+
+def test_every_core_field_is_reachable_from_the_builder() -> None:
+    """A field the builder does not declare cannot be set from Mode C at all.
+
+    The transpiler camelizes a widget kwarg by rule, so this is the assertion
+    that ties the two sides together: if the core grows ``on_hover`` and the
+    builders are not regenerated, the transpiled call emits ``onHover`` into an
+    object nobody destructures and the handler is silently dead.
+
+    ``theme`` and ``media`` are the documented exception: they feed the Material
+    3 style resolution the builder runs itself (``resolveWidgetStyle``), so they
+    are inputs to generation, not props a caller passes.
+    """
+    source = widgets_gen.WIDGETS_MODULE.read_text(encoding="utf-8")
+    resolved_by_the_builder = {"theme", "media"}
+    unreachable: list[str] = []
+    for name, spec in buildable_widgets().items():
+        chunk = source.split(f"export function {name}({{", 1)
+        if len(chunk) < 2:
+            continue
+        params = chunk[1].split("} = {}) {", 1)[0]
+        declared = set(re.findall(r"([A-Za-z_$][\w$]*)\s*(?:=|,|$)", params))
+        for field_name in spec.cls.model_fields:
+            if field_name in resolved_by_the_builder:
+                continue
+            if _camel_name(field_name) not in declared:
+                unreachable.append(f"{name}.{field_name}")
+    assert not unreachable, "unreachable from Mode C: " + ", ".join(unreachable)

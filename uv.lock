@@ -2090,7 +2090,7 @@ wheels = [
 
 [[package]]
 name = "tempestweb"
-version = "0.78.1"
+version = "0.79.0"
 source = { editable = "." }
 dependencies = [
     { name = "tempest-core" },

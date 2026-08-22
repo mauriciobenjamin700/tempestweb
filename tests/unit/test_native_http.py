@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from tempestweb.native import (
     HttpResponse,
@@ -204,3 +205,30 @@ async def test_poll_exhausts_and_raises() -> None:
         )
     assert exc.value.code == "poll_exhausted"
     assert len(bridge.calls) == 3
+
+
+def test_retry_options_refuses_a_field_it_does_not_declare() -> None:
+    """A misnamed knob must fail loudly, not configure nothing.
+
+    ``RetryOptions`` is written by hand, so ``backoff=0.5`` — the name the docs
+    used for releases — quietly left the policy at its defaults while the code
+    read as if it had been tuned. Every widget already refuses an undeclared
+    kwarg; a policy object gets the same answer.
+    """
+    with pytest.raises(ValidationError) as excinfo:
+        RetryOptions(attempts=3, backoff=0.5)  # type: ignore[call-arg]
+    assert "backoff" in str(excinfo.value)
+
+
+def test_a_browser_payload_still_ignores_an_unknown_key() -> None:
+    """Forward compatibility is the opposite requirement on the way back.
+
+    A newer client sending a key an older Python does not know must not raise —
+    which is why the strictness lands on the option model, not on the payloads
+    parsed from the bridge.
+    """
+    response = HttpResponse.model_validate(
+        {"status": 200, "ok": True, "text": "hi", "json": {"a": 1}, "trailers": {}}
+    )
+    assert response.status == 200
+    assert response.json_body == {"a": 1}

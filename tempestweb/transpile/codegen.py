@@ -18,7 +18,9 @@ from __future__ import annotations
 import ast
 import json
 import re
+from typing import Any
 
+import tempest_core
 from tempestweb.transpile.errors import TranspileError
 
 __all__: list[str] = ["generate"]
@@ -104,6 +106,25 @@ _METHOD_RENAMES: dict[str, str] = {
 def _js_name(name: str) -> str:
     """Map a Python identifier to its JS spelling (API camelCase renames)."""
     return _NAME_MAP.get(name, name)
+
+
+def _camel_name(name: str) -> str:
+    """Camelize a core widget's field name the way its JS builder spells it.
+
+    The generated builders (``widgets.gen.js``) destructure every prop in
+    camelCase, so a widget kwarg has to be renamed by rule and not by table: a
+    hand-kept list covered ``on_click``/``on_change`` and quietly dropped
+    ``on_drop``, ``on_submit``, ``drag_data``, ``min_value`` and every other
+    multi-word field, because the builder simply ignores a key it does not name.
+
+    Args:
+        name: The Python field name.
+
+    Returns:
+        The camelCase spelling (``drag_data`` → ``dragData``).
+    """
+    head, *rest = name.split("_")
+    return head + "".join(part[:1].upper() + part[1:] for part in rest)
 
 
 def _param_names(args: ast.arguments, node: ast.AST, filename: str) -> list[str]:
@@ -283,6 +304,10 @@ class _Generator:
         # Stack of the caught-error variable names while emitting `except` bodies,
         # so a bare `raise` (re-raise) can `throw` the current exception.
         self._exc_vars: list[str] = []
+        # Local name → the `tempest_core` attribute it was imported from, so a
+        # keyword-only call can be checked against the real model's fields even
+        # when the import was aliased (`from tempest_core import Column as Col`).
+        self.core_imports: dict[str, str] = {}
 
     # -- expressions --------------------------------------------------------
 
@@ -831,17 +856,90 @@ class _Generator:
         length = f"Math.max(0, Math.ceil(({stop} - {start}) / {step}))"
         return f"Array.from({{ length: {length} }}, (_, i) => {start} + i * {step})"
 
+    def _core_target(self, node: ast.Call) -> object | None:
+        """Resolve the ``tempest_core`` object a bare-name call refers to.
+
+        Args:
+            node: The call being emitted.
+
+        Returns:
+            The live core object, or ``None`` when the call is not a bare name
+            imported from ``tempest_core`` (a locally declared class wins over
+            the import, exactly as in Python).
+        """
+        if not isinstance(node.func, ast.Name):
+            return None
+        local = node.func.id
+        if local in self.class_names or local not in self.core_imports:
+            return None
+        return getattr(tempest_core, self.core_imports[local], None)
+
+    def _check_core_kwargs(self, node: ast.Call, target: object | None) -> None:
+        """Refuse a keyword the called core model does not declare.
+
+        Mode C has no Python at runtime, so nothing revalidates the call: the
+        generated builder destructures the object it is handed and ignores every
+        key it does not name. A kwarg the core would refuse therefore turns into
+        silence — ``Container(children=[...])`` renders an empty box in Mode C
+        and raises ``ValidationError`` the moment the same view is served by
+        Mode A or B. Checking here restores the core's answer at build time,
+        where it costs nothing at runtime and names the file and line.
+
+        Only a bare-name call of something imported from ``tempest_core`` is
+        checked, and only when it resolves to a model with declared fields; a
+        helper function (``t``, ``material_icon``) and a locally declared class
+        are somebody else's contract.
+
+        Args:
+            node: The call being emitted.
+            target: The core object the call resolves to, or ``None``.
+
+        Raises:
+            TranspileError: If a keyword is not a field of the model, listing
+                the widget's real child slot when that is what was meant.
+        """
+        if target is None or not isinstance(node.func, ast.Name):
+            return
+        local = node.func.id
+        fields: Any = getattr(target, "model_fields", None)
+        if not isinstance(fields, dict) or not fields:
+            return
+        accepted = set(fields)
+        for finfo in fields.values():
+            alias = getattr(finfo, "alias", None)
+            if isinstance(alias, str):
+                accepted.add(alias)
+        slots = sorted(getattr(target, "child_field_names", ()) or ())
+        for kw in node.keywords:
+            if kw.arg is None or kw.arg in accepted:
+                continue
+            hint = ""
+            if kw.arg in {"child", "children"} and slots:
+                slot_list = ", ".join(f"`{slot}`" for slot in slots)
+                hint = f" (its child slot is {slot_list})"
+            raise TranspileError(
+                f"`{local}` does not accept `{kw.arg}`{hint}",
+                node,
+                self.filename,
+            )
+
     def _object_call(self, func: str, node: ast.Call, indent: int) -> str:
         """Emit a widget-style call whose kwargs become a single object arg.
 
         Multiline when a keyword's value spans lines (e.g. a non-empty `children`
         list); inline otherwise.
         """
+        target = self._core_target(node)
+        self._check_core_kwargs(node, target)
+        # A widget's props are camelCase in its generated builder; `Style`/`Color`
+        # keep the wire's snake_case keys, so only widgets are renamed by rule.
+        camel = isinstance(target, type) and issubclass(target, tempest_core.Widget)
         pairs: list[tuple[str, str]] = []
         for kw in node.keywords:
             if kw.arg is None:
                 raise TranspileError("**kwargs is not supported", node, self.filename)
-            pairs.append((_js_name(kw.arg), self.expr(kw.value, indent + 1)))
+            key = _camel_name(kw.arg) if camel else _js_name(kw.arg)
+            pairs.append((key, self.expr(kw.value, indent + 1)))
         # A keyword-only call of a class (a dataclass, or an imported JS class like
         # Route) is a constructor — `new Route({ name })`, not `Route({ name })`.
         is_class = isinstance(node.func, ast.Name) and (
@@ -1520,6 +1618,7 @@ class _Generator:
             name = alias.asname or alias.name
             if name not in _TYPE_ONLY_NAMES:
                 importable.add(name)
+            self.core_imports[name] = alias.name
         importable.add("State")
 
     def _imports(self, used: set[str]) -> str:

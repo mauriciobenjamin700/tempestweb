@@ -566,6 +566,15 @@ spirit of `mypy --strict`.
     event the client does not yet emit (e.g. `on_scan`, `on_reorder`) are
     registered but inert for now.
 
+!!! check "Widget kwargs are validated at build time"
+    Mode C has no Python at runtime: the generated builder destructures the
+    object it receives and **ignores** any key it does not name. So the compiler
+    checks every core-model call against the real fields and fails with
+    `file:line` — `Container(children=[...])` would be an empty box here and a
+    `ValidationError` in Modes A/B. The child slot uses **the core's own name**:
+    `child` on `Container`/`Draggable`, `children` on `Column`/`Row`, `fields` on
+    `Form`.
+
 !!! warning "Still outside the subset"
     Most of `tempest_core.components` (Card, DataTable, Tabs, charts, form
     inputs …). Unlike the widgets, components are **Python composition** that

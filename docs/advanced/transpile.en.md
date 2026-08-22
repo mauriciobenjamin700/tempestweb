@@ -575,7 +575,15 @@ spirit of `mypy --strict`.
     `child` on `Container`/`Draggable`, `children` on `Column`/`Row`, `fields` on
     `Form`.
 
-!!! warning "Still outside the subset"
+!!! check "The core's enums, value objects and tokens are served"
+    `TextAlign.CENTER`, `FontWeight.BOLD`, `KeyboardType.EMAIL`,
+    `Semantics(label=…)`, `Border`, `Shadow`, `Gradient`, `ACCENT`, `ON_SURFACE`,
+    `HOVER_OPACITY` — the core's 32 enums, its non-widget value objects and its
+    design tokens are **generated** into `values.gen.js` from the core, in the
+    wire shape. `Style`/`Color`/`Edge` stay where they always were
+    (`widget-support.js`).
+
+!!! warning "Still outside the subset — and now it fails the build"
     Most of `tempest_core.components` (Card, DataTable, Tabs, charts, form
     inputs …). Unlike the widgets, components are **Python composition** that
     expands to primitives at `build()` time — many from data/loops — so they are
@@ -584,6 +592,18 @@ spirit of `mypy --strict`.
     multi-loop or destructured comprehensions (`for k, v in …`), and f-string
     format specs beyond the supported set (e.g. alignment `{x:>5}`, sign
     `{x:+.2f}`, hex/bin `{x:x}`, dynamic `{x:.{n}f}`, the `!a` conversion).
+
+    Using one of those names is now a **compile error** with `file:line`:
+
+    ```text
+    app.py:12: `Card` is not available in Mode C (the transpile client exports no such name)
+    ```
+
+    The compiler used to emit `import { Card } from "./widgets.js"` anyway — an
+    import the browser cannot resolve, so the module was never evaluated and the
+    page stayed **blank**, with nothing in the build log. Importing a type purely
+    for an annotation (`DragEvent`, `TextChangeHandler`) is still free:
+    annotations are dropped, the name is never referenced, no import is emitted.
 
 ## Recap
 

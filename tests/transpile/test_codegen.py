@@ -818,3 +818,52 @@ def test_a_style_keeps_the_wire_snake_case_keys() -> None:
     assert "font_size: 14.0" in js
     assert "max_width: 200.0" in js
     assert "fontSize" not in js
+
+
+def test_a_name_the_client_cannot_serve_is_refused() -> None:
+    """A component outside the subset must fail the build, not the page load.
+
+    ``Card`` lives in ``tempest_core.components``: Python composition that
+    expands into primitives at build time, which is why Mode C does not carry
+    it. The transpiler used to emit ``import { Card } from "./widgets.js"``
+    anyway — an import the browser cannot resolve, so the module never evaluates
+    and the page stays blank with nothing in the build log.
+    """
+    with pytest.raises(TranspileError, match="`Card` is not available in Mode C"):
+        gen(
+            "from tempest_core import Card, Text\n\n\n"
+            "def panel() -> Card:\n"
+            '    return Card(key="c", child=Text(content="x"))\n'
+        )
+
+
+def test_an_enum_and_a_value_object_now_reach_the_client() -> None:
+    """The core's enums and wire fragments are served, so they may be used."""
+    js = gen(
+        "from tempest_core import Semantics, Style, Text, TextAlign\n\n\n"
+        "def label() -> Text:\n"
+        "    return Text(\n"
+        '        content="x",\n'
+        "        style=Style(text_align=TextAlign.CENTER),\n"
+        '        semantics=Semantics(label="titulo"),\n'
+        "    )\n"
+    )
+    assert "TextAlign.CENTER" in js
+    assert 'Semantics({ label: "titulo" })' in js
+    assert 'from "./widgets.js"' in js
+
+
+def test_a_type_only_import_is_never_emitted() -> None:
+    """An event type used in an annotation costs no import.
+
+    Annotations are dropped, so the name is never referenced and the
+    availability check never sees it — which is what keeps typing a handler
+    free.
+    """
+    js = gen(
+        "from tempest_core import DragEvent, Text\n\n\n"
+        "def handle(event: DragEvent) -> Text:\n"
+        '    return Text(content="x")\n'
+    )
+    assert "DragEvent" not in js
+    assert 'import { Text } from "./widgets.js";' in js

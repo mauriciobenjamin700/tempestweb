@@ -21,6 +21,7 @@ import re
 from typing import Any
 
 import tempest_core
+from tempestweb.transpile._served import SERVED_NAMES
 from tempestweb.transpile.errors import TranspileError
 
 __all__: list[str] = ["generate"]
@@ -308,6 +309,9 @@ class _Generator:
         # keyword-only call can be checked against the real model's fields even
         # when the import was aliased (`from tempest_core import Column as Col`).
         self.core_imports: dict[str, str] = {}
+        # Local name → the import statement that introduced it, so refusing a
+        # name the client cannot serve can point at a line.
+        self.import_nodes: dict[str, ast.ImportFrom] = {}
 
     # -- expressions --------------------------------------------------------
 
@@ -901,6 +905,9 @@ class _Generator:
         if target is None or not isinstance(node.func, ast.Name):
             return
         local = node.func.id
+        origin = self.core_imports.get(local, local)
+        if origin not in SERVED_NAMES:
+            self._refuse_unserved(origin, node)
         fields: Any = getattr(target, "model_fields", None)
         if not isinstance(fields, dict) or not fields:
             return
@@ -1619,7 +1626,52 @@ class _Generator:
             if name not in _TYPE_ONLY_NAMES:
                 importable.add(name)
             self.core_imports[name] = alias.name
+            self.import_nodes[name] = node
         importable.add("State")
+
+    def _refuse_unserved(self, origin: str, node: ast.AST | None) -> None:
+        """Raise when the Mode C client exports no such name.
+
+        Args:
+            origin: The ``tempest_core`` name as the core spells it.
+            node: The node to blame in the diagnostic.
+
+        Raises:
+            TranspileError: Always, when called.
+        """
+        raise TranspileError(
+            f"`{origin}` is not available in Mode C "
+            "(the transpile client exports no such name)",
+            node,
+            self.filename,
+        )
+
+    def _check_served(self, used: set[str]) -> None:
+        """Refuse a referenced name the Mode C client cannot resolve.
+
+        The emitted module imports every core name it references. Nothing
+        verified the target existed, so a view using ``Card`` or ``Scaffold``
+        (composition living in ``tempest_core.components``, outside the Mode C
+        subset) compiled into a module whose very first import fails — the
+        browser refuses to evaluate it and the page stays blank, with the
+        goldens green and ``node --check`` happy, because parsing never resolves
+        an import.
+
+        Only *referenced* names are checked, so importing an event or handler
+        type for an annotation stays free: annotations are dropped, the name is
+        never referenced, and no import is emitted for it.
+
+        Args:
+            used: The importable names the emitted bodies actually reference.
+
+        Raises:
+            TranspileError: If a referenced name is not exported by the client.
+        """
+        for name in sorted(used):
+            origin = self.core_imports.get(name, name)
+            if origin in SERVED_NAMES or name in SERVED_NAMES:
+                continue
+            self._refuse_unserved(origin, self.import_nodes.get(name))
 
     def _imports(self, used: set[str]) -> str:
         """Emit the runtime + widgets + native + validators import lines.
@@ -1631,6 +1683,7 @@ class _Generator:
             The import lines, one per source module, aliasing the dataclass base
             when :attr:`state_base` says the module declares its own ``State``.
         """
+        self._check_served(used)
         runtime = sorted(used & _RUNTIME_NAMES)
         if self.state_base != "State":
             runtime.append(f"State as {self.state_base}")

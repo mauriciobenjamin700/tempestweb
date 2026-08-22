@@ -293,6 +293,21 @@ def login_page(app: App[AppState], controller: AuthController) -> Widget:
     )
 ```
 
+!!! tip "A field's `key` becomes the control's `name`"
+    The renderer derives the `name` attribute of an `<input>`/`<textarea>`/
+    `<select>` from the widget's `key`. A control with neither `name` nor `id` is
+    an accessibility and autofill dead end — the browser cannot label it or offer
+    a saved value. So give every field a `key`, and prefer one that describes the
+    data (`key="email"`, not `key="input-3"`): it shows up in the accessibility
+    tree.
+
+    A field's `keyboard` also becomes real behaviour:
+    `KeyboardType.EMAIL`/`PHONE`/`URL` set the control's `type` and its autofill
+    hint, `NUMBER` sets `inputmode="numeric"`. Need a specific `autocomplete`
+    (`new-password` on a signup)? Pass it through
+    `attrs={"autocomplete": "new-password"}` — what the app declares beats the
+    derived value.
+
 ### `styles/tokens.py` — style is a token, not an inline string
 
 ```python

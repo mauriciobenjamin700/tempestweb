@@ -455,3 +455,85 @@ test("a Button's label is still its text", () => {
   applyPatches(el, [{ path: [], set_props: { label: "Saved" } }]);
   assert.equal(el.textContent, "Saved");
 });
+
+test("a form control gets a name from its key, other elements do not", () => {
+  freshDom();
+  const input = buildElement({
+    type: "Input",
+    key: "email",
+    props: { value: "", placeholder: "you@example.com" },
+    children: [],
+  });
+  assert.equal(input.tagName, "INPUT");
+  assert.equal(input.getAttribute("name"), "email", "an input with no name or id is an a11y and autofill dead end");
+
+  const box = buildElement({ type: "Container", key: "wrap", props: {}, children: [] });
+  assert.equal(box.getAttribute("name"), null, "only form controls carry a name");
+
+  const unkeyed = buildElement({ type: "Input", key: null, props: {}, children: [] });
+  assert.equal(unkeyed.getAttribute("name"), null, "no key, nothing to name it after");
+});
+
+test("a Checkbox names the input nested in its label", () => {
+  freshDom();
+  const label = buildElement({
+    type: "Checkbox",
+    key: "terms",
+    props: { checked: false, label: "Aceito" },
+    children: [],
+  });
+  const nested = label.querySelector("input");
+  assert.ok(nested, "the checkbox renders a real input inside its label");
+  assert.equal(nested.getAttribute("type"), "checkbox");
+  assert.equal(nested.getAttribute("name"), "terms");
+});
+
+test("an Input's keyboard becomes the control's type and autofill hint", () => {
+  freshDom();
+  const email = buildElement({
+    type: "Input",
+    key: "email",
+    props: { value: "", keyboard: "email" },
+    children: [],
+  });
+  assert.equal(email.getAttribute("type"), "email", "the widget declared an e-mail keyboard");
+  assert.equal(email.getAttribute("autocomplete"), "email");
+
+  const phone = buildElement({ type: "Input", key: "tel", props: { keyboard: "phone" }, children: [] });
+  assert.equal(phone.getAttribute("type"), "tel");
+  assert.equal(phone.getAttribute("autocomplete"), "tel");
+
+  const amount = buildElement({ type: "Input", key: "qty", props: { keyboard: "number" }, children: [] });
+  assert.equal(amount.getAttribute("inputmode"), "numeric");
+  assert.equal(amount.getAttribute("type"), "text", "a number input fights a controlled value");
+
+  const plain = buildElement({ type: "Input", key: "nick", props: { keyboard: "text" }, children: [] });
+  assert.equal(plain.getAttribute("type"), "text");
+  assert.equal(plain.getAttribute("autocomplete"), null, "no hint for a plain text field");
+});
+
+test("secure wins over the keyboard type, and typing does not reset either", () => {
+  freshDom();
+  const el = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { value: "", keyboard: "email", secure: true },
+    children: [],
+  });
+  assert.equal(el.getAttribute("type"), "password", "a secure field is masked whatever its keyboard");
+
+  applyPatches(el, [{ path: [], set_props: { value: "abc" } }]);
+  assert.equal(el.getAttribute("type"), "password", "a value-only patch must not unmask it");
+  assert.equal(el.value, "abc");
+});
+
+test("an app-provided autocomplete is not overwritten by the derived hint", () => {
+  freshDom();
+  const el = buildElement({
+    type: "Input",
+    key: "newpw",
+    props: { keyboard: "email", attrs: { autocomplete: "new-password" } },
+    children: [],
+  });
+  assert.equal(el.getAttribute("autocomplete"), "new-password", "only the app knows the field's role");
+});

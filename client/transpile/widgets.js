@@ -16,5 +16,11 @@
 // star re-export gives the app every builder plus the Style/Edge helpers.
 export * from "./widgets.gen.js";
 
+// The rest of the core's value surface: enums (TextAlign, FontWeight, …), the
+// non-widget wire fragments (Semantics, Border, Shadow, Gradient, …) and the
+// design tokens (ACCENT, ON_SURFACE, HOVER_OPACITY, …). Generated the same way
+// the builders are: python -m tests.conformance._transpile_values.
+export * from "./values.gen.js";
+
 // Ergonomic layout components (the portable subset of tempest_core.components).
 export { HStack, VStack } from "./components.js";

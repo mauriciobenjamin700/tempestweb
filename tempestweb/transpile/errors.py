@@ -14,12 +14,17 @@ class TranspileError(Exception):
     (``file:line: <what> is not supported``), in the spirit of ``mypy --strict``.
     """
 
-    def __init__(self, message: str, node: ast.AST, filename: str = "<source>") -> None:
+    def __init__(
+        self, message: str, node: ast.AST | None, filename: str = "<source>"
+    ) -> None:
         """Initialize the error.
 
         Args:
             message: What is unsupported and, ideally, why.
-            node: The offending AST node (its ``lineno`` locates the diagnostic).
+            node: The offending AST node (its ``lineno`` locates the
+                diagnostic), or ``None`` when the diagnostic is about the module
+                as a whole and no node carries the blame — the line then reads
+                ``0``, which is still better than losing the message.
             filename: The source file name, for the ``file:line`` prefix.
         """
         line: int = getattr(node, "lineno", 0)

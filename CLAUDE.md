@@ -146,6 +146,11 @@ Armadilhas já pagas neste repo:
   errado era silêncio no Modo C e `ValidationError` nos Modos A/B — desde 0.79.0
   o compilador recusa com `arquivo:linha`. Builder novo sai de
   `python -m tests.conformance._transpile_widgets`, nunca da mão.
+- **O Modo C só serve o que `tempestweb/transpile/_served.py` lista.** O
+  manifesto é gerado do próprio JS (`python -m tests.conformance._transpile_served`)
+  e o compilador recusa nome fora dele — antes emitia import morto e a página
+  ficava em branco, porque `node --check` parseia sem resolver import. Mexeu no
+  export de `client/transpile/`? Regenere o manifesto **e** `values.gen.js`.
 - **Modelo de opção do desenvolvedor recusa kwarg desconhecido; payload do
   browser ignora.** `RetryOptions` é `extra="forbid"` (nome errado é bug e tem
   que doer); `HttpResponse`, `Photo`, `Position` e afins continuam ignorando

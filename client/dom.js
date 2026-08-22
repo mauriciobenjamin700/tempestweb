@@ -22,6 +22,9 @@ export const KEY_ATTR = "data-tw-key";
 /** Attribute holding a widget's IR type (so patches can re-key/inspect it). */
 export const TYPE_ATTR = "data-tw-type";
 
+/** Tags the browser treats as form controls, which need a `name` or an `id`. */
+const FORM_CONTROL_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
+
 // Each widget type maps to one HTML tag. Container-like widgets are <div>; Text is
 // an inline <span>; Button is a real <button>. Unknown types fall back to <div> so
 // a new core widget renders (as a generic box) rather than throwing.
@@ -100,7 +103,34 @@ function applyNodeShape(el, type, key, props) {
   } else {
     el.removeAttribute(KEY_ATTR);
   }
+  nameFormControl(el, key);
   applyProps(el, props ?? {});
+}
+
+/**
+ * Give a native form control a `name`, taken from its widget key.
+ *
+ * A control with neither `name` nor `id` is an accessibility and autofill dead
+ * end: the browser cannot label it, cannot offer a saved value for it, and
+ * DevTools reports it as an issue on every page that renders an input. The
+ * widget key is already the stable identity the reconciler addresses the node
+ * by, so it is the honest name — and it stays out of the wire, because the
+ * renderer derives it rather than the app declaring it twice.
+ *
+ * Inert for submission: tempestweb never submits an HTML form (state lives in
+ * Python), so the attribute only feeds the accessibility tree and autofill.
+ *
+ * @param {HTMLElement} el   The freshly shaped element.
+ * @param {?string} key      The widget key, or null.
+ * @returns {void}
+ */
+function nameFormControl(el, key) {
+  if (key == null || !FORM_CONTROL_TAGS.has(el.tagName)) {
+    return;
+  }
+  if (!el.hasAttribute("name")) {
+    el.setAttribute("name", key);
+  }
 }
 
 /**
@@ -963,6 +993,7 @@ function ensureCheckboxInput(el) {
   if (input == null) {
     input = /** @type {HTMLInputElement} */ (document.createElement("input"));
     input.setAttribute("type", "checkbox");
+    nameFormControl(input, el.getAttribute(KEY_ATTR));
     el.insertBefore(input, el.firstChild);
   }
   return input;
@@ -1126,19 +1157,68 @@ function paintCanvas(el, props) {
  * @param {Object} props       The props to apply.
  * @returns {void}
  */
+/**
+ * Input types and autofill hints for each `KeyboardType` the core declares.
+ *
+ * `NUMBER` maps to `inputmode` rather than `type="number"`: a number input adds
+ * spinners and drops a partially typed value, which fights a controlled field.
+ * `PASSWORD` gets no `autocomplete` — only the app knows whether the field is a
+ * login or a new password, and guessing `current-password` on a signup form
+ * makes the browser offer the wrong saved secret.
+ */
+const KEYBOARD_HINTS = Object.freeze({
+  email: { type: "email", autocomplete: "email" },
+  phone: { type: "tel", autocomplete: "tel" },
+  url: { type: "url", autocomplete: "url" },
+  number: { inputmode: "numeric" },
+  password: { type: "password" },
+});
+
+/**
+ * Decide an Input's `type`, input mode and autofill hint from what it declared.
+ *
+ * The widget declared the keyboard and the renderer dropped it: an
+ * `Input(keyboard=KeyboardType.EMAIL)` — what `EmailField` builds — rendered a
+ * plain text box, so a phone showed the wrong keyboard, the browser offered no
+ * saved address, and DevTools reported the field as missing an autocomplete
+ * attribute.
+ *
+ * `secure` wins the type — a masked field stays masked whatever keyboard it
+ * asks for, and an explicit ``secure: false`` unmasks even when the patch says
+ * nothing about the keyboard — while a props bag with neither key leaves the
+ * attribute alone: typing
+ * patches `value` only, and re-deriving from an incomplete bag used to turn a
+ * password field back into a visible one on the first keystroke. An
+ * `autocomplete` the app set through `attrs` also wins, because only the app
+ * knows the field's role in its form (a signup needs `new-password`, a login
+ * `current-password`).
+ *
+ * @param {HTMLElement} el   The input element.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applyInputType(el, props) {
+  const hint = "keyboard" in props ? KEYBOARD_HINTS[String(props.keyboard)] : null;
+  if (hint?.inputmode != null) {
+    el.setAttribute("inputmode", hint.inputmode);
+  }
+  if (hint?.autocomplete != null && !el.hasAttribute("autocomplete")) {
+    el.setAttribute("autocomplete", hint.autocomplete);
+  }
+  if (props.secure === true) {
+    el.setAttribute("type", "password");
+  } else if (hint?.type != null) {
+    el.setAttribute("type", hint.type);
+  } else if ("secure" in props || !el.hasAttribute("type")) {
+    el.setAttribute("type", "text");
+  }
+}
+
 function applyControlProps(el, type, props) {
   if (type === "Canvas") {
     paintCanvas(el, props);
   } else if (type === "Input") {
-    // Only when the patch carries `secure`. Deriving the type from every props
-    // bag turned a password field back into a visible text field on the first
-    // update that did not mention it — which is every keystroke, since typing
-    // patches `value` alone. The password was masked until the user typed.
-    if ("secure" in props) {
-      el.setAttribute("type", props.secure ? "password" : "text");
-    } else if (!el.hasAttribute("type")) {
-      el.setAttribute("type", "text");
-    }
+    applyInputType(el, props);
     if ("value" in props) {
       el.value = props.value == null ? "" : String(props.value);
     }

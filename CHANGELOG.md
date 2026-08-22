@@ -4,6 +4,63 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.80.0] — 2026-08-22
+
+### Fixed
+
+- **Modo C deixou de emitir import que o browser não resolve.** O transpiler
+  roteava todo nome do `tempest_core` para um import no JS gerado, sem verificar
+  se o alvo existe. Medido no corpus: **5 dos 13 exemplos que transpilavam
+  produziam um módulo que não carrega** — `Semantics`, `TextAlign`, `FontWeight`,
+  `AlignItems`, `JustifyContent`, `ACCENT`, `ON_SURFACE`, `Card`, `Divider`,
+  `Chip`, `AppBar`, `Scaffold`, `SegmentedControl`, `RadioGroup`. Nenhum guard
+  via: `node --check` parseia sem resolver import, e os goldens comparam texto.
+  Resultado era página em branco com erro de import no console e build verde.
+- **O `keyboard` do `Input` chegou ao DOM.** O widget declarava
+  `KeyboardType.EMAIL` — é o que o `EmailField` constrói — e o renderizador
+  descartava: saía um campo de texto comum, então o celular abria o teclado
+  errado, o browser não oferecia o endereço salvo e o DevTools reclamava de
+  `autocomplete` ausente. Agora `EMAIL`/`PHONE`/`URL` viram `type` + hint de
+  autofill, `NUMBER` vira `inputmode="numeric"` (não `type="number"`, que briga
+  com campo controlado) e `PASSWORD` vira `type="password"`. `secure` continua
+  ganhando o tipo, `secure: false` explícito continua desmascarando, e
+  `autocomplete` que a app passou por `attrs` vence o derivado — só a app sabe se
+  o campo é login ou cadastro.
+- **Controle de formulário renderizado ganhou `name`.** `<input>`, `<textarea>` e
+  `<select>` saíam sem `name` nem `id` — beco sem saída de acessibilidade e de
+  autofill, e um *issue* do DevTools em toda página com campo. O renderizador
+  agora deriva o `name` da `key` do widget (inclusive no `<input>` aninhado no
+  `<label>` do `Checkbox`), sem passar nada novo no fio.
+
+### Added
+
+- **`client/transpile/values.gen.js`** — gerado do core: os 32 enums (objeto
+  congelado nome → valor de fio), os objetos de valor não-widget (`Semantics`,
+  `Border`, `Shadow`, `Gradient`, `GradientStop`, `Corners`, `SideBorder`,
+  `MenuItem`, `TableRow`/`TableCell`, `ChartSeries`, …) como fragmentos de fio, e
+  os tokens de design (`ACCENT`, `ON_SURFACE`, `HOVER_OPACITY`,
+  `MIN_TOUCH_TARGET`, …). Evento e tipo interno da IR ficam fora: o runtime JS os
+  constrói, então builder ali seria byte morto em todo artefato. Regenerar:
+  `python -m tests.conformance._transpile_values`.
+- **`tempestweb/transpile/_served.py`** — manifesto gerado do próprio JS com os
+  186 nomes que o cliente do Modo C exporta. O compilador recusa qualquer outro
+  com `arquivo:linha` (`` `Card` is not available in Mode C ``) em vez de emitir
+  o import morto. Importar tipo só para anotação continua livre — anotação é
+  descartada, o nome nunca é referenciado. Regenerar:
+  `python -m tests.conformance._transpile_served`.
+- **Conformance**: goldens de `values.gen.js` e de `_served.py`, mais um teste de
+  que `values.gen.js` está em `_TRANSPILE_ASSETS` (módulo gerado que ninguém
+  copia não existe no artefato).
+
+### Notas
+
+- Os 4 exemplos que dependem de componente (`i18n-greeting`,
+  `onboarding-carousel`, `search-autocomplete`, `settings-panel`) **passaram a ser
+  recusados** no Modo C em vez de gerar página em branco. Continuam sendo
+  exemplos de Modo A/B. Portar `Card`/`Divider`/`Chip`/`AppBar`/`Scaffold`/
+  `SegmentedControl`/`RadioGroup` para o Modo C é feature nova, não corrigida
+  aqui.
+
 ## [0.79.0] — 2026-08-22
 
 ### Changed

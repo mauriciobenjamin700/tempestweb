@@ -13,9 +13,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from tempestweb.cli.commands import build as build_cmd
+from tempestweb.transpile._served import SERVED_NAMES
 from tempestweb.transpile.codegen import _camel_name
 from tests.conformance import _transpile_components as components_gen
+from tests.conformance import _transpile_served as served_gen
 from tests.conformance import _transpile_spacing as spacing_gen
+from tests.conformance import _transpile_values as values_gen
 from tests.conformance import _transpile_widget_styles as styles_gen
 from tests.conformance import _transpile_widgets as widgets_gen
 from tests.conformance._widgetspec import buildable_widgets
@@ -168,3 +172,58 @@ def test_every_core_field_is_reachable_from_the_builder() -> None:
             if _camel_name(field_name) not in declared:
                 unreachable.append(f"{name}.{field_name}")
     assert not unreachable, "unreachable from Mode C: " + ", ".join(unreachable)
+
+
+def test_values_module_matches_core() -> None:
+    """The committed values.gen.js byte-matches a fresh render from the core."""
+    on_disk = values_gen.VALUES_MODULE.read_text(encoding="utf-8")
+    assert on_disk == values_gen.render_module_text(), (
+        "values.gen.js is stale — regenerate with "
+        "`python -m tests.conformance._transpile_values` and review the diff"
+    )
+
+
+def test_served_manifest_matches_the_client() -> None:
+    """The shipped manifest byte-matches a fresh render from the client JS.
+
+    The compiler refuses a name this manifest does not list, so a stale manifest
+    either rejects something that works or admits an import the browser cannot
+    resolve.
+    """
+    on_disk = served_gen.SERVED_MODULE.read_text(encoding="utf-8")
+    assert on_disk == served_gen.render_module_text(), (
+        "tempestweb/transpile/_served.py is stale — regenerate with "
+        "`python -m tests.conformance._transpile_served`"
+    )
+
+
+def test_the_values_module_is_copied_into_the_artifact() -> None:
+    """A generated client module nobody copies simply does not exist in a build.
+
+    ``values.gen.js`` is imported by ``widgets.js``, so leaving it out of the
+    asset list would break every artifact at load time rather than at build.
+    """
+    assert "values.gen.js" in build_cmd._TRANSPILE_ASSETS
+
+
+def test_the_core_value_surface_is_served() -> None:
+    """The enums, value objects and tokens a view uses resolve in Mode C.
+
+    These are the names that used to compile into an import of something the
+    client does not export: a blank page, with the goldens green.
+    """
+    for name in (
+        "TextAlign",
+        "FontWeight",
+        "AlignItems",
+        "JustifyContent",
+        "KeyboardType",
+        "Semantics",
+        "Border",
+        "Shadow",
+        "Gradient",
+        "ACCENT",
+        "ON_SURFACE",
+        "HOVER_OPACITY",
+    ):
+        assert name in SERVED_NAMES, f"{name} is not served by the Mode C client"

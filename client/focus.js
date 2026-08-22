@@ -1,183 +1,201 @@
-// focus.js — the focus half of the modal contract.
+// focus.js — the rest of the modal contract: focus goes in, stays in, comes back.
 //
-// A modal overlay already gets `role=dialog`, `aria-modal=true`, a scrim, and a
-// dismiss on Escape or on a click outside. What was missing is where the keyboard
-// is: focus stayed on whatever opened the overlay, so Tab walked the page behind
-// the scrim — reachable by keyboard, unreachable by pointer, and announced by a
-// screen reader as if the modal were not there.
+// A modal overlay (Dialog, BottomSheet, ActionSheet) paints over the app and a
+// click on the scrim or Escape dismisses it. Focus was left out: it stayed on
+// whatever opened the overlay, so Tab walked the page *behind* the scrim — a
+// keyboard user could type into a form they could not see, and a screen-reader
+// user was never told the dialog existed.
 //
-// This closes the three remaining obligations:
+// Three obligations, and this module is all three:
+//   * on open, move focus into the overlay (its first focusable, or the overlay
+//     itself, which is given `tabindex="-1"` so it can hold focus);
+//   * while open, keep Tab / Shift+Tab inside it, wrapping at both ends;
+//   * on close, return focus to the element that had it when the overlay opened,
+//     so the reader lands back where they were.
 //
-//   1. On open, move focus into the overlay.
-//   2. While open, keep Tab and Shift+Tab inside it.
-//   3. On close, give focus back to the element that opened it.
+// Non-modal overlays are left alone: a Menu or Popover has no scrim, a Toast is
+// not something to be trapped in, and stealing focus for them would break the
+// widget that opened them.
 //
-// Scoped to the modal overlays — Dialog, BottomSheet, ActionSheet. A Menu or
-// Popover is anchored and has no scrim, so trapping it would strand the keyboard
-// in a transient surface; a Toast is not interactive at all.
-//
-// State is synced from `mount()` after each patch batch rather than from a
-// MutationObserver: patches are the only way an overlay appears, so the explicit
-// call is both cheaper and deterministic under the test runner.
+// Driven by `sync()` (called from mount's post-layout pass) rather than a
+// MutationObserver: the mount already knows when the tree changed, and one
+// explicit call per batch is cheaper and easier to reason about than a
+// subscription that fires mid-patch, on trees that are momentarily incomplete.
 
-/** Overlay types that own the keyboard while they are open. */
+/** Modal overlay types that own the keyboard while they are open. */
 const MODAL_TYPES =
   '[data-tw-type="Dialog"],[data-tw-type="BottomSheet"],[data-tw-type="ActionSheet"]';
 
+/** The overlay host `mount` patches the overlay layer into. */
+const OVERLAY_HOST_ATTR = "data-tw-overlays";
+
 /**
- * What counts as tabbable. `[tabindex="-1"]` is focusable but not tabbable, so it
- * is excluded here and reached only by the fallback that focuses the overlay box.
+ * Elements that can take keyboard focus.
+ *
+ * `[tabindex="-1"]` is deliberately excluded: it is focusable by script (which is
+ * how the overlay itself holds focus) but not by Tab, so including it would put
+ * the container into its own tab cycle.
  */
-const TABBABLE = [
+const FOCUSABLE = [
   "a[href]",
   "area[href]",
-  "input:not([disabled])",
+  "button:not([disabled])",
+  "input:not([disabled]):not([type=hidden])",
   "select:not([disabled])",
   "textarea:not([disabled])",
-  "button:not([disabled])",
   "iframe",
   "object",
   "embed",
-  '[tabindex]:not([tabindex="-1"])',
   '[contenteditable="true"]',
+  '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
 /**
- * The tabbable descendants of an element, in document order.
+ * The focusable descendants of `el`, in document order.
  *
- * Skips what is explicitly hidden, and asks `checkVisibility` when the browser
+ * Skips what is explicitly hidden, and asks `checkVisibility` where the browser
  * offers it, so a stop inside a collapsed section is not focused into silently.
  *
- * Deliberately **not** `offsetParent !== null`, the usual shortcut for "is it
- * laid out": that is null for a `position: fixed` element, which is what an
- * overlay is — the check would report every stop in every modal as hidden and
- * the trap would fall back to the box on real pages, not just under jsdom.
+ * Deliberately **not** `offsetParent !== null`, the usual shortcut for "is this
+ * laid out": that is null for a `position: fixed` element, which is exactly what
+ * an overlay is — the check would call every stop in every modal hidden, and the
+ * trap would fall back to focusing the box on real pages, not only under jsdom.
  *
- * @param {HTMLElement} el
- * @returns {HTMLElement[]}
+ * @param {HTMLElement} el  The container to search.
+ * @returns {HTMLElement[]} The focusable elements, possibly empty.
  */
-function tabbable(el) {
-  return Array.from(el.querySelectorAll(TABBABLE)).filter((node) => {
-    const box = /** @type {HTMLElement} */ (node);
-    if (box.hasAttribute("hidden") || box.getAttribute("aria-hidden") === "true") {
+function focusables(el) {
+  return Array.from(el.querySelectorAll(FOCUSABLE)).filter((node) => {
+    const candidate = /** @type {HTMLElement} */ (node);
+    if (
+      candidate.hasAttribute("hidden") ||
+      candidate.getAttribute("aria-hidden") === "true"
+    ) {
       return false;
     }
-    if (typeof box.checkVisibility === "function") {
-      return box.checkVisibility();
+    if (typeof candidate.checkVisibility === "function") {
+      return candidate.checkVisibility();
     }
     return true;
   });
 }
 
 /**
- * The top-most modal overlay inside a host, or `null` when there is none.
+ * The top-most modal overlay currently mounted, or null when there is none.
  *
- * Overlays stack in ascending z-order, so the last match is the one on top and
- * the one that owns the keyboard.
+ * Overlays are z-ordered by document order in the host, so the last one is the
+ * one on top — the same rule the dismiss handler uses.
  *
- * @param {HTMLElement|null} host
- * @returns {HTMLElement|null}
+ * @param {HTMLElement} root  The mount root.
+ * @returns {?HTMLElement}    The active modal, or null.
  */
-function topModal(host) {
+function topModal(root) {
+  const host = root.querySelector(`[${OVERLAY_HOST_ATTR}]`);
   if (host == null) {
     return null;
   }
-  const found = host.querySelectorAll(MODAL_TYPES);
-  return found.length === 0 ? null : /** @type {HTMLElement} */ (found[found.length - 1]);
+  const modals = host.querySelectorAll(MODAL_TYPES);
+  return modals.length === 0 ? null : /** @type {HTMLElement} */ (modals[modals.length - 1]);
 }
 
 /**
- * Install modal focus management for an overlay host.
+ * Install modal focus management for the overlays under `root`.
  *
- * @param {() => (HTMLElement|null)} host  Returns the overlay host, or null when
- *     no overlay has ever been rendered (the host is created lazily).
- * @param {Document} [doc]  The document to bind (defaults to the global).
+ * `sync()` reconciles focus with whatever the last patch batch left mounted: it
+ * captures and restores the outside focus, and moves focus into a newly opened
+ * modal. The Tab trap is a document-level keydown listener, because focus can be
+ * anywhere when the key is pressed.
+ *
+ * @param {HTMLElement} root  The mount root.
  * @returns {{sync: () => void, dispose: () => void}}
  */
-export function installFocusTrap(host, doc) {
-  const target = doc ?? (typeof document !== "undefined" ? document : null);
-  if (target == null) {
-    return { sync() {}, dispose() {} };
-  }
-
-  /** @type {HTMLElement|null} The modal currently holding the keyboard. */
-  let trapped = null;
-  /** @type {HTMLElement|null} Where focus goes when the last modal closes. */
+export function installFocusTrap(root) {
+  /** The modal that currently owns the keyboard, if any. */
+  let active = null;
+  /** Where focus was when that modal opened, to hand it back on close. */
   let restoreTo = null;
 
-  const focusInto = (modal) => {
-    const first = tabbable(modal)[0];
-    if (first != null) {
-      first.focus();
+  const doc = root.ownerDocument;
+
+  /** Reconcile focus with the currently mounted overlays. */
+  const sync = () => {
+    const modal = topModal(root);
+    if (modal === active) {
       return;
     }
-    // A modal with nothing tabbable in it still has to take the keyboard, or Tab
-    // would walk the page behind the scrim.
+    if (modal == null) {
+      const target = restoreTo;
+      active = null;
+      restoreTo = null;
+      // Only give focus back if that element is still in the document: the same
+      // batch may have removed the button that opened the overlay.
+      if (target != null && doc != null && doc.contains(target)) {
+        target.focus();
+      }
+      return;
+    }
+    if (active == null) {
+      const current = doc == null ? null : /** @type {HTMLElement|null} */ (doc.activeElement);
+      restoreTo = current != null && current !== doc?.body ? current : null;
+    }
+    active = modal;
     if (!modal.hasAttribute("tabindex")) {
       modal.setAttribute("tabindex", "-1");
     }
-    modal.focus();
-  };
-
-  const sync = () => {
-    const modal = topModal(host());
-    if (modal === trapped) {
-      return;
-    }
-    if (modal != null) {
-      if (trapped === null) {
-        const active = /** @type {HTMLElement|null} */ (target.activeElement);
-        restoreTo = active != null && active !== target.body ? active : null;
-      }
-      trapped = modal;
-      focusInto(modal);
-      return;
-    }
-    trapped = null;
-    const back = restoreTo;
-    restoreTo = null;
-    if (back != null && typeof back.focus === "function" && back.isConnected) {
-      back.focus();
-    }
+    const inside = focusables(modal);
+    (inside[0] ?? modal).focus();
   };
 
   /**
-   * Keep Tab inside the trapped modal.
+   * Keep Tab inside the active modal.
    *
-   * @param {KeyboardEvent} event
+   * Wraps at both ends, and pulls focus back in when it had escaped (the browser
+   * puts focus on the document body after the element holding it is removed, and
+   * Tab from there would walk the page behind the scrim).
+   *
+   * @param {KeyboardEvent} event  The keydown event.
    * @returns {void}
    */
   const onKeyDown = (event) => {
-    if (event.key !== "Tab" || trapped == null) {
+    if (event.key !== "Tab" || active == null) {
       return;
     }
-    const stops = tabbable(trapped);
-    if (stops.length === 0) {
+    const inside = focusables(active);
+    if (inside.length === 0) {
       event.preventDefault();
+      active.focus();
       return;
     }
-    const first = stops[0];
-    const last = stops[stops.length - 1];
-    const active = target.activeElement;
-    const inside = active != null && trapped.contains(/** @type {Node} */ (active));
-    if (event.shiftKey && (!inside || active === first)) {
+    const current = /** @type {HTMLElement|null} */ (doc?.activeElement ?? null);
+    const first = inside[0];
+    const last = inside[inside.length - 1];
+    if (current == null || !active.contains(current)) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+      return;
+    }
+    if (event.shiftKey && current === first) {
       event.preventDefault();
       last.focus();
       return;
     }
-    if (!event.shiftKey && (!inside || active === last)) {
+    if (!event.shiftKey && current === last) {
       event.preventDefault();
       first.focus();
     }
   };
 
-  target.addEventListener("keydown", onKeyDown);
+  if (doc != null) {
+    doc.addEventListener("keydown", onKeyDown);
+  }
 
   return {
     sync,
     dispose() {
-      target.removeEventListener("keydown", onKeyDown);
-      trapped = null;
+      if (doc != null) {
+        doc.removeEventListener("keydown", onKeyDown);
+      }
+      active = null;
       restoreTo = null;
     },
   };

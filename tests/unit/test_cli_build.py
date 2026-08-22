@@ -486,3 +486,60 @@ def test_build_unrunnable_project_raises(tmp_path: Path) -> None:
     (root / "app.py").write_text("def broken( =", encoding="utf-8")
     with pytest.raises(BuildError, match="failed to build"):
         build_artifact(root, mode="wasm")
+
+
+@pytest.mark.parametrize("mode", ["wasm", "server", "transpile"])
+def test_every_artifact_links_a_tab_icon(tmp_path: Path, mode: str) -> None:
+    """Every shell links `rel="icon"`, and ships the file it points at.
+
+    A browser does not read the manifest for the tab icon: with no ``rel="icon"``
+    it probes ``/favicon.ico``. Mode B answers that with a route and Mode A links
+    a PWA icon, but Mode C linked only ``apple-touch-icon`` — so every load of a
+    static bundle opened the console with a 404 nobody can act on.
+    """
+    root = _project(tmp_path)
+    out = build_artifact(root, mode=mode).out_dir
+    html = (out / "index.html").read_text(encoding="utf-8")
+
+    assert 'rel="icon"' in html, f"the {mode} shell links no tab icon"
+    start = html.index('rel="icon"')
+    href = html[start:].split('href="', 1)[1].split('"', 1)[0]
+    assert (out / href.removeprefix("./")).is_file(), (
+        f"{href} is linked but not shipped"
+    )
+
+
+@pytest.mark.parametrize("mode", ["wasm", "server"])
+def test_a_declared_theme_reaches_the_generated_entrypoint(
+    tmp_path: Path, mode: str
+) -> None:
+    """Both Python-side artifacts pass the app's ``THEME`` through.
+
+    An app declares its palette next to its ``view``; the artifact is what has to
+    honour it. Neither entrypoint did, so a themed app rendered baseline-purple
+    buttons — components resolve their colours in Python, so the theme has to be
+    handed to the tree that is built.
+    """
+    root = _project(tmp_path)
+    out = build_artifact(root, mode=mode).out_dir
+    entry = "bootstrap.js" if mode == "wasm" else "server.py"
+    source = (out / entry).read_text(encoding="utf-8")
+
+    assert "THEME" in source, f"the {mode} entrypoint ignores a declared theme"
+
+
+def test_the_wasm_shell_injects_the_theme_css(tmp_path: Path) -> None:
+    """Mode A's page is static, so the palette's CSS is injected at boot.
+
+    Mode B renders the custom properties into the page head; here the app only
+    exists once Pyodide is up, so the handle hands the CSS to JS and the bootstrap
+    puts it in a `<style>` before the first mount.
+    """
+    root = _project(tmp_path)
+    out = build_artifact(root, mode="wasm").out_dir
+    bootstrap = (out / "bootstrap.js").read_text(encoding="utf-8")
+
+    assert "theme_css()" in bootstrap
+    assert "tw-app-theme" in bootstrap
+    # Before the mount, or the first paint is unthemed and then flips.
+    assert bootstrap.index("tw-app-theme") < bootstrap.index("mount(root")

@@ -1,195 +1,270 @@
-// Tests for client/focus.js — the focus half of the modal contract.
-//
-// A modal already had role=dialog, aria-modal, a scrim and a dismiss. What it did
-// not have was the keyboard: focus stayed on the opener, so Tab walked the page
-// behind the scrim. These pin the three obligations that closes — take focus,
-// keep it, give it back.
+// Tests for client/focus.js — the rest of the modal contract (issue #77, item 4).
+// A modal used to paint over the app while focus stayed behind the scrim: Tab
+// walked the page the reader could not see, and closing left focus nowhere.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { freshDom } from "./setup.js";
+import { buildElement } from "../../client/dom.js";
 import { installFocusTrap } from "../../client/focus.js";
 
-/**
- * A page with an opener button and a lazily-attached overlay host.
- * @returns {{doc: Document, win: Window, root: HTMLElement, opener: HTMLElement,
- *            host: () => (HTMLElement|null), openModal: (type?: string,
- *            buttons?: string[]) => HTMLElement, closeAll: () => void,
- *            tab: (shift?: boolean) => boolean}}
- */
-function page() {
-  const dom = freshDom();
-  const doc = dom.document;
-  const opener = doc.createElement("button");
-  opener.textContent = "Open";
-  dom.root.appendChild(opener);
+/** Build the app tree (a button that "opens" the overlay) plus an overlay host. */
+function scene(dom) {
+  const tree = buildElement({
+    type: "Column",
+    key: "root",
+    props: {},
+    children: [{ type: "Button", key: "open", props: { label: "Open" }, children: [] }],
+  });
+  dom.root.appendChild(tree);
+  const host = dom.document.createElement("div");
+  host.setAttribute("data-tw-overlays", "");
+  dom.root.appendChild(host);
+  return { tree, host };
+}
 
-  let overlayRoot = null;
-  const host = () => overlayRoot;
+/** Mount a Dialog with `n` buttons inside `host` and return it. */
+function openDialog(dom, host, labels = ["Cancel", "Confirm"]) {
+  const dialog = buildElement({
+    type: "Dialog",
+    key: "dlg",
+    props: { title: "Sure?" },
+    children: labels.map((label, index) => ({
+      type: "Button",
+      key: `b${index}`,
+      props: { label },
+      children: [],
+    })),
+  });
+  host.appendChild(dialog);
+  return dialog;
+}
 
-  return {
-    doc,
-    win: dom.window,
-    root: dom.root,
-    opener,
-    host,
-    openModal(type = "Dialog", buttons = ["OK", "Cancel"]) {
-      if (overlayRoot === null) {
-        overlayRoot = doc.createElement("div");
-        overlayRoot.setAttribute("data-tw-overlays", "");
-        dom.root.appendChild(overlayRoot);
-      }
-      const modal = doc.createElement("div");
-      modal.setAttribute("data-tw-type", type);
-      for (const label of buttons) {
-        const b = doc.createElement("button");
-        b.textContent = label;
-        modal.appendChild(b);
-      }
-      overlayRoot.appendChild(modal);
-      return modal;
-    },
-    closeAll() {
-      if (overlayRoot !== null) {
-        overlayRoot.innerHTML = "";
-      }
-    },
-    /**
-     * Dispatch a Tab keydown and report whether it was prevented.
-     * @param {boolean} [shift]
-     */
-    tab(shift = false) {
-      const event = new dom.window.KeyboardEvent("keydown", {
-        key: "Tab",
-        shiftKey: shift,
-        bubbles: true,
-        cancelable: true,
-      });
-      doc.dispatchEvent(event);
-      return event.defaultPrevented;
-    },
-  };
+/** Press Tab (or Shift+Tab) on the document. */
+function tab(dom, { shift = false } = {}) {
+  dom.document.dispatchEvent(
+    new dom.window.KeyboardEvent("keydown", { key: "Tab", shiftKey: shift, bubbles: true }),
+  );
 }
 
 test("opening a modal moves focus into it", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  p.opener.focus();
-  assert.equal(p.doc.activeElement, p.opener);
-
-  const modal = p.openModal();
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
   trap.sync();
 
-  assert.equal(p.doc.activeElement, modal.firstChild, "the first tabbable takes it");
+  const opener = dom.root.querySelector("[data-tw-key=\"open\"]");
+  opener.focus();
+  assert.equal(dom.document.activeElement, opener);
+
+  openDialog(dom, host);
+  trap.sync();
+
+  const cancel = host.querySelector("[data-tw-key=\"b0\"]");
+  assert.equal(dom.document.activeElement, cancel, "focus lands on the first control");
+  trap.dispose();
 });
 
-test("Tab past the last stop wraps to the first", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  const modal = p.openModal("Dialog", ["OK", "Cancel"]);
+test("a modal with nothing focusable holds focus itself", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host, []);
   trap.sync();
-  const [ok, cancel] = Array.from(modal.children);
-  cancel.focus();
 
-  const prevented = p.tab();
-
-  assert.equal(prevented, true, "the browser's own move was replaced");
-  assert.equal(p.doc.activeElement, ok);
+  assert.equal(dialog.getAttribute("tabindex"), "-1");
+  assert.equal(dom.document.activeElement, dialog);
+  trap.dispose();
 });
 
-test("Shift+Tab before the first stop wraps to the last", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  const modal = p.openModal("BottomSheet", ["One", "Two", "Three"]);
+test("Tab wraps at the end of the modal instead of leaving it", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host);
   trap.sync();
-  const stops = Array.from(modal.children);
-  stops[0].focus();
 
-  const prevented = p.tab(true);
+  const [first, last] = [
+    dialog.querySelector("[data-tw-key=\"b0\"]"),
+    dialog.querySelector("[data-tw-key=\"b1\"]"),
+  ];
+  last.focus();
+  tab(dom);
+  assert.equal(dom.document.activeElement, first, "Tab from the last control wraps");
 
-  assert.equal(prevented, true);
-  assert.equal(p.doc.activeElement, stops[stops.length - 1]);
+  first.focus();
+  tab(dom, { shift: true });
+  assert.equal(dom.document.activeElement, last, "Shift+Tab from the first wraps back");
+  trap.dispose();
 });
 
 test("Tab from outside the modal is pulled back in", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  const modal = p.openModal();
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host);
   trap.sync();
-  // Whatever put focus behind the scrim — a stray script, a click that slipped
-  // through — the next Tab belongs to the modal.
-  p.opener.focus();
 
-  const prevented = p.tab();
+  // The page behind the scrim: focus there is exactly what the trap exists for.
+  const behind = dom.root.querySelector("[data-tw-key=\"open\"]");
+  behind.focus();
+  tab(dom);
 
-  assert.equal(prevented, true);
-  assert.equal(p.doc.activeElement, modal.firstChild);
+  assert.ok(dialog.contains(dom.document.activeElement), "focus returns to the modal");
+  trap.dispose();
 });
 
-test("a modal with nothing tabbable still takes the keyboard", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  const modal = p.openModal("Dialog", []);
+test("Tab in the middle of the modal is left alone", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host, ["A", "B", "C"]);
   trap.sync();
 
-  assert.equal(modal.getAttribute("tabindex"), "-1");
-  assert.equal(p.doc.activeElement, modal);
-  assert.equal(p.tab(), true, "Tab has nowhere to go, so it goes nowhere");
+  const middle = dialog.querySelector("[data-tw-key=\"b1\"]");
+  middle.focus();
+  tab(dom);
+  assert.equal(
+    dom.document.activeElement,
+    middle,
+    "the browser's own Tab order handles the interior",
+  );
+  trap.dispose();
 });
 
-test("closing the last modal gives focus back to the opener", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  p.opener.focus();
-  p.openModal();
-  trap.sync();
+test("closing the modal gives focus back to what opened it", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
 
-  p.closeAll();
+  const opener = dom.root.querySelector("[data-tw-key=\"open\"]");
+  opener.focus();
+  const dialog = openDialog(dom, host);
   trap.sync();
+  assert.notEqual(dom.document.activeElement, opener);
 
-  assert.equal(p.doc.activeElement, p.opener);
+  dialog.remove();
+  trap.sync();
+  assert.equal(dom.document.activeElement, opener, "the reader lands back where they were");
+  trap.dispose();
 });
 
-test("a stacked modal takes over, and closing it returns to the one below", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  p.opener.focus();
-  const first = p.openModal("Dialog", ["Back"]);
-  trap.sync();
-  const second = p.openModal("ActionSheet", ["Confirm"]);
-  trap.sync();
+test("closing does not chase an opener the same batch removed", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { tree, host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
 
-  assert.equal(p.doc.activeElement, second.firstChild, "the top one owns it");
-
-  second.remove();
+  const opener = dom.root.querySelector("[data-tw-key=\"open\"]");
+  opener.focus();
+  const dialog = openDialog(dom, host);
   trap.sync();
 
-  assert.equal(p.doc.activeElement, first.firstChild, "not the opener, the one below");
+  tree.remove();
+  dialog.remove();
+  trap.sync();
+  assert.equal(dom.document.activeElement, dom.document.body, "no throw, no stale focus");
+  trap.dispose();
 });
 
-test("a Menu is not trapped: it is anchored, not modal", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  p.opener.focus();
-  p.openModal("Menu", ["Copy"]);
+test("a non-modal overlay does not steal focus", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+
+  const opener = dom.root.querySelector("[data-tw-key=\"open\"]");
+  opener.focus();
+  const menu = buildElement({
+    type: "Menu",
+    key: "menu",
+    props: { items: [{ label: "Rename", value: "rename" }] },
+    children: [],
+  });
+  host.appendChild(menu);
   trap.sync();
 
-  assert.equal(p.doc.activeElement, p.opener, "focus stayed where it was");
-  assert.equal(p.tab(), false, "and Tab is the browser's again");
+  assert.equal(dom.document.activeElement, opener, "a Menu has no scrim to trap behind");
+  trap.dispose();
 });
 
 test("dispose stops trapping", () => {
-  const p = page();
-  const trap = installFocusTrap(p.host, p.doc);
-  p.openModal();
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host);
   trap.sync();
-
   trap.dispose();
 
-  assert.equal(p.tab(), false);
+  const last = dialog.querySelector("[data-tw-key=\"b1\"]");
+  last.focus();
+  tab(dom);
+  assert.equal(dom.document.activeElement, last, "the trap no longer intervenes");
 });
 
-test("no document is a no-op, not a crash", () => {
-  const trap = installFocusTrap(() => null, null);
+test("a stacked modal takes over, and closing it returns to the one below", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+
+  const first = openDialog(dom, host, ["Below"]);
   trap.sync();
+  const below = first.querySelector("[data-tw-key=\"b0\"]");
+  assert.equal(dom.document.activeElement, below);
+
+  // Overlays stack in document order, so the second one is on top and owns the
+  // keyboard while it is open.
+  const second = openDialog(dom, host, ["Above"]);
+  second.setAttribute("data-tw-key", "dlg2");
+  trap.sync();
+  assert.ok(second.contains(dom.document.activeElement), "the top modal takes over");
+
+  second.remove();
+  trap.sync();
+  assert.ok(
+    first.contains(dom.document.activeElement),
+    "closing it hands the keyboard back to the modal below, not to the page",
+  );
+  trap.dispose();
+});
+
+test("a hidden control is not a tab stop", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host, ["Hidden", "Real"]);
+  const hidden = dialog.querySelector("[data-tw-key=\"b0\"]");
+  hidden.setAttribute("hidden", "");
+  trap.sync();
+
+  assert.equal(
+    dom.document.activeElement,
+    dialog.querySelector("[data-tw-key=\"b1\"]"),
+    "focus skips the control the app hid",
+  );
+  trap.dispose();
+});
+
+test("an editable region counts as a tab stop", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host, []);
+  const editable = dom.document.createElement("div");
+  editable.setAttribute("contenteditable", "true");
+  dialog.appendChild(editable);
+  trap.sync();
+
+  // A note editor inside a dialog is the whole reason the dialog is modal.
+  assert.equal(dom.document.activeElement, editable);
   trap.dispose();
 });

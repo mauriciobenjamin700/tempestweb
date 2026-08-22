@@ -183,6 +183,60 @@ async def take_photo() -> bytes:
     No Modo B a foto atravessa a rede no round-trip. Comprima no cliente antes de
     devolver para manter o payload pequeno.
 
+### Preview ao vivo e leitor de QR (widgets)
+
+`camera.capture()` é uma **foto**: abre a câmera, pega um frame, fecha. Quando o
+app precisa da câmera *ligada* — um preview na tela, um leitor de código —
+o widget é o caminho, porque ele mantém o stream enquanto está montado e o fecha
+quando sai (câmera aberta é luz acesa no celular de alguém).
+
+```python
+from tempest_core import App, Widget
+from tempest_core.widgets.events import CameraFrameEvent, QrScanEvent
+from tempest_core.widgets.media import CameraPreview, QrScanner
+
+
+def view(app: App[State]) -> Widget:
+    """Show the camera and read codes from it."""
+
+    def framed(event: CameraFrameEvent) -> None:
+        # event.data são os bytes do frame em base64; event.width/height, o tamanho.
+        app.set_state(lambda state: setattr(state, "last", f"{event.width}x{event.height}"))
+
+    def scanned(event: QrScanEvent) -> None:
+        app.set_state(lambda state: setattr(state, "code", event.data))
+
+    return Column(
+        key="root",
+        children=[
+            CameraPreview(
+                key="preview",
+                facing="back",
+                frame_interval_ms=500,
+                on_frame=framed,
+            ),
+            QrScanner(key="scanner", on_scan=scanned),
+        ],
+    )
+```
+
+* **`frame_interval_ms` é o seu orçamento de rede.** No Modo B cada frame é um
+  round-trip com a imagem dentro; 500ms é uma escolha, 30fps é um plano de
+  saturar a conexão. No Modo A o custo é local, mas ainda é CPU por frame.
+* **`facing`** vira o `facingMode` do `getUserMedia`: `back` → `environment`,
+  `front` → `user`.
+* **Um código lido não é reportado a cada tick.** Ele fica no enquadramento por
+  vários frames; o cliente reporta a mudança, não a presença.
+* **Contexto seguro obrigatório.** `localhost` conta; um deploy precisa de HTTPS,
+  ou o `getUserMedia` não existe.
+
+!!! warning "`QrScanner` depende do `BarcodeDetector` do browser"
+    A decodificação é a do próprio navegador — hoje Chrome/Android. Onde ela não
+    existe, o widget **mostra a câmera e avisa no console**, sem decodificar: este
+    cliente não embute dependência de runtime, então não há decoder de reserva.
+    Se você precisa de cobertura ampla, use o `CameraPreview` e decodifique os
+    frames você mesmo (é para isso que `on_frame` entrega os bytes).
+
 ## Inferência ONNX no browser (`native.onnx`)
 
 `onnxruntime` (a extensão C do CPython) **não tem wheel Pyodide** — Python no

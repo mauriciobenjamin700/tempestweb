@@ -135,6 +135,9 @@ EXAMPLE_NAMES = [
     "gesture_demo",
     "a11y_demo",
     "list_demo",
+    "responsive_demo",
+    "reorder_demo",
+    "camera_demo",
     "router_demo",
     "login_demo",
     "geo_demo",
@@ -298,10 +301,19 @@ def test_form_exercises_form_widgets() -> None:
 
     form_node = next(n for n in _walk(node) if n.type == "Form")
     field_nodes = [n for n in _walk(form_node) if n.type == "FormField"]
-    assert len(field_nodes) == 2
-    # Each field wraps exactly one Input child.
+    # Email, password, and the invite code (a PinInput, which reports on_complete
+    # the moment its last digit lands).
+    assert len(field_nodes) == 3
+    assert {n.props["name"] for n in field_nodes} == {"email", "password", "code"}
+    # Every field wraps exactly one control, and each declares on_validate so the
+    # reader hears about a bad value on leaving the field, not only on submit.
     for field_node in field_nodes:
-        assert any(c.type == "Input" for c in field_node.children)
+        assert any(c.type in {"Input", "PinInput"} for c in field_node.children)
+    named = {n.props["name"]: n for n in field_nodes}
+    assert named["email"].props["on_validate"] is not None
+    assert named["password"].props["on_validate"] is not None
+    pin = next(c for c in named["code"].children if c.type == "PinInput")
+    assert pin.props["on_complete"] is not None
 
 
 def test_form_validation_surfaces_errors() -> None:
@@ -476,3 +488,42 @@ def _find_handler(widget: Any, key: str, attr: str) -> Any:  # noqa: ANN401 — 
         if children:
             stack.extend(children)
     raise AssertionError(f"no widget with key={key!r} and handler {attr!r}")
+
+
+def test_theme_switcher_accent_reaches_the_buttons() -> None:
+    """Choosing an accent restyles the buttons, not just the swatches.
+
+    Regression for the trap that made this demo look broken: a ``Theme`` carries
+    a token set **and** a few loose convenience colours, and components read the
+    tokens. The example used to fill in only the loose fields, so every button
+    stayed on the baseline palette while the swatch said teal.
+    """
+    module = _load_example("theme-switcher")
+    app = _make_app(module)
+    app.start()
+
+    def button_fill(tree: Node) -> object:
+        button = next(node for node in _walk(tree) if node.key == "btn-light")
+        return button.props["style"].background
+
+    scene = app.current_tree
+    assert scene is not None
+    before = button_fill(scene.root)
+
+    swatches = [
+        node.key
+        for node in _walk(scene.root)
+        if node.key is not None and node.key.startswith("swatch-btn")
+    ]
+    assert len(swatches) >= 2, "the demo lost its accent swatches"
+    swatch = next(node for node in _walk(scene.root) if node.key == swatches[-1])
+    handler = swatch.props.get("on_click")
+    assert callable(handler), "the swatch lost its handler"
+    handler()
+    app._rebuild()  # noqa: SLF001 — the loop would do this on the next tick
+
+    scene = app.current_tree
+    assert scene is not None
+    after = button_fill(scene.root)
+    assert after != before, "the accent must reach the button, not only the swatch"
+    assert after == app.theme.tokens.schemes.light.primary

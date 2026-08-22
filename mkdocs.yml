@@ -165,6 +165,7 @@ plugins:
             "Computer vision (ONNX)": "Visão computacional (ONNX)"
             "Device panel": "Painel do dispositivo"
             "Routing & navigation": "Roteamento e navegação"
+            "Long lists": "Listas longas"
             "PWA & offline": "PWA e offline"
             "Offline + backend sync": "Offline + sincronização com backend"
             Observability: Observabilidade
@@ -254,6 +255,7 @@ nav:
       - Theming (Material 3): tutorial/theming.md
       - Icons (Material + Lucide): tutorial/icons.md
       - Routing & navigation: tutorial/routing.md
+      - Long lists: tutorial/lists.md
       - Best practices: tutorial/best-practices.md
   - Advanced User Guide:
       - Capabilities: advanced/capabilities.md

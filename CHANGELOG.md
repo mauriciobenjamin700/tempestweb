@@ -4,6 +4,72 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.68.0] — 2026-08-22
+
+Uma lista declarava as duas bordas e nenhuma delas existia na tela.
+
+### Added
+
+- **`on_end_reached` funciona — infinite scroll de verdade.** `LazyColumn`,
+  `LazyRow`, `LazyGrid` e `SectionList` declaram o handler desde sempre, e
+  nenhum dos três modos jamais o chamava: ninguém detectava o fim da lista.
+  O novo `client/lists.js` mede o progresso de scroll de toda lista marcada
+  com `data-tw-end-threshold` (o `end_reached_threshold` do core, default
+  `0.8`) e reporta `end_reached` uma vez por travessia, destravando quando a
+  lista volta para trás do limiar.
+
+  Duas geometrias contam, porque as duas existem na web: o viewport com
+  altura própria (progresso sobre `scrollHeight`, que numa lista virtualizada
+  já inclui o espaço reservado fora da janela, e portanto acompanha o
+  `item_count` real) e a lista que corre na página, como um `SectionList`
+  (progresso sobre quanto da caixa o viewport revelou).
+
+  A detecção é só por scroll, nunca depois de um batch de patches: o handler
+  típico acrescenta itens, e reavaliar ali dispararia de novo na lista maior
+  — crescimento infinito sem o usuário mover um dedo.
+
+- **`on_refresh` funciona — pull-to-refresh, o gesto que o browser não tem.**
+  Reconhecido a partir de pointer events: arrasto ao longo do eixo do widget
+  (`data-tw-refresh` = `y`/`x`, então num `LazyRow` o pull é para a direita),
+  começando na origem do scroll — fora dela o arrasto é scroll, não pull — e
+  mais longo no eixo do que atravessado. Passar de 64px arma o pull; soltar
+  armado reporta `refresh`. Widget que a app marcou como `refreshing` é
+  ignorado, então segurar a lista embaixo não enfileira um segundo reload.
+
+  O estado é visível, porque gesto sem affordance é gesto que ninguém
+  descobre: o tema base desenha uma faixa `inset` na borda do pull enquanto
+  armado e enquanto a app recarrega, `refreshing` também vira `aria-busy`, e
+  um `RefreshControl` — folha da IR que saía como div vazia — ganhou o
+  spinner que o renderizador possui.
+
+### Fixed
+
+- **O spacer da lista virtualizada era encolhido pelo flex.** A barra de
+  rolagem descrevia só a janela materializada, nunca o `item_count` — o
+  contrário do que o `virtualize.js` promete. Um viewport lazy é
+  `display:flex; flex-direction:column`, então os pseudo-elementos de spacer
+  são flex items e o browser os encolhia até caberem. Medido num Chrome real
+  no `examples/list_demo`: 200 itens, janela de 30, `::after` reservando
+  5950px e `scrollHeight` de 1050px. Com `flex:0 0 auto` nas regras geradas,
+  o mesmo cenário mede 7000px (200 × 35px) com 30 nós no DOM.
+
+  Foi o `end_reached` que expôs isso: ele mede progresso sobre o
+  `scrollHeight`, então com o spacer encolhido disparava sobre a extensão da
+  janela em vez da lista inteira — três páginas carregadas por tick de roda.
+
+### Changed
+
+- **`examples/list_demo`** passou a demonstrar as três coisas ao mesmo tempo:
+  janela virtualizada, infinite scroll até esgotar a fonte e pull-to-refresh
+  com handler `async`, para o estado `refreshing` ser observável.
+
+### Docs
+
+- **Nova página de tutorial bilíngue "Listas longas" / "Long lists"**
+  (`docs/tutorial/lists.md`): virtualização, `on_end_reached` com condição de
+  parada, `on_refresh` + `refreshing`, `RefreshControl` avulso e como o
+  cliente mede o fim em cada geometria.
+
 ## [0.67.0] — 2026-08-21
 
 ### Changed

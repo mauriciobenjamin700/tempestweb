@@ -48,6 +48,10 @@ const TAG_BY_TYPE = Object.freeze({
   // no patch path ever descends into what the renderer puts inside them.
   ProgressBar: "div",
   Spinner: "div",
+  // Draggable/DragTarget are plain boxes; what makes them work is the HTML5
+  // drag contract applied by applyDragProps + the listeners in events.js.
+  Draggable: "div",
+  DragTarget: "div",
 });
 
 // Font stack for Canvas draw_text commands (a literal, since a 2D context cannot
@@ -128,9 +132,51 @@ function applyProps(el, props) {
   }
   applyIndicatorProps(el, type, props);
   applyControlProps(el, type, props);
+  applyDragProps(el, type, props);
   applyA11yProps(el, props);
   applyEscapeHatchAttrs(el, props);
   applyLazyProps(el, type, props);
+}
+
+/** Attribute carrying a `Draggable`'s payload, read by the dragstart listener. */
+export const DRAG_DATA_ATTR = "data-tw-drag-data";
+/** Attribute marking a `DragTarget`, read by the dragover/drop listeners. */
+export const DROP_TARGET_ATTR = "data-tw-drop";
+
+/**
+ * Apply the HTML5 drag-and-drop contract for `Draggable` / `DragTarget`.
+ *
+ * The core has always had both widgets and the SSR renderer emitted their boxes,
+ * but the DOM renderer treated them as anonymous `div`s: nothing was marked
+ * `draggable`, so a "draggable" card could not be picked up in any mode, and a
+ * `DragTarget` never accepted a drop. The board rendered and did nothing.
+ *
+ * A `Draggable` becomes a real draggable element carrying its payload in
+ * {@link DRAG_DATA_ATTR}; `events.js` reads it on `dragstart` and hands it to the
+ * `DragTarget` marked with {@link DROP_TARGET_ATTR} on `drop`. The grab cursor is
+ * a default only — an explicit Style on the widget wins, and it is re-applied on
+ * every update because a `style` patch resets the element's inline cssText.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyDragProps(el, type, props) {
+  if (type === "Draggable") {
+    el.setAttribute("draggable", "true");
+    if ("drag_data" in props) {
+      const data = props.drag_data;
+      el.setAttribute(DRAG_DATA_ATTR, data == null ? "" : String(data));
+    } else if (!el.hasAttribute(DRAG_DATA_ATTR)) {
+      el.setAttribute(DRAG_DATA_ATTR, "");
+    }
+    if (!el.style.cursor) {
+      el.style.cursor = "grab";
+    }
+  } else if (type === "DragTarget") {
+    el.setAttribute(DROP_TARGET_ATTR, "");
+  }
 }
 
 /** Valid HTML attribute name — mirrors `_ATTR_KEY_RE` in the SSR renderer. */

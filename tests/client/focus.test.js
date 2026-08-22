@@ -207,3 +207,64 @@ test("dispose stops trapping", () => {
   tab(dom);
   assert.equal(dom.document.activeElement, last, "the trap no longer intervenes");
 });
+
+test("a stacked modal takes over, and closing it returns to the one below", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+
+  const first = openDialog(dom, host, ["Below"]);
+  trap.sync();
+  const below = first.querySelector("[data-tw-key=\"b0\"]");
+  assert.equal(dom.document.activeElement, below);
+
+  // Overlays stack in document order, so the second one is on top and owns the
+  // keyboard while it is open.
+  const second = openDialog(dom, host, ["Above"]);
+  second.setAttribute("data-tw-key", "dlg2");
+  trap.sync();
+  assert.ok(second.contains(dom.document.activeElement), "the top modal takes over");
+
+  second.remove();
+  trap.sync();
+  assert.ok(
+    first.contains(dom.document.activeElement),
+    "closing it hands the keyboard back to the modal below, not to the page",
+  );
+  trap.dispose();
+});
+
+test("a hidden control is not a tab stop", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host, ["Hidden", "Real"]);
+  const hidden = dialog.querySelector("[data-tw-key=\"b0\"]");
+  hidden.setAttribute("hidden", "");
+  trap.sync();
+
+  assert.equal(
+    dom.document.activeElement,
+    dialog.querySelector("[data-tw-key=\"b1\"]"),
+    "focus skips the control the app hid",
+  );
+  trap.dispose();
+});
+
+test("an editable region counts as a tab stop", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { host } = scene(dom);
+  const trap = installFocusTrap(dom.root);
+  const dialog = openDialog(dom, host, []);
+  const editable = dom.document.createElement("div");
+  editable.setAttribute("contenteditable", "true");
+  dialog.appendChild(editable);
+  trap.sync();
+
+  // A note editor inside a dialog is the whole reason the dialog is modal.
+  assert.equal(dom.document.activeElement, editable);
+  trap.dispose();
+});

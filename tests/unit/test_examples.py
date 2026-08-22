@@ -300,10 +300,19 @@ def test_form_exercises_form_widgets() -> None:
 
     form_node = next(n for n in _walk(node) if n.type == "Form")
     field_nodes = [n for n in _walk(form_node) if n.type == "FormField"]
-    assert len(field_nodes) == 2
-    # Each field wraps exactly one Input child.
+    # Email, password, and the invite code (a PinInput, which reports on_complete
+    # the moment its last digit lands).
+    assert len(field_nodes) == 3
+    assert {n.props["name"] for n in field_nodes} == {"email", "password", "code"}
+    # Every field wraps exactly one control, and each declares on_validate so the
+    # reader hears about a bad value on leaving the field, not only on submit.
     for field_node in field_nodes:
-        assert any(c.type == "Input" for c in field_node.children)
+        assert any(c.type in {"Input", "PinInput"} for c in field_node.children)
+    named = {n.props["name"]: n for n in field_nodes}
+    assert named["email"].props["on_validate"] is not None
+    assert named["password"].props["on_validate"] is not None
+    pin = next(c for c in named["code"].children if c.type == "PinInput")
+    assert pin.props["on_complete"] is not None
 
 
 def test_form_validation_surfaces_errors() -> None:

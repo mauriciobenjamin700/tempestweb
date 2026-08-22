@@ -33,6 +33,10 @@ const TAG_BY_TYPE = Object.freeze({
   Text: "span",
   Button: "button",
   Input: "input",
+  // A PinInput is a one-time-code field: a single <input> with the browser's own
+  // autofill hint and a length cap, spaced out by the base sheet so it reads as a
+  // code box. It rendered as an anonymous div before — declared, and invisible.
+  PinInput: "input",
   // A Checkbox renders as a <label> wrapping a real <input type=checkbox> plus
   // its caption text, so the box and its label show side by side and the input
   // gets its accessible name natively. The <label> is the keyed, path-addressed
@@ -377,6 +381,15 @@ function applyDragProps(el, type, props) {
   }
 }
 
+/** Attribute holding a `PinInput`'s expected code length. */
+export const PIN_LENGTH_ATTR = "data-tw-length";
+
+/** Attribute holding a `FormField`'s field name, reported with its validation. */
+export const FIELD_ATTR = "data-tw-field";
+
+/** Attribute holding a `FormField`'s current error message, painted by the sheet. */
+export const FIELD_ERROR_ATTR = "data-tw-error";
+
 /** Attribute marking a `ReorderableList`, whose children can be dragged to sort. */
 export const REORDER_ATTR = "data-tw-reorder";
 
@@ -385,6 +398,47 @@ export const PAGE_ATTR = "data-tw-page";
 
 /** Attribute holding a `PageView`'s page count. */
 export const PAGE_COUNT_ATTR = "data-tw-pages";
+
+/**
+ * Apply a `PinInput`'s props onto its `<input>`.
+ *
+ * The widget declares `length`, `value`, `secure` and `on_complete`, and used to
+ * render as an empty div: nothing to type into, so `on_change` and `on_complete`
+ * were both unreachable. It becomes a single one-time-code field rather than
+ * `length` separate boxes, because that is what the platform rewards — the
+ * browser (and iOS/Android) offer to fill `autocomplete="one-time-code"` from an
+ * SMS, `inputmode="numeric"` brings up the digit keypad, and a paste of the whole
+ * code just works. The base sheet spaces the characters so it still reads as a
+ * code box. `data-tw-length` is what the client compares against to know the code
+ * is complete.
+ *
+ * `secure` is applied only when the patch mentions it, for the same reason as an
+ * Input: typing patches `value` alone, and re-deriving the type from every props
+ * bag would unmask the code on the first keystroke.
+ *
+ * @param {HTMLElement} el  The PinInput element.
+ * @param {Object} props    The props to apply.
+ * @returns {void}
+ */
+function applyPinProps(el, props) {
+  if ("secure" in props) {
+    el.setAttribute("type", props.secure ? "password" : "text");
+  } else if (!el.hasAttribute("type")) {
+    el.setAttribute("type", "text");
+  }
+  if (!el.hasAttribute("inputmode")) {
+    el.setAttribute("inputmode", "numeric");
+    el.setAttribute("autocomplete", "one-time-code");
+  }
+  if ("length" in props && props.length != null) {
+    const length = Math.max(1, Math.trunc(Number(props.length)));
+    el.setAttribute("maxlength", String(length));
+    el.setAttribute(PIN_LENGTH_ATTR, String(length));
+  }
+  if ("value" in props) {
+    el.value = props.value == null ? "" : String(props.value);
+  }
+}
 
 /**
  * Apply the contract of the two container widgets whose gesture the DOM lacks.
@@ -407,6 +461,26 @@ export const PAGE_COUNT_ATTR = "data-tw-pages";
  * @returns {void}
  */
 function applySortAndPageProps(el, type, props) {
+  if (type === "FormField") {
+    // The name is what `ValidationEvent.field` carries, and the app looks its
+    // validators up by it; without it on the element the client has nothing to
+    // report and `on_validate` can never fire.
+    if ("name" in props) {
+      setOrRemove(el, FIELD_ATTR, props.name);
+    }
+    // `error` is a prop, not a child, so it cannot become an element without
+    // shifting the index the field's own child is addressed by. It goes onto an
+    // attribute the base sheet paints through `::after` — the same trick a
+    // Dialog's title uses — plus `aria-invalid`, so the message is announced and
+    // not merely drawn.
+    if ("error" in props) {
+      const error = props.error;
+      const has = error != null && String(error) !== "";
+      setOrRemove(el, FIELD_ERROR_ATTR, has ? error : null);
+      setOrRemove(el, "aria-invalid", has ? "true" : null);
+    }
+    return;
+  }
   if (type === "ReorderableList") {
     el.setAttribute(REORDER_ATTR, "");
     return;
@@ -1033,6 +1107,8 @@ function applyControlProps(el, type, props) {
     if ("max_length" in props) {
       setOrRemove(el, "maxlength", props.max_length);
     }
+  } else if (type === "PinInput") {
+    applyPinProps(el, props);
   } else if (type === "Checkbox") {
     const input = ensureCheckboxInput(el);
     if ("checked" in props) {

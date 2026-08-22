@@ -136,8 +136,10 @@ Armadilhas já pagas neste repo:
   `flex:0 0 auto` ou o browser o encolhe.
 - Scroll e gesto são **fluxo** de eventos: reportar posição intermediária faz a
   app desfazer o próprio movimento. Reporte quando assentar.
-- Widget do core ignora kwarg que não declara (`Container(on_click=...)` é aceito
-  e descartado). Confira o campo em `model_fields` antes de culpar o cliente.
+- Widget do core **recusa** kwarg que não declara desde `tempest-core` 0.14.0
+  (`Container(on_click=...)` levanta `ValidationError` com o nome do campo). Antes
+  era aceito e descartado em silêncio — se você vê o erro, ele está dizendo a
+  verdade: use o widget que declara aquele handler.
 
 ## Git
 

@@ -14,13 +14,17 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Text, Widget
-from tempest_core.widgets.events import PanEvent, ScaleEvent, TapEvent
-from tempest_core.widgets.gestures import (
+from tempest_core import (
+    App,
     GestureDetector,
     InteractiveViewer,
+    PanEvent,
     PanHandler,
+    ScaleEvent,
     ScaleHandler,
+    TapEvent,
+    Text,
+    Widget,
 )
 from tempestweb.runtime import AppSession, WasmRuntime
 from tempestweb.transports import WasmTransport

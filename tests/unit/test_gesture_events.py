@@ -15,10 +15,16 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Column, Text, Widget
-from tempest_core.widgets.events import PageChangeEvent, ReorderEvent
-from tempest_core.widgets.gestures import ReorderableList
-from tempest_core.widgets.layout import PageView
+from tempest_core import (
+    App,
+    Column,
+    PageChangeEvent,
+    PageView,
+    ReorderableList,
+    ReorderEvent,
+    Text,
+    Widget,
+)
 from tempestweb.runtime import AppSession, WasmRuntime
 from tempestweb.transports import WasmTransport
 from tempestweb.transports.base import Event, Patch, TransportClosedError

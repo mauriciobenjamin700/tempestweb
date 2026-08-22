@@ -22,8 +22,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qsl, urlencode, urlsplit
 
-from tempest_core import Route
-from tempest_core.navigation import routes_from_path
+from tempest_core import Route, routes_from_path
 
 __all__ = ["match_path", "path_to_routes", "route_to_path"]
 

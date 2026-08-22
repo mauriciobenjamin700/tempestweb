@@ -16,8 +16,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from tempest_core import Text, build
-from tempest_core.components import HStack, VStack
+from tempest_core import HStack, Text, VStack, build
 
 FIXTURES_DIR: Path = Path(__file__).resolve().parents[1] / "fixtures"
 COMPONENTS_FIXTURE: Path = FIXTURES_DIR / "transpile_component_samples.json"

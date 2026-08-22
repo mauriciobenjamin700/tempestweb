@@ -11,20 +11,25 @@ import pytest
 
 from tempest_core import (
     Button,
+    Canvas,
+    Checkbox,
+    Color,
     Column,
     Component,
     Container,
+    Edge,
+    Icon,
+    Image,
+    Input,
+    ProgressBar,
     Row,
+    Spinner,
+    Stack,
     Style,
     Text,
     Widget,
     build,
 )
-from tempest_core.style import Color, Edge
-from tempest_core.widgets.indicators import ProgressBar, Spinner
-from tempest_core.widgets.inputs import Checkbox, Input
-from tempest_core.widgets.layout import Stack
-from tempest_core.widgets.media import Canvas, Icon, Image
 from tempestweb.html import render_document, render_to_html
 
 # ---------------------------------------------------------------------------

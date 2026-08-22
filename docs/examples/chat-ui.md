@@ -78,7 +78,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from tempest_core import App, Style, Widget
-from tempest_core.components.base import (
+from tempest_core import (
     ACCENT,
     BACKGROUND,
     MUTED,
@@ -86,15 +86,15 @@ from tempest_core.components.base import (
     ON_SURFACE,
     SURFACE,
 )
-from tempest_core.components.feedback import Banner
-from tempest_core.style import (
+from tempest_core import Banner
+from tempest_core import (
     AlignItems,
     Color,
     Edge,
     FontWeight,
     JustifyContent,
 )
-from tempest_core.widgets import (
+from tempest_core import (
     Button,
     Column,
     Container,
@@ -103,7 +103,7 @@ from tempest_core.widgets import (
     Row,
     Text,
 )
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Color palette additions specific to this example

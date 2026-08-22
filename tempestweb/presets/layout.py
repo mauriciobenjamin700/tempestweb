@@ -13,8 +13,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Literal
 
-from tempest_core import Style, Text, Widget
-from tempest_core.widgets import Column, Stack
+from tempest_core import Column, Stack, Style, Text, Widget
 from tempestweb.presets import roles
 
 __all__ = ["Level", "box", "heading", "muted", "page_header"]

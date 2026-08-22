@@ -32,21 +32,31 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
+    App,
     Border,
+    Button,
     Color,
+    Column,
+    Container,
     Curve,
     Edge,
     FontWeight,
     JustifyContent,
+    MediaQueryData,
+    Row,
+    Semantics,
+    Style,
+    Switch,
+    Text,
+    Theme,
+    ThemeChangeEvent,
+    ThemeMode,
+    ToggleEvent,
     Transition,
+    Widget,
 )
-from tempest_core.theme import MediaQueryData, Theme, ThemeMode
-from tempest_core.widgets import Button, Column, Container, Row, Switch, Text
-from tempest_core.widgets.base import Semantics
-from tempest_core.widgets.events import ThemeChangeEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Palette definitions

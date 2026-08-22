@@ -12,7 +12,7 @@ actually reads onto their variables and returns a CSS block to drop in the
 document head, **before** the base sheet is installed at mount:
 
     from tempest_core import Theme, ThemeMode
-    from tempest_core.style import Color
+    from tempest_core import Color
     from tempestweb.html import theme_css
 
     theme = Theme.from_seed(Color(r=39, g=58, b=79), mode=ThemeMode.SYSTEM)
@@ -37,9 +37,7 @@ from typing import TYPE_CHECKING
 from tempest_core import ThemeMode
 
 if TYPE_CHECKING:
-    from tempest_core import Theme
-    from tempest_core.style import Color
-    from tempest_core.tokens import ColorScheme
+    from tempest_core import Color, ColorScheme, Theme
 
 __all__: list[str] = ["ROLE_BY_VARIABLE", "theme_css"]
 
@@ -117,7 +115,7 @@ def theme_css(theme: Theme) -> str:
     Example:
         ```python
         from tempest_core import Theme, ThemeMode
-        from tempest_core.style import Color
+        from tempest_core import Color
         from tempestweb.html import theme_css
 
 

@@ -19,8 +19,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Button, Column, Container, Row, Style, Text, Widget
-from tempest_core.style import Color, Edge
+from tempest_core import (
+    App,
+    Button,
+    Color,
+    Column,
+    Container,
+    Edge,
+    Row,
+    Style,
+    Text,
+    Widget,
+)
 
 #: Viewport width (px) at which the layout switches from stacked to side by side.
 BREAKPOINT = 700.0

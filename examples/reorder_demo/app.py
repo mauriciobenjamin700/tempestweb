@@ -16,10 +16,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Column, Container, Style, Text, Widget
-from tempest_core.style import Color, Edge
-from tempest_core.widgets.events import ReorderEvent
-from tempest_core.widgets.gestures import ReorderableList
+from tempest_core import (
+    App,
+    Color,
+    Column,
+    Container,
+    Edge,
+    ReorderableList,
+    ReorderEvent,
+    Style,
+    Text,
+    Widget,
+)
 
 
 @dataclass

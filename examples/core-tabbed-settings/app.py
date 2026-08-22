@@ -15,8 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import App, Column, Edge, Row, Style, Text, Widget
 from tempestweb.components import Card, Chip, RadioGroup, SegmentedControl, Tabs
 
 TAB_LABELS: list[str] = ["Appearance", "Notifications"]

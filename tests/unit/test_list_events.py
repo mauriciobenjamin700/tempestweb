@@ -15,9 +15,17 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Column, Container, Text, Widget
-from tempest_core.widgets.events import EndReachedEvent, RefreshEvent
-from tempest_core.widgets.lists import LazyColumn, RefreshControl
+from tempest_core import (
+    App,
+    Column,
+    Container,
+    EndReachedEvent,
+    LazyColumn,
+    RefreshControl,
+    RefreshEvent,
+    Text,
+    Widget,
+)
 from tempestweb.runtime import AppSession, WasmRuntime
 from tempestweb.transports import WasmTransport
 from tempestweb.transports.base import Event, Patch, TransportClosedError

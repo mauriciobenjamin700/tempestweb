@@ -12,9 +12,17 @@ from dataclasses import dataclass, field
 
 from fastapi.testclient import TestClient
 
-from tempest_core import App, Column, Text, Widget, build_scene
-from tempest_core.widgets import ActionSheet, Menu, MenuItem
-from tempest_core.widgets.events import MenuSelectEvent
+from tempest_core import (
+    ActionSheet,
+    App,
+    Column,
+    Menu,
+    MenuItem,
+    MenuSelectEvent,
+    Text,
+    Widget,
+    build_scene,
+)
 from tempestweb.runtime.events import coerce_event
 from tempestweb.runtime.serialize import find_node_type, resolve_handler
 from tempestweb.server import create_app

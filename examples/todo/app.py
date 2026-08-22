@@ -18,18 +18,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import (
+    App,
     Button,
     Checkbox,
     Column,
+    Edge,
     Input,
     LazyColumn,
     Row,
+    Style,
     Text,
+    TextChangeEvent,
+    Widget,
 )
-from tempest_core.widgets.events import TextChangeEvent
 
 
 @dataclass

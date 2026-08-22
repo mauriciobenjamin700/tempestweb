@@ -172,7 +172,7 @@ Dentro de `view()`, dois handlers respondem às interações do usuário:
 
 ```python
 from tempest_core import App, Widget
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import TextChangeEvent
 
 
 def view(app: App[GreetingState]) -> Widget:
@@ -248,9 +248,9 @@ Agora montamos a UI. O alinhamento de texto espelha a direção da localidade:
 
 ```python
 from tempest_core import Style
-from tempest_core.components import Card, Divider, SegmentedControl
-from tempest_core.style import Edge, FontWeight, TextAlign
-from tempest_core.widgets import Column, Input, Text
+from tempest_core import Card, Divider, SegmentedControl
+from tempest_core import Edge, FontWeight, TextAlign
+from tempest_core import Column, Input, Text
 
 
 def view(app: App[GreetingState]) -> Widget:
@@ -386,10 +386,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Locale, Style, Widget, t
-from tempest_core.components import Card, Divider, SegmentedControl
-from tempest_core.style import Edge, FontWeight, TextAlign
-from tempest_core.widgets import Column, Input, Text
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import Card, Divider, SegmentedControl
+from tempest_core import Edge, FontWeight, TextAlign
+from tempest_core import Column, Input, Text
+from tempest_core import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Translation catalogue

@@ -478,8 +478,8 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import Edge
+from tempest_core import (
     Button,
     Column,
     Input,

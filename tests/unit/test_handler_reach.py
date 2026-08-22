@@ -30,7 +30,7 @@ import re
 from pathlib import Path
 
 import tempest_core.widgets as widgets
-from tempest_core.widgets.base import Widget
+from tempest_core import Widget
 from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS
 
 ROOT = Path(__file__).resolve().parents[2]

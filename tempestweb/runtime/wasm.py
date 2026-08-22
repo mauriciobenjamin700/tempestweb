@@ -32,8 +32,7 @@ import inspect
 from collections.abc import Callable, Coroutine
 from typing import Any, Generic, TypeVar
 
-from tempest_core import App, Node, Scene, Theme, Widget
-from tempest_core.core.ir import Patch
+from tempest_core import App, Node, Patch, Scene, Theme, Widget
 from tempestweb.runtime.background import install_spawner
 from tempestweb.runtime.events import (
     apply_media,

@@ -98,8 +98,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import Edge
+from tempest_core import Button, Column, Row, Spinner, Text
 from tempestweb.native import clipboard
 from tempestweb.native.share import ShareOutcome, ShareResult
 from tempestweb.native.share import share as _native_share
@@ -393,8 +393,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import Edge
+from tempest_core import Button, Column, Row, Spinner, Text
 from tempestweb.native import clipboard
 from tempestweb.native.share import ShareOutcome, ShareResult
 from tempestweb.native.share import share as _native_share

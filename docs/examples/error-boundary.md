@@ -332,7 +332,7 @@ O layout tem quatro seções fora da boundary (que nunca são afetadas por ela) 
 
 ```python
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 
 
 def view(app: App[BoundaryState]) -> Widget:
@@ -438,7 +438,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.observability import (
     ConsoleTelemetryAdapter,
     ErrorBoundary,

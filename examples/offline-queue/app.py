@@ -22,10 +22,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Column, Input, Row, Text
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import (
+    App,
+    Button,
+    Column,
+    Edge,
+    Input,
+    Row,
+    Style,
+    Text,
+    TextChangeEvent,
+    Widget,
+)
 from tempestweb import native
 
 

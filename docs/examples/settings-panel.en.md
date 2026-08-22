@@ -116,7 +116,7 @@ def make_state() -> SettingsState:
 Two event types arrive from input controls. Import them from `tempest_core.widgets.events`:
 
 ```python
-from tempest_core.widgets.events import SlideEvent, ToggleEvent
+from tempest_core import SlideEvent, ToggleEvent
 ```
 
 | Type | Used by | Relevant field |
@@ -134,10 +134,10 @@ The first section uses `Switch` for the master control and two `Checkbox` widget
 
 ```python
 from tempest_core import App, Style, Widget
-from tempest_core.components import AppBar, Card, Divider, Scaffold
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import Checkbox, Column, Row, Switch, Text
-from tempest_core.widgets.events import ToggleEvent
+from tempest_core import AppBar, Card, Divider, Scaffold
+from tempest_core import AlignItems, Edge, FontWeight
+from tempest_core import Checkbox, Column, Row, Switch, Text
+from tempest_core import ToggleEvent
 
 
 def _notifications_card(app: App[SettingsState]) -> Widget:
@@ -214,9 +214,9 @@ def _notifications_card(app: App[SettingsState]) -> Widget:
 This section introduces `SegmentedControl` (for theme and quality) and `Slider` (for font size):
 
 ```python
-from tempest_core.components import SegmentedControl
-from tempest_core.widgets import Slider
-from tempest_core.widgets.events import SlideEvent
+from tempest_core import SegmentedControl
+from tempest_core import Slider
+from tempest_core import SlideEvent
 
 
 def _appearance_card(app: App[SettingsState]) -> Widget:
@@ -368,7 +368,7 @@ def _audio_card(app: App[SettingsState]) -> Widget:
 `RadioGroup` is the right choice for single selection when all items should be visible at once:
 
 ```python
-from tempest_core.components import RadioGroup
+from tempest_core import RadioGroup
 
 
 def _language_card(app: App[SettingsState]) -> Widget:
@@ -531,7 +531,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
     AppBar,
     Card,
     Divider,
@@ -539,8 +539,8 @@ from tempest_core.components import (
     Scaffold,
     SegmentedControl,
 )
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import (
+from tempest_core import AlignItems, Edge, FontWeight
+from tempest_core import (
     Checkbox,
     Column,
     Row,
@@ -548,7 +548,7 @@ from tempest_core.widgets import (
     Switch,
     Text,
 )
-from tempest_core.widgets.events import SlideEvent, ToggleEvent
+from tempest_core import SlideEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Constants

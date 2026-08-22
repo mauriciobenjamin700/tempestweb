@@ -27,10 +27,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets.events import CameraFrameEvent, QrScanEvent
-from tempest_core.widgets.media import CameraPreview, QrScanner
+from tempest_core import (
+    App,
+    CameraFrameEvent,
+    CameraPreview,
+    Column,
+    Edge,
+    QrScanEvent,
+    QrScanner,
+    Row,
+    Style,
+    Text,
+    Widget,
+)
 
 #: How often the preview samples a frame. 500ms is deliberately slow: in Mode B
 #: every frame is a round trip, and this demo only needs to prove they arrive.

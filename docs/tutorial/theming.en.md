@@ -84,7 +84,7 @@ the cascade. The interaction states (hover/focus) keep working on top.
 
 ```python
 from tempest_core import Button, Style
-from tempest_core.style import Color
+from tempest_core import Color
 
 # The pill, the typography and the state layer stay — only the color changes.
 Button(
@@ -111,7 +111,7 @@ direct: `offset_x offset_y blur color`.
 
 ```python
 from tempest_core import Column, Text, Widget
-from tempest_core.style import Color, Edge, Shadow, Style
+from tempest_core import Color, Edge, Shadow, Style
 
 
 def card(content: str) -> Widget:
@@ -240,7 +240,7 @@ Python and need it on the page.
 
 ```python
 from tempest_core import Theme, ThemeMode
-from tempest_core.style import Color
+from tempest_core import Color
 from tempestweb.html import theme_css
 
 
@@ -283,7 +283,7 @@ your `view`**.
 from dataclasses import dataclass
 
 from tempest_core import App, Theme, Widget
-from tempest_core.style import Color
+from tempest_core import Color
 
 
 @dataclass
@@ -347,7 +347,7 @@ accent from the families the core names (`primary`, `secondary`, `tertiary`,
 
 ```python
 from tempest_core import App, Column, Widget
-from tempest_core.widgets import ProgressBar, Spinner
+from tempest_core import ProgressBar, Spinner
 
 
 def view(app: App[State]) -> Widget:

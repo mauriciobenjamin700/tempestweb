@@ -84,7 +84,7 @@ estados de interação (hover/foco) continuam funcionando por cima.
 
 ```python
 from tempest_core import Button, Style
-from tempest_core.style import Color
+from tempest_core import Color
 
 # A pílula, a tipografia e o state layer continuam — só a cor muda.
 Button(
@@ -111,7 +111,7 @@ desenham. O mapeamento é direto: `offset_x offset_y blur color`.
 
 ```python
 from tempest_core import Column, Text, Widget
-from tempest_core.style import Color, Edge, Shadow, Style
+from tempest_core import Color, Edge, Shadow, Style
 
 
 def card(content: str) -> Widget:
@@ -240,7 +240,7 @@ página.
 
 ```python
 from tempest_core import Theme, ThemeMode
-from tempest_core.style import Color
+from tempest_core import Color
 from tempestweb.html import theme_css
 
 
@@ -282,7 +282,7 @@ curto, e ele cobre as duas metades: **declare `THEME` ao lado da sua `view`**.
 from dataclasses import dataclass
 
 from tempest_core import App, Theme, Widget
-from tempest_core.style import Color
+from tempest_core import Color
 
 
 @dataclass
@@ -345,7 +345,7 @@ entre as famílias que o core nomeia (`primary`, `secondary`, `tertiary`, `error
 
 ```python
 from tempest_core import App, Column, Widget
-from tempest_core.widgets import ProgressBar, Spinner
+from tempest_core import ProgressBar, Spinner
 
 
 def view(app: App[State]) -> Widget:

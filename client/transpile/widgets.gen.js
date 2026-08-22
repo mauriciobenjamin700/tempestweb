@@ -14,7 +14,7 @@ void Style;
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function ActionSheet({ key = null, focusOrder = null, focusable = null, items = [], semantics = null, tag = null, title = null, attrs = {}, style = null, onSelect = null } = {}) {
+export function ActionSheet({ key = null, focusOrder = null, focusable = null, items = [], semantics = null, tag = null, title = null, attrs = {}, style = null, onSelect = null, onDismiss = null } = {}) {
   return {
     type: "ActionSheet",
     key,
@@ -23,6 +23,7 @@ export function ActionSheet({ key = null, focusOrder = null, focusable = null, i
       focus_order: focusOrder,
       focusable: focusable,
       items: items,
+      on_dismiss: null,
       on_select: null,
       semantics: semantics,
       style: style,
@@ -30,7 +31,7 @@ export function ActionSheet({ key = null, focusOrder = null, focusable = null, i
       title: title,
     },
     children: [],
-    __handlers: { "select": onSelect },
+    __handlers: { "select": onSelect, "dismiss": onDismiss },
   };
 }
 

@@ -79,8 +79,8 @@ from enum import StrEnum
 from typing import Any
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import Card
-from tempest_core.style import (
+from tempest_core import Card
+from tempest_core import (
     AlignItems,
     Color,
     Edge,
@@ -88,7 +88,7 @@ from tempest_core.style import (
     JustifyContent,
     TextAlign,
 )
-from tempest_core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import Button, Column, Row, Spinner, Text
 from tempestweb.native import geolocation
 from tempestweb.native.geolocation import Position
 from tempestweb.native.http import HttpResponse, request
@@ -499,8 +499,8 @@ from enum import StrEnum
 from typing import Any
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import Card
-from tempest_core.style import (
+from tempest_core import Card
+from tempest_core import (
     AlignItems,
     Color,
     Edge,
@@ -508,7 +508,7 @@ from tempest_core.style import (
     JustifyContent,
     TextAlign,
 )
-from tempest_core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import Button, Column, Row, Spinner, Text
 from tempestweb.native import geolocation
 from tempestweb.native.geolocation import Position
 from tempestweb.native.http import HttpResponse, request

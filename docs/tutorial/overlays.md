@@ -12,7 +12,7 @@ da tela:
 
 ```python
 from tempest_core import App, Button, Text, Widget
-from tempest_core.widgets.overlays import Dialog
+from tempest_core import Dialog
 
 
 def view(app: App[State]) -> Widget:
@@ -72,8 +72,8 @@ dois registros que o widget `Icon` usa: nome puro é Lucide, prefixo `material:`
 é Material. Dá para misturar por item.
 
 ```python
-from tempest_core.widgets.events import MenuSelectEvent
-from tempest_core.widgets.overlays import ActionSheet, MenuItem
+from tempest_core import MenuSelectEvent
+from tempest_core import ActionSheet, MenuItem
 
 
 def open_actions() -> None:
@@ -109,7 +109,7 @@ posiciona logo abaixo dele depois do layout, limitando à viewport para que um
 menu aberto na borda continue alcançável:
 
 ```python
-from tempest_core.widgets.overlays import Menu
+from tempest_core import Menu
 
 Menu(
     key="row-menu",

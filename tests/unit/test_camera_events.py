@@ -14,9 +14,16 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Column, Text, Widget
-from tempest_core.widgets.events import CameraFrameEvent, QrScanEvent
-from tempest_core.widgets.media import CameraPreview, QrScanner
+from tempest_core import (
+    App,
+    CameraFrameEvent,
+    CameraPreview,
+    Column,
+    QrScanEvent,
+    QrScanner,
+    Text,
+    Widget,
+)
 from tempestweb.runtime import AppSession, WasmRuntime
 from tempestweb.transports import WasmTransport
 from tempestweb.transports.base import Event, Patch, TransportClosedError

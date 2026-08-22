@@ -21,9 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Column, Row, Text
+from tempest_core import App, Button, Column, Edge, Row, Style, Text, Widget
 from tempestweb import native
 
 

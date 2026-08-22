@@ -86,7 +86,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 
 
 @dataclass

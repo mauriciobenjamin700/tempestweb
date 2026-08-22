@@ -23,22 +23,25 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import (
+    App,
     Button,
     Column,
     Dropdown,
+    Edge,
     Form,
     FormField,
     FormState,
     Input,
     Row,
+    SelectEvent,
+    Style,
     Text,
     TextArea,
+    TextChangeEvent,
     Validator,
+    Widget,
 )
-from tempest_core.widgets.events import SelectEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # State

@@ -21,18 +21,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Style, Widget
-from tempest_core.components import Chip
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import (
+    App,
     Autocomplete,
     Button,
+    Chip,
     Column,
+    Edge,
     Row,
+    SelectEvent,
+    Style,
     Text,
+    TextChangeEvent,
+    Widget,
     Wrap,
 )
-from tempest_core.widgets.events import SelectEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Data catalog

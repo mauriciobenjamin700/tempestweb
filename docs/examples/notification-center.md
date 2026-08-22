@@ -219,9 +219,9 @@ O cabeçalho combina um `Text` com `grow=1.0` (ocupa o espaço sobrando), um `Ba
 
 ```python
 from tempest_core import App, Style, Widget
-from tempest_core.components.feedback import Badge, Banner, EmptyState
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Column, LazyColumn, Row, Text
+from tempest_core import Badge, Banner, EmptyState
+from tempest_core import Edge
+from tempest_core import Button, Column, LazyColumn, Row, Text
 
 
 def view(app: App[NotificationState]) -> Widget:
@@ -406,9 +406,9 @@ from enum import StrEnum
 from uuid import uuid4
 
 from tempest_core import App, Style, Widget
-from tempest_core.components.feedback import Badge, Banner, EmptyState
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Column, LazyColumn, Row, Text
+from tempest_core import Badge, Banner, EmptyState
+from tempest_core import Edge
+from tempest_core import Button, Column, LazyColumn, Row, Text
 
 # ---------------------------------------------------------------------------
 # Domain model

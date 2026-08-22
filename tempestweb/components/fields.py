@@ -22,29 +22,35 @@ from typing import Any
 
 from pydantic import Field
 
-from tempest_core import Column, Style, Text, Widget
-from tempest_core.components.brforms import (
+from tempest_core import (
     AddressInput as AddressField,
 )
-from tempest_core.components.brforms import (
+from tempest_core import (
     CNPJInput as CNPJField,
 )
-from tempest_core.components.brforms import (
-    CPFInput as CPFField,
-)
-from tempest_core.components.brforms import (
-    PhoneInput as PhoneField,
-)
-from tempest_core.style import Color, Edge, FontWeight
-from tempest_core.validators import (
+from tempest_core import (
+    Color,
+    Column,
+    Component,
+    Edge,
+    FontWeight,
+    Input,
+    KeyboardType,
+    Style,
+    Text,
+    TextChangeEvent,
+    Widget,
     validate_cnpj,
     validate_cpf,
     validate_email,
     validate_phone,
 )
-from tempest_core.widgets import Component
-from tempest_core.widgets.events import TextChangeEvent
-from tempest_core.widgets.inputs import Input, KeyboardType
+from tempest_core import (
+    CPFInput as CPFField,
+)
+from tempest_core import (
+    PhoneInput as PhoneField,
+)
 
 __all__ = [
     "AddressField",

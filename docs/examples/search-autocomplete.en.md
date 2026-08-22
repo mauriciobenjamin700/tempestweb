@@ -76,9 +76,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import Chip
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import Chip
+from tempest_core import Edge
+from tempest_core import (
     Autocomplete,
     Button,
     Column,
@@ -86,7 +86,7 @@ from tempest_core.widgets import (
     Text,
     Wrap,
 )
-from tempest_core.widgets.events import SelectEvent, TextChangeEvent
+from tempest_core import SelectEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Data catalog

@@ -17,27 +17,28 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from functools import partial
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
+    App,
     Border,
-    Color,
-    Edge,
-    FontWeight,
-    JustifyContent,
-)
-from tempest_core.widgets import (
     Button,
+    Color,
     Column,
     Container,
+    DragEvent,
     Draggable,
     DragTarget,
+    Edge,
+    FontWeight,
     Input,
+    JustifyContent,
     Row,
     ScrollView,
+    Style,
     Text,
+    TextChangeEvent,
+    Widget,
 )
-from tempest_core.widgets.events import DragEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Domain types

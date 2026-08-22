@@ -18,8 +18,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from tempest_core import App, Button, Column, Theme, Widget
-from tempest_core.style import Color
+from tempest_core import App, Button, Color, Column, Theme, Widget
 from tempestweb.runtime import WasmRuntime
 from tempestweb.runtime.wasm_main import WasmAppHandle
 from tempestweb.transports import WasmTransport

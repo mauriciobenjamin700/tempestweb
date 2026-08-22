@@ -18,9 +18,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from math import ceil
 
-from tempest_core import App, Style, Text, Widget
-from tempest_core.components import Badge, ChartSeries, LineChart
-from tempest_core.widgets import Button, Input
+from tempest_core import (
+    App,
+    Badge,
+    Button,
+    ChartSeries,
+    Input,
+    LineChart,
+    Style,
+    Text,
+    Widget,
+)
 from tempestweb.presets import (
     FormField,
     FormSection,

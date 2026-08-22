@@ -93,7 +93,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
     AppBar,
     Avatar,
     Badge,
@@ -105,7 +105,7 @@ from tempest_core.components import (
     Scaffold,
     Sidebar,
 )
-from tempest_core.components.base import (
+from tempest_core import (
     ACCENT,
     BACKGROUND,
     MUTED,
@@ -113,8 +113,8 @@ from tempest_core.components.base import (
     ON_SURFACE,
     SURFACE,
 )
-from tempest_core.style import AlignItems, Color, Edge, FontWeight
-from tempest_core.widgets import Button, Column, Container, Row, Text
+from tempest_core import AlignItems, Color, Edge, FontWeight
+from tempest_core import Button, Column, Container, Row, Text
 
 # ---------------------------------------------------------------------------
 # Data model

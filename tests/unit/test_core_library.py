@@ -13,8 +13,7 @@ from typing import Any
 
 import tempest_core.components as core_components
 import tempestweb.components as tw_components
-from tempest_core import Node, Text, build
-from tempest_core.components import (
+from tempest_core import (
     Alert,
     BarChart,
     Card,
@@ -24,7 +23,10 @@ from tempest_core.components import (
     EmptyState,
     LineChart,
     ListTile,
+    Node,
     Stat,
+    Text,
+    build,
 )
 from tempestweb.components import library
 
@@ -89,7 +91,10 @@ def test_sampled_components_lower_to_renderable_leaves() -> None:
     """A representative sample of components lowers to renderable node types."""
     samples: list[Any] = [
         Card(children=[Text(content="body")]),
-        Alert(message="heads up"),
+        # `Alert` declares title/body, not message: with extra="forbid" upstream
+        # this line used to build an *empty* alert and the test passed anyway,
+        # because it only checks the node types a component lowers to.
+        Alert(title="heads up", body="the disk is nearly full"),
         Chip(label="tag"),
         Divider(),
         EmptyState(title="nothing here"),

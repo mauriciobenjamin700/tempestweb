@@ -259,7 +259,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.components import (
     Accordion,
     Avatar,

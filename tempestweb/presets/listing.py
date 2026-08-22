@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from tempest_core import Style, Text, Widget
-from tempest_core.components import EmptyState, SearchBar
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Row, TextChangeEvent
+from tempest_core import (
+    Button,
+    Edge,
+    EmptyState,
+    Row,
+    SearchBar,
+    Style,
+    Text,
+    TextChangeEvent,
+    Widget,
+)
 from tempestweb.presets import roles
 from tempestweb.presets.layout import box, page_header
 from tempestweb.presets.models import TableColumn

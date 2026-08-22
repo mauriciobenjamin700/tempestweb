@@ -24,10 +24,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Input
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import (
+    App,
+    Column,
+    Edge,
+    Input,
+    Row,
+    Style,
+    Text,
+    TextChangeEvent,
+    Widget,
+)
 
 __all__ = ["ConverterState", "make_state", "view"]
 

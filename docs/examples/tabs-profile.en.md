@@ -62,7 +62,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
     AppBar,
     Avatar,
     Card,
@@ -70,15 +70,15 @@ from tempest_core.components import (
     ListTile,
     Scaffold,
 )
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import (
+from tempest_core import AlignItems, Edge, FontWeight
+from tempest_core import (
     Column,
     Row,
     Switch,
     TabView,
     Text,
 )
-from tempest_core.widgets.events import RouteChangeEvent, ToggleEvent
+from tempest_core import RouteChangeEvent, ToggleEvent
 
 _TABS: list[str] = ["Overview", "Activity", "Settings"]
 

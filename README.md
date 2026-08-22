@@ -168,7 +168,7 @@ runtime. HTML is just another leaf renderer.
 
 ```python
 from tempest_core import Column, Text, Button, Style
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.html import render_to_html, render_document
 
 tree: Column = Column(

@@ -14,9 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import App, Column, Edge, Row, Style, Text, TextChangeEvent, Widget
 from tempestweb.components import Badge, DataTable, SearchBar
 
 #: The grid columns, in display order.

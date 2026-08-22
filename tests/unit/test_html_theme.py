@@ -16,8 +16,7 @@ import re
 
 import pytest
 
-from tempest_core import Theme, ThemeMode
-from tempest_core.style import Color
+from tempest_core import Color, Theme, ThemeMode
 from tempestweb.html import ROLE_BY_VARIABLE, theme_css
 
 SEED: Color = Color(r=39, g=58, b=79)

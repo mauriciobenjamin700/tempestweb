@@ -23,11 +23,21 @@ import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempest_core import App, Style, Widget
-from tempest_core.components import DataTable, SearchBar
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import Button, Column, Row, Text
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import (
+    AlignItems,
+    App,
+    Button,
+    Column,
+    DataTable,
+    Edge,
+    FontWeight,
+    Row,
+    SearchBar,
+    Style,
+    Text,
+    TextChangeEvent,
+    Widget,
+)
 
 # ---------------------------------------------------------------------------
 # Domain data

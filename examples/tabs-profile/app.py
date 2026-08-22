@@ -25,24 +25,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
+    AlignItems,
+    App,
     AppBar,
     Avatar,
     Card,
-    Divider,
-    ListTile,
-    Scaffold,
-)
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import (
     Column,
+    Divider,
+    Edge,
+    FontWeight,
+    ListTile,
+    RouteChangeEvent,
     Row,
+    Scaffold,
+    Style,
     Switch,
     TabView,
     Text,
+    ToggleEvent,
+    Widget,
 )
-from tempest_core.widgets.events import RouteChangeEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # State

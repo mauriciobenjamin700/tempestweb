@@ -13,8 +13,8 @@ biblioteca:
 
 ```python
 from tempest_core import App, Text, Widget
-from tempest_core.widgets.events import DragEvent
-from tempest_core.widgets.gestures import Draggable, DragTarget
+from tempest_core import DragEvent
+from tempest_core import Draggable, DragTarget
 
 
 def view(app: App[Board]) -> Widget:
@@ -48,9 +48,9 @@ trabalho da app, porque a ordem é estado:
 
 ```python
 from tempest_core import App, Container, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets.events import ReorderEvent
-from tempest_core.widgets.gestures import ReorderableList
+from tempest_core import Edge
+from tempest_core import ReorderEvent
+from tempest_core import ReorderableList
 
 
 def view(app: App[Tasks]) -> Widget:
@@ -97,8 +97,8 @@ scroller horizontal com *snap*, o que dá swipe no touch, no trackpad e no
 parou; isso é o que o cliente reporta.
 
 ```python
-from tempest_core.widgets.events import PageChangeEvent
-from tempest_core.widgets.layout import PageView
+from tempest_core import PageChangeEvent
+from tempest_core import PageView
 
 
 def view(app: App[Tour]) -> Widget:
@@ -139,8 +139,8 @@ eles reportam é outro:
 | `InteractiveViewer` | `on_interaction` | `ScaleEvent` — um dedo faz pan, dois fazem zoom |
 
 ```python
-from tempest_core.widgets.events import PanEvent, ScaleEvent
-from tempest_core.widgets.gestures import InteractiveViewer, PanHandler
+from tempest_core import PanEvent, ScaleEvent
+from tempest_core import InteractiveViewer, PanHandler
 
 
 def on_pan(event: PanEvent) -> None:

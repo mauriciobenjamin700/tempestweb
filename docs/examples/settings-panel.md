@@ -116,7 +116,7 @@ Observe que `make_state` é a função que o tempestweb chama para inicializar o
 Dois tipos de evento chegam dos controles de entrada. Importe-os de `tempest_core.widgets.events`:
 
 ```python
-from tempest_core.widgets.events import SlideEvent, ToggleEvent
+from tempest_core import SlideEvent, ToggleEvent
 ```
 
 | Tipo | Usado por | Campo relevante |
@@ -134,10 +134,10 @@ A primeira seção usa `Switch` para o controle mestre e dois `Checkbox` para su
 
 ```python
 from tempest_core import App, Style, Widget
-from tempest_core.components import AppBar, Card, Divider, Scaffold
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import Checkbox, Column, Row, Switch, Text
-from tempest_core.widgets.events import ToggleEvent
+from tempest_core import AppBar, Card, Divider, Scaffold
+from tempest_core import AlignItems, Edge, FontWeight
+from tempest_core import Checkbox, Column, Row, Switch, Text
+from tempest_core import ToggleEvent
 
 
 def _notifications_card(app: App[SettingsState]) -> Widget:
@@ -214,9 +214,9 @@ def _notifications_card(app: App[SettingsState]) -> Widget:
 Esta seção introduz `SegmentedControl` (para tema e qualidade) e `Slider` (para tamanho de fonte):
 
 ```python
-from tempest_core.components import SegmentedControl
-from tempest_core.widgets import Slider
-from tempest_core.widgets.events import SlideEvent
+from tempest_core import SegmentedControl
+from tempest_core import Slider
+from tempest_core import SlideEvent
 
 
 def _appearance_card(app: App[SettingsState]) -> Widget:
@@ -368,7 +368,7 @@ def _audio_card(app: App[SettingsState]) -> Widget:
 `RadioGroup` é a escolha certa para seleção única com todos os itens visíveis simultaneamente:
 
 ```python
-from tempest_core.components import RadioGroup
+from tempest_core import RadioGroup
 
 
 def _language_card(app: App[SettingsState]) -> Widget:
@@ -531,7 +531,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
     AppBar,
     Card,
     Divider,
@@ -539,8 +539,8 @@ from tempest_core.components import (
     Scaffold,
     SegmentedControl,
 )
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import (
+from tempest_core import AlignItems, Edge, FontWeight
+from tempest_core import (
     Checkbox,
     Column,
     Row,
@@ -548,7 +548,7 @@ from tempest_core.widgets import (
     Switch,
     Text,
 )
-from tempest_core.widgets.events import SlideEvent, ToggleEvent
+from tempest_core import SlideEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Constants

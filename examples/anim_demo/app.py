@@ -12,8 +12,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Button, Column, Container, Style, Text, Widget
-from tempest_core.style import Color, Curve, Edge, Transition
+from tempest_core import (
+    App,
+    Button,
+    Color,
+    Column,
+    Container,
+    Curve,
+    Edge,
+    Style,
+    Text,
+    Transition,
+    Widget,
+)
 
 
 @dataclass

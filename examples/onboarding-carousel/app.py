@@ -28,18 +28,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Button, Column, Row, Style, Widget
-from tempest_core.components import ACCENT, BACKGROUND, ON_MUTED, ON_SURFACE, Card
-from tempest_core.style import (
+from tempest_core import (
+    ACCENT,
+    BACKGROUND,
+    ON_MUTED,
+    ON_SURFACE,
     AlignItems,
+    App,
+    Button,
+    Card,
     Color,
+    Column,
+    Container,
     Edge,
     FontWeight,
     JustifyContent,
+    PageChangeEvent,
+    PageView,
+    Row,
+    Style,
+    Text,
     TextAlign,
+    Widget,
 )
-from tempest_core.widgets import Container, PageView, Text
-from tempest_core.widgets.events import PageChangeEvent
 
 # ---------------------------------------------------------------------------
 # Slide data

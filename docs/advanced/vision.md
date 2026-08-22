@@ -55,7 +55,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Button, Column, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb import native
 from tempestweb.vision import Detector, to_detection_schemas
 

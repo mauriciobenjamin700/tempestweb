@@ -21,14 +21,16 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import (
+    App,
     Button,
     Column,
+    Edge,
     LazyColumn,
     Spinner,
+    Style,
     Text,
+    Widget,
 )
 
 #: A coroutine that resolves to the fetched rows. Injected into the view so the

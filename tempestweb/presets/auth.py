@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from tempest_core import Style, Widget
-from tempest_core.components import Card
-from tempest_core.widgets import Column
+from tempest_core import Card, Column, Style, Widget
 from tempestweb.presets import roles
 from tempestweb.presets.layout import box, heading, muted
 

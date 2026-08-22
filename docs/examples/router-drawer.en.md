@@ -49,7 +49,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from tempest_core import App, NavStack, Route, Style, Widget, build
-from tempest_core.components import (
+from tempest_core import (
     AppBar,
     Breadcrumb,
     Card,
@@ -57,7 +57,7 @@ from tempest_core.components import (
     ListTile,
     Scaffold,
 )
-from tempest_core.components.base import (
+from tempest_core import (
     ACCENT,
     BACKGROUND,
     MUTED,
@@ -65,8 +65,8 @@ from tempest_core.components.base import (
     ON_SURFACE,
     SURFACE,
 )
-from tempest_core.style import AlignItems, Color, Edge, FontWeight
-from tempest_core.widgets import (
+from tempest_core import AlignItems, Color, Edge, FontWeight
+from tempest_core import (
     Button,
     Column,
     Container,

@@ -192,8 +192,8 @@ it when it goes away (a camera left open is a light left on, on someone's phone)
 
 ```python
 from tempest_core import App, Widget
-from tempest_core.widgets.events import CameraFrameEvent, QrScanEvent
-from tempest_core.widgets.media import CameraPreview, QrScanner
+from tempest_core import CameraFrameEvent, QrScanEvent
+from tempest_core import CameraPreview, QrScanner
 
 
 def view(app: App[State]) -> Widget:

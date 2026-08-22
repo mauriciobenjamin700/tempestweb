@@ -19,14 +19,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
+    App,
+    Button,
     Color,
+    Column,
     Edge,
     FontWeight,
     JustifyContent,
+    Row,
+    Style,
+    Text,
     TextAlign,
+    Widget,
 )
 
 # ---------------------------------------------------------------------------

@@ -173,7 +173,7 @@ The `view` defines three handlers. Note that `on_search` receives a
 `TextChangeEvent` and reads `event.value`.
 
 ```python
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import TextChangeEvent
 
 def on_search(event: TextChangeEvent) -> None:
     app.set_state(lambda s: setattr(s, "query", event.value))
@@ -207,7 +207,7 @@ header is clicked. The `Badge` widgets take a `label` and a `tone`
 
 ```python
 from tempest_core import Column, Row, Style, Text
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.components import Badge, DataTable, SearchBar
 
 return Column(
@@ -267,8 +267,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import Edge
+from tempest_core import TextChangeEvent
 from tempestweb.components import Badge, DataTable, SearchBar
 
 #: The grid columns, in display order.

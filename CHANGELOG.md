@@ -4,6 +4,60 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.74.0] — 2026-08-22
+
+Os gestos multi-ponteiro que o core declarava e o cliente nunca reconheceu.
+
+### Fixed
+
+- **`on_pan`, `on_scale`, `on_double_tap` e `on_interaction` funcionam**
+  (issue #77, item 1 — o último bloco de gestos). O cliente rastreava **um**
+  ponteiro e só classificava tap / swipe / long press: um `PanHandler` era uma
+  caixa inerte, uma pinça não existia, e o duplo toque — o atalho que toda
+  superfície de zoom precisa — não era detectado em nenhum widget.
+
+  Agora é **um** reconhecedor (`client/gestures.js`), porque os gestos
+  compartilham uma máquina de estado: o mesmo `pointerdown` pode virar tap, pan,
+  pinça ou a segunda metade de um duplo toque, e só os ponteiros ainda em contato
+  decidem qual. Dois reconhecedores no mesmo root veriam metade da história cada.
+  O reconhecimento de tap/swipe/long-press saiu de dentro do `events.js` para lá,
+  sem mudança de comportamento — `bindEvents` continua sendo a única porta de
+  entrada de input que um mount usa.
+
+- **Gesto contínuo custava uma ida e volta por `pointermove`.** `pan`,
+  `scale` e `interaction` passam a ser reportados no máximo uma vez por frame,
+  mantendo o **último** valor: reportar o primeiro faria o gesto atrasar e depois
+  pular.
+
+- **Largar uma pinça deixava a app um passo atrás.** O pendente do frame é
+  descarregado quando um ponteiro sai. Medido no Chrome com dois dedos de
+  verdade (via CDP): uma pinça de 100px → 200px assentava em **1,5×** antes, e
+  fecha em **2,00×** agora.
+
+- **Uma superfície de gesto não recebia `pointermove` no celular.** Um browser
+  não manda nada enquanto está ocupado rolando a própria página; a folha base
+  agora tira o `touch-action` de `PanHandler`, `ScaleHandler` e
+  `InteractiveViewer` — e **só** desses. `GestureDetector` fica de fora de
+  propósito: tap, swipe e long press convivem com a rolagem, e tirar o
+  `touch-action` dele quebraria o scroll de qualquer lista que envolva as linhas
+  num detector.
+
+### Changed
+
+- **`examples/gesture_demo`** passou a ter as três superfícies (discreta, pan e
+  viewer) com o estado de cada uma na tela. Verificado em Chrome real: arrastar
+  o `PanHandler` com o mouse acumula exatamente o deslocamento aplicado
+  (`offset 100, 30`), dois cliques rápidos no pad viram `tap` → `double tap`, e
+  no viewer a pinça de dois dedos fecha em 2,00× enquanto um dedo reporta
+  `scale=1` com o foco onde o dedo está.
+
+### Docs
+
+- A página "Arrastar, reordenar, paginar" ganhou a seção de gestos de ponteiro,
+  com a tabela widget → handler → evento e as três coisas que decidem se o gesto
+  fica bom: `on_pan` é relativo, `on_interaction` é `ScaleEvent` mesmo no pan, e
+  `touch-action` sai só das superfícies contínuas.
+
 ## [0.73.0] — 2026-08-22
 
 Um campo de código que não existia, e um formulário que só falava no fim.

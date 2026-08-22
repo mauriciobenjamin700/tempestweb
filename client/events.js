@@ -11,9 +11,12 @@
 // dataTransfer and emits `drag`, and a `DragTarget`'s drop emits `drop` with the
 // payload it received.
 //
+// Pointer gestures live in client/gestures.js; `bindEvents` installs that
+// recognizer so a mount still has a single entry point for input.
+//
 // Verify in tests/client/ with a mock transport (jsdom dispatchEvent).
 
-import { GESTURE_TYPE, LONG_PRESS_MS, SWIPE_MIN_PX } from "./constants.js";
+import { installGestures } from "./gestures.js";
 import {
   DRAG_DATA_ATTR,
   DROP_TARGET_ATTR,
@@ -362,67 +365,6 @@ function keyedAncestor(target, root) {
 }
 
 /**
- * Find the nearest ancestor-or-self GestureDetector element (keyed + typed).
- *
- * @param {EventTarget|null} target  The event's target node.
- * @param {HTMLElement} root         The delegation root.
- * @returns {?string}                The gesture widget's key, or null.
- */
-function gestureAncestor(target, root) {
-  let node = /** @type {Node|null} */ (target);
-  while (node != null && node.nodeType !== 1) {
-    node = node.parentNode;
-  }
-  let el = /** @type {HTMLElement|null} */ (node);
-  while (el != null) {
-    if (
-      el.getAttribute &&
-      el.getAttribute(TYPE_ATTR) === GESTURE_TYPE &&
-      el.hasAttribute(KEY_ATTR)
-    ) {
-      return el.getAttribute(KEY_ATTR);
-    }
-    if (el === root) {
-      break;
-    }
-    el = el.parentElement;
-  }
-  return null;
-}
-
-/**
- * Classify a completed pointer interaction into a gesture TWEvent.
- *
- * Swipe wins when travel crosses `SWIPE_MIN_PX` (direction from the dominant
- * axis); otherwise a hold past `LONG_PRESS_MS` is a long press, and a quick
- * release is a tap. Coordinates are the press origin.
- *
- * @param {{x:number, y:number, t:number}} start  The pointerdown origin.
- * @param {{x:number, y:number, t:number}} end    The pointerup point.
- * @returns {{type:string, payload:Object}}        The gesture type + payload.
- */
-function classifyGesture(start, end) {
-  const dx = Math.round(end.x - start.x);
-  const dy = Math.round(end.y - start.y);
-  const dist = Math.hypot(dx, dy);
-  if (dist >= SWIPE_MIN_PX) {
-    const horizontal = Math.abs(dx) >= Math.abs(dy);
-    const direction = horizontal
-      ? dx > 0
-        ? "right"
-        : "left"
-      : dy > 0
-        ? "down"
-        : "up";
-    return { type: "swipe", payload: { direction, dx, dy } };
-  }
-  if (end.t - start.t >= LONG_PRESS_MS) {
-    return { type: "long_press", payload: { x: Math.round(start.x), y: Math.round(start.y) } };
-  }
-  return { type: "tap", payload: { x: Math.round(start.x), y: Math.round(start.y) } };
-}
-
-/**
  * Build the TWEvent payload for a captured DOM event.
  *
  * `input`/`change` carry the control's current `value`; other event types carry an
@@ -558,35 +500,12 @@ export function bindEvents(root, transport) {
   };
   bindDrag();
 
-  /** @type {Map<number, {key: string, x: number, y: number, t: number}>} */
-  const pending = new Map();
-  const now = () => (globalThis.performance?.now?.() ?? 0);
-
-  /** @param {PointerEvent} event */
-  const onPointerDown = (event) => {
-    const key = gestureAncestor(event.target, root);
-    if (key == null) {
-      return;
-    }
-    pending.set(event.pointerId, { key, x: event.clientX, y: event.clientY, t: now() });
-  };
-  /** @param {PointerEvent} event */
-  const onPointerUp = (event) => {
-    const start = pending.get(event.pointerId);
-    if (start === undefined) {
-      return;
-    }
-    pending.delete(event.pointerId);
-    const { type, payload } = classifyGesture(start, {
-      x: event.clientX,
-      y: event.clientY,
-      t: now(),
-    });
-    transport.sendEvent({ type, key: start.key, payload });
-  };
-  root.addEventListener("pointerdown", onPointerDown);
-  root.addEventListener("pointerup", onPointerUp);
-  bound.push(["pointerdown", onPointerDown], ["pointerup", onPointerUp]);
+  // Pointer gestures — tap / swipe / long press / double tap / pan / pinch — are
+  // one recognizer in client/gestures.js, because they share one state machine:
+  // the same pointerdown may become any of them, and only the pointers still
+  // down decide which. Installed from here so `bindEvents` stays the single
+  // entry point a mount needs.
+  const gestures = installGestures(root, transport);
 
   /**
    * Dismiss the top-most modal overlay on Escape.
@@ -609,6 +528,7 @@ export function bindEvents(root, transport) {
     for (const [domType, handler] of bound) {
       root.removeEventListener(domType, handler);
     }
+    gestures.dispose();
     if (doc != null) {
       doc.removeEventListener("keydown", onKeyDown);
     }

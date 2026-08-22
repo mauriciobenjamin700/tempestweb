@@ -488,6 +488,28 @@ export const BASE_THEME_CSS = `
   box-shadow: inset 0 0 0 1px var(--tw-error);
 }
 
+/* ── Gesture surfaces: the pointer belongs to the widget ───────────────────
+   A browser will not send pointermove while it is busy panning or zooming the
+   page itself, so a pan or pinch handler that does not claim the pointer gets
+   silence. touch-action does exactly that, per widget, and nowhere else — the
+   rest of the page keeps its native scrolling.
+
+   GestureDetector is deliberately left out: tap, swipe and long press all read
+   fine alongside page scrolling, and taking touch-action from it would break
+   scrolling on any list that wraps its rows in one. */
+[data-tw-type="PanHandler"],
+[data-tw-type="ScaleHandler"],
+[data-tw-type="InteractiveViewer"] {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* A pinch surface is a viewport onto something bigger. */
+[data-tw-type="InteractiveViewer"],
+[data-tw-type="ScaleHandler"] {
+  overflow: hidden;
+}
+
 @keyframes tw-progress-slide {
   0% { margin-inline-start: -40%; }
   100% { margin-inline-start: 100%; }

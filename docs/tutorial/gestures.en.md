@@ -123,6 +123,63 @@ moves `page` (a "Next" button, say) and the carousel scrolls there.
     previous page". So the page is only reported after a moment of quiet, once the
     carousel has settled.
 
+## Pointer gestures: tap, drag, pinch
+
+`GestureDetector` recognizes the discrete gestures — `on_tap`, `on_double_tap`,
+`on_long_press`, `on_swipe`. The continuous ones have their own widgets, because
+the event they report is a different one:
+
+| Widget | Handler | Receives |
+| --- | --- | --- |
+| `PanHandler` | `on_pan` | `PanEvent{dx, dy, vx, vy}` — the drag step and its velocity |
+| `ScaleHandler` | `on_scale` · `on_double_tap` | `ScaleEvent{scale, focus_x, focus_y, rotation}` |
+| `InteractiveViewer` | `on_interaction` | `ScaleEvent` — one finger pans, two zoom |
+
+```python
+from tempest_core.widgets.events import PanEvent, ScaleEvent
+from tempest_core.widgets.gestures import InteractiveViewer, PanHandler
+
+
+def on_pan(event: PanEvent) -> None:
+    """Accumulate the drag — a pan step is relative, not absolute."""
+
+    def mutate(state: Board) -> None:
+        state.offset_x += event.dx
+        state.offset_y += event.dy
+
+    app.set_state(mutate)
+
+
+def on_interaction(event: ScaleEvent) -> None:
+    """Follow the viewer: the scale zooms, the focus says where."""
+    app.set_state(lambda state: setattr(state, "zoom", event.scale))
+
+
+PanHandler(key="pad", on_pan=on_pan, child=...)
+InteractiveViewer(key="map", on_interaction=on_interaction, child=...)
+```
+
+Three things decide whether this feels right:
+
+* **`on_pan` is relative.** Each event is the step since the last one, so the app
+  accumulates. That is what lets you drag without knowing where the gesture
+  started.
+* **`on_interaction` receives a `ScaleEvent` even for a plain pan** — one finger
+  reports `scale=1` and the focus where the finger is; the app derives the
+  translation from the moving focus.
+* **The base sheet takes `touch-action` from those three surfaces, and only
+  them**: a browser will not send `pointermove` while it is busy scrolling the
+  page itself. `GestureDetector` is deliberately left out — tap, swipe and long
+  press coexist with scrolling, and taking `touch-action` from it would break
+  scrolling on any list that wraps its rows in a detector.
+
+!!! note "A continuous gesture is reported once per frame"
+    A `pointermove` arrives 60–120 times a second, and in Mode B each one is a
+    round trip. The client reports at most one per frame, keeping the **latest**
+    value, and flushes the pending one when the pointer leaves — without that,
+    letting go of a 2× pinch left the app at 1.5× (measured in Chrome), because
+    the frame that would have carried the last move never came.
+
 ## Recap
 
 * `Draggable` + `DragTarget`: drop one thing onto another, with `drag_data`
@@ -131,6 +188,8 @@ moves `page` (a "Next" button, say) and the carousel scrolls there.
   app's.
 * `PageView` + `on_page_change`: native snapping swipe, reported once settled, and
   the app can move `page` back.
+* `PanHandler` / `ScaleHandler` / `InteractiveViewer`: drag and pinch, one report
+  per frame, with `touch-action` taken from those surfaces only.
 
 Complete examples:
 [`examples/reorder_demo`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/examples/reorder_demo/app.py),

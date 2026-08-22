@@ -4,6 +4,28 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.72.1] — 2026-08-22
+
+### Fixed
+
+- **O artefato do Modo C não linkava ícone de aba.** Um browser não lê o
+  manifest para o ícone da aba: sem `rel="icon"` ele sonda `/favicon.ico`, e um
+  bundle estático não tem rota para responder — então todo carregamento de todo
+  deploy em Modo C abria o console com um 404 que ninguém pode resolver. A
+  0.67.0 corrigiu isso nos Modos A e B e passou reto pelo C. Agora um teste
+  parametrizado cobre os três shells: cada um linka `rel="icon"` e o arquivo
+  apontado existe no artefato.
+
+### Docs
+
+- A skill `validate-implementation` e o `CLAUDE.md` ganharam as armadilhas que
+  esta rodada de validação custou: **limpar service worker e caches antes de
+  medir** (um SW servia o build anterior — e, numa porta reusada, outro app
+  inteiro), verificar durante o gesto e não só no fim (posição intermediária de
+  scroll reportada faz a app desfazer o próprio movimento), e que um widget do
+  core **ignora kwarg que não declara** (`Container(on_click=...)` é aceito e
+  descartado, sem erro).
+
 ## [0.72.0] — 2026-08-22
 
 Dois gestos de container que o core declarava e o DOM não tinha.

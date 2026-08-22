@@ -128,10 +128,16 @@ Armadilhas já pagas neste repo:
 
 - `tempestweb run` copia `client/*.js` para `dist/` no boot — editar depois não
   muda a página; reinicie e confira o artefato.
+- Todo artefato registra service worker: **limpe SW e caches antes de medir**, ou
+  você valida o build anterior (ou outro app, numa porta reusada).
 - O CSS base vive dentro de template literal em `client/theme.js`: **backtick em
   comentário quebra o módulo**.
 - Um viewport lazy é flex container; pseudo-elemento de spacer precisa de
   `flex:0 0 auto` ou o browser o encolhe.
+- Scroll e gesto são **fluxo** de eventos: reportar posição intermediária faz a
+  app desfazer o próprio movimento. Reporte quando assentar.
+- Widget do core ignora kwarg que não declara (`Container(on_click=...)` é aceito
+  e descartado). Confira o campo em `model_fields` antes de culpar o cliente.
 
 ## Git
 

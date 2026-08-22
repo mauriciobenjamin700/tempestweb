@@ -1374,6 +1374,12 @@ def _index_html_transpile(
     links the Web App Manifest and registers the cache-first service worker, so
     the static bundle is an installable, offline-capable PWA.
 
+    The tab icon is linked explicitly. The manifest names icons, but a browser
+    does not read it for the tab: without ``rel="icon"`` it probes
+    ``/favicon.ico`` and a static bundle has no route to answer, so every load of
+    every Mode C deployment opened its console with a 404 nobody can act on. The
+    other two modes were fixed for this; this one was missed.
+
     Args:
         name: The project name (page title).
         theme_color: The manifest theme color, mirrored into the ``theme-color``
@@ -1394,6 +1400,7 @@ def _index_html_transpile(
     <title>{name}</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="{theme_color}" />
+    <link rel="icon" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   </head>
   <body>

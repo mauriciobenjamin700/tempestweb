@@ -85,6 +85,29 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8123/
     build actually carries your edit
     (`grep -c "<your marker>" examples/<example>/dist/server/static/<file>.js`).
 
+!!! danger "Clear the service worker before you believe the page"
+    Every artifact registers a caching service worker, and it will happily serve
+    the previous build — or, on a port you reused, a *different app entirely*
+    (measured: a page titled `transpile-tour` served from a freshly started
+    `overlay_demo` server). Do this on the first load of every validation, then
+    reload:
+
+    ```js
+    async (page) => {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+      await page.goto(url);
+      await page.evaluate(async () => {
+        for (const r of (await navigator.serviceWorker?.getRegistrations?.()) ?? []) await r.unregister();
+        for (const k of (await caches?.keys?.()) ?? []) await caches.delete(k);
+      });
+      await page.reload();
+    }
+    ```
+
+    Then assert you are looking at the right app (`document.title`, a key you
+    just added) before measuring anything.
+
 ## Step 3 — drive it in Chrome
 
 Use the **Chrome DevTools MCP** (`mcp__chrome-devtools__*`) for inspection and
@@ -144,6 +167,10 @@ Rules for the report:
 
 * State what you could **not** verify, and why. "MCP unavailable in this
   environment" is an acceptable outcome; "it works" without a measurement is not.
+* A gesture or a scroll is a *stream* of events, so check what the app does
+  **during** the movement and not just after it. A carousel reporting its
+  intermediate scroll positions, or a list re-firing `end_reached` on every tick,
+  looks correct in a final screenshot and fights the user in practice.
 * Every fix needs a test that **fails without it**. If the browser found the bug,
   the pass is incomplete until a jsdom or pytest case pins it.
 * Kill the dev server and delete the build artifact (`dist/`) when done, so the

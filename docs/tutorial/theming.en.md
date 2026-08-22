@@ -231,6 +231,47 @@ def view(app: App[State]) -> Widget:
     have their own page in [Ready-made components](components.md). Here the focus is
     only on how the theme makes them look finished without styling anything.
 
+## Rebranding by token, from Python
+
+The base sheet paints everything from `--tw-*` custom properties on
+`:root`, and those are how an app changes its look — without touching a
+single widget. What was missing was the middle: you build the palette in
+Python and need it on the page.
+
+```python
+from tempest_core import Theme, ThemeMode
+from tempest_core.style import Color
+from tempestweb.html import theme_css
+
+
+def head() -> str:
+    """Build the head markup that rebrands the whole interface.
+
+    Returns:
+        str: A style element carrying the app's palette.
+    """
+    theme = Theme.from_seed(Color(r=39, g=58, b=79), mode=ThemeMode.SYSTEM)
+    return f"<style>{theme_css(theme)}</style>"
+```
+
+`Theme.from_seed` generates the 39 Material 3 roles from one seed colour —
+light and dark — and `theme_css` emits the ones the sheet actually reads.
+The block goes in the `<head>`, before the base sheet is installed at
+mount; since it declares the same names at the same specificity, yours wins
+by coming later.
+
+!!! tip "Dark mode comes free, and comes honestly"
+    A `SYSTEM` theme emits the light scheme on `:root` and the dark one
+    inside `@media (prefers-color-scheme: dark)`: the page follows the
+    reader's own setting. A theme pinned to `LIGHT` or `DARK` emits one
+    scheme and no media query — a pinned theme that still flipped with the
+    system would not be pinned.
+
+!!! info "Only what the sheet consumes"
+    `theme_css` emits the variables the base sheet reads, not all 39 roles.
+    A variable nothing consumes looks thorough and is debt: the next reader
+    has to go to the CSS to find out whether it does anything.
+
 ## Progress indicators
 
 `ProgressBar` and `Spinner` have no intrinsic size: with no stylesheet both
@@ -285,6 +326,7 @@ is measuring would be read out as fact.
   controls come ready, with no per-widget styling.
 - The **widget's inline `Style` always wins** over the base sheet (no `!important`);
   the hover/focus states keep working on top.
+- `theme_css(Theme.from_seed(...))` builds that block for you, dark mode included.
 - Re-theme the whole UI by overriding the `--tw-*` tokens from a `<style>` on the
   page.
 - `Style(shadow=...)` becomes a **CSS `box-shadow`** on the web, matching the native

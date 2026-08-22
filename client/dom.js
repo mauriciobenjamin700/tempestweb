@@ -154,6 +154,7 @@ function applyProps(el, props) {
   applyEscapeHatchAttrs(el, props);
   applyLazyProps(el, type, props);
   applyListEventProps(el, type, props);
+  applySortAndPageProps(el, type, props);
 }
 
 /** Attribute holding a `Dialog`'s title, painted by the base sheet. */
@@ -373,6 +374,93 @@ function applyDragProps(el, type, props) {
     }
   } else if (type === "DragTarget") {
     el.setAttribute(DROP_TARGET_ATTR, "");
+  }
+}
+
+/** Attribute marking a `ReorderableList`, whose children can be dragged to sort. */
+export const REORDER_ATTR = "data-tw-reorder";
+
+/** Attribute holding a `PageView`'s current page index. */
+export const PAGE_ATTR = "data-tw-page";
+
+/** Attribute holding a `PageView`'s page count. */
+export const PAGE_COUNT_ATTR = "data-tw-pages";
+
+/**
+ * Apply the contract of the two container widgets whose gesture the DOM lacks.
+ *
+ * A `ReorderableList` is marked so `events.js` can read a drag between its
+ * children as a reorder, and a `PageView` becomes a snapping horizontal
+ * carousel whose current page is both an attribute (so a scroll can tell whether
+ * the page actually changed) and a scroll position (so the app moving `page`
+ * moves the carousel).
+ *
+ * Their children are *not* marked here: children arrive and leave through
+ * Insert/Remove patches on the container, which never pass through this
+ * function, so anything written onto a child would go stale. The base sheet
+ * styles them by selector, and {@link syncContainerGestures} reconciles what
+ * depends on them after each batch.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applySortAndPageProps(el, type, props) {
+  if (type === "ReorderableList") {
+    el.setAttribute(REORDER_ATTR, "");
+    return;
+  }
+  if (type !== "PageView") {
+    return;
+  }
+  if (!("page" in props)) {
+    return;
+  }
+  const page = Number(props.page);
+  const current = Number.isFinite(page) && page >= 0 ? Math.trunc(page) : 0;
+  el.setAttribute(PAGE_ATTR, String(current));
+  // The app owning `page` means the app can also *move* it, so honour it: a page
+  // set from state scrolls the carousel there. Guarded by a width, because a
+  // viewport with no layout yet (first mount, jsdom) would scroll to 0 and land
+  // the reader on the wrong page.
+  const width = el.clientWidth;
+  if (width > 0) {
+    const target = current * width;
+    if (Math.abs(el.scrollLeft - target) > 1) {
+      el.scrollLeft = target;
+    }
+  }
+}
+
+/**
+ * Reconcile the two container gestures with the children a batch left behind.
+ *
+ * Both facts here are about *children*, and a child is inserted or removed by a
+ * patch on its **parent** — which never passes through the parent's own
+ * `applyProps`. So this runs in the post-layout pass instead: it marks a
+ * `ReorderableList`'s rows draggable, and records how many pages a `PageView`
+ * currently holds. Idempotent, and cheap enough to run per batch (one query per
+ * marked container).
+ *
+ * @param {HTMLElement} root  The mount root.
+ * @returns {void}
+ */
+export function syncContainerGestures(root) {
+  for (const list of root.querySelectorAll(`[${REORDER_ATTR}]`)) {
+    for (const child of list.children) {
+      const item = /** @type {HTMLElement} */ (child);
+      if (item.getAttribute("draggable") !== "true") {
+        item.setAttribute("draggable", "true");
+      }
+      if (!item.style.cursor) {
+        item.style.cursor = "grab";
+      }
+    }
+  }
+  for (const node of root.querySelectorAll(`[${PAGE_ATTR}]`)) {
+    const view = /** @type {HTMLElement} */ (node);
+    view.setAttribute(PAGE_COUNT_ATTR, String(view.childElementCount));
   }
 }
 

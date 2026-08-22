@@ -168,6 +168,7 @@ plugins:
             "Long lists": "Listas longas"
             "Responsive layout": "Layout responsivo"
             "Overlays and modals": "Overlays e modais"
+            "Drag, reorder, paginate": "Arrastar, reordenar, paginar"
             "PWA & offline": "PWA e offline"
             "Offline + backend sync": "Offline + sincronização com backend"
             Observability: Observabilidade
@@ -260,6 +261,7 @@ nav:
       - Long lists: tutorial/lists.md
       - Responsive layout: tutorial/responsive.md
       - Overlays and modals: tutorial/overlays.md
+      - Drag, reorder, paginate: tutorial/gestures.md
       - Best practices: tutorial/best-practices.md
   - Advanced User Guide:
       - Capabilities: advanced/capabilities.md

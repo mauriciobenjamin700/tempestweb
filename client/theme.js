@@ -419,6 +419,35 @@ export const BASE_THEME_CSS = `
   animation: tw-spin 900ms linear infinite;
 }
 
+/* ── PageView: a snapping carousel ─────────────────────────────────────────
+   The core declares page + on_page_change and the widget used to render as a
+   plain box: no pages, nothing to swipe. One child per viewport width plus
+   scroll snapping gets touch swipe, trackpad and shift+wheel from the browser;
+   client/pages.js reports which page the scroll landed on. */
+[data-tw-type="PageView"] {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+[data-tw-type="PageView"] > * {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  min-width: 0;
+}
+
+/* ── ReorderableList: rows you can pick up ─────────────────────────────────
+   The children are marked draggable by the renderer after each patch batch;
+   these are the affordances that make that discoverable. */
+[data-tw-reorder] > * {
+  cursor: grab;
+}
+[data-tw-reorder] > *:active {
+  cursor: grabbing;
+}
+
 @keyframes tw-progress-slide {
   0% { margin-inline-start: -40%; }
   100% { margin-inline-start: 100%; }

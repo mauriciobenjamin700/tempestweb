@@ -183,6 +183,60 @@ async def take_photo() -> bytes:
     In Mode B the photo crosses the network on the round-trip. Compress it on the
     client before returning to keep the payload small.
 
+### Live preview and QR reading (widgets)
+
+`camera.capture()` is a **photo**: open the camera, take one frame, close it.
+When the app needs the camera *running* — a preview on screen, a code reader —
+the widget is the way, because it holds the stream while it is mounted and stops
+it when it goes away (a camera left open is a light left on, on someone's phone).
+
+```python
+from tempest_core import App, Widget
+from tempest_core.widgets.events import CameraFrameEvent, QrScanEvent
+from tempest_core.widgets.media import CameraPreview, QrScanner
+
+
+def view(app: App[State]) -> Widget:
+    """Show the camera and read codes from it."""
+
+    def framed(event: CameraFrameEvent) -> None:
+        # event.data is the frame's bytes as base64; event.width/height its size.
+        app.set_state(lambda state: setattr(state, "last", f"{event.width}x{event.height}"))
+
+    def scanned(event: QrScanEvent) -> None:
+        app.set_state(lambda state: setattr(state, "code", event.data))
+
+    return Column(
+        key="root",
+        children=[
+            CameraPreview(
+                key="preview",
+                facing="back",
+                frame_interval_ms=500,
+                on_frame=framed,
+            ),
+            QrScanner(key="scanner", on_scan=scanned),
+        ],
+    )
+```
+
+* **`frame_interval_ms` is your network budget.** In Mode B every frame is a
+  round trip with an image in it; 500ms is a choice, 30fps is a plan to saturate
+  the connection. In Mode A the cost is local, but it is still CPU per frame.
+* **`facing`** becomes `getUserMedia`'s `facingMode`: `back` → `environment`,
+  `front` → `user`.
+* **A code that was read is not reported every tick.** It stays in frame for many
+  of them; the client reports the change, not the presence.
+* **A secure context is required.** `localhost` counts; a deployment needs HTTPS,
+  or `getUserMedia` is simply not there.
+
+!!! warning "`QrScanner` relies on the browser's `BarcodeDetector`"
+    Decoding is the browser's own — Chrome/Android today. Where it is missing the
+    widget **shows the camera and says so in the console**, without decoding: this
+    client ships no runtime dependencies, so there is no fallback decoder. If you
+    need broad coverage, use `CameraPreview` and decode the frames yourself —
+    that is what `on_frame` hands you the bytes for.
+
 ## ONNX inference in the browser (`native.onnx`)
 
 `onnxruntime` (the CPython C-extension) **has no Pyodide wheel** — Python in the

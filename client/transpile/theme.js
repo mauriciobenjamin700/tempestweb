@@ -4,7 +4,7 @@
 // app resolves dark/light and reads the viewport the same way as Modes A/B:
 // `app.theme.is_dark(platform_dark_mode=app.media.platform_dark_mode)` and
 // `app.media.width`. The runtime keeps `app.media` in sync with the browser via
-// client/transpile/media.js (matchMedia + resize).
+// client/media.js (matchMedia + resize).
 //
 // This is the Mode C module (client/transpile/theme.js) — distinct from the shared
 // base-stylesheet injector at client/theme.js.

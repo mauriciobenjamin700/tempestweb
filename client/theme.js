@@ -353,12 +353,16 @@ export const BASE_THEME_CSS = `
   align-items: center;
   gap: 12px;
 }
-[data-tw-type="Menu"] > [data-tw-part="item"] > [data-tw-menu-icon],
-[data-tw-type="ActionSheet"] > [data-tw-part="item"] > [data-tw-menu-icon] {
+[data-tw-type="Menu"] > [data-tw-part="item"] > svg,
+[data-tw-type="ActionSheet"] > [data-tw-part="item"] > svg {
   flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
 }
-[data-tw-type="Menu"] > [data-tw-part="item"] > [data-tw-menu-label],
-[data-tw-type="ActionSheet"] > [data-tw-part="item"] > [data-tw-menu-label] {
+/* The label takes the rest of the row, so a long one wraps inside the item
+   instead of pushing the glyph around. */
+[data-tw-type="Menu"] > [data-tw-part="item"] > [data-tw-part="item-label"],
+[data-tw-type="ActionSheet"] > [data-tw-part="item"] > [data-tw-part="item-label"] {
   flex: 1 1 auto;
 }
 [data-tw-type="Menu"] > [data-tw-part="item"]:hover,
@@ -414,6 +418,115 @@ export const BASE_THEME_CSS = `
 [data-tw-type="RefreshControl"][data-tw-refreshing="true"] > [data-tw-part="spinner"] {
   opacity: 1;
   animation: tw-spin 900ms linear infinite;
+}
+
+/* ── PageView: a snapping carousel ─────────────────────────────────────────
+   The core declares page + on_page_change and the widget used to render as a
+   plain box: no pages, nothing to swipe. One child per viewport width plus
+   scroll snapping gets touch swipe, trackpad and shift+wheel from the browser;
+   client/pages.js reports which page the scroll landed on. */
+[data-tw-type="PageView"] {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+[data-tw-type="PageView"] > * {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  min-width: 0;
+}
+
+/* ── ReorderableList: rows you can pick up ─────────────────────────────────
+   The children are marked draggable by the renderer after each patch batch;
+   these are the affordances that make that discoverable. */
+[data-tw-reorder] > * {
+  cursor: grab;
+}
+[data-tw-reorder] > *:active {
+  cursor: grabbing;
+}
+
+/* ── PinInput: a code field that looks like one ────────────────────────────
+   One input, spaced out: the platform fills a one-time-code field from an SMS
+   and pastes a whole code into it, which N separate boxes throw away. The width
+   follows the cap, so the box is the size of the code it takes. */
+[data-tw-type="PinInput"] {
+  font-family: var(--tw-font);
+  font-size: 20px;
+  letter-spacing: 0.5em;
+  text-align: center;
+  padding: 10px 12px;
+  width: 100%;
+  max-width: 12ch;
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+}
+[data-tw-type="PinInput"]:focus,
+[data-tw-type="PinInput"]:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1px var(--tw-primary);
+}
+
+/* ── FormField: the error the widget declared and nobody drew ───────────────
+   The error is a prop, so the renderer cannot make it a child without shifting
+   the index the field's own child is addressed by. It arrives as an attribute and is
+   painted here, under the control, in the error colour — and the invalid state
+   outlines the control itself so the two read as one thing. */
+[data-tw-field][aria-invalid="true"]::after {
+  content: attr(data-tw-error);
+  display: block;
+  margin-top: 4px;
+  font-family: var(--tw-font);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--tw-error);
+}
+[data-tw-field][aria-invalid="true"] [data-tw-type="Input"],
+[data-tw-field][aria-invalid="true"] [data-tw-type="PinInput"] {
+  box-shadow: inset 0 0 0 1px var(--tw-error);
+}
+
+/* ── Gesture surfaces: the pointer belongs to the widget ───────────────────
+   A browser will not send pointermove while it is busy panning or zooming the
+   page itself, so a pan or pinch handler that does not claim the pointer gets
+   silence. touch-action does exactly that, per widget, and nowhere else — the
+   rest of the page keeps its native scrolling.
+
+   GestureDetector is deliberately left out: tap, swipe and long press all read
+   fine alongside page scrolling, and taking touch-action from it would break
+   scrolling on any list that wraps its rows in one. */
+[data-tw-type="PanHandler"],
+[data-tw-type="ScaleHandler"],
+[data-tw-type="InteractiveViewer"] {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* A pinch surface is a viewport onto something bigger. */
+[data-tw-type="InteractiveViewer"],
+[data-tw-type="ScaleHandler"] {
+  overflow: hidden;
+}
+
+/* ── Camera widgets: the preview fills the box the app gave it ─────────────
+   A CameraPreview and a QrScanner are IR leaves holding a renderer-owned
+   <video>. Without these rules the video shows at its intrinsic size, which is
+   whatever the camera happens to deliver — a 1280x720 element inside a 240px
+   card. object-fit: cover keeps the framing instead of stretching faces. */
+[data-tw-camera] {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+[data-tw-camera] > [data-tw-part="preview"] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 @keyframes tw-progress-slide {

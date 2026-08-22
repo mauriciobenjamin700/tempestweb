@@ -12,7 +12,12 @@ See ``docs/plan.md`` (Trilhos A e B) and ``docs/contract.md``.
 from __future__ import annotations
 
 from tempestweb.runtime.background import NoSessionError, spawn
-from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
+from tempestweb.runtime.events import (
+    apply_media,
+    apply_navigate,
+    apply_scroll,
+    coerce_event,
+)
 from tempestweb.runtime.serialize import (
     EVENT_TYPE_TO_HANDLER_PROPS,
     find_node_type,
@@ -33,6 +38,7 @@ __all__ = [
     "NativeCallError",
     "WasmAppHandle",
     "WasmRuntime",
+    "apply_media",
     "apply_navigate",
     "apply_scroll",
     "bootstrap",

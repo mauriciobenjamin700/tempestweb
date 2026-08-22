@@ -24,7 +24,6 @@ import { mount } from "../tempestweb.js";
 import { diff } from "./diff.js";
 import { NavStack, Route, pathToRoutes, routeToPath } from "./nav.js";
 import { MediaQueryData, Theme } from "./theme.js";
-import { installMedia } from "./media.js";
 
 /**
  * @typedef {import("../transport.js").Node} Node
@@ -372,7 +371,6 @@ export function mountApp(root, { makeState, view }) {
   };
 
   const handle = mount(root, transport, node);
-  const media = installMedia(transport);
 
   let running = false;
   /** @type {?number} — previous frame timestamp; null before the first frame. */
@@ -412,7 +410,6 @@ export function mountApp(root, { makeState, view }) {
     },
     patchLog,
     unmount() {
-      media.dispose();
       handle.unmount();
     },
   };

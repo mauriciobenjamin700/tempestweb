@@ -27,7 +27,8 @@ import json
 from collections.abc import Awaitable, Callable
 from typing import Any, Generic, TypeVar
 
-from tempest_core import App, Widget
+from tempest_core import App, Theme, Widget
+from tempestweb.html import theme_css
 from tempestweb.native.bridges import FFIBridge
 from tempestweb.native.dispatch import install_bridge, uninstall_bridge
 from tempestweb.runtime.wasm import WasmRuntime
@@ -68,6 +69,7 @@ class WasmAppHandle(Generic[S]):
 
     Methods:
         initial_node_json: The serialized initial root node, as a JSON string.
+        theme_css: The app palette as `--tw-*` custom properties, for the page.
         push_event_json: Feed one DOM event (a JSON string) into the runtime.
         close: Tear the app down, stopping the event loop.
     """
@@ -78,6 +80,7 @@ class WasmAppHandle(Generic[S]):
         transport: WasmTransport,
         *,
         bridge_installed: bool = False,
+        theme: Theme | None = None,
     ) -> None:
         """Initialize the handle.
 
@@ -86,14 +89,35 @@ class WasmAppHandle(Generic[S]):
             transport: The transport bridging Python and the JS client.
             bridge_installed: Whether :func:`bootstrap` installed an
                 :class:`FFIBridge`; if so, :meth:`close` uninstalls it.
+            theme: The app's palette, if it declares one, so the page can be
+                given the matching custom properties.
         """
         self._runtime: WasmRuntime[S] = runtime
         self._transport: WasmTransport = transport
         self._bridge_installed: bool = bridge_installed
+        self._theme: Theme | None = theme
         self._initial: dict[str, Any] = runtime.start()
         # Start the client->Python event loop as a background task on the loop
         # Pyodide runs; it drains transport events until close().
         self._task: asyncio.Future[None] = asyncio.ensure_future(runtime.run())
+
+    def theme_css(self) -> str:
+        """Return the app's palette as the CSS the base stylesheet reads.
+
+        The core resolves a component's own colors inline, but the base sheet's
+        `--tw-*` tokens style everything a widget leaves to it — interaction
+        states, the surface behind the app, indicators. Mode B emits these into
+        the page head (``create_app(theme=...)``); Mode A's page is static and the
+        app only exists once Pyodide is up, so the CSS is handed to JS here and
+        injected before the first mount.
+
+        Returns:
+            The `--tw-*` rules for the app's theme, or ``""`` when it declares
+            none (the base sheet's own defaults then stand).
+        """
+        if self._theme is None:
+            return ""
+        return theme_css(self._theme)
 
     def initial_node_json(self) -> str:
         """Return the serialized initial root node as a JSON string.
@@ -140,6 +164,7 @@ def bootstrap(
     on_navigate: Callable[[str], Any] | None = None,
     subscribe: NativeSubscribe | None = None,
     unsubscribe: NativeUnsubscribe | None = None,
+    theme: Theme | None = None,
 ) -> WasmAppHandle[S]:
     """Wire an app to the JS client and start it.
 
@@ -177,6 +202,11 @@ def bootstrap(
             when ``dispatch`` is ``None``, since no bridge is installed then.
         unsubscribe: Optional in-process streaming unsubscribe (the proxy of the
             glue around ``window.__tempestweb_native_unsubscribe__``).
+        theme: The app's palette, if it declares one (the generated bootstrap
+            passes ``app.THEME``). It is handed to the core so components resolve
+            their colors against it — they do that in **Python**, so a theme that
+            never reaches the tree is a theme that never paints — and it is also
+            what :meth:`WasmAppHandle.theme_css` returns for the page.
 
     Returns:
         A :class:`WasmAppHandle` the JS side drives.
@@ -187,9 +217,14 @@ def bootstrap(
         on_patches(json.dumps(patches))
 
     transport = WasmTransport(deliver)
-    runtime: WasmRuntime[S] = WasmRuntime(state, view, transport, on_navigate)
+    runtime: WasmRuntime[S] = WasmRuntime(state, view, transport, on_navigate, theme)
     bridge_installed = False
     if dispatch is not None:
         install_bridge(FFIBridge(dispatch, subscribe, unsubscribe))
         bridge_installed = True
-    return WasmAppHandle(runtime, transport, bridge_installed=bridge_installed)
+    return WasmAppHandle(
+        runtime,
+        transport,
+        bridge_installed=bridge_installed,
+        theme=theme,
+    )

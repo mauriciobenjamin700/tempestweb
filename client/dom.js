@@ -33,6 +33,10 @@ const TAG_BY_TYPE = Object.freeze({
   Text: "span",
   Button: "button",
   Input: "input",
+  // A PinInput is a one-time-code field: a single <input> with the browser's own
+  // autofill hint and a length cap, spaced out by the base sheet so it reads as a
+  // code box. It rendered as an anonymous div before — declared, and invisible.
+  PinInput: "input",
   // A Checkbox renders as a <label> wrapping a real <input type=checkbox> plus
   // its caption text, so the box and its label show side by side and the input
   // gets its accessible name natively. The <label> is the keyed, path-addressed
@@ -154,16 +158,14 @@ function applyProps(el, props) {
   applyEscapeHatchAttrs(el, props);
   applyLazyProps(el, type, props);
   applyListEventProps(el, type, props);
+  applySortAndPageProps(el, type, props);
+  applyCameraProps(el, type, props);
 }
 
 /** Attribute holding a `Dialog`'s title, painted by the base sheet. */
 export const TITLE_ATTR = "data-tw-title";
 /** Attribute marking a renderer-owned menu item, read by the click listener. */
 export const ITEM_ATTR = "data-tw-part";
-/** Attribute marking a menu item's renderer-owned icon. */
-const ITEM_ICON_ATTR = "data-tw-menu-icon";
-/** Attribute marking a menu item's label span. */
-const ITEM_LABEL_ATTR = "data-tw-menu-label";
 /** Attribute holding the value a menu item selects. */
 export const ITEM_VALUE_ATTR = "data-tw-value";
 /** Attribute holding the widget key an overlay anchors itself to. */
@@ -181,16 +183,16 @@ export const ANCHOR_ATTR = "data-tw-anchor";
  * a changed menu looks like. Each button carries its value for the click
  * listener, and `role=menuitem` so the menu reads as a menu.
  *
- * A `MenuItem` may name an `icon`, which becomes an `<svg>` before the label —
- * sized `1em` by the icon renderer, so it matches whatever type size the item
- * inherits. The label goes in its own `<span>` rather than the button's
- * `textContent`, because assigning that would drop the icon that was just
- * inserted. An unknown icon name leaves an empty box, like every other icon.
+ * A `MenuItem` declares three things — `label`, `value` and `icon` — and the
+ * icon used to be dropped, so a menu the app drew with icons came out as plain
+ * text. It is resolved through the same registry the `Icon` widget uses and
+ * inserted before the label, which lives in its own span so the click listener
+ * can read the label back without the glyph's markup in the way.
  *
- * Once any item in the list names an icon, every item gets the slot — an empty
- * one where there is no icon. Otherwise the labels of the icon-less items start
- * a glyph's width to the left of the others, which reads as a broken menu
- * rather than as a menu with some icons.
+ * Once any item names an icon, every item gets the slot — an empty one where
+ * there is no icon. Otherwise the labels of the icon-less items start a glyph's
+ * width to the left of the others, which reads as a broken menu rather than as a
+ * menu with some icons.
  *
  * @param {HTMLElement} el     The Menu/ActionSheet element.
  * @param {*} items            The `items` prop (anything else is treated empty).
@@ -208,15 +210,13 @@ function renderMenuItems(el, items) {
     button.setAttribute(ITEM_ATTR, "item");
     button.setAttribute("role", "menuitem");
     button.setAttribute(ITEM_VALUE_ATTR, item?.value == null ? "" : String(item.value));
-    const icon = item?.icon == null ? "" : String(item.icon);
     if (anyIcon) {
       const svg = createIconSvg();
-      svg.setAttribute(ITEM_ICON_ATTR, "");
-      renderIcon(svg, { name: icon });
+      renderIcon(svg, { name: item?.icon == null ? "" : String(item.icon) });
       button.appendChild(svg);
     }
     const label = document.createElement("span");
-    label.setAttribute(ITEM_LABEL_ATTR, "");
+    label.setAttribute(ITEM_ATTR, "item-label");
     label.textContent = item?.label == null ? "" : String(item.label);
     button.appendChild(label);
     el.appendChild(button);
@@ -385,6 +385,197 @@ function applyDragProps(el, type, props) {
     }
   } else if (type === "DragTarget") {
     el.setAttribute(DROP_TARGET_ATTR, "");
+  }
+}
+
+/** Attribute marking a camera widget: `preview` or `scanner`. */
+export const CAMERA_ATTR = "data-tw-camera";
+
+/** Attribute holding a `PinInput`'s expected code length. */
+export const PIN_LENGTH_ATTR = "data-tw-length";
+
+/** Attribute holding a `FormField`'s field name, reported with its validation. */
+export const FIELD_ATTR = "data-tw-field";
+
+/** Attribute holding a `FormField`'s current error message, painted by the sheet. */
+export const FIELD_ERROR_ATTR = "data-tw-error";
+
+/** Attribute marking a `ReorderableList`, whose children can be dragged to sort. */
+export const REORDER_ATTR = "data-tw-reorder";
+
+/** Attribute holding a `PageView`'s current page index. */
+export const PAGE_ATTR = "data-tw-page";
+
+/** Attribute holding a `PageView`'s page count. */
+export const PAGE_COUNT_ATTR = "data-tw-pages";
+
+/**
+ * Apply a `PinInput`'s props onto its `<input>`.
+ *
+ * The widget declares `length`, `value`, `secure` and `on_complete`, and used to
+ * render as an empty div: nothing to type into, so `on_change` and `on_complete`
+ * were both unreachable. It becomes a single one-time-code field rather than
+ * `length` separate boxes, because that is what the platform rewards — the
+ * browser (and iOS/Android) offer to fill `autocomplete="one-time-code"` from an
+ * SMS, `inputmode="numeric"` brings up the digit keypad, and a paste of the whole
+ * code just works. The base sheet spaces the characters so it still reads as a
+ * code box. `data-tw-length` is what the client compares against to know the code
+ * is complete.
+ *
+ * `secure` is applied only when the patch mentions it, for the same reason as an
+ * Input: typing patches `value` alone, and re-deriving the type from every props
+ * bag would unmask the code on the first keystroke.
+ *
+ * @param {HTMLElement} el  The PinInput element.
+ * @param {Object} props    The props to apply.
+ * @returns {void}
+ */
+function applyPinProps(el, props) {
+  if ("secure" in props) {
+    el.setAttribute("type", props.secure ? "password" : "text");
+  } else if (!el.hasAttribute("type")) {
+    el.setAttribute("type", "text");
+  }
+  if (!el.hasAttribute("inputmode")) {
+    el.setAttribute("inputmode", "numeric");
+    el.setAttribute("autocomplete", "one-time-code");
+  }
+  if ("length" in props && props.length != null) {
+    const length = Math.max(1, Math.trunc(Number(props.length)));
+    el.setAttribute("maxlength", String(length));
+    el.setAttribute(PIN_LENGTH_ATTR, String(length));
+  }
+  if ("value" in props) {
+    el.value = props.value == null ? "" : String(props.value);
+  }
+}
+
+/**
+ * Apply the contract of the two container widgets whose gesture the DOM lacks.
+ *
+ * A `ReorderableList` is marked so `events.js` can read a drag between its
+ * children as a reorder, and a `PageView` becomes a snapping horizontal
+ * carousel whose current page is both an attribute (so a scroll can tell whether
+ * the page actually changed) and a scroll position (so the app moving `page`
+ * moves the carousel).
+ *
+ * Their children are *not* marked here: children arrive and leave through
+ * Insert/Remove patches on the container, which never pass through this
+ * function, so anything written onto a child would go stale. The base sheet
+ * styles them by selector, and {@link syncContainerGestures} reconciles what
+ * depends on them after each batch.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+/**
+ * Mark a camera widget so `client/camera.js` can open its stream.
+ *
+ * `CameraPreview` and `QrScanner` are IR leaves that rendered as empty boxes:
+ * no stream, no preview, and their declared handlers (`on_frame`, `on_scan`)
+ * unreachable. The marker carries which of the two it is, plus the preview's own
+ * two props — which camera to ask for, and how often to sample — because the
+ * module that opens the stream reads them off the element rather than being told
+ * twice.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyCameraProps(el, type, props) {
+  if (type === "CameraPreview") {
+    el.setAttribute(CAMERA_ATTR, "preview");
+    if ("facing" in props && props.facing != null) {
+      el.setAttribute("data-tw-facing", String(props.facing));
+    }
+    if ("frame_interval_ms" in props && props.frame_interval_ms != null) {
+      el.setAttribute("data-tw-frame-interval", String(props.frame_interval_ms));
+    }
+    return;
+  }
+  if (type === "QrScanner") {
+    el.setAttribute(CAMERA_ATTR, "scanner");
+  }
+}
+
+function applySortAndPageProps(el, type, props) {
+  if (type === "FormField") {
+    // The name is what `ValidationEvent.field` carries, and the app looks its
+    // validators up by it; without it on the element the client has nothing to
+    // report and `on_validate` can never fire.
+    if ("name" in props) {
+      setOrRemove(el, FIELD_ATTR, props.name);
+    }
+    // `error` is a prop, not a child, so it cannot become an element without
+    // shifting the index the field's own child is addressed by. It goes onto an
+    // attribute the base sheet paints through `::after` — the same trick a
+    // Dialog's title uses — plus `aria-invalid`, so the message is announced and
+    // not merely drawn.
+    if ("error" in props) {
+      const error = props.error;
+      const has = error != null && String(error) !== "";
+      setOrRemove(el, FIELD_ERROR_ATTR, has ? error : null);
+      setOrRemove(el, "aria-invalid", has ? "true" : null);
+    }
+    return;
+  }
+  if (type === "ReorderableList") {
+    el.setAttribute(REORDER_ATTR, "");
+    return;
+  }
+  if (type !== "PageView") {
+    return;
+  }
+  if (!("page" in props)) {
+    return;
+  }
+  const page = Number(props.page);
+  const current = Number.isFinite(page) && page >= 0 ? Math.trunc(page) : 0;
+  el.setAttribute(PAGE_ATTR, String(current));
+  // The app owning `page` means the app can also *move* it, so honour it: a page
+  // set from state scrolls the carousel there. Guarded by a width, because a
+  // viewport with no layout yet (first mount, jsdom) would scroll to 0 and land
+  // the reader on the wrong page.
+  const width = el.clientWidth;
+  if (width > 0) {
+    const target = current * width;
+    if (Math.abs(el.scrollLeft - target) > 1) {
+      el.scrollLeft = target;
+    }
+  }
+}
+
+/**
+ * Reconcile the two container gestures with the children a batch left behind.
+ *
+ * Both facts here are about *children*, and a child is inserted or removed by a
+ * patch on its **parent** — which never passes through the parent's own
+ * `applyProps`. So this runs in the post-layout pass instead: it marks a
+ * `ReorderableList`'s rows draggable, and records how many pages a `PageView`
+ * currently holds. Idempotent, and cheap enough to run per batch (one query per
+ * marked container).
+ *
+ * @param {HTMLElement} root  The mount root.
+ * @returns {void}
+ */
+export function syncContainerGestures(root) {
+  for (const list of root.querySelectorAll(`[${REORDER_ATTR}]`)) {
+    for (const child of list.children) {
+      const item = /** @type {HTMLElement} */ (child);
+      if (item.getAttribute("draggable") !== "true") {
+        item.setAttribute("draggable", "true");
+      }
+      if (!item.style.cursor) {
+        item.style.cursor = "grab";
+      }
+    }
+  }
+  for (const node of root.querySelectorAll(`[${PAGE_ATTR}]`)) {
+    const view = /** @type {HTMLElement} */ (node);
+    view.setAttribute(PAGE_COUNT_ATTR, String(view.childElementCount));
   }
 }
 
@@ -957,6 +1148,8 @@ function applyControlProps(el, type, props) {
     if ("max_length" in props) {
       setOrRemove(el, "maxlength", props.max_length);
     }
+  } else if (type === "PinInput") {
+    applyPinProps(el, props);
   } else if (type === "Checkbox") {
     const input = ensureCheckboxInput(el);
     if ("checked" in props) {

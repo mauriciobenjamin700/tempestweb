@@ -171,10 +171,15 @@ def _make_theme(
     dark: bool,
     swatch_index: int,
 ) -> Theme:
-    """Construct a fully-populated :class:`~tempest_core.theme.Theme`.
+    """Derive a whole palette from the chosen accent, via ``Theme.from_seed``.
 
-    Builds a ``Theme`` whose palette matches ``mode``/``dark`` and the chosen
-    accent swatch, so every ``set_theme`` call is consistent.
+    ``from_seed`` is the part that matters, and it is easy to get wrong: a
+    ``Theme`` carries a full ``tokens`` set **and** a handful of loose
+    convenience colours (``primary``, ``background``, …). Components read the
+    tokens, so a theme built by filling in only the loose fields leaves every
+    button, field and indicator on the baseline palette — which is exactly what
+    this example used to do, and why its buttons stayed purple while the accent
+    swatch said teal.
 
     Args:
         mode: The :class:`~tempest_core.theme.ThemeMode` to set.
@@ -182,19 +187,11 @@ def _make_theme(
         swatch_index: The 0-based index into the accent colour lists.
 
     Returns:
-        The fully-populated :class:`~tempest_core.theme.Theme`.
+        A theme whose token set is derived from the accent colour.
     """
     palette: list[Color] = _ACCENT_DARK if dark else _ACCENT_LIGHT
     accent_color: Color = palette[swatch_index]
-    return Theme(
-        mode=mode,
-        primary=accent_color,
-        background=_DARK_BG if dark else _LIGHT_BG,
-        surface=_DARK_SURFACE if dark else _LIGHT_SURFACE,
-        on_primary=_DARK_ON_PRIMARY if dark else _LIGHT_ON_PRIMARY,
-        on_background=_DARK_ON_BG if dark else _LIGHT_ON_BG,
-        error=_DARK_ERROR if dark else _LIGHT_ERROR,
-    )
+    return Theme.from_seed(seed=accent_color, mode=mode)
 
 
 # ---------------------------------------------------------------------------
@@ -832,3 +829,14 @@ def view(app: App[ThemeSwitcherState]) -> Widget:
             ],
         ),
     )
+
+
+#: The palette the app starts with, declared for the *host* to pick up.
+#:
+#: Both Python-side artifacts read ``app.THEME`` when they build the app: the
+#: components get it (they resolve their colours in Python) and the page gets the
+#: matching ``--tw-*`` custom properties, so the very first paint is themed
+#: instead of flipping from the baseline. Swapping accents at runtime still goes
+#: through ``app.set_theme``, which repaints the components; the page's CSS tokens
+#: stay on this declared palette, since the page head is written once.
+THEME: Theme = _make_theme(ThemeMode.SYSTEM, dark=False, swatch_index=0)

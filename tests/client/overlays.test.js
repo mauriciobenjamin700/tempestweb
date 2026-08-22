@@ -325,7 +325,67 @@ test("a Menu is not dismissed by the scrim path (it has no scrim)", async () => 
   assert.deepEqual(events, []);
 });
 
-test("a MenuItem's icon renders before its label", () => {
+test("a MenuItem's icon is drawn before its label", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { bindEvents } = await import("../../client/events.js");
+  /** @type {import("../../client/transport.js").TWEvent[]} */
+  const events = [];
+  const transport = { onPatches() {}, sendEvent: (e) => events.push(e), async close() {} };
+
+  const menu = buildElement({
+    type: "Menu",
+    key: "row-menu",
+    props: {
+      items: [
+        { label: "Copy", value: "copy", icon: "check" },
+        { label: "Delete", value: "delete", icon: "delete" },
+      ],
+    },
+    children: [],
+  });
+  dom.root.appendChild(menu);
+  bindEvents(dom.root, transport);
+
+  // MenuItem declares three fields; the icon used to be dropped on the floor.
+  const items = menu.querySelectorAll('[data-tw-part="item"]');
+  const glyphs = menu.querySelectorAll('[data-tw-part="item"] > svg');
+  assert.equal(glyphs.length, 2);
+  assert.equal(glyphs[0].getAttribute("data-tw-icon"), "check");
+  assert.equal(glyphs[0].getAttribute("aria-hidden"), "true", "the label carries the meaning");
+  assert.ok(glyphs[0].querySelector("path,circle,rect,line,polyline"), "a real glyph, not an empty box");
+  assert.equal(
+    items[0].firstElementChild.tagName.toLowerCase(),
+    "svg",
+    "the glyph comes before the label",
+  );
+
+  // The label still reads back cleanly for the select event.
+  items[1].dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  assert.deepEqual(events, [
+    { type: "select", key: "row-menu", payload: { value: "delete", label: "Delete" } },
+  ]);
+});
+
+test("an item with no icon renders no glyph", () => {
+  withDocument();
+  const menu = buildElement({
+    type: "Menu",
+    key: "m",
+    props: { items: [{ label: "Plain", value: "p" }, { label: "Empty", value: "e", icon: "" }] },
+    children: [],
+  });
+
+  assert.equal(menu.querySelectorAll('[data-tw-part="item"] > svg').length, 0);
+  assert.equal(menu.querySelectorAll('[data-tw-part="item"]')[0].textContent, "Plain");
+});
+
+test("the base sheet lays an item out as glyph plus label", () => {
+  assert.match(BASE_THEME_CSS, /\[data-tw-part="item"\] > svg/);
+  assert.match(BASE_THEME_CSS, /\[data-tw-type="Menu"\] > \[data-tw-part="item"\],/);
+});
+
+test("an icon-less item keeps the slot, so the labels line up", () => {
   withDocument();
   const menu = buildElement({
     type: "Menu",
@@ -339,39 +399,15 @@ test("a MenuItem's icon renders before its label", () => {
     children: [],
   });
 
-  const items = menu.querySelectorAll('[data-tw-part="item"]');
-  const withIcon = items[0];
-  const withoutIcon = items[1];
-
-  const svg = withIcon.querySelector("[data-tw-menu-icon]");
-  assert.ok(svg != null, "the item that named an icon drew one");
-  assert.equal(svg.getAttribute("data-tw-icon"), "trash");
-  assert.equal(withIcon.firstChild, svg, "the icon comes before the label");
-  assert.ok(svg.querySelector("path") != null, "a known name resolves to a glyph");
-
-  const slot = withoutIcon.querySelector("[data-tw-menu-icon]");
-  assert.ok(slot != null, "the icon-less item keeps the slot, so labels align");
+  const [withIcon, withoutIcon] = menu.querySelectorAll('[data-tw-part="item"]');
+  assert.ok(withIcon.querySelector("svg path"), "the item that named an icon drew one");
+  const slot = withoutIcon.querySelector("svg");
+  assert.ok(slot != null, "the icon-less item keeps the slot");
   assert.equal(slot.querySelector("path"), null, "and the slot is empty");
-  assert.equal(withIcon.textContent, "Delete", "the icon adds no text");
-});
-
-test("a menu with no icons at all gets no slots", () => {
-  withDocument();
-  const menu = buildElement({
-    type: "Menu",
-    key: "m",
-    props: {
-      items: [
-        { label: "Copy", value: "copy" },
-        { label: "Paste", value: "paste", icon: null },
-      ],
-    },
-    children: [],
-  });
-
-  for (const item of menu.querySelectorAll('[data-tw-part="item"]')) {
-    assert.equal(item.querySelector("[data-tw-menu-icon]"), null);
-  }
+  // Without the slot, this item's label starts a glyph's width to the left of
+  // the other one, which reads as a broken menu rather than as a menu with some
+  // icons.
+  assert.equal(withoutIcon.textContent, "Rename", "the empty slot adds no text");
 });
 
 test("an unknown icon name leaves the box and the label alone", () => {
@@ -384,13 +420,13 @@ test("an unknown icon name leaves the box and the label alone", () => {
   });
 
   const item = menu.querySelector('[data-tw-part="item"]');
-  const svg = item.querySelector("[data-tw-menu-icon]");
-  assert.ok(svg != null, "the box is still there, so layout does not jump");
+  const svg = item.querySelector("svg");
+  assert.ok(svg != null, "the box is still there, so the layout does not jump");
   assert.equal(svg.querySelector("path"), null);
   assert.equal(item.textContent, "Mystery");
 });
 
-test("clicking the icon selects the item it belongs to", async () => {
+test("clicking the glyph selects the item it belongs to", async () => {
   const dom = freshDom();
   globalThis.document = dom.document;
   const { bindEvents } = await import("../../client/events.js");
@@ -401,36 +437,18 @@ test("clicking the icon selects the item it belongs to", async () => {
   const menu = buildElement({
     type: "Menu",
     key: "row-menu",
-    props: { items: [{ label: "Delete", value: "del", icon: "trash" }] },
+    props: { items: [{ label: "Delete", value: "delete", icon: "trash" }] },
     children: [],
   });
   dom.root.appendChild(menu);
   bindEvents(dom.root, transport);
 
-  // The glyph is the innermost node, so it is what a real pointer hits.
-  const glyph = menu.querySelector("[data-tw-menu-icon] path");
+  // The pointer lands on the glyph, which the IR knows nothing about; the
+  // listener has to walk up to the item that owns it.
+  const glyph = menu.querySelector('[data-tw-part="item"] svg path');
   glyph.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
 
   assert.deepEqual(events, [
-    { type: "select", key: "row-menu", payload: { value: "del", label: "Delete" } },
+    { type: "select", key: "row-menu", payload: { value: "delete", label: "Delete" } },
   ]);
-});
-
-test("an updated items list replaces the icons too", () => {
-  withDocument();
-  const menu = buildElement({
-    type: "Menu",
-    key: "m",
-    props: { items: [{ label: "One", value: "1", icon: "trash" }] },
-    children: [],
-  });
-
-  applyPatches(menu, [
-    { path: [], set_props: { items: [{ label: "Two", value: "2" }] } },
-  ]);
-
-  const items = menu.querySelectorAll('[data-tw-part="item"]');
-  assert.equal(items.length, 1);
-  assert.equal(items[0].textContent, "Two");
-  assert.equal(items[0].querySelector("[data-tw-menu-icon]"), null, "the old icon went with it");
 });

@@ -32,10 +32,15 @@ import inspect
 from collections.abc import Callable, Coroutine
 from typing import Any, Generic, TypeVar
 
-from tempest_core import App, Node, Scene, Widget
+from tempest_core import App, Node, Scene, Theme, Widget
 from tempest_core.core.ir import Patch
 from tempestweb.runtime.background import install_spawner
-from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
+from tempestweb.runtime.events import (
+    apply_media,
+    apply_navigate,
+    apply_scroll,
+    coerce_event,
+)
 from tempestweb.runtime.routing import route_to_path
 from tempestweb.transports.base import (
     Event,
@@ -229,6 +234,7 @@ class WasmRuntime(Generic[S]):
         view: Callable[[App[S]], Widget],
         transport: PatchTransport,
         on_navigate: Callable[[str], Any] | None = None,
+        theme: Theme | None = None,
     ) -> None:
         """Initialize the runtime.
 
@@ -240,6 +246,12 @@ class WasmRuntime(Generic[S]):
                 whenever the app's navigation changes (so the client can sync the
                 URL via ``history.pushState``). The reverse of the ``navigate``
                 event (URL → view).
+            theme: The palette every component resolves its colors against.
+                ``None`` keeps the Material baseline. Mode B has taken this since
+                0.66.0 and Mode A had no way to accept it at all, so an app with
+                its own palette rendered baseline-purple buttons in the browser
+                no matter what it declared — components resolve their colors in
+                **Python**, so the tree has to be built with the theme.
         """
         self._transport: PatchTransport = transport
         self._handlers: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
@@ -247,10 +259,16 @@ class WasmRuntime(Generic[S]):
         self._last_path: str = "/"
         self._sends: set[asyncio.Future[None]] = set()
         self._tasks: set[asyncio.Future[None]] = set()
-        self._app: App[S] = App(
-            state=state,
-            view=view,
-            apply_patches=self._apply_patches,
+        self._theme: Theme | None = theme
+        self._app: App[S] = (
+            App(state=state, view=view, apply_patches=self._apply_patches)
+            if theme is None
+            else App(
+                state=state,
+                view=view,
+                apply_patches=self._apply_patches,
+                theme=theme,
+            )
         )
 
     @property
@@ -348,6 +366,9 @@ class WasmRuntime(Generic[S]):
             return
         if event_type == "navigate":
             apply_navigate(self._app, event.get("payload", {}))
+            return
+        if event_type == "media":
+            apply_media(self._app, event.get("payload", {}))
             return
         entry = self._handlers.get(key)
         if entry is None:

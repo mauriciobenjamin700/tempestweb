@@ -575,6 +575,14 @@ spirit of `mypy --strict`.
     `child` on `Container`/`Draggable`, `children` on `Column`/`Row`, `fields` on
     `Form`.
 
+!!! warning "Dark mode does not reach widgets or components in Mode C"
+    The generated style tables carry no mode axis, so the resolved style that
+    travels inline is always the **light** one — and inline beats the base sheet.
+    Switching the theme changes what the sheet paints, not what the widget
+    carries.
+    [#106](https://github.com/mauriciobenjamin700/tempestweb/issues/106) weighs
+    the options.
+
 !!! check "The structural components are ported"
     `Card`, `AppBar`, `Scaffold`, `Divider`, `Chip`, `SegmentedControl`,
     `RadioGroup` — plus the `HStack`/`VStack` aliases — run in Mode C. Each
@@ -596,7 +604,9 @@ spirit of `mypy --strict`.
     The **data-driven** components of `tempest_core.components` (`DataTable`,
     `Tabs`, `Accordion`, `BarChart`/`LineChart`, the form pickers …): their tree
     depends on the data they are handed, so there is no fixed composition to
-    port — unlike the structural ones above. Also out:
+    port — unlike the structural ones above
+    ([#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107) tracks
+    what is left). Also out:
     multi-loop or destructured comprehensions (`for k, v in …`), and f-string
     format specs beyond the supported set (e.g. alignment `{x:>5}`, sign
     `{x:+.2f}`, hex/bin `{x:x}`, dynamic `{x:.{n}f}`, the `!a` conversion).

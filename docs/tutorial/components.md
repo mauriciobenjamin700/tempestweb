@@ -203,9 +203,11 @@ função:
     roteado **por chave**, duas instâncias na mesma tela disputam o mesmo nome: o
     Python resolve para a **primeira** ocorrência, e o Modo C para a **última** —
     então um clique num controle move o outro. É defeito do `tempest-core`
-    (`SegmentedControl.render`), não do seu app, e vale nos três modos. Enquanto
-    não for corrigido lá, mantenha um por tela ou monte o controle com `Button`
-    dando chave própria a cada segmento.
+    (`SegmentedControl.render`), não do seu app, e vale nos três modos —
+    acompanhado em
+    [tempest-core#20](https://github.com/mauriciobenjamin700/tempest-core/issues/20).
+    Enquanto não for corrigido lá, mantenha um por tela ou monte o controle com
+    `Button` dando chave própria a cada segmento.
 
 !!! tip "Campo vs Input"
     O par existe de propósito: o **`*Input`** (do core) é a primitiva de baixo nível;

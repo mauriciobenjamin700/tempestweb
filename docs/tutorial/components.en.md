@@ -205,7 +205,9 @@ function:
     routed **by key**, two instances on one screen fight over the same name:
     Python resolves the **first** match and Mode C the **last** — so a click on
     one control moves the other. This is a `tempest-core` defect
-    (`SegmentedControl.render`), not your app's, and it holds in all three modes.
+    (`SegmentedControl.render`), not your app's, and it holds in all three
+    modes — tracked in
+    [tempest-core#20](https://github.com/mauriciobenjamin700/tempest-core/issues/20).
     Until it is fixed there, keep one per screen or build the control from
     `Button`s with a key of your own per segment.
 

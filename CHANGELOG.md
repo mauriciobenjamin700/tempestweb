@@ -4,6 +4,30 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.72.0] — 2026-08-22
+
+### Added
+
+- **Overlay modal prende o foco** (#77, item 4). `Dialog`, `BottomSheet` e
+  `ActionSheet` já tinham `role=dialog`, `aria-modal=true`, scrim e dismiss por
+  Escape ou clique fora. Faltava onde o teclado estava: o foco ficava no que
+  abriu o overlay, então o Tab passeava pela página **atrás** do scrim —
+  alcançável por teclado, inalcançável por ponteiro, e anunciado por leitor de
+  tela como se o modal não existisse.
+
+  `client/focus.js` fecha as três obrigações restantes: mover o foco para dentro
+  ao abrir, manter Tab e Shift+Tab dentro enquanto aberto, e devolver o foco ao
+  elemento que abriu quando fecha. Modal empilhado assume o teclado, e fechá-lo
+  devolve para o de baixo, não para o opener.
+
+  Escopo nos modais. `Menu` e `Popover` são ancorados e sem scrim — prender o
+  teclado numa superfície transitória o deixaria preso; `Toast` não é
+  interativo.
+
+  O estado é sincronizado de `mount()` depois de cada batch de patch, não por
+  `MutationObserver`: patch é a única forma de um overlay aparecer, então a
+  chamada explícita é mais barata e determinística.
+
 ## [0.69.0] — 2026-08-22
 
 Uma auditoria da perna do Modo B, e depois um browser em cima dela.

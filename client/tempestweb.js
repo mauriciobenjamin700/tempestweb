@@ -13,6 +13,7 @@ import {
   repaintCanvases,
 } from "./dom.js";
 import { bindEvents } from "./events.js";
+import { installFocusTrap } from "./focus.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
 import { installListEvents } from "./lists.js";
@@ -164,6 +165,7 @@ export function mount(root, transport, initialNode = null) {
   const virtualization = installVirtualization(root, transport);
   const listEvents = installListEvents(root, transport);
   const router = installRouter(transport);
+  const focus = installFocusTrap(() => overlayRoot);
   if (typeof transport.onNavigate === "function") {
     transport.onNavigate((path) => router.navigateTo(path));
   }
@@ -241,6 +243,7 @@ export function mount(root, transport, initialNode = null) {
     }
     if (overlayPatches.length > 0) {
       applyPatches(overlayHost(), overlayPatches, onPatchFailure);
+      focus.sync();
     }
     scheduleFrame(afterLayout);
   });
@@ -255,6 +258,7 @@ export function mount(root, transport, initialNode = null) {
       virtualization.dispose();
       listEvents.dispose();
       router.dispose();
+      focus.dispose();
       if (tree != null && tree.parentNode === root) {
         root.removeChild(tree);
       }

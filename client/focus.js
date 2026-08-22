@@ -38,15 +38,28 @@ const OVERLAY_HOST_ATTR = "data-tw-overlays";
  */
 const FOCUSABLE = [
   "a[href]",
+  "area[href]",
   "button:not([disabled])",
   "input:not([disabled]):not([type=hidden])",
   "select:not([disabled])",
   "textarea:not([disabled])",
+  "iframe",
+  "object",
+  "embed",
+  '[contenteditable="true"]',
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
 
 /**
  * The focusable descendants of `el`, in document order.
+ *
+ * Skips what is explicitly hidden, and asks `checkVisibility` where the browser
+ * offers it, so a stop inside a collapsed section is not focused into silently.
+ *
+ * Deliberately **not** `offsetParent !== null`, the usual shortcut for "is this
+ * laid out": that is null for a `position: fixed` element, which is exactly what
+ * an overlay is — the check would call every stop in every modal hidden, and the
+ * trap would fall back to focusing the box on real pages, not only under jsdom.
  *
  * @param {HTMLElement} el  The container to search.
  * @returns {HTMLElement[]} The focusable elements, possibly empty.
@@ -54,7 +67,16 @@ const FOCUSABLE = [
 function focusables(el) {
   return Array.from(el.querySelectorAll(FOCUSABLE)).filter((node) => {
     const candidate = /** @type {HTMLElement} */ (node);
-    return candidate.getAttribute("aria-hidden") !== "true";
+    if (
+      candidate.hasAttribute("hidden") ||
+      candidate.getAttribute("aria-hidden") === "true"
+    ) {
+      return false;
+    }
+    if (typeof candidate.checkVisibility === "function") {
+      return candidate.checkVisibility();
+    }
+    return true;
   });
 }
 

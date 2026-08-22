@@ -25,6 +25,27 @@ versioning.
   que os cobrem (rajada de resize, frame sem mudança, payload parcial e
   malformado).
 
+## [0.77.1] — 2026-08-22
+
+### Fixed
+
+- **O trap de foco de modal ficou mais preciso sobre o que é um ponto de
+  tabulação.** A lista passou a incluir `area[href]`, `iframe`, `object`, `embed`
+  e `[contenteditable="true"]` — um editor de texto dentro de um diálogo é,
+  muitas vezes, a razão de o diálogo ser modal —, e um controle que a app
+  esconde (`hidden`, ou invisível segundo `checkVisibility`) deixa de ser
+  focado em silêncio.
+
+  A checagem de visibilidade é `checkVisibility()`, **não** `offsetParent !==
+  null`: esse atalho é nulo para elemento `position: fixed`, que é exatamente o
+  que um overlay é — usá-lo chamaria todo ponto de todo modal de escondido, e o
+  trap cairia no fallback de focar a caixa em página real, não só sob jsdom.
+
+  Refinamentos trazidos do PR paralelo #88, que resolveu o mesmo item da #77 por
+  outro caminho; ficou a estrutura desta base com a precisão de lá, mais três
+  testes que ele escreveu — modal empilhado devolvendo o teclado ao de baixo,
+  controle escondido fora da ordem, e região editável como ponto de tabulação.
+
 ## [0.77.0] — 2026-08-22
 
 ### Changed

@@ -231,6 +231,47 @@ def view(app: App[State]) -> Widget:
     têm página própria em [Componentes prontos](components.md). Aqui o foco é só
     como o tema os deixa bonitos sem você estilizar nada.
 
+## Rebrand por tokens, do Python
+
+A folha base pinta tudo a partir de custom properties `--tw-*` no `:root`,
+e é por elas que um app troca de cara — sem tocar em widget nenhum. O que
+faltava era o meio-campo: você monta a paleta em Python e precisa dela na
+página.
+
+```python
+from tempest_core import Theme, ThemeMode
+from tempest_core.style import Color
+from tempestweb.html import theme_css
+
+
+def head() -> str:
+    """Monta o markup de head que retematiza a interface inteira.
+
+    Returns:
+        str: Um elemento de estilo com a paleta do app.
+    """
+    theme = Theme.from_seed(Color(r=39, g=58, b=79), mode=ThemeMode.SYSTEM)
+    return f"<style>{theme_css(theme)}</style>"
+```
+
+`Theme.from_seed` gera os 39 papéis do Material 3 a partir de uma cor
+semente — claro e escuro — e `theme_css` emite os que a folha de fato lê. O
+bloco vai no `<head>`, antes de a folha base ser instalada no mount; como
+ela declara os mesmos nomes com a mesma especificidade, o seu vence por vir
+depois.
+
+!!! tip "Modo escuro sai de graça, e sai honesto"
+    Tema em `SYSTEM` emite o esquema claro no `:root` e o escuro dentro de
+    `@media (prefers-color-scheme: dark)`: a página segue a configuração de
+    quem lê. Tema fixado em `LIGHT` ou `DARK` emite um esquema só e nenhuma
+    media query — um tema fixado que ainda virasse com o sistema não estaria
+    fixado.
+
+!!! info "Só o que a folha consome"
+    `theme_css` emite as variáveis que a folha base lê, não os 39 papéis.
+    Variável que ninguém consome parece zelo e é dívida: o próximo leitor
+    tem que ir ao CSS descobrir se ela faz algo.
+
 ## Indicadores de progresso
 
 `ProgressBar` e `Spinner` não têm tamanho próprio: sem folha de estilo, os dois
@@ -285,7 +326,8 @@ que ninguém está medindo seria lido como fato.
   controles acentuados saem prontos, sem estilizar widget por widget.
 - O **`Style` inline do widget sempre ganha** da folha base (sem `!important`); os
   estados de hover/foco continuam funcionando por cima.
-- Retematize a UI inteira sobrepondo os tokens `--tw-*` de um `<style>` na página.
+- Retematize a UI inteira sobrepondo os tokens `--tw-*` de um `<style>` na página —
+  `theme_css(Theme.from_seed(...))` monta esse bloco, com modo escuro junto.
 - `Style(shadow=...)` vira um **`box-shadow` CSS** na web, igual aos renderizadores
   nativos.
 - `filled_button` / `tonal_button` / `elevated_button` / `outlined_button` /

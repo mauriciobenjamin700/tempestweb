@@ -9,6 +9,8 @@ browser and to plain HTML on the server ("one tree, N renderers").
 - :func:`render_document` — a widget tree to a full ``<!doctype html>`` page.
 - :func:`style_to_css` — a Style dump to a CSS declaration body (a Python port of
   ``client/style.js``).
+- :func:`theme_css` — an app's :class:`~tempest_core.Theme` as the ``--tw-*``
+  custom properties the base stylesheet reads (light plus dark).
 - :func:`escape_text` / :func:`escape_attr` — the HTML-escaping choke points.
 
 See ``docs/ssr.md`` for the tutorial.
@@ -21,6 +23,8 @@ from tempestweb.html.escape import escape_attr as escape_attr
 from tempestweb.html.escape import escape_text as escape_text
 from tempestweb.html.renderer import render_document as render_document
 from tempestweb.html.renderer import render_to_html as render_to_html
+from tempestweb.html.theme import ROLE_BY_VARIABLE as ROLE_BY_VARIABLE
+from tempestweb.html.theme import theme_css as theme_css
 
 __all__: list[str] = [
     "escape_attr",
@@ -28,4 +32,6 @@ __all__: list[str] = [
     "render_document",
     "render_to_html",
     "style_to_css",
+    "theme_css",
+    "ROLE_BY_VARIABLE",
 ]

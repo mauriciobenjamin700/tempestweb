@@ -4,6 +4,139 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.67.0] — 2026-08-21
+
+Onze defeitos que só um browser mostra.
+
+### Fixed
+
+- **`Draggable` e `DragTarget` não arrastavam.** O core sempre teve os dois
+  widgets, o renderizador SSR desenhava suas caixas e a documentação ships um
+  tutorial bilíngue inteiro do exemplo kanban — mas nada implementava a
+  interação. O renderizador do DOM os deixava como `div` anônimos (nada marcado
+  `draggable`, nenhum alvo de drop), o `events.js` não capturava evento de drag
+  algum, e a tabela de roteamento não tinha os tipos `drag`/`drop` — então mesmo
+  um envelope enviado à mão não resolvia handler. Verificado no Chrome antes da
+  correção: arrastar um cartão até a lixeira não fazia absolutamente nada.
+
+  É o modo de falha do `ProgressBar` em 0.65.0 outra vez: a árvore afirma uma
+  feature que a tela nunca teve. Agora um `Draggable` é um elemento arrastável de
+  verdade com seu payload em `data-tw-drag-data`, o `dragover` de um `DragTarget`
+  chama `preventDefault` (sem isso o browser recusa o drop inteiro), e o `drop`
+  emite o payload contra a key do alvo — nos três modos, porque o Modo C monta
+  pelo mesmo cliente.
+
+- **A camada de overlay não sobrepunha nada.** O `mount()` aplica os patches da
+  camada de overlay num host próprio, mas o host era um `<div>` sem estilo
+  anexado depois da árvore e nenhum widget de overlay tinha regra própria. O
+  "I am a floating dialog" do exemplo renderizava **no fluxo**, no fim da página:
+  sem card, sem scrim, sem centralização — e o `title` ("Hello") nunca era
+  desenhado, porque o título de um `Dialog` é prop, não filho.
+
+  O host agora é uma camada fixa de viewport inteiro, transparente ao ponteiro
+  (para não engolir cliques na app quando vazia), com cada overlay recuperando o
+  ponteiro. `Dialog` é card centralizado com scrim, `BottomSheet` é painel
+  inferior, `Toast` é pílula transitória sem scrim. O título é pintado a partir de
+  `data-tw-title` por `::before` — inserir um elemento deslocaria os índices a que
+  todo patch de filho é relativo — e espelhado em `aria-label`. `Dialog`/
+  `BottomSheet` ganham `role=dialog` + `aria-modal`; `Toast`, `role=status` +
+  `aria-live=polite`, porque um toast que ninguém anuncia é invisível para leitor
+  de tela.
+
+- **Um `Canvas` era um bitmap esticado.** Um canvas tem dois tamanhos — o buffer
+  de pixels e a caixa que o CSS lhe dá — e só o buffer era definido. Dentro de um
+  flex column, `align-items: stretch` (o default do CSS) puxava um gráfico de
+  320×200 para 909×568: os rótulos de eixo do admin-console saíam 2,8× maiores e
+  borrados, e o card superdimensionado empurrava o resto da página para fora da
+  tela. Em tela HiDPI o mesmo bitmap era esticado outra vez pelo device pixel
+  ratio. Agora a caixa é fixada no tamanho declarado (default que o `Style` da app
+  sobrescreve), o buffer é dimensionado pela caixa real vezes o DPR, e o contexto
+  é escalado para preservar o sistema de coordenadas em que os comandos de desenho
+  foram escritos. Canvases repintam depois do layout e no resize.
+
+- **O `role` default de cada widget era apagado.** A limpeza de prop `null`
+  (0.66.0) fez `semantics: null` remover `role`/`aria-label` — correto por si, mas
+  rodava **depois** de cada widget definir seus próprios defaults, então os
+  apagava. E o core põe toda prop declarada no fio, logo `semantics: null` é o que
+  um widget sem semantics sempre manda. Medido contra as props reais:
+
+  ```text
+  ProgressBar  role=null  aria-valuemin=0   <- valuemin sem role
+  Spinner      role=null
+  Toast        role=null                    <- não anunciava nada
+  Dialog       role=null  aria-label=null   <- e título sem nome acessível
+  ```
+
+- **Os spacers da lista virtualizada colapsavam.** Um viewport lazy é um flex
+  column, então os `::before`/`::after` que reservam o espaço fora da janela são
+  flex items — e o `flex-shrink: 1` default os comprimia a zero dentro da altura
+  limitada do viewport. As regras existiam e computavam `0px`, então uma lista de
+  1000 itens rolava como se tivesse só as 60 linhas materializadas: a barra de
+  rolagem mentia sobre o tamanho da lista. Verificado no Chrome: `scrollHeight`
+  passou de 2100px para os 35000px reais, e a janela continua deslizando certo.
+
+- **Um campo de senha se desmascarava na primeira tecla.** O `type` do `Input`
+  era rederivado de todo bag de props (`props.secure ? "password" : "text"`).
+  Digitar aplica patch só em `value`, então o update seguinte não trazia `secure`,
+  lia `undefined` e definia `type="text"` — a senha ficava mascarada só até o
+  usuário digitar uma.
+
+- **O `label` de um container era escrito como seu texto.** Qualquer widget com
+  prop `label` tinha o `textContent` sobrescrito, então um `FormField` — cujo
+  label é metadado, e cujo `Text` filho o core já renderiza — mostrava um segundo
+  rótulo sem estilo, em Times New Roman ao lado do rótulo temático. O SSR nunca o
+  desenhou, então os dois renderizadores discordavam sobre a mesma árvore. Pior:
+  um Update com `label` teria substituído os filhos do campo por aquela string.
+
+- **O artefato do Modo A não bootava.** O timeout de chamada nativa (0.66.0)
+  importa `tempestweb.core.constants` em `native/bridges.py`, mas o bundle wasm
+  embarca um subconjunto explícito do pacote e `core` não estava nele. Todos os
+  testes Python seguiam verdes — o processo de teste tem o pacote inteiro
+  instalado — enquanto o artefato morria no browser com
+  `No module named 'tempestweb.core'`. Um guard novo caminha pelos arquivos
+  embarcados e exige que todo import de nível de módulo `tempestweb.X` nomeie uma
+  parte que também está embarcada.
+
+- **Nenhum artefato tinha ícone de aba.** Nenhum shell linkava um, então o browser
+  pedia `/favicon.ico` a cada carga e todo artefato respondia 404 — console de
+  deploy abrindo com um erro que ninguém pode resolver, e aba com ícone em branco.
+
+### Fixed (exemplos)
+
+- **kanban-board, dashboard-shell, notification-center:** `on_click=lambda c=col:
+  ...` é a forma usual de capturar variável de laço em Python e é uma armadilha
+  aqui: a lambda passa a **aceitar** um argumento posicional, e o runtime entrega
+  o evento tipado a todo handler que aceita um. O evento caía em `c`, então o
+  rótulo do kanban lia `New card in [x=None y=None]` em vez do nome da coluna.
+  `functools.partial` amarra o valor sem criar parâmetro.
+- **data-table:** a coluna de salário ordenava como texto, então `R$ 8.750`
+  caía depois de `R$ 20.000`. Célula que lê como número passa a ordenar por valor.
+- **admin-console:** a paginação era decorativa — todas as linhas iam para
+  `list_page` com `page_count` fixo em 2, então "Próxima" mudava o rótulo e
+  deixava as mesmas cinco linhas na tela.
+- **theme-switcher:** cada swatch de accent é um `Container` colorido cujo
+  `Button` é só a área de clique, mas o botão não tinha `Style` — então o core lhe
+  dava a variante filled: uma pílula roxa de 48px dentro de um círculo de 44px.
+  Todo swatch aparecia roxo com uma lasca da cor real na borda, num exemplo cujo
+  propósito é escolher cor.
+
+### Added
+
+- Tipos de evento `drag` / `drop` na tabela de roteamento, entregando o
+  `DragEvent` tipado que os widgets já declaravam.
+- `applyPatches` exporta `DRAG_DATA_ATTR`, `DROP_TARGET_ATTR` e `TITLE_ATTR`;
+  `repaintCanvases(root)` redesenha os canvases depois do layout.
+
+### Tests
+
+- Round-trip de drag/drop em jsdom, camada de overlay (posicionamento + papéis
+  ARIA + o `role` default sobrevivendo a `semantics: null`), máscara de senha
+  através de um update que só muda o valor, e o guard de fechamento de imports do
+  bundle do Modo A.
+- Os três modos foram exercitados num browser real: Modo B (kanban, overlays,
+  data-table, admin-console, list_demo, login-form, theme-switcher), Modo A
+  (counter sob Pyodide) e Modo C (counter transpilado).
+
 ## [0.66.0] — 2026-08-21
 
 Uma auditoria da perna do Modo B: catorze defeitos, quase todos silenciosos.

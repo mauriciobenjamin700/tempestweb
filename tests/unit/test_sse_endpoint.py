@@ -239,6 +239,12 @@ async def test_owner_reconnect_takes_the_session_over(
     The heartbeat is shortened because an abandoned stream is only *noticed* when
     the response next tries to write — with the 15s default the teardown, and so
     the bug, would land long after the test finished.
+
+    The ordering is load-bearing: the resumed stream has to be observed serving
+    (a click that comes back down it) *before* the old connection unwinds.
+    Otherwise the teardown races the resumed stream's registration, `/health`
+    momentarily reports no session, and the test reads its own race as the
+    regression — which is exactly how it flaked (issue #94).
     """
     from tempestweb.server import app as server_app
     from tempestweb.transports.sse import SSETransport
@@ -262,18 +268,36 @@ async def test_owner_reconnect_takes_the_session_over(
         second = await resumed.__aenter__()
         frames = _frames(second.aiter_lines())
 
-        # Only now does the dropped connection finish unwinding on the server.
-        await dropped.__aexit__(None, None, None)
-        assert await _sessions_stay_up(client) == 1
-
-        click = await client.post(
+        # Prove the resumed stream is *serving* before dropping the old one.
+        # Entering the context only gets the response head; the SSE generator —
+        # which is what registers the stream server-side — does not run until the
+        # client reads. Tearing the old connection down first left a window where
+        # the session belonged to neither stream, and `/health` reported zero:
+        # the assertion below then read a race as the bug it exists to catch,
+        # which is how this test failed roughly one run in four under load.
+        first_click = await client.post(
             "/sse/keep",
             headers=owner,
             json={"kind": "event", "data": {"type": "click", "key": "inc"}},
         )
-        assert click.status_code == 204
+        assert first_click.status_code == 204
+        _, resumed_update = await asyncio.wait_for(frames.__anext__(), 2.0)
+        assert _label_update(resumed_update) == {"content": "Count: 1"}
+
+        # Only now does the dropped connection finish unwinding on the server.
+        await dropped.__aexit__(None, None, None)
+        assert await _sessions_stay_up(client) == 1
+
+        # And the session it replaced is still the live one: the state survived
+        # the teardown, so this click continues the count instead of restarting it.
+        second_click = await client.post(
+            "/sse/keep",
+            headers=owner,
+            json={"kind": "event", "data": {"type": "click", "key": "inc"}},
+        )
+        assert second_click.status_code == 204
         _, update = await asyncio.wait_for(frames.__anext__(), 2.0)
-        assert _label_update(update) == {"content": "Count: 1"}
+        assert _label_update(update) == {"content": "Count: 2"}
         await resumed.__aexit__(None, None, None)
 
 

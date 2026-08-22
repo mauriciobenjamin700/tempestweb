@@ -652,3 +652,60 @@ def test_bare_annotation_emits_nothing() -> None:
     """A declaration with no value is a type statement; there is nothing to run."""
     js = gen("def view(app):\n    total: int\n    return 0\n")
     assert "total" not in js
+
+
+def test_dataclass_named_state_aliases_the_runtime_base() -> None:
+    """A state class named ``State`` transpiles to a module that parses.
+
+    Regression: the base was hard-coded to the bare name ``State``, so a module
+    declaring its own ``State`` emitted both ``import { State }`` and
+    ``export class State extends State`` — two declarations of one identifier,
+    which is a ``SyntaxError`` that takes the whole module down. Nothing failed
+    at transpile time; the browser logged ``Identifier 'State' has already been
+    declared`` and the app never mounted. ``tempestweb new`` scaffolds its state
+    dataclass under exactly this name, so Mode C was broken out of the box.
+    """
+    js = gen("@dataclass\nclass State:\n    value: int = 0\n")
+    assert 'import { State as State$ } from "./runtime.js";' in js
+    assert "export class State extends State$ {" in js
+    assert 'import { State } from "./runtime.js";' not in js
+
+
+def test_state_alias_is_unreachable_from_python() -> None:
+    """The alias holds a ``$``, which no Python identifier can contain.
+
+    That is what makes the alias collision-proof rather than merely unlikely:
+    the transpiler cannot be handed a class whose name shadows it.
+    """
+    js = gen("@dataclass\nclass State:\n    value: int = 0\n")
+    assert "State$" in js
+    with pytest.raises(SyntaxError):
+        compile("class State$:\n    pass\n", "<test>", "exec")
+
+
+def test_dataclass_named_state_still_takes_field_overrides() -> None:
+    """Aliasing the base leaves the constructor contract untouched."""
+    js = gen("@dataclass\nclass State:\n    value: int = 3\n")
+    assert "super(opts);" in js
+    assert "this.value = opts.value !== undefined ? opts.value : 3;" in js
+
+
+def test_a_class_shadowing_a_widget_drops_the_widget_import() -> None:
+    """A local class wins over the import of the same name, as in Python.
+
+    Emitting both would be the same double declaration as the ``State`` case,
+    for any name the module happens to reuse.
+    """
+    js = gen("@dataclass\nclass Text:\n    value: int = 0\n")
+    assert "export class Text extends State {" in js
+    assert 'from "./widgets.js"' not in js
+
+
+def test_dataclass_inheriting_a_state_named_base_uses_the_local_class() -> None:
+    """Explicit inheritance still names the transpiled class, not the alias."""
+    js = gen(
+        "@dataclass\nclass State:\n    value: int = 0\n\n\n"
+        "@dataclass\nclass Extra(State):\n    other: int = 1\n"
+    )
+    assert "export class State extends State$ {" in js
+    assert "export class Extra extends State {" in js

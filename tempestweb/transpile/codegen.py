@@ -25,6 +25,10 @@ __all__: list[str] = ["generate"]
 
 # Imported names that resolve to the native runtime rather than a widget builder.
 _RUNTIME_NAMES: frozenset[str] = frozenset({"App", "State"})
+# The alias the injected dataclass base is imported under when the module
+# declares its own `State`. `$` is legal in a JS identifier but never in a
+# Python one, so this alias cannot collide with a transpiled name.
+_STATE_BASE_ALIAS: str = "State$"
 # The native-capability namespace, imported from `./native.js` in Mode C.
 _NATIVE_NAMES: frozenset[str] = frozenset({"native"})
 # Navigation primitives, imported from `./nav.js` in Mode C.
@@ -266,6 +270,9 @@ class _Generator:
         """
         self.filename: str = filename
         self.class_names: set[str] = set()
+        # The name the implicit dataclass base is emitted under: the runtime
+        # `State`, or `_STATE_BASE_ALIAS` when the module declares its own.
+        self.state_base: str = "State"
         # Identifiers actually referenced in the emitted JS, so imports reflect
         # what the output uses (not merely what the Python source imported).
         self.referenced: set[str] = set()
@@ -1383,6 +1390,14 @@ class _Generator:
     def module(self, tree: ast.Module) -> str:
         """Emit the whole module: imports, then classes and functions.
 
+        A class declared here shadows the import of the same name: emitting both
+        would declare the identifier twice, which is a JS ``SyntaxError`` that
+        takes the whole module down. The local declaration wins, matching Python,
+        so shadowed names are dropped from the import list. The injected dataclass
+        base is the one name that cannot simply be dropped — it is still needed as
+        the base — so a module declaring its own ``State`` imports the runtime one
+        under :data:`_STATE_BASE_ALIAS`.
+
         Args:
             tree: The parsed module AST.
 
@@ -1413,13 +1428,17 @@ class _Generator:
                     self.filename,
                 )
 
+        if "State" in self.class_names:
+            self.state_base = _STATE_BASE_ALIAS
+        importable -= self.class_names
+
         # Emit bodies first so `referenced` reflects what the output actually
         # uses; `State` is the injected base of every emitted dataclass.
         bodies: list[str] = []
         for node in top_level:
             if isinstance(node, ast.ClassDef):
                 bodies.append(self._class(node))
-                self.referenced.add("State")
+                self.referenced.add(self.state_base)
             elif isinstance(node, ast.Assign | ast.AnnAssign):
                 bodies.append(self._module_const(node))
             else:
@@ -1504,8 +1523,18 @@ class _Generator:
         importable.add("State")
 
     def _imports(self, used: set[str]) -> str:
-        """Emit the runtime + widgets + native + validators import lines."""
+        """Emit the runtime + widgets + native + validators import lines.
+
+        Args:
+            used: Importable names the emitted bodies actually reference.
+
+        Returns:
+            The import lines, one per source module, aliasing the dataclass base
+            when :attr:`state_base` says the module declares its own ``State``.
+        """
         runtime = sorted(used & _RUNTIME_NAMES)
+        if self.state_base != "State":
+            runtime.append(f"State as {self.state_base}")
         native = sorted(used & _NATIVE_NAMES)
         nav = sorted(used & _NAV_NAMES)
         i18n = sorted(used & _I18N_NAMES)
@@ -1590,7 +1619,8 @@ class _Generator:
 
         Annotated fields become constructor assignments; methods become JS class
         methods (the ``self`` receiver maps to ``this`` and is dropped from the
-        parameter list). A dataclass with no base extends the runtime ``State``;
+        parameter list). A dataclass with no base extends :attr:`state_base` —
+        the runtime ``State``, or its alias when this module shadows the name;
         a dataclass inheriting another transpiled dataclass extends it directly
         (``super()`` chains the parent constructor, then the subclass's own field
         defaults are assigned — overriding an inherited default when they clash).
@@ -1603,7 +1633,7 @@ class _Generator:
                     node,
                     self.filename,
                 )
-        base = "State"
+        base = self.state_base
         if node.bases:
             if len(node.bases) != 1 or not isinstance(node.bases[0], ast.Name):
                 raise TranspileError(

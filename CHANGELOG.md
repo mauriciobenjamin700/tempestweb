@@ -4,6 +4,33 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.78.1] — 2026-08-22
+
+### Fixed
+
+- **Modo C voltou a funcionar para a app que o próprio `tempestweb new`
+  escreve.** O transpiler fixava o nome da base injetada como `State`, então um
+  módulo que declara a própria dataclass `State` — exatamente o que os dois
+  templates de scaffold escrevem — emitia `import { State } from "./runtime.js"`
+  **e** `export class State extends State`: duas declarações do mesmo
+  identificador, `SyntaxError` que derruba o módulo inteiro. Nada falhava no
+  transpile; o browser logava `Identifier 'State' has already been declared` e a
+  página ficava em branco. Agora a base entra sob alias (`State as State$`) e a
+  classe local vence, como em Python. O `$` é legal em identificador JS e nunca
+  em identificador Python, então o alias não pode colidir com nome transpilado.
+- **Classe local que sombreia qualquer nome importado** (`class Text`, por
+  exemplo) deixa de emitir o import junto com a declaração — mesma dupla
+  declaração, para qualquer nome que o módulo reusa.
+
+### Added
+
+- **Guard: todo JS que o transpiler emite tem que parsear** como ES module
+  (`node --check`), cobrindo os dois templates de scaffold e cada
+  `examples/*/app.py` dentro do subset do Modo C. Os goldens comparavam o texto
+  gerado, então o transpiler podia emitir um módulo que o browser recusa a
+  carregar com a suíte inteira verde — foi assim que este bug passou. Sem o fix,
+  o guard falha nos dois templates.
+
 ## [0.78.0] — 2026-08-22
 
 ### Changed

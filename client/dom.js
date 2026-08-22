@@ -131,6 +131,7 @@ function applyProps(el, props) {
   applyA11yProps(el, props);
   applyEscapeHatchAttrs(el, props);
   applyLazyProps(el, type, props);
+  applyListEventProps(el, type, props);
 }
 
 /** Valid HTML attribute name — mirrors `_ATTR_KEY_RE` in the SSR renderer. */
@@ -265,6 +266,39 @@ function applyLazyProps(el, type, props) {
   }
   const start = Array.isArray(props.window) ? props.window[0] : 0;
   el.setAttribute("data-tw-window-start", String(start ?? 0));
+}
+
+// List widgets that declare `end_reached_threshold` + `on_end_reached`. The
+// windowed ones scroll their own box; a SectionList flows in the page — both
+// geometries are measured by client/lists.js off the same marker.
+const END_REACHED_TYPES = Object.freeze([
+  "LazyColumn",
+  "LazyRow",
+  "LazyGrid",
+  "SectionList",
+]);
+
+/**
+ * Mark a list with the scroll fraction at which it wants `end_reached`.
+ *
+ * The threshold is a core prop (default `0.8`), so the client reads it off the
+ * element instead of hardcoding a value: `client/lists.js` measures scroll
+ * progress on every scroll and reports `end_reached` once per crossing. The
+ * handler itself never crosses the wire (it serializes to `null`), so the marker
+ * is what tells the client this widget has an end to reach at all.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyListEventProps(el, type, props) {
+  if (type == null || !END_REACHED_TYPES.includes(type)) {
+    return;
+  }
+  if ("end_reached_threshold" in props && props.end_reached_threshold != null) {
+    el.setAttribute("data-tw-end-threshold", String(props.end_reached_threshold));
+  }
 }
 
 /** Widget types the base theme paints as progress indicators. */

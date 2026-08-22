@@ -140,6 +140,14 @@ Armadilhas já pagas neste repo:
   (`Container(on_click=...)` levanta `ValidationError` com o nome do campo). Antes
   era aceito e descartado em silêncio — se você vê o erro, ele está dizendo a
   verdade: use o widget que declara aquele handler.
+- Golden de transpile compara **texto**, não validade: JS que o browser recusa a
+  carregar passa a suíte inteira. Mudança no codegen fecha em
+  `tests/transpile/test_generated_js_parses.py` (`node --check`), que cobre os dois
+  templates de scaffold e cada `examples/*/app.py` no subset.
+- O JS gerado compartilha namespace com o que ele importa: dataclass do usuário
+  chamada `State` (o que o scaffold escreve) colidia com a base do runtime. Nome
+  injetado pelo codegen entra sob alias com `$` — ilegal em Python, logo
+  incolidível.
 
 ## Git
 

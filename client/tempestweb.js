@@ -10,6 +10,7 @@ import { applyPatches, buildElement } from "./dom.js";
 import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
+import { installListEvents } from "./lists.js";
 import { installBaseTheme } from "./theme.js";
 import { installVirtualization } from "./virtualize.js";
 
@@ -136,6 +137,7 @@ export function mount(root, transport, initialNode = null) {
 
   const unbind = bindEvents(root, transport);
   const virtualization = installVirtualization(root, transport);
+  const listEvents = installListEvents(root, transport);
   const router = installRouter(transport);
   if (typeof transport.onNavigate === "function") {
     transport.onNavigate((path) => router.navigateTo(path));
@@ -179,6 +181,7 @@ export function mount(root, transport, initialNode = null) {
     unmount() {
       unbind();
       virtualization.dispose();
+      listEvents.dispose();
       router.dispose();
       if (tree != null && tree.parentNode === root) {
         root.removeChild(tree);

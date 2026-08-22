@@ -21,6 +21,7 @@ import {
   ITEM_VALUE_ATTR,
   KEY_ATTR,
   TYPE_ATTR,
+  REORDER_ATTR,
 } from "./dom.js";
 
 // The DOM event names captured and their corresponding TWEvent `type`. Identity
@@ -130,6 +131,82 @@ function sendMenuSelection(event, root, transport) {
     },
   });
   return true;
+}
+
+/** The dataTransfer type carrying the dragged item's position within its list. */
+const REORDER_MIME = "text/x-tw-reorder";
+
+/**
+ * Read a drag between a `ReorderableList`'s children as a reorder, if it is one.
+ *
+ * `on_reorder` was declared by the core and never fired: the HTML5 drag contract
+ * existed for `Draggable`/`DragTarget`, but a reorderable list's children are
+ * plain items — the list, not the item, is what declares the handler, and the
+ * event it wants is a pair of positions.
+ *
+ * Positions are computed from the DOM at event time rather than stamped onto the
+ * children: items arrive and leave through Insert/Remove patches, so any index
+ * written onto a child goes stale the moment the list changes.
+ *
+ * @param {DragEvent} event  The dragstart / drop event.
+ * @param {HTMLElement} root The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @param {"start"|"drop"} phase  Which half of the gesture this is.
+ * @returns {boolean}        True when the event belonged to a reorderable list.
+ */
+function handleReorder(event, root, transport, phase) {
+  const item = closestChildOfReorderable(event.target, root);
+  if (item == null) {
+    return false;
+  }
+  const list = /** @type {HTMLElement} */ (item.parentElement);
+  const index = Array.prototype.indexOf.call(list.children, item);
+  if (phase === "start") {
+    if (event.dataTransfer) {
+      event.dataTransfer.setData(REORDER_MIME, String(index));
+      event.dataTransfer.effectAllowed = "move";
+    }
+    return true;
+  }
+  event.preventDefault();
+  const raw = event.dataTransfer ? event.dataTransfer.getData(REORDER_MIME) : "";
+  const from = Number.parseInt(raw, 10);
+  const key = list.getAttribute(KEY_ATTR);
+  if (key == null || !Number.isFinite(from) || from === index) {
+    return true;
+  }
+  transport.sendEvent({
+    type: "reorder",
+    key,
+    payload: { from_index: from, to_index: index },
+  });
+  return true;
+}
+
+/**
+ * Find the direct child of a `ReorderableList` containing `target`.
+ *
+ * The pointer is usually over something nested inside the item, and the item is
+ * whatever child of the list that subtree hangs from.
+ *
+ * @param {EventTarget|null} target  The event's target.
+ * @param {HTMLElement} root         The delegation root.
+ * @returns {?HTMLElement}           The list item, or null.
+ */
+function closestChildOfReorderable(target, root) {
+  let node = /** @type {Node|null} */ (target);
+  while (node != null && node.nodeType !== 1) {
+    node = node.parentNode;
+  }
+  let el = /** @type {HTMLElement|null} */ (node);
+  while (el != null && el !== root) {
+    const parent = el.parentElement;
+    if (parent != null && parent.hasAttribute?.(REORDER_ATTR)) {
+      return el;
+    }
+    el = parent;
+  }
+  return null;
 }
 
 /** The dataTransfer type carrying a `Draggable`'s payload across a drag. */
@@ -333,6 +410,9 @@ export function bindEvents(root, transport) {
   const bindDrag = () => {
     /** @param {DragEvent} event */
     const onDragStart = (event) => {
+      if (handleReorder(event, root, transport, "start")) {
+        return;
+      }
       const source = closestWithAttr(event.target, root, DRAG_DATA_ATTR);
       if (source == null) {
         return;
@@ -350,7 +430,8 @@ export function bindEvents(root, transport) {
 
     /** @param {DragEvent} event */
     const onDragOver = (event) => {
-      if (closestWithAttr(event.target, root, DROP_TARGET_ATTR) == null) {
+      const overItem = closestChildOfReorderable(event.target, root) != null;
+      if (!overItem && closestWithAttr(event.target, root, DROP_TARGET_ATTR) == null) {
         return;
       }
       // Without this the browser refuses the drop and no `drop` ever fires.
@@ -362,6 +443,9 @@ export function bindEvents(root, transport) {
 
     /** @param {DragEvent} event */
     const onDrop = (event) => {
+      if (handleReorder(event, root, transport, "drop")) {
+        return;
+      }
       const target = closestWithAttr(event.target, root, DROP_TARGET_ATTR);
       if (target == null) {
         return;

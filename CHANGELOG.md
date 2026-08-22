@@ -4,6 +4,47 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.72.0] — 2026-08-22
+
+Dois gestos de container que o core declarava e o DOM não tinha.
+
+### Fixed
+
+- **`on_reorder` funciona: uma `ReorderableList` pode ser ordenada arrastando**
+  (issue #77, item 1). O contrato HTML5 de drag existia para
+  `Draggable`/`DragTarget`, mas as linhas de uma lista reordenável são widgets
+  comuns — quem declara o handler é a **lista**, e o evento que ela quer é um
+  par de posições. O cliente marca as linhas arrastáveis depois de cada batch
+  (uma linha entra e sai por patch no *pai*, que nunca passa pelos props do
+  próprio pai) e lê um arrasto entre duas delas como
+  `{from_index, to_index}`. As posições são calculadas do DOM no momento do
+  evento: índice gravado na linha ficaria velho no primeiro remanejamento.
+
+- **`on_page_change` funciona: um `PageView` é um carrossel** (issue #77,
+  item 1). O widget renderizava como caixa comum — não havia página para
+  arrastar nem o que reportar. A folha base o transforma num scroller
+  horizontal com snap (um filho por largura de viewport), o que traz swipe de
+  touch, trackpad e `shift`+roda do próprio navegador; `client/pages.js` reporta
+  em qual página o scroll assentou, e `dom.js` rola até a página que a app
+  pediu, então o caminho é de mão dupla.
+
+  O reporte **espera o scroll parar**, e isso não é refinamento: uma rolagem é
+  um fluxo de eventos cujas posições intermediárias arredondam para a página que
+  está sendo deixada. Medido no Chrome: apertar "Next" enviava o clique e, no
+  mesmo instante, um `page_change` dizendo "voltei para a página anterior" — a
+  app desfazia o próprio movimento. Com o assentamento, `Next` leva 0 → 1 → 2
+  (scrollLeft 0 → 452 → 904) e o swipe de volta leva 2 → 1.
+
+### Added
+
+- **`examples/reorder_demo`** — uma lista de tarefas ordenada por arrasto, com
+  log dos movimentos. Verificado em Chrome real: arrastar a primeira linha sobre
+  a última reordena de fato (`Write the spec: 0 → 3`).
+
+- **Nova página de tutorial bilíngue "Gestos: arrastar, reordenar, paginar" /
+  "Gestures: drag, reorder, paginate"** (`docs/tutorial/gestures.md`), que
+  também documenta o par `Draggable`/`DragTarget`, que não tinha página.
+
 ## [0.71.0] — 2026-08-22
 
 O resto do contrato de modal, e o ícone que um item de menu declarava.

@@ -9,6 +9,7 @@
 import {
   applyPatches,
   buildElement,
+  syncContainerGestures,
   positionAnchoredOverlays,
   repaintCanvases,
 } from "./dom.js";
@@ -17,6 +18,7 @@ import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
 import { installFocusTrap } from "./focus.js";
 import { installListEvents } from "./lists.js";
+import { installPageViews } from "./pages.js";
 import { installMedia } from "./media.js";
 import { installBaseTheme } from "./theme.js";
 import { installVirtualization } from "./virtualize.js";
@@ -166,6 +168,7 @@ export function mount(root, transport, initialNode = null) {
   const virtualization = installVirtualization(root, transport);
   const listEvents = installListEvents(root, transport);
   const focusTrap = installFocusTrap(root);
+  const pageViews = installPageViews(root, transport);
   const router = installRouter(transport);
   if (typeof transport.onNavigate === "function") {
     transport.onNavigate((path) => router.navigateTo(path));
@@ -181,6 +184,7 @@ export function mount(root, transport, initialNode = null) {
     virtualization.refresh();
     repaintCanvases(root);
     positionAnchoredOverlays(root);
+    syncContainerGestures(root);
     focusTrap.sync();
   };
   scheduleFrame(afterLayout);
@@ -267,6 +271,7 @@ export function mount(root, transport, initialNode = null) {
       virtualization.dispose();
       listEvents.dispose();
       focusTrap.dispose();
+      pageViews.dispose();
       media.dispose();
       router.dispose();
       if (tree != null && tree.parentNode === root) {

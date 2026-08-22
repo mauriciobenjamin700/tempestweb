@@ -65,8 +65,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import Border, Color, Edge, FontWeight
-from tempest_core.widgets import Button, Column, Container, Row, Text
+from tempest_core import Border, Color, Edge, FontWeight
+from tempest_core import Button, Column, Container, Row, Text
 from tempestweb.observability import (
     FeatureFlagsProvider,
     InMemoryFeatureFlagsAdapter,
@@ -650,8 +650,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import Border, Color, Edge, FontWeight
-from tempest_core.widgets import Button, Column, Container, Row, Text
+from tempest_core import Border, Color, Edge, FontWeight
+from tempest_core import Button, Column, Container, Row, Text
 from tempestweb.observability import (
     FeatureFlagsProvider,
     InMemoryFeatureFlagsAdapter,

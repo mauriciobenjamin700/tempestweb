@@ -21,33 +21,31 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from tempest_core import App, Style, Widget
-from tempest_core.components.base import (
+from tempest_core import (
     ACCENT,
     BACKGROUND,
     MUTED,
     ON_MUTED,
     ON_SURFACE,
     SURFACE,
-)
-from tempest_core.components.feedback import Banner
-from tempest_core.style import (
     AlignItems,
-    Color,
-    Edge,
-    FontWeight,
-    JustifyContent,
-)
-from tempest_core.widgets import (
+    App,
+    Banner,
     Button,
+    Color,
     Column,
     Container,
+    Edge,
+    FontWeight,
     Input,
+    JustifyContent,
     LazyColumn,
     Row,
+    Style,
     Text,
+    TextChangeEvent,
+    Widget,
 )
-from tempest_core.widgets.events import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Color palette additions specific to this example

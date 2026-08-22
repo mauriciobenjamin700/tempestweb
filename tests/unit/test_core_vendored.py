@@ -17,7 +17,7 @@ def test_vendored_core_build_and_diff() -> None:
 
 def test_style_dump_shape() -> None:
     """Style serializes Color as rgba dict — the client contract."""
-    from tempest_core.style import Color
+    from tempest_core import Color
 
     s = Style(gap=8.0, color=Color.from_hex("#111111"))
     d = s.model_dump(mode="json")

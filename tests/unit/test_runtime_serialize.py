@@ -14,8 +14,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from tempest_core import Column, Container, Style, Text, Widget, build
-from tempest_core.style import Edge
+from tempest_core import Column, Container, Edge, Style, Text, Widget, build
 from tempestweb.runtime import node_to_wire
 
 

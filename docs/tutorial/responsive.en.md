@@ -53,7 +53,7 @@ when the column around them is bounded — the bound comes from `media.height`:
 
 ```python
 from tempest_core import Style
-from tempest_core.presets import Scaffold
+from tempest_core import Scaffold
 
 
 def view(app: App[None]) -> Widget:

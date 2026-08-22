@@ -8,7 +8,7 @@ template — just plain, typed Python.
 
 ```python
 from tempest_core import App, Column, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 
 
 def view(app: App[CounterState]) -> Widget:  # (1)!
@@ -83,7 +83,7 @@ Putting container, text and buttons together:
 
 ```python
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 
 
 def view(app: App[CounterState]) -> Widget:

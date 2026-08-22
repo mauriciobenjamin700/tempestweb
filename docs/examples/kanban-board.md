@@ -69,7 +69,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
     Border,
     Color,
@@ -77,7 +77,7 @@ from tempest_core.style import (
     FontWeight,
     JustifyContent,
 )
-from tempest_core.widgets import (
+from tempest_core import (
     Button,
     Column,
     Container,
@@ -88,7 +88,7 @@ from tempest_core.widgets import (
     ScrollView,
     Text,
 )
-from tempest_core.widgets.events import DragEvent, TextChangeEvent
+from tempest_core import DragEvent, TextChangeEvent
 
 #: As três colunas do quadro, na ordem de exibição.
 COLUMNS: list[str] = ["Backlog", "In Progress", "Done"]

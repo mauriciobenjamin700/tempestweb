@@ -45,8 +45,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import Edge
+from tempest_core import (
     Button,
     Column,
     Dropdown,
@@ -59,7 +59,7 @@ from tempest_core.widgets import (
     TextArea,
     Validator,
 )
-from tempest_core.widgets.events import SelectEvent, TextChangeEvent
+from tempest_core import SelectEvent, TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # State

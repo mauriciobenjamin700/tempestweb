@@ -15,25 +15,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
+    AlignItems,
+    App,
     AppBar,
     Card,
-    Divider,
-    RadioGroup,
-    Scaffold,
-    SegmentedControl,
-)
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import (
     Checkbox,
     Column,
+    Divider,
+    Edge,
+    FontWeight,
+    RadioGroup,
     Row,
+    Scaffold,
+    SegmentedControl,
+    SlideEvent,
     Slider,
+    Style,
     Switch,
     Text,
+    ToggleEvent,
+    Widget,
 )
-from tempest_core.widgets.events import SlideEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Constants

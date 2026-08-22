@@ -15,10 +15,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import (
+    AnimationController,
     App,
     Button,
+    Color,
     Column,
     Container,
+    Curve,
+    Edge,
+    Input,
     Locale,
     Route,
     Row,
@@ -26,13 +31,11 @@ from tempest_core import (
     Text,
     Theme,
     ThemeMode,
+    Tween,
     Widget,
     t,
+    validate_email,
 )
-from tempest_core.animation import AnimationController, Tween
-from tempest_core.style import Color, Curve, Edge
-from tempest_core.validators import validate_email
-from tempest_core.widgets import Input
 from tempestweb import native
 
 MESSAGES = {

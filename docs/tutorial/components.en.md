@@ -235,8 +235,8 @@ value, please check it) when the control loses focus, and the handler runs the
 real validators:
 
 ```python
-from tempest_core.widgets import FormField, Input, Validator
-from tempest_core.widgets.events import ValidationEvent
+from tempest_core import FormField, Input, Validator
+from tempest_core import ValidationEvent
 
 rules: dict[str, list[Validator]] = {"email": [_require("Email is required")]}
 
@@ -281,8 +281,8 @@ The error is painted by the base sheet under the control, and the field gets
 `on_complete` firing the moment the last digit lands — no button:
 
 ```python
-from tempest_core.widgets.events import SubmitEvent
-from tempest_core.widgets.inputs import PinInput
+from tempest_core import SubmitEvent
+from tempest_core import PinInput
 
 
 def code_completed(event: SubmitEvent) -> None:

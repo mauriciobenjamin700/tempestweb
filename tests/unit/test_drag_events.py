@@ -12,9 +12,16 @@ from dataclasses import dataclass, field
 
 from fastapi.testclient import TestClient
 
-from tempest_core import App, Column, Text, Widget, build_scene
-from tempest_core.widgets import Draggable, DragTarget
-from tempest_core.widgets.events import DragEvent
+from tempest_core import (
+    App,
+    Column,
+    DragEvent,
+    Draggable,
+    DragTarget,
+    Text,
+    Widget,
+    build_scene,
+)
 from tempestweb.runtime.events import coerce_event
 from tempestweb.runtime.serialize import find_node_type, resolve_handler
 from tempestweb.server import create_app

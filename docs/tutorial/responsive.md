@@ -54,7 +54,7 @@ paradas se a coluna em volta tiver altura limitada — o limite vem de
 
 ```python
 from tempest_core import Style
-from tempest_core.presets import Scaffold
+from tempest_core import Scaffold
 
 
 def view(app: App[None]) -> Widget:

@@ -114,7 +114,7 @@ def make_state() -> GalleryState:
 Centralizamos as cores em constantes nomeadas para não repetir valores numéricos por todo o código:
 
 ```python
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
     Color,
     Edge,
@@ -150,7 +150,7 @@ Cada célula da grade é um `GestureDetector` que, ao ser tocado, define `state.
 
 ```python
 from tempest_core import App, Style, Widget
-from tempest_core.widgets import (
+from tempest_core import (
     Button,
     Column,
     Container,
@@ -530,7 +530,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
     Color,
     Edge,
@@ -539,7 +539,7 @@ from tempest_core.style import (
     Shadow,
     TextAlign,
 )
-from tempest_core.widgets import (
+from tempest_core import (
     Button,
     Column,
     Container,

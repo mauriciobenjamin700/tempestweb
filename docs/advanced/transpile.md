@@ -41,7 +41,7 @@ Pegue o app do contador (o mesmo que roda nos Modos A/B, sem mudar uma linha):
 from dataclasses import dataclass
 
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 
 
 @dataclass
@@ -182,8 +182,8 @@ vias: digitar dispara o handler, que atualiza o estado e re-renderiza.
 
 ```python
 from tempest_core import App, Column, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Input
+from tempest_core import Edge
+from tempest_core import Input
 
 
 @dataclass
@@ -363,7 +363,7 @@ runtime Python, sem driver de frame.
 
 ```python
 from tempest_core import App, Container, Style, Widget
-from tempest_core.style import Color, Curve, Transition
+from tempest_core import Color, Curve, Transition
 
 
 def view(app: App[MyState]) -> Widget:
@@ -387,8 +387,8 @@ os controllers num loop `requestAnimationFrame`, computando o valor a cada frame
 e re-renderizando.
 
 ```python
-from tempest_core.animation import AnimationController, Tween
-from tempest_core.style import Curve
+from tempest_core import AnimationController, Tween
+from tempest_core import Curve
 
 
 def make_state() -> S:

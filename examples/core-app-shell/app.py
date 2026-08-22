@@ -16,8 +16,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Column, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import App, Column, Edge, Style, Text, Widget
 from tempestweb.components import AppBar, Card, ListTile, NavBar, Scaffold, Sidebar
 
 

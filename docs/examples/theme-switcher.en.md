@@ -61,7 +61,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core.theme import ThemeMode
+from tempest_core import ThemeMode
 
 
 @dataclass
@@ -104,7 +104,7 @@ Define two colour palettes (light and dark) as module-level constants. This
 keeps all colour values centralised and easy to maintain.
 
 ```python
-from tempest_core.style import Color, Curve, Transition
+from tempest_core import Color, Curve, Transition
 
 # Light palette
 _LIGHT_BG: Color = Color.from_hex("#f8fafc")
@@ -164,8 +164,8 @@ Two small helpers isolate the theme resolution logic from the rest of the UI:
 
 ```python
 from tempest_core import App
-from tempest_core.style import Color
-from tempest_core.theme import Theme, ThemeMode
+from tempest_core import Color
+from tempest_core import Theme, ThemeMode
 
 
 def _is_dark(app: App[ThemeSwitcherState]) -> bool:
@@ -243,8 +243,8 @@ The first card displays the active mode and current accent name:
 
 ```python
 from tempest_core import Style, Widget
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import Button, Column, Container, Row, Switch, Text
+from tempest_core import AlignItems, Edge, FontWeight
+from tempest_core import Button, Column, Container, Row, Switch, Text
 
 
 def _header_card(app: App[ThemeSwitcherState]) -> Widget:
@@ -335,9 +335,9 @@ The second card provides the three mode buttons and a `Switch` that simulates
 an OS signal:
 
 ```python
-from tempest_core.style import Border, JustifyContent
-from tempest_core.theme import MediaQueryData
-from tempest_core.widgets.events import ToggleEvent
+from tempest_core import Border, JustifyContent
+from tempest_core import MediaQueryData
+from tempest_core import ToggleEvent
 
 
 def _mode_card(app: App[ThemeSwitcherState]) -> Widget:
@@ -724,7 +724,7 @@ def _palette_preview_card(app: App[ThemeSwitcherState]) -> Widget:
 The **ThemeChangeEvent** card simulates OS notifications:
 
 ```python
-from tempest_core.widgets.events import ThemeChangeEvent
+from tempest_core import ThemeChangeEvent
 
 
 def _os_event_card(app: App[ThemeSwitcherState]) -> Widget:
@@ -841,7 +841,7 @@ The root `view` function composes the five cards inside a `Column`:
 
 ```python
 from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 
 
 def view(app: App[ThemeSwitcherState]) -> Widget:
@@ -923,7 +923,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
     Border,
     Color,
@@ -933,9 +933,9 @@ from tempest_core.style import (
     JustifyContent,
     Transition,
 )
-from tempest_core.theme import MediaQueryData, Theme, ThemeMode
-from tempest_core.widgets import Button, Column, Container, Row, Switch, Text
-from tempest_core.widgets.events import ThemeChangeEvent, ToggleEvent
+from tempest_core import MediaQueryData, Theme, ThemeMode
+from tempest_core import Button, Column, Container, Row, Switch, Text
+from tempest_core import ThemeChangeEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
 # Palette definitions

@@ -313,7 +313,7 @@ def _change_event(value: str) -> Any:  # noqa: ANN401 - the core's event model
     Returns:
         The event instance.
     """
-    from tempest_core.widgets import TextChangeEvent
+    from tempest_core import TextChangeEvent
 
     return TextChangeEvent(value=value)
 

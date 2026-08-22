@@ -29,20 +29,24 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import (
+    App,
     Button,
     Column,
+    Edge,
     Form,
     FormField,
     FormState,
     Input,
+    PinInput,
+    Style,
+    SubmitEvent,
     Text,
+    TextChangeEvent,
+    ValidationEvent,
     Validator,
+    Widget,
 )
-from tempest_core.widgets.events import SubmitEvent, TextChangeEvent, ValidationEvent
-from tempest_core.widgets.inputs import PinInput
 
 #: Digits in the invite code, and what makes the field report completion.
 CODE_LENGTH = 4

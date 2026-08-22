@@ -13,8 +13,8 @@ Comece pelo caso mais simples: mil itens, uma janela.
 
 ```python
 from tempest_core import App, Container, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets.lists import LazyColumn
+from tempest_core import Edge
+from tempest_core import LazyColumn
 
 
 def view(app: App[None]) -> Widget:
@@ -64,9 +64,9 @@ perto do fim. Declare `on_end_reached`.
 from dataclasses import dataclass
 
 from tempest_core import App, Container, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets.events import EndReachedEvent
-from tempest_core.widgets.lists import LazyColumn
+from tempest_core import Edge
+from tempest_core import EndReachedEvent
+from tempest_core import LazyColumn
 
 PAGE_SIZE = 25
 TOTAL_ITEMS = 200
@@ -129,7 +129,7 @@ de 64px. Fora da origem o arrasto é scroll, não pull.
 ```python
 import asyncio
 
-from tempest_core.widgets.events import RefreshEvent
+from tempest_core import RefreshEvent
 
 
 async def reload(event: RefreshEvent) -> None:
@@ -172,7 +172,7 @@ LazyColumn(
 Quer pull-to-refresh em conteúdo que não é lista? Use o controle avulso:
 
 ```python
-from tempest_core.widgets.lists import RefreshControl
+from tempest_core import RefreshControl
 
 RefreshControl(key="pull", refreshing=app.state.refreshing, on_refresh=reload)
 ```

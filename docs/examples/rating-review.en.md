@@ -70,10 +70,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import Card, Chip, Divider, Rating
-from tempest_core.style import Edge, FontWeight
-from tempest_core.widgets import Button, Column, Row, Text, TextArea, Wrap
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import Card, Chip, Divider, Rating
+from tempest_core import Edge, FontWeight
+from tempest_core import Button, Column, Row, Text, TextArea, Wrap
+from tempest_core import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Chip tag catalogue — aspect keywords the reviewer can toggle.
@@ -530,10 +530,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import Card, Chip, Divider, Rating
-from tempest_core.style import Edge, FontWeight
-from tempest_core.widgets import Button, Column, Row, Text, TextArea, Wrap
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import Card, Chip, Divider, Rating
+from tempest_core import Edge, FontWeight
+from tempest_core import Button, Column, Row, Text, TextArea, Wrap
+from tempest_core import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Chip tag catalogue — aspect keywords the reviewer can toggle.

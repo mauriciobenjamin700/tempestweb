@@ -27,11 +27,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from tempest_core import build
-from tempest_core.style import Size, Variant
-from tempest_core.variants import VALID_COLOR_SCHEMES
-from tempest_core.widgets.base import Widget as WidgetBase
-from tempest_core.widgets.inputs import FieldVariant
+from tempest_core import VALID_COLOR_SCHEMES, FieldVariant, Size, Variant, build
+from tempest_core import Widget as WidgetBase
 from tests.conformance._widgetspec import buildable_widgets
 
 CLIENT_DIR: Path = Path(__file__).resolve().parents[2] / "client" / "transpile"

@@ -4,6 +4,37 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.78.0] — 2026-08-22
+
+### Changed
+
+- **Piso `tempest-core>=0.14.0`**, e todo import passa a vir da raiz do pacote.
+  A 0.14.0 re-exporta os 343 símbolos públicos do core (eram 101), então
+  `from tempest_core import Input` finalmente funciona — e os **104 arquivos**
+  deste repo que importavam de submódulo (`tempest_core.widgets.inputs`,
+  `.style`, `.widgets.events`, …) passaram a seguir a própria regra de casa:
+  237 imports em código, 481 em docs e README.
+
+  Isso era dívida com juros: cada exemplo da documentação ensinava o caminho que
+  a regra proíbe, porque era o único que funcionava.
+
+- **`ActionSheet` agora declara `on_dismiss`** (via core 0.14.0), então `Escape`
+  e clique no scrim fecham uma action sheet — o cliente já reportava o evento e
+  não havia handler para receber. O `client/transpile/widgets.gen.js` foi
+  regenerado para incluí-lo.
+
+### Fixed
+
+- **Dois kwargs inválidos que passavam em silêncio nos testes deste repo**,
+  revelados pelo `extra="forbid"` do core 0.14.0:
+
+  - `Alert(message="heads up")` — o widget declara `title`/`body`, então o alerta
+    era construído **vazio** e o teste passava porque só conferia os tipos de nó
+    em que um componente aterrissa;
+  - `Text(content=..., on_click=...)` — `Text` não declara handler. O teste
+    afirmava que um clique **não** dispararia o handler e passava pelo motivo
+    errado: o handler nunca existiu. Virou `Button`.
+
 ## [0.77.2] — 2026-08-22
 
 ### Fixed

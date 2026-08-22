@@ -41,7 +41,7 @@ Take the counter app (the same one that runs in Modes A/B, unchanged):
 from dataclasses import dataclass
 
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 
 
 @dataclass
@@ -182,8 +182,8 @@ typing fires the handler, which updates the state and re-renders.
 
 ```python
 from tempest_core import App, Column, Style, Text, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Input
+from tempest_core import Edge
+from tempest_core import Input
 
 
 @dataclass
@@ -364,7 +364,7 @@ runtime, no frame driver.
 
 ```python
 from tempest_core import App, Container, Style, Widget
-from tempest_core.style import Color, Curve, Transition
+from tempest_core import Color, Curve, Transition
 
 
 def view(app: App[MyState]) -> Widget:
@@ -388,8 +388,8 @@ the controllers on a `requestAnimationFrame` loop, computing the value each fram
 and re-rendering.
 
 ```python
-from tempest_core.animation import AnimationController, Tween
-from tempest_core.style import Curve
+from tempest_core import AnimationController, Tween
+from tempest_core import Curve
 
 
 def make_state() -> S:

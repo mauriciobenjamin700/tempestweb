@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Column, Row, Text, Widget
+from tempest_core import App, Button, Column, Row, Text, Widget
 from tempestweb.runtime import AppSession, WasmRuntime, apply_media
 from tempestweb.transports import WasmTransport
 from tempestweb.transports.base import Event, Patch, TransportClosedError
@@ -266,9 +266,12 @@ async def test_media_is_not_mistaken_for_a_widget_event() -> None:
         def clicked() -> None:
             seen.append("click")
 
+        # A Button, because `Text` declares no handler: this test used to hand
+        # `on_click` to a Text, which the core dropped in silence, so it passed
+        # for the wrong reason — the handler could not have fired either way.
         return Column(
             key="root",
-            children=[Text(content="x", key="t", on_click=clicked)],
+            children=[Button(label="x", key="t", on_click=clicked)],
         )
 
     session: AppSession[_State] = AppSession(lambda: _State(), view, _StubTransport())

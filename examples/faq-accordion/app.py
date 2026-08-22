@@ -19,11 +19,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Style, Widget
-from tempest_core.components import Accordion, Card, Divider
-from tempest_core.style import Edge, FontWeight
-from tempest_core.widgets import Column, Input, Row, Text
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import (
+    Accordion,
+    App,
+    Card,
+    Column,
+    Divider,
+    Edge,
+    FontWeight,
+    Input,
+    Row,
+    Style,
+    Text,
+    TextChangeEvent,
+    Widget,
+)
 
 # ---------------------------------------------------------------------------
 # FAQ data

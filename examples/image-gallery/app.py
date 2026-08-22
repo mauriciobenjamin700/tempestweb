@@ -17,27 +17,27 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Style, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
-    Color,
-    Edge,
-    FontWeight,
-    JustifyContent,
-    Shadow,
-    TextAlign,
-)
-from tempest_core.widgets import (
+    App,
     Button,
+    Color,
     Column,
     Container,
     Dialog,
+    Edge,
+    FontWeight,
     GestureDetector,
     Image,
     ImageFit,
+    JustifyContent,
     LazyGrid,
     Row,
+    Shadow,
+    Style,
     Text,
+    TextAlign,
+    Widget,
 )
 
 

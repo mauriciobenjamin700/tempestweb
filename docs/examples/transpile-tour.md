@@ -75,10 +75,10 @@ from tempest_core import (
     Widget,
     t,
 )
-from tempest_core.animation import AnimationController, Tween
-from tempest_core.style import Color, Curve, Edge
-from tempest_core.validators import validate_email
-from tempest_core.widgets import Input
+from tempest_core import AnimationController, Tween
+from tempest_core import Color, Curve, Edge
+from tempest_core import validate_email
+from tempest_core import Input
 from tempestweb import native
 
 MESSAGES = {

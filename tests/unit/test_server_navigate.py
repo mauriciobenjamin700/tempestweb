@@ -14,8 +14,7 @@ import asyncio
 import json
 from dataclasses import dataclass
 
-from tempest_core import App, Button, Column, Text, Widget
-from tempest_core.navigation import Route
+from tempest_core import App, Button, Column, Route, Text, Widget
 from tempestweb.runtime.session import AppSession
 from tempestweb.transports.sse import SSETransport
 

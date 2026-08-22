@@ -184,7 +184,7 @@ Agora montamos a UI. O cronômetro tem três seções:
 
 ```python
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
     Color,
     Edge,
@@ -358,7 +358,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
     Color,
     Edge,

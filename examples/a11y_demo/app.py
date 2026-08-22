@@ -13,9 +13,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Button, Column, Locale, Style, Text, Widget, translate
-from tempest_core.style import Color, Edge
-from tempest_core.widgets import Semantics
+from tempest_core import (
+    App,
+    Button,
+    Color,
+    Column,
+    Edge,
+    Locale,
+    Semantics,
+    Style,
+    Text,
+    Widget,
+    translate,
+)
 
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "en": {"greeting": "Hello"},

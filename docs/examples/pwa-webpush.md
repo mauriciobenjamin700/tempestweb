@@ -219,8 +219,8 @@ O reconciliador calcula o diff e atualiza o DOM com o mínimo de mudanças.
 
 ```python
 from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import Edge
+from tempest_core import Button, Column, Row, Spinner, Text
 
 
 def view(app: App[State]) -> Widget:
@@ -526,8 +526,8 @@ from enum import StrEnum
 from typing import Any
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import Button, Column, Row, Spinner, Text
+from tempest_core import Edge
+from tempest_core import Button, Column, Row, Spinner, Text
 from tempestweb.native import notifications
 from tempestweb.native.notifications import NotificationPermission
 

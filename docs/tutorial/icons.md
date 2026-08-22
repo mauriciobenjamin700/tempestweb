@@ -86,7 +86,7 @@ fonte** ao redor. A cor vem do `Style.color` — o glifo é desenhado em
 
 ```python
 from tempest_core import Style
-from tempest_core.style import Color
+from tempest_core import Color
 
 from tempestweb.icons import MaterialIcons, material_icon
 

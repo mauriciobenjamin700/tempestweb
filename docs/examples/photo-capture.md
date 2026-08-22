@@ -500,9 +500,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import Card, Divider
-from tempest_core.style import AlignItems, Edge, FontWeight, JustifyContent
-from tempest_core.widgets import Button, Column, Image, ImageFit, Row, Spinner, Text
+from tempest_core import Card, Divider
+from tempest_core import AlignItems, Edge, FontWeight, JustifyContent
+from tempest_core import Button, Column, Image, ImageFit, Row, Spinner, Text
 from tempestweb.native import NativeError
 from tempestweb.native import camera as _camera
 from tempestweb.native.camera import Photo

@@ -20,23 +20,27 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
+    AlignItems,
+    App,
     Banner,
-    Card,
-    Divider,
-    EmailInput,
-    PasswordInput,
-)
-from tempest_core.style import AlignItems, Color, Edge, FontWeight, TextAlign
-from tempest_core.widgets import (
     Button,
+    Card,
+    Color,
     Column,
+    Divider,
+    Edge,
+    EmailInput,
+    FontWeight,
     Form,
     FormField,
     FormState,
+    PasswordInput,
+    Style,
     Text,
+    TextAlign,
     Validator,
+    Widget,
 )
 
 # ---------------------------------------------------------------------------

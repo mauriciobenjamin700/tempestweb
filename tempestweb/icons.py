@@ -26,15 +26,15 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from tempest_core.icons import (
+from tempest_core import (
     ICON_PATHS,
+    Icon,
     Icons,
+    Style,
     icon_names,
     icon_path,
     register_icon,
 )
-from tempest_core.style import Style
-from tempest_core.widgets import Icon
 
 __all__ = [
     "ICON_PATHS",

@@ -76,15 +76,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
     Banner,
     Card,
     Divider,
     EmailInput,
     PasswordInput,
 )
-from tempest_core.style import AlignItems, Color, Edge, FontWeight, TextAlign
-from tempest_core.widgets import (
+from tempest_core import AlignItems, Color, Edge, FontWeight, TextAlign
+from tempest_core import (
     Button,
     Column,
     Form,

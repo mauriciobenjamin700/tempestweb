@@ -15,9 +15,7 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Button, Column, Theme, ThemeMode, Widget
-from tempest_core.style import Color
-from tempest_core.widgets import Input
+from tempest_core import App, Button, Color, Column, Input, Theme, ThemeMode, Widget
 from tempestweb.runtime import AppSession, NoSessionError, spawn
 from tempestweb.runtime.background import install_spawner, uninstall_spawner
 from tempestweb.transports.base import Event, Patch, TransportClosedError

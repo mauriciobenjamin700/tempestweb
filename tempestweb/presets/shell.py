@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 
-from tempest_core import Style, Widget
-from tempest_core.components import AppBar
-from tempest_core.components.base import ACCENT, ON_MUTED, SURFACE
-from tempest_core.style import Color, Edge, FontWeight
-from tempest_core.widgets import Button, Column
-from tempest_core.widgets.base import Semantics
+from tempest_core import (
+    ACCENT,
+    ON_MUTED,
+    SURFACE,
+    AppBar,
+    Button,
+    Color,
+    Column,
+    Edge,
+    FontWeight,
+    Semantics,
+    Style,
+    Widget,
+)
 from tempestweb.presets import roles
 from tempestweb.presets.layout import box, muted
 from tempestweb.presets.models import NavItem

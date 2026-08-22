@@ -27,17 +27,23 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
-from tempest_core import App, Widget
-from tempest_core.style import AlignItems, Color, Edge, FontWeight, Style, TextAlign
-from tempest_core.widgets import (
+from tempest_core import (
+    AlignItems,
+    App,
     Button,
+    Color,
     Column,
+    Edge,
+    FontWeight,
     Input,
     KeyboardType,
     Row,
+    Style,
     Text,
+    TextAlign,
+    TextChangeEvent,
+    Widget,
 )
-from tempest_core.widgets.events import TextChangeEvent
 from tempestweb.observability import (
     AuthStore,
     Logger,

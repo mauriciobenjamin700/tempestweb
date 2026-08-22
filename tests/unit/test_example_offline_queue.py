@@ -14,8 +14,7 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, build
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import App, TextChangeEvent, build
 from tempestweb.native import install_bridge, uninstall_bridge
 
 EXAMPLES_DIR = Path(__file__).resolve().parents[2] / "examples"

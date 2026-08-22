@@ -101,7 +101,7 @@ from tempestweb.presets import (
 from dataclasses import dataclass
 
 from tempest_core import App, Text, Widget
-from tempest_core.widgets import Button
+from tempest_core import Button
 from tempestweb.presets import (
     Kpi, NavItem, Section, TableColumn, admin_shell, dashboard_page, list_page,
 )

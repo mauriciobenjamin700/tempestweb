@@ -160,7 +160,7 @@ panel.
 
 ```python
 from tempest_core import Column, Style, Text
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.components import Tabs
 
 return Column(
@@ -201,7 +201,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from tempest_core import App, Column, Row, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.components import Card, Chip, RadioGroup, SegmentedControl, Tabs
 
 TAB_LABELS: list[str] = ["Appearance", "Notifications"]

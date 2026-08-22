@@ -21,7 +21,7 @@ The value models and helpers needed to drive the components (``ChartSeries``,
 
 from __future__ import annotations
 
-from tempest_core.components import (
+from tempest_core import (
     Accordion,
     AddressInput,
     Alert,

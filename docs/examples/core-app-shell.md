@@ -190,7 +190,7 @@ O `Scaffold` une tudo: `app_bar` no topo e `body` com a barra lateral + conteúd
 
 ```python
 from tempest_core import Column, Style
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.components import AppBar, Scaffold
 
 return Scaffold(
@@ -231,7 +231,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Column, Style, Text, Widget
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.components import AppBar, Card, ListTile, NavBar, Scaffold, Sidebar
 
 

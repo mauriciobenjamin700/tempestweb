@@ -21,7 +21,7 @@ Escreva uma árvore tipada e transforme em HTML:
 
 ```python
 from tempest_core import Column, Text, Button, Style
-from tempest_core.style import Edge
+from tempest_core import Edge
 from tempestweb.html import render_to_html
 
 

@@ -18,11 +18,16 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Column, Widget
-from tempest_core.widgets import Input
-from tempest_core.widgets.events import SubmitEvent, ValidationEvent
-from tempest_core.widgets.forms import FormField
-from tempest_core.widgets.inputs import PinInput
+from tempest_core import (
+    App,
+    Column,
+    FormField,
+    Input,
+    PinInput,
+    SubmitEvent,
+    ValidationEvent,
+    Widget,
+)
 from tempestweb.runtime import AppSession, WasmRuntime
 from tempestweb.transports import WasmTransport
 from tempestweb.transports.base import Event, Patch, TransportClosedError

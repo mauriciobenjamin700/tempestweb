@@ -55,14 +55,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
     Color,
     Edge,
     FontWeight,
     JustifyContent,
 )
-from tempest_core.widgets import (
+from tempest_core import (
     Canvas,
     DrawCommand,
     Dropdown,
@@ -531,14 +531,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Button, Column, Row, Style, Text, Widget
-from tempest_core.style import (
+from tempest_core import (
     AlignItems,
     Color,
     Edge,
     FontWeight,
     JustifyContent,
 )
-from tempest_core.widgets import (
+from tempest_core import (
     Canvas,
     DrawCommand,
     Dropdown,

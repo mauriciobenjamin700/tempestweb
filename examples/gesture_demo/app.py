@@ -21,13 +21,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from tempest_core import App, Column, Container, Style, Text, Widget
-from tempest_core.style import Color, Edge
-from tempest_core.widgets.events import PanEvent, ScaleEvent, SwipeEvent, TapEvent
-from tempest_core.widgets.gestures import (
+from tempest_core import (
+    App,
+    Color,
+    Column,
+    Container,
+    Edge,
     GestureDetector,
     InteractiveViewer,
+    PanEvent,
     PanHandler,
+    ScaleEvent,
+    Style,
+    SwipeEvent,
+    TapEvent,
+    Text,
+    Widget,
 )
 
 

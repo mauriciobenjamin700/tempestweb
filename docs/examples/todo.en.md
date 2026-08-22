@@ -43,8 +43,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from tempest_core import App, Style, Widget
-from tempest_core.style import Edge
-from tempest_core.widgets import (
+from tempest_core import Edge
+from tempest_core import (
     Button,
     Checkbox,
     Column,
@@ -53,7 +53,7 @@ from tempest_core.widgets import (
     Row,
     Text,
 )
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import TextChangeEvent
 
 
 @dataclass

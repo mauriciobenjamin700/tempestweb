@@ -15,9 +15,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from tempest_core import Button, Column, Row, Text, Widget, build, diff
-from tempest_core.widgets import Image, Input
-from tempest_core.widgets.base import Semantics
+from tempest_core import (
+    Button,
+    Column,
+    Image,
+    Input,
+    Row,
+    Semantics,
+    Text,
+    Widget,
+    build,
+    diff,
+)
 
 
 def counter_views() -> list[Widget]:

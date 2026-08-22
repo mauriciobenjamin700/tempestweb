@@ -7,8 +7,7 @@ import inspect
 import pkgutil
 
 import tempest_core
-from tempest_core.widgets.base import Widget
-from tempest_core.widgets.events import SwipeEvent, TextChangeEvent, ToggleEvent
+from tempest_core import SwipeEvent, TextChangeEvent, ToggleEvent, Widget
 from tempestweb.runtime import coerce_event
 from tempestweb.runtime.events import _WIDGET_EVENT_TYPES
 from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS

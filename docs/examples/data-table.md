@@ -51,10 +51,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import DataTable, SearchBar
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import Button, Column, Row, Text
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import DataTable, SearchBar
+from tempest_core import AlignItems, Edge, FontWeight
+from tempest_core import Button, Column, Row, Text
+from tempest_core import TextChangeEvent
 
 # ---------------------------------------------------------------------------
 # Domain data
@@ -423,10 +423,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from tempest_core import App, Style, Widget
-from tempest_core.components import DataTable, SearchBar
-from tempest_core.style import AlignItems, Edge, FontWeight
-from tempest_core.widgets import Button, Column, Row, Text
-from tempest_core.widgets.events import TextChangeEvent
+from tempest_core import DataTable, SearchBar
+from tempest_core import AlignItems, Edge, FontWeight
+from tempest_core import Button, Column, Row, Text
+from tempest_core import TextChangeEvent
 
 _EMPLOYEES: list[tuple[str, str, str, str]] = [
     ("Alice Martins", "Engineering", "São Paulo", "R$ 18.500"),

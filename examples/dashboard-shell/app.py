@@ -16,29 +16,36 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 
-from tempest_core import App, Style, Widget
-from tempest_core.components import (
-    AppBar,
-    Avatar,
-    Badge,
-    Banner,
-    Card,
-    Divider,
-    Grid,
-    NavBar,
-    Scaffold,
-    Sidebar,
-)
-from tempest_core.components.base import (
+from tempest_core import (
     ACCENT,
     BACKGROUND,
     MUTED,
     ON_MUTED,
     ON_SURFACE,
     SURFACE,
+    AlignItems,
+    App,
+    AppBar,
+    Avatar,
+    Badge,
+    Banner,
+    Button,
+    Card,
+    Color,
+    Column,
+    Container,
+    Divider,
+    Edge,
+    FontWeight,
+    Grid,
+    NavBar,
+    Row,
+    Scaffold,
+    Sidebar,
+    Style,
+    Text,
+    Widget,
 )
-from tempest_core.style import AlignItems, Color, Edge, FontWeight
-from tempest_core.widgets import Button, Column, Container, Row, Text
 
 # ---------------------------------------------------------------------------
 # Data model

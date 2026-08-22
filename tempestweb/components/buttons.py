@@ -25,8 +25,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from tempest_core import Button, Variant
-from tempest_core.style import Color, Shadow, Style
+from tempest_core import Button, Color, Shadow, Style, Variant
 
 __all__ = [
     "elevated_button",

@@ -297,7 +297,7 @@ def login_page(app: App[AppState], controller: AuthController) -> Widget:
 
 ```python
 from tempest_core import Style
-from tempest_core.style import Color, Edge
+from tempest_core import Color, Edge
 
 PRIMARY: Color = Color(r=63, g=81, b=181, a=1.0)
 SCREEN: Style = Style(gap=12.0, padding=Edge.all(24))

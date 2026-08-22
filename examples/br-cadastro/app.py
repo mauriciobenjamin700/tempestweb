@@ -23,26 +23,31 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tempest_core import App, Style, Widget
-from tempest_core.components import (
+from tempest_core import (
     AddressInput,
+    App,
     Banner,
+    Button,
     Card,
     CNPJInput,
+    Color,
+    Column,
     CPFInput,
     Divider,
+    Edge,
     EmailInput,
+    FontWeight,
+    Input,
     PhoneInput,
     SegmentedControl,
-)
-from tempest_core.style import Color, Edge, FontWeight
-from tempest_core.validators import (
+    Style,
+    Text,
+    Widget,
     validate_cnpj,
     validate_cpf,
     validate_email,
     validate_phone,
 )
-from tempest_core.widgets import Button, Column, Input, Text
 
 # ---------------------------------------------------------------------------
 # Module constants

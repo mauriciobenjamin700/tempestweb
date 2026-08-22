@@ -233,8 +233,8 @@ valor, confira agora) quando o controle perde o foco, e o handler roda os
 validadores de verdade:
 
 ```python
-from tempest_core.widgets import FormField, Input, Validator
-from tempest_core.widgets.events import ValidationEvent
+from tempest_core import FormField, Input, Validator
+from tempest_core import ValidationEvent
 
 rules: dict[str, list[Validator]] = {"email": [_require("Email é obrigatório")]}
 
@@ -279,8 +279,8 @@ O erro é desenhado pela folha base sob o controle, e o campo ganha
 `on_complete` disparando no instante em que o último dígito entra — sem botão:
 
 ```python
-from tempest_core.widgets.events import SubmitEvent
-from tempest_core.widgets.inputs import PinInput
+from tempest_core import SubmitEvent
+from tempest_core import PinInput
 
 
 def code_completed(event: SubmitEvent) -> None:

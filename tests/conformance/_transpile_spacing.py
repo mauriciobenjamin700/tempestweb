@@ -16,8 +16,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from tempest_core import build
-from tempest_core.components import HStack
+from tempest_core import HStack, build
 
 CLIENT_DIR: Path = Path(__file__).resolve().parents[2] / "client" / "transpile"
 SPACING_MODULE: Path = CLIENT_DIR / "spacing.gen.js"

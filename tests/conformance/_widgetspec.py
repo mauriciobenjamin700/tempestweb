@@ -16,9 +16,9 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any
 
+from tempest_core import Widget as WidgetBase
 from tempest_core import build
 from tempest_core import widgets as _widgets
-from tempest_core.widgets.base import Widget as WidgetBase
 
 # Candidate arguments used to satisfy a widget's required fields when building a
 # bare instance for introspection. Keyed by parameter name.

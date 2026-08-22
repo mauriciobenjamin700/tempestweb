@@ -510,6 +510,24 @@ export const BASE_THEME_CSS = `
   overflow: hidden;
 }
 
+/* ── Camera widgets: the preview fills the box the app gave it ─────────────
+   A CameraPreview and a QrScanner are IR leaves holding a renderer-owned
+   <video>. Without these rules the video shows at its intrinsic size, which is
+   whatever the camera happens to deliver — a 1280x720 element inside a 240px
+   card. object-fit: cover keeps the framing instead of stretching faces. */
+[data-tw-camera] {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+[data-tw-camera] > [data-tw-part="preview"] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 @keyframes tw-progress-slide {
   0% { margin-inline-start: -40%; }
   100% { margin-inline-start: 100%; }

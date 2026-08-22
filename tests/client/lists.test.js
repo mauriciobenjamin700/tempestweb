@@ -1,10 +1,12 @@
-// Tests for client/lists.js — end_reached detection in both list geometries.
-// jsdom has no layout, so scroll metrics and rects are stubbed via defineProperty.
+// Tests for client/lists.js — end_reached in both list geometries, plus the
+// pull-to-refresh gesture. jsdom has no layout, so scroll metrics and rects are
+// stubbed via defineProperty and pointer events are dispatched by hand.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { freshDom } from "./setup.js";
-import { buildElement } from "../../client/dom.js";
+import { applyPatches, buildElement } from "../../client/dom.js";
 import { installListEvents } from "../../client/lists.js";
+import { PULL_REFRESH_PX } from "../../client/constants.js";
 
 /** A mock Transport recording sendEvent calls. */
 function mockTransport() {
@@ -166,5 +168,176 @@ test("dispose stops reporting", () => {
 
   stubScroll(el, { extent: 2000, client: 400, offset: 1600 });
   scroll(dom, el);
+  assert.deepEqual(transport.events, []);
+});
+
+// --------------------------------------------------------------------------- //
+// pull-to-refresh                                                             //
+// --------------------------------------------------------------------------- //
+
+/** Dispatch one pointer event on `target` (jsdom has no PointerEvent). */
+function pointer(dom, target, type, { x = 0, y = 0 } = {}) {
+  target.dispatchEvent(
+    new dom.window.MouseEvent(type, { bubbles: true, clientX: x, clientY: y }),
+  );
+}
+
+/** Drag from (0,0) by (dx, dy) over `target`, releasing at the end. */
+function drag(dom, target, { dx = 0, dy = 0, release = "pointerup" } = {}) {
+  pointer(dom, target, "pointerdown", { x: 0, y: 0 });
+  pointer(dom, target, "pointermove", { x: dx, y: dy });
+  pointer(dom, target, release, { x: dx, y: dy });
+}
+
+test("a widget that declares on_refresh is marked with its pull axis", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const column = listElement(dom, "LazyColumn", { item_count: 10, refreshing: false });
+  const row = listElement(dom, "LazyRow", { item_count: 10, refreshing: false });
+  const grid = listElement(dom, "LazyGrid", { item_count: 10 });
+
+  assert.equal(column.getAttribute("data-tw-refresh"), "y");
+  assert.equal(row.getAttribute("data-tw-refresh"), "x");
+  assert.equal(grid.getAttribute("data-tw-refresh"), null, "a grid has no pull-to-refresh");
+});
+
+test("a RefreshControl owns a spinner, and `refreshing` announces the wait", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "RefreshControl", { refreshing: true });
+
+  assert.equal(el.getAttribute("data-tw-refresh"), "y");
+  assert.equal(el.querySelectorAll("[data-tw-part=\"spinner\"]").length, 1);
+  assert.equal(el.getAttribute("data-tw-refreshing"), "true");
+  assert.equal(el.getAttribute("aria-busy"), "true");
+
+  applyPatches(el, [{ path: [], set_props: { refreshing: false }, unset_props: [] }]);
+  assert.equal(el.getAttribute("data-tw-refreshing"), null);
+  assert.equal(el.getAttribute("aria-busy"), null);
+  assert.equal(
+    el.querySelectorAll("[data-tw-part=\"spinner\"]").length,
+    1,
+    "the renderer-owned spinner is not duplicated by an update",
+  );
+});
+
+test("pulling a list past the threshold reports refresh on release", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyColumn", { item_count: 100, refreshing: false });
+  const transport = mockTransport();
+  installListEvents(dom.root, transport);
+
+  drag(dom, el, { dy: PULL_REFRESH_PX + 10 });
+  assert.deepEqual(transport.events, [{ type: "refresh", key: "L", payload: {} }]);
+  assert.equal(el.getAttribute("data-tw-pull-armed"), null, "the mark is cleared on release");
+});
+
+test("the pull is marked while it is armed, so the theme can show it", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyColumn", { item_count: 100, refreshing: false });
+  installListEvents(dom.root, mockTransport());
+
+  pointer(dom, el, "pointerdown", { x: 0, y: 0 });
+  pointer(dom, el, "pointermove", { x: 0, y: PULL_REFRESH_PX + 5 });
+  assert.equal(el.getAttribute("data-tw-pull-armed"), "");
+
+  pointer(dom, el, "pointermove", { x: 0, y: 4 });
+  assert.equal(el.getAttribute("data-tw-pull-armed"), null, "dragging back disarms it");
+});
+
+test("a pull short of the threshold reports nothing", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyColumn", { item_count: 100, refreshing: false });
+  const transport = mockTransport();
+  installListEvents(dom.root, transport);
+
+  drag(dom, el, { dy: PULL_REFRESH_PX - 1 });
+  assert.deepEqual(transport.events, []);
+});
+
+test("a mostly-sideways drag is not a pull on a vertical list", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyColumn", { item_count: 100, refreshing: false });
+  const transport = mockTransport();
+  installListEvents(dom.root, transport);
+
+  drag(dom, el, { dx: 300, dy: PULL_REFRESH_PX + 10 });
+  assert.deepEqual(transport.events, []);
+});
+
+test("a list already scrolled down is being scrolled, not pulled", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyColumn", { item_count: 100, refreshing: false });
+  const transport = mockTransport();
+  installListEvents(dom.root, transport);
+  Object.defineProperty(el, "scrollTop", { value: 120, configurable: true });
+
+  drag(dom, el, { dy: PULL_REFRESH_PX + 40 });
+  assert.deepEqual(transport.events, []);
+});
+
+test("a list already refreshing does not queue a second reload", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyColumn", { item_count: 100, refreshing: true });
+  const transport = mockTransport();
+  installListEvents(dom.root, transport);
+
+  drag(dom, el, { dy: PULL_REFRESH_PX + 40 });
+  assert.deepEqual(transport.events, []);
+});
+
+test("a cancelled pull reports nothing and clears its mark", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyColumn", { item_count: 100, refreshing: false });
+  const transport = mockTransport();
+  installListEvents(dom.root, transport);
+
+  drag(dom, el, { dy: PULL_REFRESH_PX + 10, release: "pointercancel" });
+  assert.deepEqual(transport.events, []);
+  assert.equal(el.getAttribute("data-tw-pull-armed"), null);
+});
+
+test("a LazyRow is pulled along its own axis", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyRow", { item_count: 100, refreshing: false });
+  const transport = mockTransport();
+  installListEvents(dom.root, transport);
+
+  drag(dom, el, { dy: PULL_REFRESH_PX + 10 });
+  assert.deepEqual(transport.events, [], "a vertical drag is not its pull");
+
+  drag(dom, el, { dx: PULL_REFRESH_PX + 10 });
+  assert.deepEqual(transport.events, [{ type: "refresh", key: "L", payload: {} }]);
+});
+
+test("a pull that starts on a child of the control still counts", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "RefreshControl", { refreshing: false });
+  const transport = mockTransport();
+  installListEvents(dom.root, transport);
+
+  const spinner = el.querySelector("[data-tw-part=\"spinner\"]");
+  drag(dom, spinner, { dy: PULL_REFRESH_PX + 10 });
+  assert.deepEqual(transport.events, [{ type: "refresh", key: "L", payload: {} }]);
+});
+
+test("dispose stops the pull gesture too", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = listElement(dom, "LazyColumn", { item_count: 100, refreshing: false });
+  const transport = mockTransport();
+  const handle = installListEvents(dom.root, transport);
+  handle.dispose();
+
+  drag(dom, el, { dy: PULL_REFRESH_PX + 40 });
   assert.deepEqual(transport.events, []);
 });

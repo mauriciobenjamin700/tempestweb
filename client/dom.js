@@ -278,14 +278,46 @@ const END_REACHED_TYPES = Object.freeze([
   "SectionList",
 ]);
 
+// Widgets that declare `on_refresh`, and the axis their pull runs along: a
+// LazyRow scrolls sideways, so its pull-to-refresh is a drag to the right.
+const REFRESH_AXIS = Object.freeze({
+  LazyColumn: "y",
+  LazyRow: "x",
+  RefreshControl: "y",
+});
+
 /**
- * Mark a list with the scroll fraction at which it wants `end_reached`.
+ * Get (or lazily create) the spinner inside a RefreshControl.
  *
- * The threshold is a core prop (default `0.8`), so the client reads it off the
- * element instead of hardcoding a value: `client/lists.js` measures scroll
- * progress on every scroll and reports `end_reached` once per crossing. The
- * handler itself never crosses the wire (it serializes to `null`), so the marker
- * is what tells the client this widget has an end to reach at all.
+ * A RefreshControl is an IR leaf that carries only the refresh contract — the
+ * core says the content "is supplied by the renderer" — so no patch path
+ * descends into it and this element is safe to own, exactly like a ProgressBar's
+ * fill. It is the only thing the widget can show: the pull affordance while the
+ * gesture is armed, and the running indicator while `refreshing` is set.
+ *
+ * @param {HTMLElement} el  The RefreshControl element.
+ * @returns {HTMLElement}   The spinner element.
+ */
+function ensureRefreshSpinner(el) {
+  let spinner = /** @type {HTMLElement|null} */ (el.querySelector("[data-tw-part=\"spinner\"]"));
+  if (spinner == null) {
+    spinner = document.createElement("div");
+    spinner.setAttribute("data-tw-part", "spinner");
+    el.appendChild(spinner);
+  }
+  return spinner;
+}
+
+/**
+ * Mark the list-event contract a widget declares: end-reached and refresh.
+ *
+ * Both markers exist because the handlers themselves never cross the wire (they
+ * serialize to `null`), so the element has to carry what the widget *declares*:
+ * the scroll fraction it wants `end_reached` at (a core prop, default `0.8`) and
+ * the axis its pull-to-refresh runs along. `client/lists.js` reads both. The
+ * app's `refreshing` flag is mirrored too — it both drives the running indicator
+ * (base theme) and suppresses a second pull while the reload is in flight — and
+ * is announced with `aria-busy` so a screen reader hears the wait.
  *
  * @param {HTMLElement} el     The target element.
  * @param {?string} type       The widget type.
@@ -293,11 +325,32 @@ const END_REACHED_TYPES = Object.freeze([
  * @returns {void}
  */
 function applyListEventProps(el, type, props) {
-  if (type == null || !END_REACHED_TYPES.includes(type)) {
+  if (type == null) {
     return;
   }
-  if ("end_reached_threshold" in props && props.end_reached_threshold != null) {
+  if (
+    END_REACHED_TYPES.includes(type) &&
+    "end_reached_threshold" in props &&
+    props.end_reached_threshold != null
+  ) {
     el.setAttribute("data-tw-end-threshold", String(props.end_reached_threshold));
+  }
+  const axis = REFRESH_AXIS[type];
+  if (axis === undefined) {
+    return;
+  }
+  el.setAttribute("data-tw-refresh", axis);
+  if (type === "RefreshControl") {
+    ensureRefreshSpinner(el);
+  }
+  if ("refreshing" in props) {
+    if (props.refreshing) {
+      el.setAttribute("data-tw-refreshing", "true");
+      el.setAttribute("aria-busy", "true");
+    } else {
+      el.removeAttribute("data-tw-refreshing");
+      el.removeAttribute("aria-busy");
+    }
   }
 }
 

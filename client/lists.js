@@ -23,10 +23,20 @@
 // Verify in tests/client/lists.test.js (jsdom has no layout, so scroll and rect
 // metrics are stubbed).
 
+import { PULL_REFRESH_PX } from "./constants.js";
 import { KEY_ATTR, TYPE_ATTR } from "./dom.js";
 
 /** Marks a list that reports `end_reached`; the value is its threshold (0..1). */
 const END_ATTR = "data-tw-end-threshold";
+
+/** Marks a widget that reports `refresh`; the value is the pull axis (`y`/`x`). */
+const REFRESH_ATTR = "data-tw-refresh";
+
+/** Set by the app (via the `refreshing` prop) while the reload runs. */
+const REFRESHING_ATTR = "data-tw-refreshing";
+
+/** Set while the pull has passed the threshold, so the theme can show it. */
+const ARMED_ATTR = "data-tw-pull-armed";
 
 /** Threshold used when the attribute is absent or unparsable (the core's default). */
 const DEFAULT_THRESHOLD = 0.8;
@@ -101,13 +111,46 @@ function progressOf(el) {
 }
 
 /**
- * Install end-reached detection for every list under `root`.
+ * Find the nearest ancestor-or-self element that reports `refresh`.
  *
- * One capture-phase scroll listener on the document (falling back to `root`)
- * covers both geometries at once: a `scroll` on a bounded list viewport does not
- * bubble, and a page scroll fires on the document — capture sees both. Every
- * marked list is then measured, and the ones past their threshold report
- * `end_reached` once, until they fall back under it.
+ * @param {EventTarget|null} target  The pointer event's target node.
+ * @param {HTMLElement} root         The delegation root (search stops above it).
+ * @returns {?HTMLElement}           The pullable element, or null.
+ */
+function refreshAncestor(target, root) {
+  let node = /** @type {Node|null} */ (target);
+  while (node != null && node.nodeType !== 1) {
+    node = node.parentNode;
+  }
+  let el = /** @type {HTMLElement|null} */ (node);
+  while (el != null) {
+    if (el.hasAttribute?.(REFRESH_ATTR) && el.hasAttribute(KEY_ATTR)) {
+      return el;
+    }
+    if (el === root) {
+      break;
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/**
+ * Install list event detection (`end_reached` + pull-to-refresh) under `root`.
+ *
+ * End-reached: one capture-phase scroll listener on the document (falling back
+ * to `root`) covers both geometries at once — a `scroll` on a bounded list
+ * viewport does not bubble, and a page scroll fires on the document, so capture
+ * sees both. Every marked list is then measured, and the ones past their
+ * threshold report `end_reached` once, until they fall back under it.
+ *
+ * Refresh: the browser has no pull-to-refresh of its own for an element, so the
+ * gesture is recognized from pointer events — a drag along the widget's axis,
+ * started at its scroll origin (otherwise the drag is a scroll, not a pull) and
+ * longer along that axis than across it. Passing {@link PULL_REFRESH_PX} arms the
+ * pull (marked on the element, which is what the base theme draws); releasing
+ * while armed reports `refresh`. A widget the app already marked as refreshing is
+ * skipped, so holding the list down does not queue a second reload.
  *
  * @param {HTMLElement} root  The mount root.
  * @param {import("./transport.js").Transport} transport  The event sink.
@@ -139,10 +182,88 @@ export function installListEvents(root, transport) {
   const host = typeof document !== "undefined" ? document : root;
   host.addEventListener("scroll", evaluate, true);
 
+  /** @type {Map<number, {el: HTMLElement, key: string, axis: string, x: number, y: number, armed: boolean}>} */
+  const pulls = new Map();
+
+  /** @param {PointerEvent} event */
+  const onPointerDown = (event) => {
+    const el = refreshAncestor(event.target, root);
+    if (el == null || el.getAttribute(REFRESHING_ATTR) === "true") {
+      return;
+    }
+    const key = el.getAttribute(KEY_ATTR);
+    if (key == null) {
+      return;
+    }
+    const axis = el.getAttribute(REFRESH_ATTR) === "x" ? "x" : "y";
+    if ((axis === "x" ? el.scrollLeft : el.scrollTop) > 0) {
+      return;
+    }
+    pulls.set(event.pointerId, {
+      el,
+      key,
+      axis,
+      x: event.clientX,
+      y: event.clientY,
+      armed: false,
+    });
+  };
+
+  /** @param {PointerEvent} event */
+  const onPointerMove = (event) => {
+    const pull = pulls.get(event.pointerId);
+    if (pull === undefined) {
+      return;
+    }
+    const dx = event.clientX - pull.x;
+    const dy = event.clientY - pull.y;
+    const along = pull.axis === "x" ? dx : dy;
+    const across = pull.axis === "x" ? dy : dx;
+    pull.armed = along >= PULL_REFRESH_PX && along > Math.abs(across);
+    if (pull.armed) {
+      pull.el.setAttribute(ARMED_ATTR, "");
+    } else {
+      pull.el.removeAttribute(ARMED_ATTR);
+    }
+  };
+
+  /** @param {PointerEvent} event */
+  const onPointerUp = (event) => {
+    const pull = pulls.get(event.pointerId);
+    if (pull === undefined) {
+      return;
+    }
+    pulls.delete(event.pointerId);
+    pull.el.removeAttribute(ARMED_ATTR);
+    if (pull.armed) {
+      transport.sendEvent({ type: "refresh", key: pull.key, payload: {} });
+    }
+  };
+
+  /** @param {PointerEvent} event */
+  const onPointerCancel = (event) => {
+    const pull = pulls.get(event.pointerId);
+    if (pull === undefined) {
+      return;
+    }
+    pulls.delete(event.pointerId);
+    pull.el.removeAttribute(ARMED_ATTR);
+  };
+
+  root.addEventListener("pointerdown", onPointerDown);
+  root.addEventListener("pointermove", onPointerMove);
+  root.addEventListener("pointerup", onPointerUp);
+  root.addEventListener("pointercancel", onPointerCancel);
+
   return {
     dispose() {
       host.removeEventListener("scroll", evaluate, true);
+      root.removeEventListener("pointerdown", onPointerDown);
+      root.removeEventListener("pointermove", onPointerMove);
+      root.removeEventListener("pointerup", onPointerUp);
+      root.removeEventListener("pointercancel", onPointerCancel);
       latched.clear();
+      pulls.clear();
     },
   };
 }

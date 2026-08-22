@@ -1,10 +1,11 @@
 """A list's declared handlers fire from the wire events the client now emits.
 
 ``LazyColumn`` and friends declare ``on_end_reached`` (and, on the scrollable
-ones, ``on_refresh``), and both resolve through the plain ``on_<type>`` fallback
-— no entry in ``EVENT_TYPE_TO_HANDLER_PROPS`` is needed. Nothing exercised that
-path before ``client/lists.js`` started emitting the events, so these pin it in
-both runtimes: Mode A (``WasmRuntime``) and Mode B (``AppSession``).
+ones plus ``RefreshControl``, ``on_refresh``), and both resolve through the plain
+``on_<type>`` fallback — no entry in ``EVENT_TYPE_TO_HANDLER_PROPS`` is needed.
+Nothing exercised that path before ``client/lists.js`` started emitting the
+events, so these pin it in both runtimes: Mode A (``WasmRuntime``) and Mode B
+(``AppSession``).
 """
 
 from __future__ import annotations
@@ -14,9 +15,9 @@ from typing import Any
 
 import pytest
 
-from tempest_core import App, Container, Text, Widget
-from tempest_core.widgets.events import EndReachedEvent
-from tempest_core.widgets.lists import LazyColumn
+from tempest_core import App, Column, Container, Text, Widget
+from tempest_core.widgets.events import EndReachedEvent, RefreshEvent
+from tempest_core.widgets.lists import LazyColumn, RefreshControl
 from tempestweb.runtime import AppSession, WasmRuntime
 from tempestweb.transports import WasmTransport
 from tempestweb.transports.base import Event, Patch, TransportClosedError
@@ -206,3 +207,115 @@ async def test_end_reached_payload_coerces_to_the_typed_event() -> None:
 
     assert len(seen) == 1
     assert isinstance(seen[0], EndReachedEvent)
+
+
+def _refresh(key: str) -> Event:
+    """Build the wire event the client sends when a pull-to-refresh completes.
+
+    Args:
+        key: The widget key that was pulled.
+
+    Returns:
+        The wire event.
+    """
+    return {"type": "refresh", "key": key, "payload": {}}
+
+
+def _refresh_view(app: App[_ListState]) -> Widget:
+    """Render a list plus a standalone control, both wired to on_refresh.
+
+    Args:
+        app: The application handle.
+
+    Returns:
+        The widget tree for the current state.
+    """
+
+    def reload(event: RefreshEvent) -> None:
+        app.state.events.append("refresh")
+        app.set_state(lambda s: setattr(s, "loaded", PAGE))
+
+    def reload_control(event: RefreshEvent) -> None:
+        app.state.events.append("control")
+
+    return Column(
+        key="root",
+        children=[
+            RefreshControl(key="pull", on_refresh=reload_control),
+            LazyColumn(
+                key="rows",
+                item_count=app.state.loaded,
+                item_builder=lambda index: Container(
+                    key=str(index), child=Text(content=str(index))
+                ),
+                on_refresh=reload,
+            ),
+        ],
+    )
+
+
+@pytest.mark.asyncio
+async def test_mode_b_refresh_runs_the_list_handler() -> None:
+    """A pull on the list itself runs its ``on_refresh``."""
+    state = _ListState(loaded=5 * PAGE)
+    session: AppSession[_ListState] = AppSession(
+        lambda: state, _refresh_view, _StubTransport()
+    )
+    await session.start()
+
+    await session.dispatch(_refresh("rows"))
+
+    assert state.events == ["refresh"]
+    assert state.loaded == PAGE
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_mode_b_refresh_runs_a_standalone_control() -> None:
+    """A pull on a standalone ``RefreshControl`` runs its own handler."""
+    state = _ListState()
+    session: AppSession[_ListState] = AppSession(
+        lambda: state, _refresh_view, _StubTransport()
+    )
+    await session.start()
+
+    await session.dispatch(_refresh("pull"))
+
+    assert state.events == ["control"]
+    await session.close()
+
+
+@pytest.mark.asyncio
+async def test_mode_a_refresh_runs_the_list_handler() -> None:
+    """Mode A resolves ``refresh`` the same way, off the handler registry."""
+    state = _ListState(loaded=5 * PAGE)
+    runtime: WasmRuntime[_ListState] = WasmRuntime(
+        state, _refresh_view, WasmTransport(lambda _patches: None)
+    )
+    runtime.start()
+
+    await runtime.dispatch_event(_refresh("rows"))
+
+    assert state.events == ["refresh"]
+    assert state.loaded == PAGE
+
+
+@pytest.mark.asyncio
+async def test_refresh_payload_coerces_to_the_typed_event() -> None:
+    """The handler receives a ``RefreshEvent``, not the raw payload dict."""
+    seen: list[object] = []
+
+    def view(app: App[_ListState]) -> Widget:
+        def reload(event: RefreshEvent) -> None:
+            seen.append(event)
+
+        return RefreshControl(key="pull", on_refresh=reload)
+
+    runtime: WasmRuntime[_ListState] = WasmRuntime(
+        _ListState(), view, WasmTransport(lambda _patches: None)
+    )
+    runtime.start()
+    await runtime.dispatch_event(_refresh("pull"))
+
+    assert len(seen) == 1
+    assert isinstance(seen[0], RefreshEvent)

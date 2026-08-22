@@ -507,3 +507,39 @@ def test_every_artifact_links_a_tab_icon(tmp_path: Path, mode: str) -> None:
     assert (out / href.removeprefix("./")).is_file(), (
         f"{href} is linked but not shipped"
     )
+
+
+@pytest.mark.parametrize("mode", ["wasm", "server"])
+def test_a_declared_theme_reaches_the_generated_entrypoint(
+    tmp_path: Path, mode: str
+) -> None:
+    """Both Python-side artifacts pass the app's ``THEME`` through.
+
+    An app declares its palette next to its ``view``; the artifact is what has to
+    honour it. Neither entrypoint did, so a themed app rendered baseline-purple
+    buttons — components resolve their colours in Python, so the theme has to be
+    handed to the tree that is built.
+    """
+    root = _project(tmp_path)
+    out = build_artifact(root, mode=mode).out_dir
+    entry = "bootstrap.js" if mode == "wasm" else "server.py"
+    source = (out / entry).read_text(encoding="utf-8")
+
+    assert "THEME" in source, f"the {mode} entrypoint ignores a declared theme"
+
+
+def test_the_wasm_shell_injects_the_theme_css(tmp_path: Path) -> None:
+    """Mode A's page is static, so the palette's CSS is injected at boot.
+
+    Mode B renders the custom properties into the page head; here the app only
+    exists once Pyodide is up, so the handle hands the CSS to JS and the bootstrap
+    puts it in a `<style>` before the first mount.
+    """
+    root = _project(tmp_path)
+    out = build_artifact(root, mode="wasm").out_dir
+    bootstrap = (out / "bootstrap.js").read_text(encoding="utf-8")
+
+    assert "theme_css()" in bootstrap
+    assert "tw-app-theme" in bootstrap
+    # Before the mount, or the first paint is unthemed and then flips.
+    assert bootstrap.index("tw-app-theme") < bootstrap.index("mount(root")

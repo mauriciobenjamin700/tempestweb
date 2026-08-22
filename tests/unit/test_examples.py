@@ -487,3 +487,42 @@ def _find_handler(widget: Any, key: str, attr: str) -> Any:  # noqa: ANN401 — 
         if children:
             stack.extend(children)
     raise AssertionError(f"no widget with key={key!r} and handler {attr!r}")
+
+
+def test_theme_switcher_accent_reaches_the_buttons() -> None:
+    """Choosing an accent restyles the buttons, not just the swatches.
+
+    Regression for the trap that made this demo look broken: a ``Theme`` carries
+    a token set **and** a few loose convenience colours, and components read the
+    tokens. The example used to fill in only the loose fields, so every button
+    stayed on the baseline palette while the swatch said teal.
+    """
+    module = _load_example("theme-switcher")
+    app = _make_app(module)
+    app.start()
+
+    def button_fill(tree: Node) -> object:
+        button = next(node for node in _walk(tree) if node.key == "btn-light")
+        return button.props["style"].background
+
+    scene = app.current_tree
+    assert scene is not None
+    before = button_fill(scene.root)
+
+    swatches = [
+        node.key
+        for node in _walk(scene.root)
+        if node.key is not None and node.key.startswith("swatch-btn")
+    ]
+    assert len(swatches) >= 2, "the demo lost its accent swatches"
+    swatch = next(node for node in _walk(scene.root) if node.key == swatches[-1])
+    handler = swatch.props.get("on_click")
+    assert callable(handler), "the swatch lost its handler"
+    handler()
+    app._rebuild()  # noqa: SLF001 — the loop would do this on the next tick
+
+    scene = app.current_tree
+    assert scene is not None
+    after = button_fill(scene.root)
+    assert after != before, "the accent must reach the button, not only the swatch"
+    assert after == app.theme.tokens.schemes.light.primary

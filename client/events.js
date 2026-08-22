@@ -14,7 +14,14 @@
 // Verify in tests/client/ with a mock transport (jsdom dispatchEvent).
 
 import { GESTURE_TYPE, LONG_PRESS_MS, SWIPE_MIN_PX } from "./constants.js";
-import { DRAG_DATA_ATTR, DROP_TARGET_ATTR, KEY_ATTR, TYPE_ATTR } from "./dom.js";
+import {
+  DRAG_DATA_ATTR,
+  DROP_TARGET_ATTR,
+  ITEM_ATTR,
+  ITEM_VALUE_ATTR,
+  KEY_ATTR,
+  TYPE_ATTR,
+} from "./dom.js";
 
 // The DOM event names captured and their corresponding TWEvent `type`. Identity
 // here, but kept explicit so the captured set is the contract, not "whatever fires".
@@ -24,6 +31,43 @@ const EVENT_TYPES = Object.freeze({
   change: "change",
   submit: "submit",
 });
+
+/** Widget types whose renderer-owned items report a selection. */
+const MENU_TYPES = '[data-tw-type="Menu"],[data-tw-type="ActionSheet"]';
+
+/**
+ * Report a click on a menu item as a `select` event, if that is what it was.
+ *
+ * A `Menu`/`ActionSheet` draws its `items` prop as renderer-owned buttons, so the
+ * click lands on an element the IR knows nothing about. The event belongs to the
+ * *menu* — that is where `on_select` lives — and carries the item's value and
+ * label, which is the `MenuSelectEvent` the handler is declared against.
+ *
+ * @param {Event} event      The click event.
+ * @param {HTMLElement} root The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {boolean}        True when the click was a menu selection.
+ */
+function sendMenuSelection(event, root, transport) {
+  const item = closestWithAttr(event.target, root, ITEM_ATTR);
+  if (item == null || item.getAttribute(ITEM_ATTR) !== "item") {
+    return false;
+  }
+  const menu = item.closest(MENU_TYPES);
+  const key = menu == null ? null : menu.getAttribute(KEY_ATTR);
+  if (key == null) {
+    return false;
+  }
+  transport.sendEvent({
+    type: "select",
+    key,
+    payload: {
+      value: item.getAttribute(ITEM_VALUE_ATTR) ?? "",
+      label: item.textContent ?? "",
+    },
+  });
+  return true;
+}
 
 /** The dataTransfer type carrying a `Draggable`'s payload across a drag. */
 const DRAG_MIME = "text/plain";
@@ -201,6 +245,9 @@ export function bindEvents(root, transport) {
   for (const domType of Object.keys(EVENT_TYPES)) {
     /** @param {Event} event */
     const handler = (event) => {
+      if (domType === "click" && sendMenuSelection(event, root, transport)) {
+        return;
+      }
       const key = keyedAncestor(event.target, root);
       if (key == null) {
         return;

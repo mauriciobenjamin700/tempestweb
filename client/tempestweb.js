@@ -6,7 +6,12 @@
 // transport-ws.js) implement the same `Transport` interface and plug in here
 // unchanged — the renderer and event capture are identical across both modes.
 
-import { applyPatches, buildElement, repaintCanvases } from "./dom.js";
+import {
+  applyPatches,
+  buildElement,
+  positionAnchoredOverlays,
+  repaintCanvases,
+} from "./dom.js";
 import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
@@ -162,13 +167,15 @@ export function mount(root, transport, initialNode = null) {
   }
   /**
    * Recompute what only exists after layout: a virtualized list's off-window
-   * scroll space, and every Canvas's pixel buffer (which is sized to the box the
-   * layout gave it, not to the widget's declared size).
+   * scroll space, every Canvas's pixel buffer (which is sized to the box the
+   * layout gave it, not to the widget's declared size), and the position of any
+   * overlay anchored to a widget key.
    * @returns {void}
    */
   const afterLayout = () => {
     virtualization.refresh();
     repaintCanvases(root);
+    positionAnchoredOverlays(root);
   };
   scheduleFrame(afterLayout);
 

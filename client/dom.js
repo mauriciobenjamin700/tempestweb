@@ -57,6 +57,10 @@ const TAG_BY_TYPE = Object.freeze({
   Dialog: "div",
   BottomSheet: "div",
   Toast: "div",
+  Menu: "div",
+  ActionSheet: "div",
+  Popover: "div",
+  Tooltip: "div",
 });
 
 // Font stack for Canvas draw_text commands (a literal, since a 2D context cannot
@@ -153,6 +157,82 @@ function applyProps(el, props) {
 
 /** Attribute holding a `Dialog`'s title, painted by the base sheet. */
 export const TITLE_ATTR = "data-tw-title";
+/** Attribute marking a renderer-owned menu item, read by the click listener. */
+export const ITEM_ATTR = "data-tw-part";
+/** Attribute holding the value a menu item selects. */
+export const ITEM_VALUE_ATTR = "data-tw-value";
+/** Attribute holding the widget key an overlay anchors itself to. */
+export const ANCHOR_ATTR = "data-tw-anchor";
+
+/**
+ * Render a `Menu`/`ActionSheet`'s items as renderer-owned buttons.
+ *
+ * `items` is a prop — a list of `{label, value, icon}` dicts — and these widgets
+ * are IR leaves, so no patch path ever descends into them and the renderer is
+ * free to own their contents. Without this the widget rendered as an empty box:
+ * the items existed on the wire and nothing drew them.
+ *
+ * The list is rebuilt whenever `items` arrives, which is what an Update carrying
+ * a changed menu looks like. Each button carries its value for the click
+ * listener, and `role=menuitem` so the menu reads as a menu.
+ *
+ * @param {HTMLElement} el     The Menu/ActionSheet element.
+ * @param {*} items            The `items` prop (anything else is treated empty).
+ * @returns {void}
+ */
+function renderMenuItems(el, items) {
+  const list = Array.isArray(items) ? items : [];
+  for (const existing of Array.from(el.querySelectorAll(`[${ITEM_ATTR}="item"]`))) {
+    existing.remove();
+  }
+  for (const item of list) {
+    const button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute(ITEM_ATTR, "item");
+    button.setAttribute("role", "menuitem");
+    button.setAttribute(ITEM_VALUE_ATTR, item?.value == null ? "" : String(item.value));
+    button.textContent = item?.label == null ? "" : String(item.label);
+    el.appendChild(button);
+  }
+}
+
+/**
+ * Position every anchored overlay next to the widget it names.
+ *
+ * A `Menu`/`Popover` carries the `key` of its anchor, which the renderer can
+ * only honour once layout exists — so this runs in the same post-layout pass
+ * that repaints canvases. The overlay is placed under the anchor, left-aligned,
+ * then clamped into the viewport so a menu opened near an edge stays reachable.
+ * An overlay whose anchor is absent keeps the sheet's default placement.
+ *
+ * @param {HTMLElement} root  The mount root to search under.
+ * @returns {void}
+ */
+export function positionAnchoredOverlays(root) {
+  const anchored = root.querySelectorAll(`[${ANCHOR_ATTR}]`);
+  for (const node of anchored) {
+    const el = /** @type {HTMLElement} */ (node);
+    const key = el.getAttribute(ANCHOR_ATTR);
+    if (!key) continue;
+    const anchor = root.querySelector(`[${KEY_ATTR}="${CSS.escape(key)}"]`);
+    if (anchor == null) continue;
+    const box = anchor.getBoundingClientRect();
+    const own = el.getBoundingClientRect();
+    const margin = 8;
+    // A harness without layout (jsdom) reports no viewport; skip the clamp there
+    // rather than pinning everything to the top-left corner.
+    const viewW = globalThis.innerWidth || 0;
+    const viewH = globalThis.innerHeight || 0;
+    const left = Math.max(margin, box.left);
+    const top = box.bottom + 4;
+    const maxLeft = viewW > 0 ? Math.max(margin, viewW - own.width - margin) : left;
+    const maxTop = viewH > 0 ? Math.max(margin, viewH - own.height - margin) : top;
+    el.style.position = "fixed";
+    el.style.left = `${Math.min(left, maxLeft)}px`;
+    el.style.top = `${Math.min(top, maxTop)}px`;
+    el.style.transform = "none";
+  }
+}
 
 /**
  * Apply the overlay-layer widgets' text and accessibility semantics.
@@ -203,6 +283,39 @@ function applyOverlayProps(el, type, props) {
     }
     if ("message" in props) {
       el.textContent = props.message == null ? "" : String(props.message);
+    }
+  } else if (type === "Menu" || type === "ActionSheet") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "menu");
+    }
+    if (type === "ActionSheet" && "title" in props) {
+      const title = props.title;
+      setOrRemove(el, TITLE_ATTR, title === "" ? null : title);
+      const sem = props.semantics;
+      const named = sem != null && typeof sem === "object" && sem.label != null;
+      if (!named) {
+        setOrRemove(el, "aria-label", title === "" ? null : title);
+      }
+    }
+    if ("items" in props) {
+      renderMenuItems(el, props.items);
+    }
+    if ("anchor" in props) {
+      setOrRemove(el, ANCHOR_ATTR, props.anchor);
+    }
+  } else if (type === "Popover") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "dialog");
+    }
+    if ("anchor" in props) {
+      setOrRemove(el, ANCHOR_ATTR, props.anchor);
+    }
+  } else if (type === "Tooltip") {
+    // The native `title` attribute, deliberately: it shows on hover and keyboard
+    // focus, and assistive tech already reads it. A custom bubble would need an
+    // id to point aria-describedby at, and would fight the browser's own.
+    if ("message" in props) {
+      setOrRemove(el, "title", props.message === "" ? null : props.message);
     }
   }
 }

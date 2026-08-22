@@ -226,7 +226,8 @@ export const BASE_THEME_CSS = `
 /* The scrim sits on the host, not on the dialog: a dialog is the card, and a
    card cannot also be the full-viewport backdrop behind itself. */
 [data-tw-overlays]:has([data-tw-type="Dialog"])::before,
-[data-tw-overlays]:has([data-tw-type="BottomSheet"])::before {
+[data-tw-overlays]:has([data-tw-type="BottomSheet"])::before,
+[data-tw-overlays]:has([data-tw-type="ActionSheet"])::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -299,6 +300,64 @@ export const BASE_THEME_CSS = `
   font-family: var(--tw-font);
   font-size: 14px;
   line-height: 20px;
+}
+
+/* A menu and an action sheet are cards of choices. Their items are
+   renderer-owned buttons (the widgets are IR leaves), so they are styled here
+   rather than by the core: full-width rows with a hover state, which inline
+   Style cannot express. */
+[data-tw-type="Menu"],
+[data-tw-type="ActionSheet"],
+[data-tw-type="Popover"] {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  min-width: min(220px, 90vw);
+  max-width: min(420px, 90vw);
+  max-height: 80vh;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+  box-shadow: var(--tw-elevation-2);
+  font-family: var(--tw-font);
+}
+
+/* An action sheet names itself; the title is a prop, not a child. */
+[data-tw-type="ActionSheet"][data-tw-title]::before {
+  content: attr(data-tw-title);
+  padding: 8px 12px 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tw-on-surface-variant);
+}
+
+[data-tw-type="Menu"] > [data-tw-part="item"],
+[data-tw-type="ActionSheet"] > [data-tw-part="item"] {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: start;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  min-height: 44px;
+}
+[data-tw-type="Menu"] > [data-tw-part="item"]:hover,
+[data-tw-type="ActionSheet"] > [data-tw-part="item"]:hover {
+  background: var(--tw-secondary-container);
+}
+[data-tw-type="Menu"] > [data-tw-part="item"]:focus-visible,
+[data-tw-type="ActionSheet"] > [data-tw-part="item"]:focus-visible {
+  outline: 2px solid var(--tw-primary);
+  outline-offset: -2px;
 }
 
 @keyframes tw-progress-slide {

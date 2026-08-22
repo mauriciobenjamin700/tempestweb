@@ -101,6 +101,25 @@ Onze defeitos que só um browser mostra.
   pedia `/favicon.ico` a cada carga e todo artefato respondia 404 — console de
   deploy abrindo com um erro que ninguém pode resolver, e aba com ícone em branco.
 
+- **`Menu`, `ActionSheet`, `Popover` e `Tooltip` não desenhavam nada.** As
+  escolhas de um menu vivem na prop `items` (lista de dicts no fio) e nenhum
+  código as renderizava: o widget saía como caixa vazia, e não havia caminho para
+  o `on_select` que ele declara. `Popover` e `Menu` carregam a `key` da própria
+  âncora, ignorada. O `message` de um `Tooltip` nunca aparecia.
+
+  Como esses widgets são folhas da IR — nenhum caminho de patch desce neles — o
+  renderizador é livre para possuir seu conteúdo: os itens agora são botões
+  renderer-owned com `role=menuitem`, e um clique reporta `select` com
+  `{value, label}` contra a key do menu, que é o `MenuSelectEvent` que o handler
+  declara. Um overlay ancorado é posicionado sob sua âncora no mesmo passo
+  pós-layout que repinta canvases, com clamp na viewport para um menu aberto perto
+  da borda seguir alcançável. O título do `ActionSheet` é pintado como o do
+  `Dialog` (prop, não filho) e ele ganha scrim, porque é modal — `Menu` e
+  `Popover` não ganham, porque não são. O `message` do `Tooltip` vira o atributo
+  `title` nativo: aparece no hover e no foco por teclado, e leitor de tela já o lê;
+  uma bolha própria precisaria de um id para apontar `aria-describedby` e brigaria
+  com a do browser.
+
 ### Fixed (exemplos)
 
 - **kanban-board, dashboard-shell, notification-center:** `on_click=lambda c=col:
@@ -124,15 +143,18 @@ Onze defeitos que só um browser mostra.
 
 - Tipos de evento `drag` / `drop` na tabela de roteamento, entregando o
   `DragEvent` tipado que os widgets já declaravam.
-- `applyPatches` exporta `DRAG_DATA_ATTR`, `DROP_TARGET_ATTR` e `TITLE_ATTR`;
-  `repaintCanvases(root)` redesenha os canvases depois do layout.
+- `client/dom.js` exporta `DRAG_DATA_ATTR`, `DROP_TARGET_ATTR`, `TITLE_ATTR`,
+  `ITEM_ATTR`, `ITEM_VALUE_ATTR` e `ANCHOR_ATTR`; `repaintCanvases(root)` redesenha
+  os canvases depois do layout e `positionAnchoredOverlays(root)` coloca cada
+  overlay ancorado junto da sua âncora.
 
 ### Tests
 
 - Round-trip de drag/drop em jsdom, camada de overlay (posicionamento + papéis
-  ARIA + o `role` default sobrevivendo a `semantics: null`), máscara de senha
-  através de um update que só muda o valor, e o guard de fechamento de imports do
-  bundle do Modo A.
+  ARIA + o `role` default sobrevivendo a `semantics: null`), itens de menu
+  desenhados e a seleção chegando ao handler pelos dois lados do fio, máscara de
+  senha através de um update que só muda o valor, e o guard de fechamento de
+  imports do bundle do Modo A.
 - Os três modos foram exercitados num browser real: Modo B (kanban, overlays,
   data-table, admin-console, list_demo, login-form, theme-switcher), Modo A
   (counter sob Pyodide) e Modo C (counter transpilado).

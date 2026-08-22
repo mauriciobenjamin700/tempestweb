@@ -197,6 +197,16 @@ função:
 | **Gráficos** | `BarChart` · `LineChart` · `ChartSeries` | tempest-core |
 | **Visão** | `DetectionBox` · `DetectionOverlay` · `ConfidenceBadge` · `ResultView` · `confidence_scheme` | tempest-core |
 
+!!! warning "Duas instâncias do mesmo componente na mesma tela colidem"
+    `SegmentedControl` e `RadioGroup` nomeiam os próprios filhos com chave fixa
+    (`seg-0`, `radio-0`, …), sem prefixo da chave do componente. Como o evento é
+    roteado **por chave**, duas instâncias na mesma tela disputam o mesmo nome: o
+    Python resolve para a **primeira** ocorrência, e o Modo C para a **última** —
+    então um clique num controle move o outro. É defeito do `tempest-core`
+    (`SegmentedControl.render`), não do seu app, e vale nos três modos. Enquanto
+    não for corrigido lá, mantenha um por tela ou monte o controle com `Button`
+    dando chave própria a cada segmento.
+
 !!! tip "Campo vs Input"
     O par existe de propósito: o **`*Input`** (do core) é a primitiva de baixo nível;
     o **`*Field`** (nativo do tempestweb, para e-mail/senha/BR) é o campo pronto —

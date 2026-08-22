@@ -102,6 +102,15 @@ export const Edge = Object.freeze({
   all(n) {
     return { top: n, right: n, bottom: n, left: n };
   },
+
+  /**
+   * An edge with one value top/bottom and another left/right.
+   * @param {{vertical?: number, horizontal?: number}} [args]
+   * @returns {{top: number, right: number, bottom: number, left: number}}
+   */
+  symmetric({ vertical = 0.0, horizontal = 0.0 } = {}) {
+    return { top: vertical, right: horizontal, bottom: vertical, left: horizontal };
+  },
 });
 
 /**

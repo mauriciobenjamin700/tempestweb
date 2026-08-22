@@ -574,6 +574,15 @@ no espírito do `mypy --strict`.
     `child` no `Container`/`Draggable`, `children` no `Column`/`Row`, `fields` no
     `Form`.
 
+!!! check "Componentes estruturais estão portados"
+    `Card`, `AppBar`, `Scaffold`, `Divider`, `Chip`, `SegmentedControl`,
+    `RadioGroup` — mais os aliases `HStack`/`VStack` — rodam em Modo C. A
+    composição de cada um foi reescrita em `components.js` e o *resultado* dos
+    resolvedores de estilo do core viaja em tabela gerada
+    (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
+    pelos widgets. Cada builder é fixado por uma matriz de props construída do
+    core real, então drift de composição ou de estilo falha no teste.
+
 !!! check "Enums, objetos de valor e tokens do core estão servidos"
     `TextAlign.CENTER`, `FontWeight.BOLD`, `KeyboardType.EMAIL`,
     `Semantics(label=…)`, `Border`, `Shadow`, `Gradient`, `ACCENT`, `ON_SURFACE`,
@@ -583,11 +592,10 @@ no espírito do `mypy --strict`.
     (`widget-support.js`).
 
 !!! warning "Ainda fora do subset — e agora falha no build"
-    A maior parte de `tempest_core.components` (Card, DataTable, Tabs, charts,
-    inputs de formulário …). Diferente dos widgets, componentes são **composição
-    Python** que expande em primitivos no `build()` — muitos a partir de dados/
-    loops — então não são auto-portáveis para um runtime sem Python. Os aliases de
-    layout `HStack`/`VStack` são a exceção (expandem em `Row`/`Column`). Também
+    Os componentes **dirigidos por dados** de `tempest_core.components`
+    (`DataTable`, `Tabs`, `Accordion`, `BarChart`/`LineChart`, os pickers de
+    formulário …): a árvore deles depende dos dados recebidos, então não há
+    composição fixa para portar — diferente dos estruturais acima. Também
     fora: comprehensions multi-loop ou com alvo desestruturado (`for k, v in …`),
     e format-specs de f-string além dos suportados (ex.: alinhamento `{x:>5}`,
     sinal `{x:+.2f}`, hex/bin `{x:x}`, dinâmico `{x:.{n}f}`, conversão `!a`).

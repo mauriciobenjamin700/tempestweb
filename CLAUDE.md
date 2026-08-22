@@ -146,6 +146,17 @@ Armadilhas já pagas neste repo:
   errado era silêncio no Modo C e `ValidationError` nos Modos A/B — desde 0.79.0
   o compilador recusa com `arquivo:linha`. Builder novo sai de
   `python -m tests.conformance._transpile_widgets`, nunca da mão.
+- **Componente do Modo C é composição à mão + tabela de estilo gerada.** A
+  composição vive em `client/transpile/components.js` (reescrita do `render()` do
+  core) e o estilo vem de `component-styles.gen.js`
+  (`python -m tests.conformance._transpile_component_styles`). O que garante
+  fidelidade é a matriz em `tests/fixtures/transpile_component_samples.json`,
+  construída do core real — um caso por componente não basta: variante, esquema,
+  tamanho e elevação driftam em silêncio.
+- **Chave de filho de componente colide entre instâncias.** `SegmentedControl` e
+  `RadioGroup` nomeiam filhos com chave fixa (`seg-N`, `radio-N`); duas instâncias
+  na mesma tela disputam o nome e o evento vai para a errada (Python pega a
+  primeira, Modo C a última). Defeito do `tempest-core`, vale nos três modos.
 - **O Modo C só serve o que `tempestweb/transpile/_served.py` lista.** O
   manifesto é gerado do próprio JS (`python -m tests.conformance._transpile_served`)
   e o compilador recusa nome fora dele — antes emitia import morto e a página

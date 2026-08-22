@@ -823,17 +823,17 @@ def test_a_style_keeps_the_wire_snake_case_keys() -> None:
 def test_a_name_the_client_cannot_serve_is_refused() -> None:
     """A component outside the subset must fail the build, not the page load.
 
-    ``Card`` lives in ``tempest_core.components``: Python composition that
-    expands into primitives at build time, which is why Mode C does not carry
-    it. The transpiler used to emit ``import { Card } from "./widgets.js"``
-    anyway — an import the browser cannot resolve, so the module never evaluates
-    and the page stays blank with nothing in the build log.
+    ``DataTable`` composes its tree from the rows it is handed, so there is no
+    fixed composition to port to a Python-free runtime — unlike ``Card`` and the
+    other structural components, which are ported. The transpiler used to emit
+    the import anyway — one the browser cannot resolve, so the module never
+    evaluates and the page stays blank with nothing in the build log.
     """
-    with pytest.raises(TranspileError, match="`Card` is not available in Mode C"):
+    with pytest.raises(TranspileError, match="`DataTable` is not available in Mode C"):
         gen(
-            "from tempest_core import Card, Text\n\n\n"
-            "def panel() -> Card:\n"
-            '    return Card(key="c", child=Text(content="x"))\n'
+            "from tempest_core import DataTable\n\n\n"
+            "def grid() -> DataTable:\n"
+            "    return DataTable(columns=[], data=[])\n"
         )
 
 

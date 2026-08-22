@@ -71,6 +71,7 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "transport.js",
     "virtualize.js",
     "router.js",
+    "camera-widgets.js",
     "constants.js",
 )
 

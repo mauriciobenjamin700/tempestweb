@@ -159,6 +159,7 @@ function applyProps(el, props) {
   applyLazyProps(el, type, props);
   applyListEventProps(el, type, props);
   applySortAndPageProps(el, type, props);
+  applyCameraProps(el, type, props);
 }
 
 /** Attribute holding a `Dialog`'s title, painted by the base sheet. */
@@ -381,6 +382,9 @@ function applyDragProps(el, type, props) {
   }
 }
 
+/** Attribute marking a camera widget: `preview` or `scanner`. */
+export const CAMERA_ATTR = "data-tw-camera";
+
 /** Attribute holding a `PinInput`'s expected code length. */
 export const PIN_LENGTH_ATTR = "data-tw-length";
 
@@ -460,6 +464,37 @@ function applyPinProps(el, props) {
  * @param {Object} props       The props to apply.
  * @returns {void}
  */
+/**
+ * Mark a camera widget so `client/camera.js` can open its stream.
+ *
+ * `CameraPreview` and `QrScanner` are IR leaves that rendered as empty boxes:
+ * no stream, no preview, and their declared handlers (`on_frame`, `on_scan`)
+ * unreachable. The marker carries which of the two it is, plus the preview's own
+ * two props — which camera to ask for, and how often to sample — because the
+ * module that opens the stream reads them off the element rather than being told
+ * twice.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyCameraProps(el, type, props) {
+  if (type === "CameraPreview") {
+    el.setAttribute(CAMERA_ATTR, "preview");
+    if ("facing" in props && props.facing != null) {
+      el.setAttribute("data-tw-facing", String(props.facing));
+    }
+    if ("frame_interval_ms" in props && props.frame_interval_ms != null) {
+      el.setAttribute("data-tw-frame-interval", String(props.frame_interval_ms));
+    }
+    return;
+  }
+  if (type === "QrScanner") {
+    el.setAttribute(CAMERA_ATTR, "scanner");
+  }
+}
+
 function applySortAndPageProps(el, type, props) {
   if (type === "FormField") {
     // The name is what `ValidationEvent.field` carries, and the app looks its

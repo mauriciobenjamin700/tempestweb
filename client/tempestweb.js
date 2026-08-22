@@ -16,6 +16,7 @@ import {
 import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
+import { installCameras } from "./camera-widgets.js";
 import { installFocusTrap } from "./focus.js";
 import { installListEvents } from "./lists.js";
 import { installPageViews } from "./pages.js";
@@ -168,6 +169,7 @@ export function mount(root, transport, initialNode = null) {
   const virtualization = installVirtualization(root, transport);
   const listEvents = installListEvents(root, transport);
   const focusTrap = installFocusTrap(root);
+  const cameras = installCameras(root, transport);
   const pageViews = installPageViews(root, transport);
   const router = installRouter(transport);
   if (typeof transport.onNavigate === "function") {
@@ -186,6 +188,7 @@ export function mount(root, transport, initialNode = null) {
     positionAnchoredOverlays(root);
     syncContainerGestures(root);
     focusTrap.sync();
+    cameras.sync();
   };
   scheduleFrame(afterLayout);
 
@@ -271,6 +274,7 @@ export function mount(root, transport, initialNode = null) {
       virtualization.dispose();
       listEvents.dispose();
       focusTrap.dispose();
+      cameras.dispose();
       pageViews.dispose();
       media.dispose();
       router.dispose();

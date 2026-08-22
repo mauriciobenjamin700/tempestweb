@@ -137,6 +137,7 @@ EXAMPLE_NAMES = [
     "list_demo",
     "responsive_demo",
     "reorder_demo",
+    "camera_demo",
     "router_demo",
     "login_demo",
     "geo_demo",

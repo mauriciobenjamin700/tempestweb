@@ -4,6 +4,59 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.76.0] — 2026-08-22
+
+Os dois últimos handlers inertes: a câmera.
+
+### Fixed
+
+- **`CameraPreview` e `QrScanner` renderizavam caixas vazias** (issue #77,
+  item 1 — o último). Os dois declaram handler (`on_frame`, `on_scan`) e o
+  renderizador DOM não os conhecia: nenhum stream, nenhum preview, nada para
+  amostrar ou decodificar. Ambos são folhas da IR, então o renderizador é dono do
+  que vai dentro — um `<video>` tocando o stream, como um `ProgressBar` é dono do
+  próprio fill.
+
+  O stream abre quando o widget aparece e **fecha quando ele sai**, o que aqui
+  importa mais que na maioria dos recursos: câmera aberta é luz acesa no celular
+  de alguém.
+
+- **`on_frame` funciona.** O preview amostra o vídeo num canvas a cada
+  `frame_interval_ms` e reporta `{width, height, data, rotation}` com o frame em
+  base64 — o `CameraFrameEvent` do core. `facing` vira o `facingMode` do
+  `getUserMedia`.
+
+- **`on_scan` funciona**, usando o `BarcodeDetector` do próprio navegador, e
+  reporta a **mudança** de código, não a presença: um QR fica no enquadramento
+  por dezenas de frames, e reportar cada um transformaria uma leitura em dezenas
+  de chamadas de handler.
+
+  Onde o `BarcodeDetector` não existe (hoje, tudo fora de Chrome/Android) o
+  widget mostra a câmera e **avisa no console**, uma vez. Não há decoder de
+  reserva de propósito: este cliente não embute dependência de runtime, e a
+  alternativa honesta é `CameraPreview` + decodificação própria sobre os frames.
+
+- **Permissão negada e API ausente falham alto.** `getUserMedia` que rejeita
+  avisa com a mensagem do browser e não deixa `<video>` órfão; página sem
+  `mediaDevices` (contexto inseguro) avisa uma vez para a página, não uma por
+  widget.
+
+### Added
+
+- **`examples/camera_demo`** — preview com contador de frames e tamanho do último,
+  mais um leitor de QR com histórico. Verificado em Chrome real com um stream de
+  `canvas.captureStream()` e um `BarcodeDetector` stub (não há câmera neste
+  ambiente): 4 frames em 2,5s no intervalo de 500ms, último `320 × 240` com 2064
+  caracteres base64, dois códigos deduplicados na ordem certa, `<video>` com
+  `object-fit: cover`.
+
+### Docs
+
+- A página de capacidades (PT + EN) ganhou "Preview ao vivo e leitor de QR",
+  separando a **capacidade** (`camera.capture()`, uma foto) dos **widgets** (a
+  câmera ligada), com o orçamento de rede do `frame_interval_ms` e o aviso sobre
+  o `BarcodeDetector`.
+
 ## [0.75.0] — 2026-08-22
 
 A paleta que um app declara agora chega aos componentes — nos dois modos Python.

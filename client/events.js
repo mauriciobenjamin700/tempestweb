@@ -35,6 +35,68 @@ const EVENT_TYPES = Object.freeze({
 /** Widget types whose renderer-owned items report a selection. */
 const MENU_TYPES = '[data-tw-type="Menu"],[data-tw-type="ActionSheet"]';
 
+/** The overlay host, whose own surface is the scrim (a ::before on this element). */
+const OVERLAY_HOST_ATTR = "data-tw-overlays";
+
+/**
+ * Overlay types a click outside — or Escape — dismisses.
+ *
+ * Modal overlays only: a Toast dismisses itself on a timer, and a Menu/Popover
+ * has no scrim to click through, so neither belongs here.
+ */
+const DISMISSIBLE_TYPES =
+  '[data-tw-type="Dialog"],[data-tw-type="BottomSheet"],[data-tw-type="ActionSheet"]';
+
+/**
+ * Whether this event target is the overlay host itself (i.e. the scrim).
+ *
+ * Duck-typed rather than `instanceof Element`: the client also runs under jsdom,
+ * where the module scope has no browser `Element` to compare against.
+ *
+ * @param {EventTarget|null} target  The event's target.
+ * @returns {boolean}                True when the target is the overlay host.
+ */
+function isOverlayHost(target) {
+  const el = /** @type {HTMLElement|null} */ (target);
+  return (
+    el != null &&
+    typeof el.hasAttribute === "function" &&
+    el.hasAttribute(OVERLAY_HOST_ATTR)
+  );
+}
+
+/**
+ * Report a dismiss for the top-most modal overlay, if there is one.
+ *
+ * The scrim is the overlay host's own ::before, so a click on it lands on the
+ * host itself — that is the signal that the user clicked *outside* the overlay.
+ * Escape means the same thing. Both were inert: `on_dismiss` existed on Dialog
+ * and BottomSheet and nothing ever fired it, so a scrim that looked dismissible
+ * was not, and an app without its own close button trapped the user.
+ *
+ * The payload is empty: `DismissEvent.overlay_id` is the server's id for the
+ * overlay, which the client never sees — the handler knows which overlay it is
+ * on.
+ *
+ * @param {HTMLElement} root The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {boolean}        True when a dismiss was reported.
+ */
+function sendOverlayDismiss(root, transport) {
+  const host = root.querySelector(`[${OVERLAY_HOST_ATTR}]`);
+  if (host == null) {
+    return false;
+  }
+  const modals = host.querySelectorAll(DISMISSIBLE_TYPES);
+  const top = modals[modals.length - 1];
+  const key = top == null ? null : top.getAttribute(KEY_ATTR);
+  if (key == null) {
+    return false;
+  }
+  transport.sendEvent({ type: "dismiss", key, payload: {} });
+  return true;
+}
+
 /**
  * Report a click on a menu item as a `select` event, if that is what it was.
  *
@@ -248,6 +310,11 @@ export function bindEvents(root, transport) {
       if (domType === "click" && sendMenuSelection(event, root, transport)) {
         return;
       }
+      if (domType === "click" && isOverlayHost(event.target)) {
+        if (sendOverlayDismiss(root, transport)) {
+          return;
+        }
+      }
       const key = keyedAncestor(event.target, root);
       if (key == null) {
         return;
@@ -347,9 +414,29 @@ export function bindEvents(root, transport) {
   root.addEventListener("pointerup", onPointerUp);
   bound.push(["pointerdown", onPointerDown], ["pointerup", onPointerUp]);
 
+  /**
+   * Dismiss the top-most modal overlay on Escape.
+   *
+   * Listened for on the document, not the mount root: an overlay rarely holds
+   * focus, so the key event would never reach the root.
+   * @param {KeyboardEvent} event
+   */
+  const onKeyDown = (event) => {
+    if (event.key === "Escape") {
+      sendOverlayDismiss(root, transport);
+    }
+  };
+  const doc = root.ownerDocument;
+  if (doc != null) {
+    doc.addEventListener("keydown", onKeyDown);
+  }
+
   return () => {
     for (const [domType, handler] of bound) {
       root.removeEventListener(domType, handler);
+    }
+    if (doc != null) {
+      doc.removeEventListener("keydown", onKeyDown);
     }
   };
 }

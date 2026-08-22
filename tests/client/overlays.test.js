@@ -247,3 +247,80 @@ test("an anchored overlay is placed under the widget it names", () => {
   assert.notEqual(menu.style.top, "");
   assert.equal(menu.style.transform, "none");
 });
+
+test("clicking the scrim dismisses the top-most modal overlay", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { bindEvents } = await import("../../client/events.js");
+  /** @type {import("../../client/transport.js").TWEvent[]} */
+  const events = [];
+  const transport = { onPatches() {}, sendEvent: (e) => events.push(e), async close() {} };
+  bindEvents(dom.root, transport);
+
+  // The layer as `mount` builds it: a host holding the overlays.
+  const host = dom.document.createElement("div");
+  host.setAttribute("data-tw-overlays", "");
+  dom.root.appendChild(host);
+  host.appendChild(
+    buildElement({ type: "Dialog", key: "confirm", props: { title: "Sure?" }, children: [] }),
+  );
+
+  // The scrim is the host's own ::before, so a click on it targets the host —
+  // that is what "clicked outside" looks like in the DOM.
+  host.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  assert.deepEqual(events, [{ type: "dismiss", key: "confirm", payload: {} }]);
+});
+
+test("Escape dismisses the top-most modal overlay", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { bindEvents } = await import("../../client/events.js");
+  /** @type {import("../../client/transport.js").TWEvent[]} */
+  const events = [];
+  const unbind = bindEvents(dom.root, {
+    onPatches() {},
+    sendEvent: (e) => events.push(e),
+    async close() {},
+  });
+
+  const host = dom.document.createElement("div");
+  host.setAttribute("data-tw-overlays", "");
+  dom.root.appendChild(host);
+  host.appendChild(
+    buildElement({ type: "Dialog", key: "first", props: {}, children: [] }),
+  );
+  host.appendChild(
+    buildElement({ type: "BottomSheet", key: "second", props: {}, children: [] }),
+  );
+
+  dom.document.dispatchEvent(
+    new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  // The one on top, not the first one opened.
+  assert.deepEqual(events, [{ type: "dismiss", key: "second", payload: {} }]);
+
+  unbind();
+  dom.document.dispatchEvent(
+    new dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+  );
+  assert.equal(events.length, 1, "unbind must detach the document listener");
+});
+
+test("a Menu is not dismissed by the scrim path (it has no scrim)", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { bindEvents } = await import("../../client/events.js");
+  /** @type {import("../../client/transport.js").TWEvent[]} */
+  const events = [];
+  bindEvents(dom.root, { onPatches() {}, sendEvent: (e) => events.push(e), async close() {} });
+
+  const host = dom.document.createElement("div");
+  host.setAttribute("data-tw-overlays", "");
+  dom.root.appendChild(host);
+  host.appendChild(
+    buildElement({ type: "Menu", key: "m", props: { items: [] }, children: [] }),
+  );
+
+  host.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  assert.deepEqual(events, []);
+});

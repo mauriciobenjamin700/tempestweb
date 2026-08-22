@@ -120,6 +120,16 @@ Onze defeitos que só um browser mostra.
   uma bolha própria precisaria de um id para apontar `aria-describedby` e brigaria
   com a do browser.
 
+- **O `on_dismiss` de um overlay modal nunca disparava.** `Dialog` e `BottomSheet`
+  declaram o handler e nada no cliente o acionava: com o scrim agora visível, ele
+  prometia "clique fora para fechar" e não cumpria, e uma app sem botão próprio
+  prendia o usuário. Um clique no scrim — que é o `::before` do host, então o
+  clique aterra no host, o que no DOM é exatamente "clicou fora" — e a tecla
+  `Escape` agora reportam `dismiss` para o overlay modal do topo. Clique **dentro**
+  do overlay não fecha, e `Menu`/`Popover` não entram nesse caminho porque não têm
+  scrim. Verificado no Chrome: abrir → clicar no scrim fecha; reabrir → `Escape`
+  fecha; clicar no corpo do dialog mantém aberto.
+
 ### Fixed (exemplos)
 
 - **kanban-board, dashboard-shell, notification-center:** `on_click=lambda c=col:

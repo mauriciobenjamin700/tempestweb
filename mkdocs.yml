@@ -167,6 +167,7 @@ plugins:
             "Routing & navigation": "Roteamento e navegação"
             "Long lists": "Listas longas"
             "Responsive layout": "Layout responsivo"
+            "Overlays and modals": "Overlays e modais"
             "PWA & offline": "PWA e offline"
             "Offline + backend sync": "Offline + sincronização com backend"
             Observability: Observabilidade
@@ -258,6 +259,7 @@ nav:
       - Routing & navigation: tutorial/routing.md
       - Long lists: tutorial/lists.md
       - Responsive layout: tutorial/responsive.md
+      - Overlays and modals: tutorial/overlays.md
       - Best practices: tutorial/best-practices.md
   - Advanced User Guide:
       - Capabilities: advanced/capabilities.md

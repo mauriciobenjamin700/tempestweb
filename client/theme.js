@@ -350,6 +350,20 @@ export const BASE_THEME_CSS = `
   cursor: pointer;
   min-height: 44px;
 }
+/* An item is a glyph plus a label, so it lays out as a row; the glyph inherits
+   the row's font size through the Icon registry's own "1em" default. */
+[data-tw-type="Menu"] > [data-tw-part="item"],
+[data-tw-type="ActionSheet"] > [data-tw-part="item"] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+[data-tw-type="Menu"] > [data-tw-part="item"] > svg,
+[data-tw-type="ActionSheet"] > [data-tw-part="item"] > svg {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+}
 [data-tw-type="Menu"] > [data-tw-part="item"]:hover,
 [data-tw-type="ActionSheet"] > [data-tw-part="item"]:hover {
   background: var(--tw-secondary-container);

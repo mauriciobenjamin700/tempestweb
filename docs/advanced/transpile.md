@@ -574,7 +574,15 @@ no espírito do `mypy --strict`.
     `child` no `Container`/`Draggable`, `children` no `Column`/`Row`, `fields` no
     `Form`.
 
-!!! warning "Ainda fora do subset"
+!!! check "Enums, objetos de valor e tokens do core estão servidos"
+    `TextAlign.CENTER`, `FontWeight.BOLD`, `KeyboardType.EMAIL`,
+    `Semantics(label=…)`, `Border`, `Shadow`, `Gradient`, `ACCENT`, `ON_SURFACE`,
+    `HOVER_OPACITY` — os 32 enums do core, os objetos de valor não-widget e os
+    tokens de design são **gerados** para `values.gen.js` a partir do core, na
+    forma do fio. `Style`/`Color`/`Edge` continuam onde sempre estiveram
+    (`widget-support.js`).
+
+!!! warning "Ainda fora do subset — e agora falha no build"
     A maior parte de `tempest_core.components` (Card, DataTable, Tabs, charts,
     inputs de formulário …). Diferente dos widgets, componentes são **composição
     Python** que expande em primitivos no `build()` — muitos a partir de dados/
@@ -583,6 +591,18 @@ no espírito do `mypy --strict`.
     fora: comprehensions multi-loop ou com alvo desestruturado (`for k, v in …`),
     e format-specs de f-string além dos suportados (ex.: alinhamento `{x:>5}`,
     sinal `{x:+.2f}`, hex/bin `{x:x}`, dinâmico `{x:.{n}f}`, conversão `!a`).
+
+    Usar um desses nomes agora é **erro de compilação** com `arquivo:linha`:
+
+    ```text
+    app.py:12: `Card` is not available in Mode C (the transpile client exports no such name)
+    ```
+
+    Antes o compilador emitia `import { Card } from "./widgets.js"` mesmo assim —
+    um import que o browser não resolve, então o módulo nunca era avaliado e a
+    página ficava **em branco**, sem nada no log do build. Importar um tipo só
+    para anotação (`DragEvent`, `TextChangeHandler`) continua livre: anotação é
+    descartada, o nome nunca é referenciado, nenhum import é emitido.
 
 ## Recapitulando
 

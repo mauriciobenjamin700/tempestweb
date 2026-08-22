@@ -82,6 +82,7 @@ _TRANSPILE_ASSETS: tuple[str, ...] = (
     "runtime.js",
     "widgets.js",
     "widgets.gen.js",
+    "values.gen.js",
     "widget-support.js",
     "components.js",
     "spacing.gen.js",

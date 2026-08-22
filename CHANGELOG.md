@@ -4,6 +4,61 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.70.0] — 2026-08-22
+
+Um app em Modo A ou B não sabia o tamanho da própria janela.
+
+### Fixed
+
+- **`App.media` agora segue o browser nos três modos** (issue #74). A docstring
+  do `MediaQueryData` sempre prometeu que "o renderizador mantém isso
+  atualizado via `App._update_media` em resize / mudança de configuração", e
+  nada neste pacote chamava: o reporter (`media.js`) morava em
+  `client/transpile/` e só o runtime do Modo C o instalava. Um app em Modo A ou
+  B rodava para sempre com `width = height = 0`, então:
+
+  - uma `view` que escolhe layout por breakpoint escolhia sempre o mesmo ramo;
+  - um frame que se limita pela altura do viewport (`Scaffold(scroll=True)`, que
+    só segura `app_bar`/`bottom_bar` se a coluna em volta for limitada, e
+    `Style` não tem `100vh`) não tinha limite nenhum — a página inteira rolava e
+    as ações iam para o fim do documento.
+
+  O módulo sempre foi genérico (depende só do `transport`), então virou
+  `client/media.js` e o `mount()` compartilhado o instala. `apply_media` faz a
+  metade Python: valida o payload num `MediaQueryData` e entrega ao
+  `App._update_media`, que já pede o rebuild coalescido. Campo ausente mantém o
+  default (nenhum browser reporta `text_scale_factor`); payload malformado é
+  ignorado.
+
+  Medido nos três modos com Chrome real, no novo `examples/responsive_demo`:
+  1200×850 monta em `Row`, estreitar para 430px vira `Column`, e o snapshot
+  impresso na tela acompanha resize, orientação e `prefers-color-scheme`.
+
+- **O reporte inicial de viewport era descartado no Modo C.** O `installMedia`
+  reporta na hora, e no Modo C esse reporte reconstrói a árvore em processo —
+  mas ele era instalado antes de `transport.onPatches`, então os patches iam
+  para um sink inexistente **enquanto a árvore do runtime avançava**: o DOM
+  ficava no render anterior (`0 × 0` até o primeiro resize) e todo diff seguinte
+  era calculado contra uma árvore que o DOM não tinha. A instalação agora é a
+  última coisa que o `mount()` faz.
+
+- **Variável local tipada não era emitida pelo transpiler (Modo C).**
+  `ast.AnnAssign` estava agrupado com `pass` no dispatcher de statements, então
+  `layout: Widget = Row(...) if wide else Column(...)` — a forma que as regras
+  de estilo deste repo pedem — desaparecia do módulo gerado. Nada falhava no
+  transpile; o browser levantava `ReferenceError: layout is not defined`.
+  Declaração sem valor (`total: int`) segue emitindo nada.
+
+### Added
+
+- **`examples/responsive_demo`** — a mesma `view` em dois layouts, com a foto do
+  viewport impressa na tela, rodando nos três modos.
+
+- **Nova página de tutorial bilíngue "Layout responsivo" / "Responsive layout"**
+  (`docs/tutorial/responsive.md`): os seis campos de `app.media`, breakpoint por
+  conteúdo, frames com altura de viewport, tema do sistema, e como o evento
+  `media` chega em cada modo.
+
 ## [0.69.0] — 2026-08-22
 
 Uma auditoria da perna do Modo B, e depois um browser em cima dela.

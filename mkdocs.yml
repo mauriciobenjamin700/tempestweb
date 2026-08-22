@@ -166,6 +166,7 @@ plugins:
             "Device panel": "Painel do dispositivo"
             "Routing & navigation": "Roteamento e navegação"
             "Long lists": "Listas longas"
+            "Responsive layout": "Layout responsivo"
             "PWA & offline": "PWA e offline"
             "Offline + backend sync": "Offline + sincronização com backend"
             Observability: Observabilidade
@@ -256,6 +257,7 @@ nav:
       - Icons (Material + Lucide): tutorial/icons.md
       - Routing & navigation: tutorial/routing.md
       - Long lists: tutorial/lists.md
+      - Responsive layout: tutorial/responsive.md
       - Best practices: tutorial/best-practices.md
   - Advanced User Guide:
       - Capabilities: advanced/capabilities.md

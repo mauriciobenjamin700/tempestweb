@@ -360,6 +360,51 @@ export const BASE_THEME_CSS = `
   outline-offset: -2px;
 }
 
+/* ── Pull-to-refresh: an affordance for a gesture the DOM has none for ─────
+   A widget that declares on_refresh is marked [data-tw-refresh] by dom.js;
+   client/lists.js arms it while the reader drags past the threshold, and the
+   app's own refreshing flag marks the reload in flight. Both states are drawn
+   as an inset band at the pull edge rather than a background or a child, so an
+   app's inline Style (which owns the element's own declarations) and the
+   virtualized list's spacer pseudo-elements are both left alone. */
+[data-tw-refresh] { overscroll-behavior: contain; }
+[data-tw-refresh][data-tw-pull-armed],
+[data-tw-refresh][data-tw-refreshing="true"] {
+  box-shadow: inset 0 3px 0 0 var(--tw-primary);
+}
+[data-tw-refresh="x"][data-tw-pull-armed],
+[data-tw-refresh="x"][data-tw-refreshing="true"] {
+  box-shadow: inset 3px 0 0 0 var(--tw-primary);
+}
+[data-tw-refresh][data-tw-refreshing="true"] {
+  animation: tw-refresh-pulse 1200ms ease-in-out infinite;
+}
+/* A standalone RefreshControl has no content of its own, so the spinner the
+   renderer owns *is* the widget: invisible at rest, shown once the pull is
+   armed, spinning while the app reloads. */
+[data-tw-type="RefreshControl"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  touch-action: pan-y;
+}
+[data-tw-type="RefreshControl"] > [data-tw-part="spinner"] {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--tw-primary-container);
+  border-top-color: var(--tw-primary);
+  border-radius: var(--tw-radius-full);
+  opacity: 0;
+  transition: opacity var(--tw-motion);
+}
+[data-tw-type="RefreshControl"][data-tw-pull-armed] > [data-tw-part="spinner"] { opacity: 1; }
+[data-tw-type="RefreshControl"][data-tw-refreshing="true"] > [data-tw-part="spinner"] {
+  opacity: 1;
+  animation: tw-spin 900ms linear infinite;
+}
+
 @keyframes tw-progress-slide {
   0% { margin-inline-start: -40%; }
   100% { margin-inline-start: 100%; }
@@ -367,13 +412,18 @@ export const BASE_THEME_CSS = `
 @keyframes tw-spin {
   to { transform: rotate(360deg); }
 }
+@keyframes tw-refresh-pulse {
+  50% { box-shadow: inset 0 3px 0 0 var(--tw-primary-container); }
+}
 
 /* A moving bar is decoration; the reader who asked for less motion still needs
    to see that something is running, so the animation stops and the
    indeterminate fill stays as a static band. */
 @media (prefers-reduced-motion: reduce) {
   [data-tw-type="ProgressBar"] > [data-tw-part="fill"],
-  [data-tw-type="Spinner"] {
+  [data-tw-type="Spinner"],
+  [data-tw-refresh][data-tw-refreshing="true"],
+  [data-tw-type="RefreshControl"][data-tw-refreshing="true"] > [data-tw-part="spinner"] {
     animation: none;
     transition: none;
   }

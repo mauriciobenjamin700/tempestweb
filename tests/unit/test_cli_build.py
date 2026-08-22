@@ -486,3 +486,24 @@ def test_build_unrunnable_project_raises(tmp_path: Path) -> None:
     (root / "app.py").write_text("def broken( =", encoding="utf-8")
     with pytest.raises(BuildError, match="failed to build"):
         build_artifact(root, mode="wasm")
+
+
+@pytest.mark.parametrize("mode", ["wasm", "server", "transpile"])
+def test_every_artifact_links_a_tab_icon(tmp_path: Path, mode: str) -> None:
+    """Every shell links `rel="icon"`, and ships the file it points at.
+
+    A browser does not read the manifest for the tab icon: with no ``rel="icon"``
+    it probes ``/favicon.ico``. Mode B answers that with a route and Mode A links
+    a PWA icon, but Mode C linked only ``apple-touch-icon`` — so every load of a
+    static bundle opened the console with a 404 nobody can act on.
+    """
+    root = _project(tmp_path)
+    out = build_artifact(root, mode=mode).out_dir
+    html = (out / "index.html").read_text(encoding="utf-8")
+
+    assert 'rel="icon"' in html, f"the {mode} shell links no tab icon"
+    start = html.index('rel="icon"')
+    href = html[start:].split('href="', 1)[1].split('"', 1)[0]
+    assert (out / href.removeprefix("./")).is_file(), (
+        f"{href} is linked but not shipped"
+    )

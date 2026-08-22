@@ -22,7 +22,17 @@ import {
 } from "../../client/transpile/widgets.js";
 import { mountApp, State } from "../../client/transpile/runtime.js";
 import * as widgets from "../../client/transpile/widgets.gen.js";
-import { HStack, VStack } from "../../client/transpile/components.js";
+import {
+  AppBar,
+  Card,
+  Chip,
+  Divider,
+  HStack,
+  RadioGroup,
+  Scaffold,
+  SegmentedControl,
+  VStack,
+} from "../../client/transpile/components.js";
 import { native, NativeError } from "../../client/transpile/native.js";
 import { makeState, view } from "../../client/transpile/counter.gen.js";
 
@@ -104,12 +114,81 @@ test("HStack/VStack expand to Row/Column matching the core (order-agnostic)", ()
     props: n.props,
     children: (n.children ?? []).map(drop),
   });
+  const child = () => Text({ content: "a", key: "a" });
+  const noop = () => {};
   const cases = {
-    hstack_default: HStack({ children: [Text({ content: "a", key: "a" })] }),
+    hstack_default: HStack({ children: [child()] }),
     hstack_lg_between: HStack({ gap: "lg", justify: "space-between" }),
     hstack_float: HStack({ gap: 8.0 }),
-    vstack_sm: VStack({ children: [Text({ content: "a", key: "a" })], gap: "sm" }),
-    vstack_start: VStack({ children: [Text({ content: "a", key: "a" })], align: "start" }),
+    vstack_sm: VStack({ children: [child()], gap: "sm" }),
+    vstack_start: VStack({ children: [child()], align: "start" }),
+    card_default: Card({ children: [child()] }),
+    card_filled_primary: Card({ children: [child()], variant: "filled", colorScheme: "primary" }),
+    card_outlined_error_flat: Card({
+      children: [child()],
+      variant: "outlined",
+      colorScheme: "error",
+      elevation: 0,
+    }),
+    card_elevated_level_4: Card({ children: [child()], elevation: 4 }),
+    card_steps: Card({
+      children: [child()],
+      paddingStep: "lg",
+      radiusStep: "xl",
+      gapStep: "none",
+    }),
+    divider_default: Divider(),
+    divider_token_thickness: Divider({ thickness: "xs" }),
+    divider_tinted: Divider({ colorScheme: "primary" }),
+    chip_static: Chip({ label: "tag" }),
+    chip_selected: Chip({ label: "tag", selected: true }),
+    chip_clickable_lg_success: Chip({
+      label: "tag",
+      onClick: noop,
+      size: "lg",
+      colorScheme: "success",
+    }),
+    segmented_default: SegmentedControl({ options: ["a", "b"], onSelect: noop }),
+    segmented_second_lg: SegmentedControl({
+      options: ["a", "b", "c"],
+      selected: 1,
+      onSelect: noop,
+      size: "lg",
+    }),
+    segmented_secondary: SegmentedControl({
+      options: ["a"],
+      onSelect: noop,
+      colorScheme: "secondary",
+    }),
+    appbar_title_only: AppBar({ title: "Home" }),
+    appbar_filled_with_slots: AppBar({
+      title: "Home",
+      variant: "filled",
+      leading: Button({ label: "<", onClick: noop, key: "back" }),
+      actions: [Button({ label: "+", onClick: noop, key: "add" })],
+    }),
+    appbar_outlined_primary_level_2: AppBar({
+      title: "Home",
+      variant: "outlined",
+      colorScheme: "primary",
+      elevation: 2,
+    }),
+    radio_default: RadioGroup({ options: ["a", "b"], onSelect: noop }),
+    radio_second_sm_warning: RadioGroup({
+      options: ["a", "b"],
+      selected: 1,
+      onSelect: noop,
+      size: "sm",
+      colorScheme: "warning",
+    }),
+    scaffold_body_only: Scaffold({ body: child() }),
+    scaffold_full: Scaffold({
+      appBar: AppBar({ title: "Home" }),
+      body: child(),
+      bottomBar: Divider(),
+    }),
+    scaffold_scroll: Scaffold({ body: child(), scroll: true }),
+    scaffold_empty: Scaffold(),
   };
   for (const [name, built] of Object.entries(cases)) {
     // diff() ignores prop key order, so an empty diff means the trees are equal.

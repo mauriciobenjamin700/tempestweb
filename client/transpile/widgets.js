@@ -22,5 +22,18 @@ export * from "./widgets.gen.js";
 // the builders are: python -m tests.conformance._transpile_values.
 export * from "./values.gen.js";
 
-// Ergonomic layout components (the portable subset of tempest_core.components).
-export { HStack, VStack } from "./components.js";
+// The ported subset of tempest_core.components: the ergonomic layout aliases plus
+// the compositional components whose tree does not depend on the data they are
+// handed. Each one is parity-pinned against the real core (see
+// tests/fixtures/transpile_component_samples.json).
+export {
+  AppBar,
+  Card,
+  Chip,
+  Divider,
+  HStack,
+  RadioGroup,
+  Scaffold,
+  SegmentedControl,
+  VStack,
+} from "./components.js";

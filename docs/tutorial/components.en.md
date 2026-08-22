@@ -199,6 +199,16 @@ function:
 | **Charts** | `BarChart` · `LineChart` · `ChartSeries` | tempest-core |
 | **Vision** | `DetectionBox` · `DetectionOverlay` · `ConfidenceBadge` · `ResultView` · `confidence_scheme` | tempest-core |
 
+!!! warning "Two instances of the same component on one screen collide"
+    `SegmentedControl` and `RadioGroup` key their own children with a fixed name
+    (`seg-0`, `radio-0`, …), unscoped by the component's key. Since an event is
+    routed **by key**, two instances on one screen fight over the same name:
+    Python resolves the **first** match and Mode C the **last** — so a click on
+    one control moves the other. This is a `tempest-core` defect
+    (`SegmentedControl.render`), not your app's, and it holds in all three modes.
+    Until it is fixed there, keep one per screen or build the control from
+    `Button`s with a key of your own per segment.
+
 !!! tip "Field vs Input"
     The pair exists on purpose: the **`*Input`** (from the core) is the low-level
     primitive; the **`*Field`** (tempestweb-native, for email/password/BR) is the

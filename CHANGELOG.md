@@ -4,6 +4,48 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.81.0] — 2026-08-22
+
+### Added
+
+- **Os componentes estruturais do core rodam em Modo C:** `Card`, `AppBar`,
+  `Scaffold`, `Divider`, `Chip`, `SegmentedControl` e `RadioGroup` (os aliases
+  `HStack`/`VStack` já rodavam). A composição de cada um foi reescrita em
+  `client/transpile/components.js` e o *resultado* dos resolvedores de estilo do
+  core viaja em tabela gerada (`client/transpile/component-styles.gen.js`) — os
+  resolvedores são puros, então a saída deles pode ser tabelada, o mesmo truque
+  que `widget-styles.gen.js` usa pelos widgets. A tabela é esparsa (só o campo que
+  o resolvedor setou; o `Style()` do JS preenche o resto), o que a mantém em
+  ~160 KB em vez de 412 KB.
+- **Fixture de paridade com matriz.** `transpile_component_samples.json` passou de
+  5 para 28 casos, construídos do core **real** e cobrindo, por componente, os
+  eixos que mudam o estilo resolvido: variante, esquema de cor, tamanho,
+  elevação, os passos de token e a presença de cada slot opcional. Um caso por
+  componente fixaria o caminho felizardo e deixaria todo o resto driftar em
+  silêncio.
+- `Edge.symmetric` no cliente do Modo C (o `Edge` só tinha `all`).
+
+### Fixed
+
+- **Os 5 exemplos que o Modo C recusava por falta de nome voltaram a compilar** —
+  `a11y_demo`, `i18n-greeting`, `onboarding-carousel`, `search-autocomplete` e
+  `settings-panel`. Medido: 13 exemplos transpilam, **0 com import morto**.
+
+### Notas
+
+- **Defeito do `tempest-core` encontrado ao validar, não corrigido aqui:**
+  `SegmentedControl.render` nomeia os filhos com chave fixa (`seg-0`, `seg-1`, …)
+  sem prefixo da chave do componente, e `RadioGroup` faz o mesmo (`radio-N`). Como
+  o evento é roteado por chave, duas instâncias na mesma tela colidem — o Python
+  resolve para a **primeira** ocorrência (`_find_node_by_key` é depth-first e para
+  no primeiro match) e o Modo C para a **última**. Medido no `settings-panel`:
+  clicar "Light" no controle de tema muda a *qualidade* para "Medium". Vale nos
+  três modos; o conserto é no core (prefixar a chave do componente) e aí a fixture
+  regenera. Documentado em `docs/tutorial/components.md`.
+- Continua fora do Modo C o que é **dirigido por dados** (`DataTable`, `Tabs`,
+  `Accordion`, `BarChart`/`LineChart`, pickers de formulário): a árvore depende
+  dos dados recebidos, então não há composição fixa para portar.
+
 ## [0.80.0] — 2026-08-22
 
 ### Fixed

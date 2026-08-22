@@ -16,6 +16,7 @@ from pathlib import Path
 from tempestweb.cli.commands import build as build_cmd
 from tempestweb.transpile._served import SERVED_NAMES
 from tempestweb.transpile.codegen import _camel_name
+from tests.conformance import _transpile_component_styles as component_styles_gen
 from tests.conformance import _transpile_components as components_gen
 from tests.conformance import _transpile_served as served_gen
 from tests.conformance import _transpile_spacing as spacing_gen
@@ -227,3 +228,49 @@ def test_the_core_value_surface_is_served() -> None:
         "HOVER_OPACITY",
     ):
         assert name in SERVED_NAMES, f"{name} is not served by the Mode C client"
+
+
+def test_component_styles_module_matches_core() -> None:
+    """The committed component-styles.gen.js byte-matches a fresh render.
+
+    The ported components read their look from this table instead of running the
+    core's resolvers, so a drift here is a component that renders the wrong
+    surface in Mode C while Modes A and B render the right one.
+    """
+    on_disk = component_styles_gen.STYLES_MODULE.read_text(encoding="utf-8")
+    assert on_disk == component_styles_gen.render_module_text(), (
+        "component-styles.gen.js is stale — regenerate with "
+        "`python -m tests.conformance._transpile_component_styles`"
+    )
+
+
+def test_the_component_style_table_is_copied_into_the_artifact() -> None:
+    """A table nobody copies leaves every ported component unstyled at load."""
+    assert "component-styles.gen.js" in build_cmd._TRANSPILE_ASSETS
+
+
+def test_the_ported_components_are_served() -> None:
+    """A ported component must also be reachable, or the compiler refuses it."""
+    for name in (
+        "Card",
+        "Divider",
+        "Chip",
+        "SegmentedControl",
+        "AppBar",
+        "RadioGroup",
+        "Scaffold",
+        "HStack",
+        "VStack",
+    ):
+        assert name in SERVED_NAMES, f"{name} is ported but not served"
+
+
+def test_a_data_driven_component_is_still_out_of_scope() -> None:
+    """The components whose tree depends on their data stay refused.
+
+    Keeping this explicit is the point: ``DataTable`` and friends compose from
+    the rows they are handed, so there is no fixed tree to port — and a silent
+    admission here would be the dead-import bug all over again.
+    """
+    for name in ("DataTable", "Tabs", "LineChart", "BarChart", "Accordion"):
+        assert name not in SERVED_NAMES, f"{name} claims to be served"

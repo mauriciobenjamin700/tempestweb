@@ -272,6 +272,70 @@ by coming later.
     A variable nothing consumes looks thorough and is debt: the next reader
     has to go to the CSS to find out whether it does anything.
 
+## Declare the theme, and the host delivers it
+
+The snippet above builds the CSS by hand because that used to be the only way.
+There is a shorter one now, and it covers both halves: **declare `THEME` next to
+your `view`**.
+
+```python
+# app.py
+from dataclasses import dataclass
+
+from tempest_core import App, Theme, Widget
+from tempest_core.style import Color
+
+
+@dataclass
+class State:
+    """The app's state."""
+
+
+def make_state() -> State:
+    """Build the initial state."""
+    return State()
+
+
+def view(app: App[State]) -> Widget:
+    """Build the screen."""
+    ...
+
+
+#: The brand palette. The artifact reads it and delivers it to both ends.
+THEME: Theme = Theme.from_seed(seed=Color(r=39, g=58, b=79))
+```
+
+The generated artifact — Mode B's and Mode A's alike — passes that `THEME` to the
+app when it builds it, and that matters because **components resolve colour in
+Python**: a filled button carries its own fill as an inline style. A theme that
+never reaches the tree is a theme that never paints, however many tokens the page
+carries.
+
+The two ends the host covers:
+
+* **The tree** — the theme goes to the `App`, so every component is born with
+  your palette.
+* **The page** — the `--tw-*` tokens the base sheet reads. In Mode B they are
+  written into the `<head>` at render time; in Mode A the page is static and the
+  app only exists once Pyodide is up, so the CSS is injected at boot, before the
+  first mount.
+
+!!! warning "`Theme(primary=...)` is not the same as `Theme.from_seed(...)`"
+    A `Theme` carries a **token set** (`tokens`) plus a few loose convenience
+    fields (`primary`, `background`, …). **Components read the tokens.** Building
+    a theme by filling in only the loose fields leaves the whole tree on the
+    baseline palette — which was exactly the bug in the `theme-switcher` example,
+    whose buttons stayed purple while the swatch said teal. Use
+    `Theme.from_seed`, or build the `TokenSet` explicitly.
+
+!!! note "A runtime theme repaints components, not the page's tokens"
+    `app.set_theme(...)` rebuilds the tree, so everything that resolves colour in
+    Python follows immediately. The `--tw-*` tokens, though, are written once —
+    they follow the declared `THEME`. In practice: widget colours change, and the
+    states only the sheet can express (hover, focus) stay on the declared palette.
+    If runtime switching is the heart of your app, declare `THEME` with the
+    palette it opens on.
+
 ## Progress indicators
 
 `ProgressBar` and `Spinner` have no intrinsic size: with no stylesheet both

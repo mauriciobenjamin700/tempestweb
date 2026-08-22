@@ -4,6 +4,55 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.75.0] — 2026-08-22
+
+A paleta que um app declara agora chega aos componentes — nos dois modos Python.
+
+### Fixed
+
+- **O Modo A não tinha como receber tema nenhum** (issue #77, item 3). O
+  `AppSession` aceita `theme=` desde a 0.66.0 e o `WasmRuntime` não aceitava
+  nada: um app em Modo A renderizava botões roxos-baseline por construção, sem
+  caminho para a própria paleta. `WasmRuntime(..., theme=)` fecha isso, e
+  `bootstrap` o repassa.
+
+- **Os artefatos gerados ignoravam a paleta do app.** O `server.py` do Modo B
+  chamava `create_app(make_state, view, title=...)` e o `bootstrap.js` do Modo A
+  chamava `bootstrap(make_state(), view, ...)`, os dois sem tema — então
+  declarar uma paleta não tinha efeito. Ambos passam a ler `app.THEME` (opcional)
+  e entregá-la nas duas pontas: à árvore (componente resolve cor em **Python**) e
+  à página (os tokens `--tw-*` que a folha base lê). No Modo A a página é
+  estática e o app só existe depois do Pyodide, então o CSS vem do
+  `WasmAppHandle.theme_css()` e é injetado antes do primeiro mount.
+
+- **`examples/theme-switcher` mostrava botões roxos com accent teal.** A causa
+  não era o caminho do tema: um `Theme` carrega um **conjunto de tokens** e
+  alguns campos soltos de conveniência (`primary`, `background`, …), e os
+  componentes leem os tokens. O exemplo montava o tema preenchendo só os campos
+  soltos, então a árvore inteira ficava na paleta baseline. Passou a usar
+  `Theme.from_seed`. Medido em Chrome: escolher o swatch teal leva o botão de
+  `rgb(88, 71, 133)` para `rgb(28, 176, 163)`.
+
+### Added
+
+- **Convenção `THEME`**: um módulo de app que expõe `THEME: Theme` tem a paleta
+  entregue pelo host, sem configurar nada no artefato. `examples/theme-switcher`
+  declara a sua, então o Modo A abre já no azul da marca (medido:
+  `--tw-primary: #1c4ab0` e botão `rgb(28, 74, 176)` no primeiro paint, com o
+  `<style id="tw-app-theme">` presente).
+
+- **`tempestweb/html` entrou no bundle do Modo A**, porque é de lá que sai o
+  emissor de tokens de tema. Python puro sobre o core, nenhuma dependência nova;
+  o guard de fechamento do bundle (0.67.0) pegou a falta na hora.
+
+### Docs
+
+- A página de temas ganhou "Declare o tema, e o host o entrega" (PT + EN), com
+  os dois avisos que custam tempo: `Theme(primary=...)` **não** é
+  `Theme.from_seed(...)` (campo solto não é token, e é o token que pinta), e tema
+  trocado em runtime repinta os componentes mas não reescreve os tokens da
+  página.
+
 ## [0.74.0] — 2026-08-22
 
 Os gestos multi-ponteiro que o core declarava e o cliente nunca reconheceu.

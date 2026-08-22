@@ -86,8 +86,27 @@ test("refresh writes proportional spacer rules for the full item_count", () => {
   const sheet = dom.document.getElementById("tw-virt-styles");
   assert.ok(sheet, "stylesheet created");
   // before = start*extent = 40*20 = 800; after = (1000-40-30)*20 = 18600.
-  assert.match(sheet.textContent, /::before\{content:"";display:block;height:800px\}/);
-  assert.match(sheet.textContent, /::after\{content:"";display:block;height:18600px\}/);
+  assert.match(sheet.textContent, /::before\{content:"";display:block;flex:0 0 auto;height:800px\}/);
+  assert.match(sheet.textContent, /::after\{content:"";display:block;flex:0 0 auto;height:18600px\}/);
+});
+
+test("the spacers refuse to shrink, or the scrollbar describes only the window", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  lazyViewport(dom, { count: 200, windowSize: 30, start: 0, rendered: 30, h: 35 });
+  const v = installVirtualization(dom.root, transportNoop());
+  v.refresh();
+
+  // A lazy viewport is a flex container, so a spacer is a flex item: without
+  // flex:0 0 auto the browser shrinks it to nothing and the reserved 5950px
+  // never reach the scroll extent (measured in Chrome: scrollHeight stayed at
+  // 1050 — the 30 materialized rows — until the spacers stopped shrinking).
+  const rules = dom.document.getElementById("tw-virt-styles").textContent.split("\n");
+  assert.equal(rules.length, 2);
+  for (const rule of rules) {
+    assert.match(rule, /flex:0 0 auto/);
+  }
 });
 
 function transportNoop() {

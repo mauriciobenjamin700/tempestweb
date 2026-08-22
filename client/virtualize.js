@@ -9,7 +9,11 @@
 // Off-window space is reserved with `::before` / `::after` pseudo-elements on the
 // viewport (heights driven by an injected stylesheet), NOT child elements, so the
 // window items keep their patch-path indices (0..window_size-1). `::before` pushes
-// the window down to its true offset; `::after` stands in for the rows below.
+// the window down to its true offset; `::after` stands in for the rows below. Both
+// carry `flex:0 0 auto`, because a lazy viewport is a flex container: as flex items
+// the spacers would otherwise be shrunk away (measured: a 200-item list reserving
+// 5950px of `::after` still had scrollHeight 1050 — the materialized window and
+// nothing else), so the scrollbar described the window instead of the item_count.
 //
 // Lazy viewports are marked by dom.js with data-tw-item-count / -window-size /
 // -window-start. Scroll events do not bubble, so the listener is attached in the
@@ -104,8 +108,8 @@ export function installVirtualization(root, transport) {
           ? globalThis.CSS.escape(key)
           : key.replace(/["\\]/g, "\\$&");
       const sel = `[${LAZY_ATTR}][data-tw-key="${escaped}"]`;
-      rules.push(`${sel}::before{content:"";display:block;height:${before}px}`);
-      rules.push(`${sel}::after{content:"";display:block;height:${after}px}`);
+      rules.push(`${sel}::before{content:"";display:block;flex:0 0 auto;height:${before}px}`);
+      rules.push(`${sel}::after{content:"";display:block;flex:0 0 auto;height:${after}px}`);
     }
     sheet.textContent = rules.join("\n");
   };

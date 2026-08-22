@@ -25,6 +25,24 @@ versioning.
   testes que ele escreveu — modal empilhado devolvendo o teclado ao de baixo,
   controle escondido fora da ordem, e região editável como ponto de tabulação.
 
+## [0.77.0] — 2026-08-22
+
+### Changed
+
+- **Item de menu alinha o rótulo quando o menu tem ícones.** A 0.71.0 passou a
+  desenhar o `icon` do `MenuItem`, mas só nos itens que nomeiam um: o rótulo dos
+  demais começava uma largura de glifo à esquerda, o que lê como menu quebrado e
+  não como menu com alguns ícones. Agora, assim que **algum** item nomeia um
+  ícone, todos ganham o slot — vazio onde não há ícone —, e o rótulo leva o resto
+  da linha (`flex: 1 1 auto`), então rótulo longo quebra dentro do item em vez de
+  empurrar o glifo. Menu sem ícone nenhum não ganha slot.
+
+  Refinamento trazido do PR paralelo #86, que resolveu o mesmo item da #77 por
+  outro caminho: ficou a estrutura desta base (`data-tw-part="item-label"`, que é
+  o que o listener de seleção lê) com o comportamento de alinhamento de lá, mais
+  os quatro testes que ele escreveu — slot vazio, menu sem ícones, nome
+  desconhecido e clique sobre o glifo.
+
 ## [0.76.0] — 2026-08-22
 
 Os dois últimos handlers inertes: a câmera.

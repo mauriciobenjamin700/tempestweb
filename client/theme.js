@@ -349,11 +349,6 @@ export const BASE_THEME_CSS = `
   border-radius: 8px;
   cursor: pointer;
   min-height: 44px;
-}
-/* An item is a glyph plus a label, so it lays out as a row; the glyph inherits
-   the row's font size through the Icon registry's own "1em" default. */
-[data-tw-type="Menu"] > [data-tw-part="item"],
-[data-tw-type="ActionSheet"] > [data-tw-part="item"] {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -363,6 +358,12 @@ export const BASE_THEME_CSS = `
   flex: 0 0 auto;
   width: 18px;
   height: 18px;
+}
+/* The label takes the rest of the row, so a long one wraps inside the item
+   instead of pushing the glyph around. */
+[data-tw-type="Menu"] > [data-tw-part="item"] > [data-tw-part="item-label"],
+[data-tw-type="ActionSheet"] > [data-tw-part="item"] > [data-tw-part="item-label"] {
+  flex: 1 1 auto;
 }
 [data-tw-type="Menu"] > [data-tw-part="item"]:hover,
 [data-tw-type="ActionSheet"] > [data-tw-part="item"]:hover {

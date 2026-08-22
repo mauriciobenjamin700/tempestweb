@@ -6,7 +6,7 @@
 // transport-ws.js) implement the same `Transport` interface and plug in here
 // unchanged — the renderer and event capture are identical across both modes.
 
-import { applyPatches, buildElement } from "./dom.js";
+import { applyPatches, buildElement, repaintCanvases } from "./dom.js";
 import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
@@ -122,9 +122,10 @@ function applyTreePatches(tree, patches, mountRoot, onError) {
  * inline Style still overrides it — see theme.js). When the transport implements
  * `onNavigate` (Mode B, imperative navigation), it is mirrored onto the browser
  * URL; Mode A transports omit it (the bridge wires pushState directly), so that is
- * a no-op there. A frame is scheduled after mount and after each patch batch to
- * recompute the off-window scroll space of any virtualized list, once the browser
- * has laid the window out so item heights can be measured.
+ * a no-op there. A frame is scheduled after mount, after each patch batch and on
+ * window resize to recompute what only exists once the browser has laid out: a
+ * virtualized list's off-window scroll space, and each Canvas's pixel buffer,
+ * which is sized to the box layout gave it so a chart is not a stretched bitmap.
  *
  * @param {HTMLElement} root  The host element to mount into.
  * @param {import("./transport.js").Transport} transport  The patch/event seam.
@@ -159,7 +160,23 @@ export function mount(root, transport, initialNode = null) {
   if (typeof transport.onNavigate === "function") {
     transport.onNavigate((path) => router.navigateTo(path));
   }
-  scheduleFrame(virtualization.refresh);
+  /**
+   * Recompute what only exists after layout: a virtualized list's off-window
+   * scroll space, and every Canvas's pixel buffer (which is sized to the box the
+   * layout gave it, not to the widget's declared size).
+   * @returns {void}
+   */
+  const afterLayout = () => {
+    virtualization.refresh();
+    repaintCanvases(root);
+  };
+  scheduleFrame(afterLayout);
+
+  /** Resizing changes every Canvas's box, so their buffers are stale. */
+  const onResize = () => scheduleFrame(afterLayout);
+  if (typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener("resize", onResize);
+  }
 
   let resyncPending = false;
 
@@ -216,12 +233,15 @@ export function mount(root, transport, initialNode = null) {
     if (overlayPatches.length > 0) {
       applyPatches(overlayHost(), overlayPatches, onPatchFailure);
     }
-    scheduleFrame(virtualization.refresh);
+    scheduleFrame(afterLayout);
   });
 
   return {
     root,
     unmount() {
+      if (typeof globalThis.removeEventListener === "function") {
+        globalThis.removeEventListener("resize", onResize);
+      }
       unbind();
       virtualization.dispose();
       router.dispose();

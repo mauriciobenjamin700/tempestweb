@@ -52,6 +52,11 @@ const TAG_BY_TYPE = Object.freeze({
   // drag contract applied by applyDragProps + the listeners in events.js.
   Draggable: "div",
   DragTarget: "div",
+  // Overlay-layer widgets. They are boxes too; what makes them float is the
+  // base sheet (positioning + backdrop) plus the roles applyOverlayProps sets.
+  Dialog: "div",
+  BottomSheet: "div",
+  Toast: "div",
 });
 
 // Font stack for Canvas draw_text commands (a literal, since a 2D context cannot
@@ -133,9 +138,60 @@ function applyProps(el, props) {
   applyIndicatorProps(el, type, props);
   applyControlProps(el, type, props);
   applyDragProps(el, type, props);
+  applyOverlayProps(el, type, props);
   applyA11yProps(el, props);
   applyEscapeHatchAttrs(el, props);
   applyLazyProps(el, type, props);
+}
+
+/** Attribute holding a `Dialog`'s title, painted by the base sheet. */
+export const TITLE_ATTR = "data-tw-title";
+
+/**
+ * Apply the overlay-layer widgets' text and accessibility semantics.
+ *
+ * A scene's overlays are patched into a separate host (see `mount`), which the
+ * base sheet positions; these are the per-widget bits the sheet cannot do.
+ *
+ * A `Dialog`'s title is *not* one of its children — it is a prop — so it cannot
+ * be inserted as an element without shifting the indices every child patch is
+ * relative to. It goes onto {@link TITLE_ATTR}, which the sheet paints via
+ * `::before`, and onto `aria-label`, so a screen reader announces the dialog by
+ * its title rather than reading a decorative pseudo-element. A `Toast` carries
+ * no children at all, so its message is plain text content, and it announces
+ * itself politely — a toast that appeared silently would be invisible to a
+ * screen reader.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyOverlayProps(el, type, props) {
+  if (type === "Dialog") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "dialog");
+      el.setAttribute("aria-modal", "true");
+    }
+    if ("title" in props) {
+      const title = props.title;
+      setOrRemove(el, TITLE_ATTR, title === "" ? null : title);
+      setOrRemove(el, "aria-label", title === "" ? null : title);
+    }
+  } else if (type === "BottomSheet") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "dialog");
+      el.setAttribute("aria-modal", "true");
+    }
+  } else if (type === "Toast") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
+    }
+    if ("message" in props) {
+      el.textContent = props.message == null ? "" : String(props.message);
+    }
+  }
 }
 
 /** Attribute carrying a `Draggable`'s payload, read by the dragstart listener. */
@@ -514,6 +570,17 @@ function canvasColor(c) {
  * required. A no-op when the 2D context is unavailable (e.g. a jsdom harness
  * without canvas support).
  *
+ * **Buffer vs. display size.** A canvas has two sizes: the pixel buffer
+ * (`width`/`height`) and the box CSS gives it. Painting only the buffer at the
+ * widget's declared size left the browser to stretch that bitmap over whatever
+ * box the layout produced — a 320×200 chart blown up to 909×568 inside a card,
+ * every label soft and oversized. And on a HiDPI screen the same bitmap was
+ * stretched again by the device pixel ratio. So the buffer is sized to the box
+ * actually on screen (times the DPR) while the context is scaled to keep the
+ * app's declared coordinate system, which is what its draw commands are written
+ * in. Before layout — first paint, or a jsdom harness with no layout at all —
+ * the box is unknown (`clientWidth` is 0) and the declared size is used as-is.
+ *
  * @param {HTMLCanvasElement} el  The Canvas element.
  * @param {Object} props          Props that may include width/height/commands.
  * @returns {void}
@@ -528,17 +595,38 @@ function paintCanvas(el, props) {
   if ("commands" in props && Array.isArray(props.commands)) {
     el._twCanvasCmds = props.commands;
   }
-  if (el._twCanvasW != null) {
-    el.width = el._twCanvasW;
+  const declaredW = el._twCanvasW;
+  const declaredH = el._twCanvasH;
+  if (declaredW == null || declaredH == null) {
+    return;
   }
-  if (el._twCanvasH != null) {
-    el.height = el._twCanvasH;
+  // Defaults only, and only when the app's Style did not size the canvas: a
+  // canvas declares 320x200 but a flex parent's `align-items: stretch` (the CSS
+  // default) pulls it to the container's width, and the intrinsic aspect ratio
+  // drags the height along — a chart drawn for 320x200 was being blown up to
+  // 909x568, so every label came out 2.8x too large. Pinning the box to the
+  // declared size keeps the drawing at the scale the app designed it for; an
+  // app that wants a bigger canvas sets the size on the widget's Style, and the
+  // scaling below then maps its commands onto that box.
+  if (!el.style.width) {
+    el.style.width = `${declaredW}px`;
   }
+  if (!el.style.height) {
+    el.style.height = `${declaredH}px`;
+  }
+  const dpr = globalThis.devicePixelRatio || 1;
+  const displayW = el.clientWidth || declaredW;
+  const displayH = el.clientHeight || declaredH;
+  el.width = Math.round(displayW * dpr);
+  el.height = Math.round(displayH * dpr);
   const ctx = typeof el.getContext === "function" ? el.getContext("2d") : null;
   if (ctx == null) {
     return;
   }
-  ctx.clearRect(0, 0, el.width, el.height);
+  if (typeof ctx.setTransform === "function") {
+    ctx.setTransform((displayW * dpr) / declaredW, 0, 0, (displayH * dpr) / declaredH, 0, 0);
+  }
+  ctx.clearRect(0, 0, declaredW, declaredH);
   for (const cmd of el._twCanvasCmds ?? []) {
     switch (cmd.kind) {
       case "move_to":
@@ -627,6 +715,24 @@ function applyControlProps(el, type, props) {
     if ("alt" in props) {
       setOrRemove(el, "alt", props.alt);
     }
+  }
+}
+
+/**
+ * Repaint every Canvas under `root` at its current on-screen size.
+ *
+ * The first paint happens while the element is still detached, so it has no box
+ * to measure and falls back to the declared size; the same is true after the
+ * window resizes. Callers run this once layout exists (see `mount`), which is
+ * what keeps a chart sharp instead of a stretched bitmap.
+ *
+ * @param {HTMLElement} root  The mount root to search under.
+ * @returns {void}
+ */
+export function repaintCanvases(root) {
+  const canvases = root.querySelectorAll('[data-tw-type="Canvas"]');
+  for (const el of canvases) {
+    paintCanvas(/** @type {any} */ (el), {});
   }
 }
 

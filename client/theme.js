@@ -206,6 +206,101 @@ export const BASE_THEME_CSS = `
 [data-tw-scheme="info"] { --tw-indicator: var(--tw-info); }
 [data-tw-scheme="neutral"] { --tw-indicator: var(--tw-neutral); }
 
+/* ── Overlay layer: dialogs, sheets, toasts ────────────────────────────────
+   A scene is a root tree plus a z-ordered overlay layer, and mount() patches
+   the layer into its own host. The host used to be an unstyled <div> appended
+   after the tree, so "floating" overlays were not floating at all: a Dialog
+   rendered inline at the bottom of the page, in the flow, with no card and no
+   backdrop. These rules are what make the layer a layer.
+
+   The host itself is transparent to the pointer so it never swallows clicks on
+   the app behind it; each overlay takes the pointer back. */
+[data-tw-overlays] {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+[data-tw-overlays] > * { pointer-events: auto; }
+
+/* The scrim sits on the host, not on the dialog: a dialog is the card, and a
+   card cannot also be the full-viewport backdrop behind itself. */
+[data-tw-overlays]:has([data-tw-type="Dialog"])::before,
+[data-tw-overlays]:has([data-tw-type="BottomSheet"])::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+
+[data-tw-type="Dialog"] {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(280px, 90vw);
+  max-width: min(560px, 90vw);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 24px;
+  border-radius: 28px;
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+  box-shadow: var(--tw-elevation-2);
+  font-family: var(--tw-font);
+}
+
+/* A Dialog's title is a prop, not a child: inserting an element for it would
+   shift the indices every child patch is relative to. The sheet paints it, and
+   dom.js mirrors it to aria-label so it is announced, not just drawn. */
+[data-tw-type="Dialog"][data-tw-title]::before {
+  content: attr(data-tw-title);
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 500;
+  color: var(--tw-on-surface);
+}
+
+[data-tw-type="BottomSheet"] {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 80vh;
+  overflow: auto;
+  padding: 24px 24px 32px;
+  border-radius: 28px 28px 0 0;
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+  box-shadow: var(--tw-elevation-2);
+  font-family: var(--tw-font);
+}
+
+/* A toast is transient and never modal: no scrim, and it must not cover the
+   controls the user is still working with. */
+[data-tw-type="Toast"] {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: min(560px, 90vw);
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: var(--tw-on-surface);
+  color: var(--tw-surface);
+  box-shadow: var(--tw-elevation-2);
+  font-family: var(--tw-font);
+  font-size: 14px;
+  line-height: 20px;
+}
+
 @keyframes tw-progress-slide {
   0% { margin-inline-start: -40%; }
   100% { margin-inline-start: 100%; }

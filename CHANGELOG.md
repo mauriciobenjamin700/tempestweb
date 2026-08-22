@@ -4,6 +4,21 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.67.0] — 2026-08-21
+
+### Changed
+
+- **Piso `tempest-core>=0.12.0`**, onde o tema do `App` finalmente alcança os
+  componentes que a view constrói. As duas metades que a 0.66.0 entregou —
+  `theme_css` na página e `theme=` até o `App` — só pintam de verdade com
+  esse terceiro pedaço: o core instala o tema num `ContextVar` em volta da
+  chamada da view, e os campos `theme` dos componentes passam a nascer com
+  ele em vez de um baseline novo em folha.
+
+  Sem a 0.12.0, um app com paleta própria ainda desenhava botões roxos
+  sobre fundo rebrandeado — medido: `--tw-primary` ardósia no `:root` e o
+  botão computando `rgb(88, 71, 133)`.
+
 ## [0.66.0] — 2026-08-21
 
 Um app podia montar a própria paleta e não tinha como usá-la.

@@ -17,12 +17,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from tempest_core import App, Widget
+from pydantic import ValidationError
+
+from tempest_core import App, MediaQueryData, Widget
 from tempest_core.widgets.events import Event, EventValidationError, parse_event
 from tempestweb.runtime.routing import path_to_routes
 from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS
 
-__all__ = ["coerce_event", "apply_scroll", "apply_navigate"]
+__all__ = ["coerce_event", "apply_media", "apply_scroll", "apply_navigate"]
 
 
 def apply_navigate(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload
@@ -43,6 +45,37 @@ def apply_navigate(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wir
     path = payload.get("path")
     if isinstance(path, str) and path:
         app.reset(path_to_routes(path))
+
+
+def apply_media(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload
+    """Refresh the app's media-query snapshot from a ``media`` wire event.
+
+    The browser owns the viewport, so a responsive ``view`` — one that branches
+    on ``media.width`` or bounds a frame by ``media.height`` — is only correct
+    while ``App.media`` is current. The client reports a snapshot on mount and on
+    every resize / color-scheme change; this validates it into a
+    :class:`~tempest_core.MediaQueryData` and hands it to
+    ``App._update_media``, which records it and requests the coalesced rebuild.
+
+    Absent fields keep their defaults rather than failing, since the payload is
+    the browser's report and not every renderer knows every field (no browser
+    reports ``text_scale_factor`` today). A payload that is not a mapping, or
+    whose values do not validate, is ignored: a malformed resize must not take
+    down the event loop.
+
+    Args:
+        app: The application whose media snapshot to refresh.
+        payload: The wire payload, expected to carry the viewport fields.
+    """
+    if not isinstance(payload, dict):
+        return
+    fields = set(MediaQueryData.model_fields)
+    known = {name: value for name, value in payload.items() if name in fields}
+    try:
+        data = MediaQueryData(**known)
+    except ValidationError:
+        return
+    app._update_media(data)  # noqa: SLF001 — the renderer's half of the core's contract
 
 
 def apply_scroll(app: App[Any], key: str, payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload

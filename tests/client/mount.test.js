@@ -203,3 +203,55 @@ test("mount asks for a resync when a patch cannot be applied", () => {
   transport.push([{ path: [99], set_props: { content: "nope" } }]);
   assert.equal(resyncs, 2);
 });
+
+test("mount reports the viewport, so a responsive view sees a real width", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const hadWindow = "window" in globalThis;
+  const previous = globalThis.window;
+  globalThis.window = dom.window;
+  try {
+    const transport = mockTransport();
+    mount(dom.root, transport, fixture("node_initial.json"));
+
+    const reports = () => transport.events.filter((event) => event.type === "media");
+    assert.equal(reports().length, 1, "reported once on mount");
+    const first = reports()[0];
+    assert.equal(first.key, "", "media is app-wide, not a widget event");
+    assert.equal(first.payload.width, dom.window.innerWidth);
+    assert.equal(first.payload.height, dom.window.innerHeight);
+    assert.equal(typeof first.payload.orientation, "string");
+
+    dom.window.dispatchEvent(new dom.window.Event("resize"));
+    assert.equal(reports().length, 2, "and again on every resize");
+  } finally {
+    if (hadWindow) {
+      globalThis.window = previous;
+    } else {
+      delete globalThis.window;
+    }
+  }
+});
+
+test("unmount stops the viewport reporting", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const hadWindow = "window" in globalThis;
+  const previous = globalThis.window;
+  globalThis.window = dom.window;
+  try {
+    const transport = mockTransport();
+    const handle = mount(dom.root, transport, fixture("node_initial.json"));
+    handle.unmount();
+    const before = transport.events.length;
+
+    dom.window.dispatchEvent(new dom.window.Event("resize"));
+    assert.equal(transport.events.length, before);
+  } finally {
+    if (hadWindow) {
+      globalThis.window = previous;
+    } else {
+      delete globalThis.window;
+    }
+  }
+});

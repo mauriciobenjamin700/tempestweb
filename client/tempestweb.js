@@ -16,6 +16,7 @@ import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
 import { installListEvents } from "./lists.js";
+import { installMedia } from "./media.js";
 import { installBaseTheme } from "./theme.js";
 import { installVirtualization } from "./virtualize.js";
 
@@ -245,6 +246,14 @@ export function mount(root, transport, initialNode = null) {
     scheduleFrame(afterLayout);
   });
 
+  // Installed last, and deliberately: installMedia reports the viewport
+  // immediately, and in Mode C that report rebuilds the tree in-process. With no
+  // patch sink registered yet those patches were dropped while the runtime's own
+  // tree advanced — the DOM stayed at the pre-report render (measured: a Mode C
+  // app painted `0 x 0` until the first resize) and every later diff was
+  // computed against a tree the DOM did not have.
+  const media = installMedia(transport);
+
   return {
     root,
     unmount() {
@@ -254,6 +263,7 @@ export function mount(root, transport, initialNode = null) {
       unbind();
       virtualization.dispose();
       listEvents.dispose();
+      media.dispose();
       router.dispose();
       if (tree != null && tree.parentNode === root) {
         root.removeChild(tree);

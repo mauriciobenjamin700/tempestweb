@@ -35,7 +35,12 @@ from typing import Any, Generic, TypeVar
 from tempest_core import App, Node, Scene, Widget
 from tempest_core.core.ir import Patch
 from tempestweb.runtime.background import install_spawner
-from tempestweb.runtime.events import apply_navigate, apply_scroll, coerce_event
+from tempestweb.runtime.events import (
+    apply_media,
+    apply_navigate,
+    apply_scroll,
+    coerce_event,
+)
 from tempestweb.runtime.routing import route_to_path
 from tempestweb.transports.base import (
     Event,
@@ -348,6 +353,9 @@ class WasmRuntime(Generic[S]):
             return
         if event_type == "navigate":
             apply_navigate(self._app, event.get("payload", {}))
+            return
+        if event_type == "media":
+            apply_media(self._app, event.get("payload", {}))
             return
         entry = self._handlers.get(key)
         if entry is None:

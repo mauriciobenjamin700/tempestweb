@@ -34,6 +34,7 @@ from tempestweb.cli.config import VALID_MODES, ProjectConfig, WasmConfig, load_c
 from tempestweb.cli.loader import load_app, render_initial_tree
 from tempestweb.core.constants import WASM_PACKAGE_ARCHIVE, WASM_PYODIDE_VERSION
 from tempestweb.pwa import (
+    IconSpec,
     ManifestOptions,
     emit_icons,
     pyodide_cdn_base,
@@ -177,11 +178,22 @@ _OFFLINE_ASSETS: tuple[str, ...] = (
 # alongside (see :func:`_zip_package`).
 _WASM_PACKAGE_PARTS: tuple[str, ...] = (
     "__init__.py",
+    # Shared constants (SSE/native-call defaults) the runtime and native layers
+    # import. Left out, the artifact booted as far as `import app` and then died
+    # on `No module named 'tempestweb.core'` — a browser-only failure no Python
+    # test could see, since the test process has the whole package installed.
+    "core",
     "runtime",
     "transports",
     "native",
     "components",
 )
+
+#: The single icon a Mode B artifact emits, purely so the tab has a favicon (the
+#: server artifact is not a PWA: no manifest, no service worker). It sits beside
+#: the client rather than under ``static/icons/``, which holds the *icon widget's*
+#: JS modules.
+_SERVER_FAVICON: IconSpec = IconSpec("favicon.png", 192)
 
 # PWA assets emitted into every artifact (manifest + service worker + icons).
 _PWA_ICON_FILES: tuple[str, ...] = (
@@ -237,6 +249,7 @@ SERVER_ARTIFACT_FILES: tuple[str, ...] = (
     "static/pwa/install-prompt.js",
     "static/pwa/connectivity-banner.js",
     "static/pwa/post-install-redirect.js",
+    "static/favicon.png",
 )
 
 # Files a transpile artifact must contain, relative to the artifact root. No
@@ -792,6 +805,7 @@ def _index_html(
     <title>{name}</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="{theme_color}" />
+    <link rel="icon" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />{script_tags}
   </head>
   <body>
@@ -965,6 +979,7 @@ def _index_html_server(name: str) -> str:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
+    <link rel="icon" href="./static/favicon.png" />
   </head>
   <body>
     <div id="app"></div>
@@ -1340,6 +1355,10 @@ def _build_server(
     (out / "index.html").write_text(_index_html_server(name), encoding="utf-8")
     _copy_client(client, out / "static", "transport-ws.js", "transport-sse.js")
     _copy_client_extras(client, out / "static")
+    # A tab icon, from the same generator the PWA modes use. Without it the
+    # browser asks for /favicon.ico on every load, the artifact answers 404, and
+    # every deployment's console opens with an error it cannot do anything about.
+    emit_icons(out / "static", (_SERVER_FAVICON,))
     return tuple(sorted(SERVER_ARTIFACT_FILES))
 
 

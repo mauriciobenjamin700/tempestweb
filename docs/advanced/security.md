@@ -9,6 +9,12 @@
 Por padrão o `create_app(state_factory, view)` é **aberto**: qualquer cliente
 conecta. Para produção, passe um `SecurityConfig`.
 
+!!! warning "O host aberto avisa no log"
+    Sem `SecurityConfig`, o servidor registra um `WARNING` dizendo exatamente o
+    que está desligado — sem auth, sem allowlist de origem (então **qualquer
+    site** abre um WebSocket para o seu host) e sem limites. É o default certo
+    para `tempestweb dev` e o errado para chegar em produção sem ninguém notar.
+
 ```python
 from tempestweb.server import create_app, SecurityConfig, token_authenticator
 
@@ -37,6 +43,7 @@ Ele recebe um `Credentials`:
 | `origin` | header `Origin` |
 | `headers` | headers (chaves minúsculas) |
 | `query` | parâmetros de query |
+| `client_ip` | endereço do peer — ou do `X-Forwarded-For`, se `trusted_proxies` permitir |
 
 Dois builders prontos:
 
@@ -72,6 +79,11 @@ header `Origin` no upgrade do WebSocket — que o CORS do browser **não** prote
 `verify_jwt(token, key)` valida **assinatura e expiração** e devolve os claims —
 diferente de `observability.auth.decode_jwt`, que só lê os claims (client-side).
 
+O claim `exp` é **obrigatório**: o PyJWT só confere uma expiração que existe, e um
+token emitido sem `exp` seria aceito para sempre — o que não é "validar a
+expiração". Para um token cuja vida outra coisa limita, passe
+`require_expiry=False` (em `verify_jwt` e em `jwt_authenticator`).
+
 ```python
 from tempestweb.server import verify_jwt, jwt_authenticator
 
@@ -95,6 +107,7 @@ SecurityConfig(
     max_message_bytes=65536,         # rejeita POST SSE maior que isso (413)
     max_connections_per_minute=60,   # flood de conexões por IP (1013/429)
     max_events_per_minute=600,       # flood de envelopes por IP (1013/429)
+    trusted_proxies=["10.0.0.1"],    # de quem o X-Forwarded-For pode ser lido
 )
 ```
 
@@ -103,14 +116,61 @@ SecurityConfig(
 - **`max_message_bytes`** — um `POST /sse/{id}` com corpo maior responde `413`. O
   teto é conferido **enquanto o corpo é lido**, não só no `Content-Length` — um
   POST com `Transfer-Encoding: chunked` não declara tamanho e antes passava reto.
-- **`max_connections_per_minute`** — janela deslizante de 60s por IP (do
-  `X-Forwarded-For` ou peer); flood é recusado (WS `1013` / SSE `429`).
+- **`max_connections_per_minute`** — janela deslizante de 60s por IP; flood é
+  recusado (WS `1013` / SSE `429`). O IP vem do **peer do socket**, a menos que
+  `trusted_proxies` diga o contrário (abaixo).
+- **`trusted_proxies`** — de quais peers o `X-Forwarded-For` pode ser acreditado.
+  `None` (default) **ignora** o header; `["*"]` confia em qualquer peer; uma lista
+  de endereços confia só neles.
 - **`max_events_per_minute`** — a mesma janela, mas contando **envelopes de
   entrada** (cliques, input, `native_result`) nas duas pernas: `POST /sse/{id}`
   acima do teto responde `429`, e um frame de WebSocket acima do teto fecha o
   socket com `1013`. É um knob separado porque as ordens de grandeza diferem: uma
   conexão por cliente, mas um envelope por interação. Dimensione acima do pico
   legítimo do seu app — sem ele, uma conexão já aceita envia sem limite.
+
+!!! danger "`X-Forwarded-For` é dado do cliente"
+    Todo limite por IP só vale se o IP não for escolhido por quem está sendo
+    limitado. O header é enviado pelo cliente: acreditar nele sem condição faz
+    cada requisição parecer um cliente novo, e o limite nunca dispara — contra um
+    teto de 3 conexões/minuto, 8 conexões com um `X-Forwarded-For` forjado por
+    request passavam todas.
+
+    Com `trusted_proxies`, o header é lido **da direita para a esquerda**: um
+    proxy anexa o endereço que ele viu, então o hop mais à direita que não é um
+    proxy declarado é o mais distante de que este deploy pode dar fé — o que o
+    cliente prependou fica à esquerda e é ignorado.
+
+    ```python
+    # atrás de um nginx em 10.0.0.1
+    SecurityConfig(trusted_proxies=["10.0.0.1"], max_connections_per_minute=60)
+    ```
+
+## Sessões SSE: o `session` na URL não autoriza nada
+
+A perna SSE se divide em `GET /sse?session=<id>` (stream) e `POST /sse/<id>`
+(eventos), e o `id` é escolhido pelo cliente. Ele identifica a sessão; **não**
+prova quem pode usá-la. Quem apenas conhecesse o `id` leria o stream de patches
+da vítima — que é o estado renderizado da tela dela — e postaria eventos na
+sessão dela.
+
+Por isso o `GET` que **materializa** a sessão grava a impressão digital de quem a
+abriu — o token de auth quando o host autentica, o endereço do cliente quando
+não — e todo `GET`/`POST` posterior naquele `id` precisa casar, ou responde
+`403`.
+
+- **Reabrir o stream é um takeover:** o stream mais novo passa a ser o dono; o que
+  ele substituiu não pode mais derrubar a sessão. Isso é o caso normal de
+  reconexão — a rede cai, o cliente reconecta, e só depois a resposta antiga
+  termina de desmontar no servidor.
+- **Gap no replay vira resync:** se o `Last-Event-ID` aponta para um tick que o
+  buffer já descartou, o servidor manda a cena inteira (um Replace na raiz) antes
+  de retomar, em vez de patches relativos a índice que não encaixam mais.
+
+!!! tip "Escolha um `session` imprevisível"
+    A posse protege o conteúdo, mas o `id` ainda viaja numa URL (logs, referer,
+    histórico). Gere-o com `crypto.randomUUID()` — nunca um contador ou o id do
+    usuário.
 
 !!! note "Conexões mortas + ociosas"
     Conexão WS **morta/meio-aberta** já é ceifada pelo ping do uvicorn (~20–40s),

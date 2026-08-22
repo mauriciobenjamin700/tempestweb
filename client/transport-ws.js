@@ -364,6 +364,19 @@ export function createWebSocketTransport(url, options = {}) {
       send({ kind: "event", data: event });
     },
 
+    /**
+     * Ask the server to re-send the whole scene.
+     *
+     * The DOM is only correct while every patch has applied in order, so a batch
+     * the renderer could not apply leaves a tree no later index-relative patch
+     * fits. This asks for one root replace to start from instead.
+     *
+     * @returns {void}
+     */
+    requestResync() {
+      send({ kind: "event", data: { type: "resync", key: "" } });
+    },
+
     sendNativeResult,
 
     ready,

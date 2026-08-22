@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import hmac
 import time
-from collections import defaultdict, deque
+from collections import deque
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -33,6 +33,7 @@ __all__ = [
     "RateLimiter",
     "SecurityConfig",
     "jwt_authenticator",
+    "resolve_client_ip",
     "token_authenticator",
     "verify_jwt",
 ]
@@ -69,6 +70,13 @@ class SecurityConfig:
         authenticate: Run on every WS upgrade / SSE request before a session is
             created; a falsy return or a raised error rejects the connection.
             ``None`` (default) leaves the host open — dev only.
+        trusted_proxies: Peer addresses whose ``X-Forwarded-For`` header may be
+            believed — the reverse proxies actually in front of this host, or
+            ``["*"]`` to trust every peer. ``None`` (default) ignores the header
+            entirely and uses the socket's peer address, because a client can put
+            anything in it: with the header trusted unconditionally, a flood needs
+            only a fresh fake value per request to be counted as a fresh client,
+            which defeats every per-IP limit below.
         allowed_origins: If set, the exact ``Origin`` values allowed to connect
             (installs CORS for HTTP/SSE and checks the WS upgrade). ``["*"]``
             allows any origin (CORS wildcard; the WS check is skipped).
@@ -79,8 +87,9 @@ class SecurityConfig:
             bytes with ``413`` (S2). ``None`` = unbounded.
         max_connections_per_minute: Per-client-IP cap on new connections in a
             rolling 60s window; a flood is refused (WS ``1013`` / SSE ``429``).
-            The IP is taken from ``X-Forwarded-For`` (first hop) or the peer
-            address. ``None`` = no per-IP limit (S2). Pair with a reverse-proxy
+            The address comes from the socket's peer, or from
+            ``X-Forwarded-For`` when ``trusted_proxies`` says the header may be
+            believed. ``None`` = no per-IP limit (S2). Pair with a reverse-proxy
             limiter for defense in depth.
         max_events_per_minute: Per-client-IP cap on *inbound envelopes* in a
             rolling 60s window — clicks, input, ``native_result`` frames — counted
@@ -101,6 +110,7 @@ class SecurityConfig:
     """
 
     authenticate: Authenticate | None = None
+    trusted_proxies: list[str] | None = field(default=None)
     allowed_origins: list[str] | None = field(default=None)
     max_connections: int | None = None
     max_message_bytes: int | None = None
@@ -152,6 +162,47 @@ class SecurityConfig:
         return origin in self.allowed_origins
 
 
+def resolve_client_ip(
+    headers: Mapping[str, str],
+    peer: str | None,
+    trusted_proxies: list[str] | None,
+) -> str | None:
+    """Resolve the address a per-IP limit should be charged to.
+
+    ``X-Forwarded-For`` is client-supplied data. It is read only when the peer is
+    a proxy the deployment declared trustworthy, and then from the **right**: a
+    proxy appends the address it saw, so the right-most entry that is not itself
+    a trusted proxy is the furthest hop this deployment can actually vouch for.
+    Anything the client prepended sits to the left of that and is ignored.
+
+    Args:
+        headers: The request headers (lower-cased keys).
+        peer: The socket's peer address, if known.
+        trusted_proxies: Peer addresses whose header may be believed, ``["*"]``
+            for any peer, or ``None`` to ignore the header.
+
+    Returns:
+        The resolved client address, or ``None`` when nothing is known.
+    """
+    if not trusted_proxies:
+        return peer
+    wildcard = "*" in trusted_proxies
+    if not wildcard and peer not in trusted_proxies:
+        return peer
+    forwarded = headers.get("x-forwarded-for")
+    if not forwarded:
+        return peer
+    hops = [hop.strip() for hop in forwarded.split(",") if hop.strip()]
+    if not hops:
+        return peer
+    if wildcard:
+        return hops[0]
+    for hop in reversed(hops):
+        if hop not in trusted_proxies:
+            return hop
+    return peer
+
+
 def _bearer_token(headers: Mapping[str, str], query: Mapping[str, str]) -> str | None:
     """Extract a bearer token from an ``Authorization`` header or ``?token=``."""
     auth = headers.get("authorization")
@@ -168,6 +219,7 @@ def verify_jwt(
     algorithms: tuple[str, ...] = ("HS256",),
     audience: str | None = None,
     issuer: str | None = None,
+    require_expiry: bool = True,
 ) -> dict[str, Any]:
     """Verify a JWT's signature and expiry, returning its claims.
 
@@ -180,13 +232,19 @@ def verify_jwt(
         algorithms: Accepted signing algorithms.
         audience: Expected ``aud`` claim, if any.
         issuer: Expected ``iss`` claim, if any.
+        require_expiry: Refuse a token that carries no ``exp`` claim. PyJWT only
+            checks an expiry that is *present*, so without this a token minted
+            without ``exp`` is accepted forever — which is not what "verifies
+            the expiry" can mean. Set ``False`` only for a token whose lifetime
+            something else bounds.
 
     Returns:
         The verified claims.
 
     Raises:
         RuntimeError: If PyJWT is not installed.
-        ValueError: If the token is invalid, expired, or fails a claim check.
+        ValueError: If the token is invalid, expired, missing a required claim,
+            or fails a claim check.
     """
     try:
         import jwt  # type: ignore[import-not-found]  # optional [auth] extra
@@ -195,6 +253,7 @@ def verify_jwt(
             "PyJWT is required for verify_jwt; install "
             'tempest-fastapi-sdk[auth] or "pyjwt".'
         ) from exc
+    required: list[str] = ["exp"] if require_expiry else []
     try:
         return dict(
             jwt.decode(
@@ -203,6 +262,7 @@ def verify_jwt(
                 algorithms=list(algorithms),
                 audience=audience,
                 issuer=issuer,
+                options={"require": required},
             )
         )
     except jwt.PyJWTError as exc:
@@ -215,6 +275,7 @@ def jwt_authenticator(
     algorithms: tuple[str, ...] = ("HS256",),
     audience: str | None = None,
     issuer: str | None = None,
+    require_expiry: bool = True,
 ) -> Authenticate:
     """Build an ``authenticate`` callable that verifies a bearer JWT (S3).
 
@@ -223,6 +284,8 @@ def jwt_authenticator(
         algorithms: Accepted signing algorithms.
         audience: Expected ``aud`` claim, if any.
         issuer: Expected ``iss`` claim, if any.
+        require_expiry: Refuse a token with no ``exp`` claim (see
+            :func:`verify_jwt`).
 
     Returns:
         A predicate that accepts a connection with a valid, unexpired JWT.
@@ -252,6 +315,7 @@ def jwt_authenticator(
                 algorithms=algorithms,
                 audience=audience,
                 issuer=issuer,
+                require_expiry=require_expiry,
             )
         except (ValueError, RuntimeError):
             return False
@@ -299,21 +363,36 @@ def token_authenticator(secret: str) -> Authenticate:
 class RateLimiter:
     """A per-key rolling-window rate limiter (S2 — per-IP connection flood).
 
-    Allows at most ``limit`` events per ``window`` seconds per key. Timestamps
-    are pruned on access; empty buckets are dropped so the map does not grow
-    unboundedly. Uses a monotonic clock; not shared across processes (per-worker).
+    Allows at most ``limit`` events per ``window`` seconds per key. A key's own
+    timestamps are pruned when it is touched, and every ``sweep_every`` calls the
+    whole map is swept for keys that have gone quiet — without that sweep the map
+    keeps one entry per address ever seen, which is memory a flood of distinct
+    (or forged) addresses can grow at will. Uses a monotonic clock; not shared
+    across processes (per-worker).
     """
 
-    def __init__(self, limit: int, *, window: float = 60.0) -> None:
+    #: Calls between full sweeps of the map for keys whose window has passed.
+    DEFAULT_SWEEP_EVERY: int = 256
+
+    def __init__(
+        self,
+        limit: int,
+        *,
+        window: float = 60.0,
+        sweep_every: int = DEFAULT_SWEEP_EVERY,
+    ) -> None:
         """Initialize the limiter.
 
         Args:
             limit: Max events allowed per key within ``window``.
             window: The rolling window in seconds.
+            sweep_every: How many calls between full sweeps for quiet keys.
         """
         self._limit: int = limit
         self._window: float = window
-        self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._sweep_every: int = max(1, sweep_every)
+        self._calls: int = 0
+        self._hits: dict[str, deque[float]] = {}
 
     def allow(self, key: str, *, now: float | None = None) -> bool:
         """Record an event for ``key`` and report whether it is within the limit.
@@ -326,13 +405,33 @@ class RateLimiter:
             ``True`` if the event is allowed, ``False`` if it exceeds the limit.
         """
         current = time.monotonic() if now is None else now
+        self._calls += 1
+        if self._calls % self._sweep_every == 0:
+            self._sweep(current)
         cutoff = current - self._window
-        bucket = self._hits[key]
+        bucket = self._hits.get(key)
+        if bucket is None:
+            bucket = self._hits[key] = deque()
         while bucket and bucket[0] <= cutoff:
             bucket.popleft()
         if len(bucket) >= self._limit:
-            if not bucket:
-                del self._hits[key]
             return False
         bucket.append(current)
         return True
+
+    def _sweep(self, now: float) -> None:
+        """Drop every key whose most recent event has fallen out of the window.
+
+        Args:
+            now: The current monotonic time.
+        """
+        cutoff = now - self._window
+        stale = [
+            key for key, hits in self._hits.items() if not hits or hits[-1] <= cutoff
+        ]
+        for key in stale:
+            del self._hits[key]
+
+    def tracked_keys(self) -> int:
+        """How many keys the limiter currently holds state for."""
+        return len(self._hits)

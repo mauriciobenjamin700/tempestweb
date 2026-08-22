@@ -99,6 +99,21 @@ def test_invalid_attr_key_raises(bad_key: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "handler_key", ["onclick", "onerror", "ONLOAD", "onmouseover", "onfocus"]
+)
+def test_inline_event_handler_attr_raises(handler_key: str) -> None:
+    """An ``on*`` attribute is script, which escaping cannot make safe.
+
+    ``attrs`` is an escape hatch for markup the app owns. A widget built from
+    data the app did not write (a row label, a remote field) must not be able to
+    ship executable code into the page; the DOM renderer refuses the same names,
+    so a tree behaves the same whichever renderer draws it.
+    """
+    with pytest.raises(ValueError, match="inline event-handler attribute"):
+        render_to_html(Container(attrs={handler_key: "alert(1)"}))
+
+
+@pytest.mark.parametrize(
     "ok_key", ["id", "data-x", "hx-get", "aria-label", "x:y", "a_b"]
 )
 def test_valid_attr_keys_are_accepted(ok_key: str) -> None:

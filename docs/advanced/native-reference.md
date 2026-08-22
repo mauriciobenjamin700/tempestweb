@@ -47,6 +47,17 @@ Há **dois** formatos de capacidade, e você sabe qual é pela forma como consom
     As capacidades de stream correm sobre o **canal de eventos nativo (T-EV)** —
     veja o [tutorial do canal de eventos](native-events.md).
 
+!!! info "No Modo B a chamada tem prazo"
+    No Modo A a capacidade roda no mesmo processo. No Modo B ela é **proxiada**:
+    o servidor manda um `native_call` e espera o `native_result` do browser. Uma
+    aba fechada no meio, ou uma capacidade que quebrou antes de responder,
+    deixaria esse `await` suspenso para sempre — então ele falha com
+    `NativeError("timeout")` depois de
+    `DEFAULT_NATIVE_CALL_TIMEOUT` (30s), tempo de sobra para um prompt de
+    permissão ou um seletor de arquivo. Trate `timeout` como qualquer outro código
+    de erro; para mudar o prazo, construa a sessão com um
+    `ProxyBridge(send_frame, timeout=...)`.
+
 !!! warning "Contexto seguro e só-Chromium"
     Muitas capacidades exigem **HTTPS** (ou `localhost`) e algumas só existem no
     **Chromium** (Chrome/Edge). Cada grupo de risco expõe um `is_supported()` para

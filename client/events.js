@@ -6,12 +6,22 @@
 // reading the widget key from the `data-tw-key` attribute set by dom.js. It maps
 // the DOM events click/input/change/submit onto the TWEvent shape in transport.js.
 // Delegation means a single listener per event type survives patch churn (children
-// are added/removed/replaced without rebinding).
+// are added/removed/replaced without rebinding). The same delegation carries the
+// HTML5 drag contract: a `Draggable`'s dragstart puts its payload on the
+// dataTransfer and emits `drag`, and a `DragTarget`'s drop emits `drop` with the
+// payload it received.
 //
 // Verify in tests/client/ with a mock transport (jsdom dispatchEvent).
 
 import { GESTURE_TYPE, LONG_PRESS_MS, SWIPE_MIN_PX } from "./constants.js";
-import { KEY_ATTR, TYPE_ATTR } from "./dom.js";
+import {
+  DRAG_DATA_ATTR,
+  DROP_TARGET_ATTR,
+  ITEM_ATTR,
+  ITEM_VALUE_ATTR,
+  KEY_ATTR,
+  TYPE_ATTR,
+} from "./dom.js";
 
 // The DOM event names captured and their corresponding TWEvent `type`. Identity
 // here, but kept explicit so the captured set is the contract, not "whatever fires".
@@ -21,6 +31,149 @@ const EVENT_TYPES = Object.freeze({
   change: "change",
   submit: "submit",
 });
+
+/** Widget types whose renderer-owned items report a selection. */
+const MENU_TYPES = '[data-tw-type="Menu"],[data-tw-type="ActionSheet"]';
+
+/** The overlay host, whose own surface is the scrim (a ::before on this element). */
+const OVERLAY_HOST_ATTR = "data-tw-overlays";
+
+/**
+ * Overlay types a click outside — or Escape — dismisses.
+ *
+ * Modal overlays only: a Toast dismisses itself on a timer, and a Menu/Popover
+ * has no scrim to click through, so neither belongs here.
+ */
+const DISMISSIBLE_TYPES =
+  '[data-tw-type="Dialog"],[data-tw-type="BottomSheet"],[data-tw-type="ActionSheet"]';
+
+/**
+ * Whether this event target is the overlay host itself (i.e. the scrim).
+ *
+ * Duck-typed rather than `instanceof Element`: the client also runs under jsdom,
+ * where the module scope has no browser `Element` to compare against.
+ *
+ * @param {EventTarget|null} target  The event's target.
+ * @returns {boolean}                True when the target is the overlay host.
+ */
+function isOverlayHost(target) {
+  const el = /** @type {HTMLElement|null} */ (target);
+  return (
+    el != null &&
+    typeof el.hasAttribute === "function" &&
+    el.hasAttribute(OVERLAY_HOST_ATTR)
+  );
+}
+
+/**
+ * Report a dismiss for the top-most modal overlay, if there is one.
+ *
+ * The scrim is the overlay host's own ::before, so a click on it lands on the
+ * host itself — that is the signal that the user clicked *outside* the overlay.
+ * Escape means the same thing. Both were inert: `on_dismiss` existed on Dialog
+ * and BottomSheet and nothing ever fired it, so a scrim that looked dismissible
+ * was not, and an app without its own close button trapped the user.
+ *
+ * The payload is empty: `DismissEvent.overlay_id` is the server's id for the
+ * overlay, which the client never sees — the handler knows which overlay it is
+ * on.
+ *
+ * @param {HTMLElement} root The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {boolean}        True when a dismiss was reported.
+ */
+function sendOverlayDismiss(root, transport) {
+  const host = root.querySelector(`[${OVERLAY_HOST_ATTR}]`);
+  if (host == null) {
+    return false;
+  }
+  const modals = host.querySelectorAll(DISMISSIBLE_TYPES);
+  const top = modals[modals.length - 1];
+  const key = top == null ? null : top.getAttribute(KEY_ATTR);
+  if (key == null) {
+    return false;
+  }
+  transport.sendEvent({ type: "dismiss", key, payload: {} });
+  return true;
+}
+
+/**
+ * Report a click on a menu item as a `select` event, if that is what it was.
+ *
+ * A `Menu`/`ActionSheet` draws its `items` prop as renderer-owned buttons, so the
+ * click lands on an element the IR knows nothing about. The event belongs to the
+ * *menu* — that is where `on_select` lives — and carries the item's value and
+ * label, which is the `MenuSelectEvent` the handler is declared against.
+ *
+ * @param {Event} event      The click event.
+ * @param {HTMLElement} root The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {boolean}        True when the click was a menu selection.
+ */
+function sendMenuSelection(event, root, transport) {
+  const item = closestWithAttr(event.target, root, ITEM_ATTR);
+  if (item == null || item.getAttribute(ITEM_ATTR) !== "item") {
+    return false;
+  }
+  const menu = item.closest(MENU_TYPES);
+  const key = menu == null ? null : menu.getAttribute(KEY_ATTR);
+  if (key == null) {
+    return false;
+  }
+  transport.sendEvent({
+    type: "select",
+    key,
+    payload: {
+      value: item.getAttribute(ITEM_VALUE_ATTR) ?? "",
+      label: item.textContent ?? "",
+    },
+  });
+  return true;
+}
+
+/** The dataTransfer type carrying a `Draggable`'s payload across a drag. */
+const DRAG_MIME = "text/plain";
+
+/**
+ * Find the nearest ancestor-or-self element carrying `attr`.
+ *
+ * The drag listeners need the element that declared the *role* (the `Draggable`
+ * that owns the payload, the `DragTarget` that accepts the drop), which is
+ * usually an ancestor of whatever the pointer was actually over.
+ *
+ * @param {EventTarget|null} target  The event's target node.
+ * @param {HTMLElement} root         The delegation root (search stops above it).
+ * @param {string} attr              The attribute to look for.
+ * @returns {?HTMLElement}           The element, or null when none has it.
+ */
+function closestWithAttr(target, root, attr) {
+  let node = /** @type {Node|null} */ (target);
+  while (node != null && node.nodeType !== 1) {
+    node = node.parentNode;
+  }
+  let el = /** @type {HTMLElement|null} */ (node);
+  while (el != null) {
+    if (el.hasAttribute && el.hasAttribute(attr)) {
+      return el;
+    }
+    if (el === root) {
+      break;
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
+
+/**
+ * Build the wire payload for a drag/drop event (a core `DragEvent`).
+ *
+ * @param {DragEvent} event  The DOM drag event.
+ * @param {string} data      The `Draggable`'s payload string.
+ * @returns {{data: string, x: number, y: number}}  The wire payload.
+ */
+function dragPayload(event, data) {
+  return { data, x: event.clientX ?? 0, y: event.clientY ?? 0 };
+}
 
 /**
  * Find the nearest ancestor-or-self element carrying a widget key.
@@ -154,6 +307,14 @@ export function bindEvents(root, transport) {
   for (const domType of Object.keys(EVENT_TYPES)) {
     /** @param {Event} event */
     const handler = (event) => {
+      if (domType === "click" && sendMenuSelection(event, root, transport)) {
+        return;
+      }
+      if (domType === "click" && isOverlayHost(event.target)) {
+        if (sendOverlayDismiss(root, transport)) {
+          return;
+        }
+      }
       const key = keyedAncestor(event.target, root);
       if (key == null) {
         return;
@@ -167,6 +328,61 @@ export function bindEvents(root, transport) {
     root.addEventListener(domType, handler);
     bound.push([domType, handler]);
   }
+
+  const bindDrag = () => {
+    /** @param {DragEvent} event */
+    const onDragStart = (event) => {
+      const source = closestWithAttr(event.target, root, DRAG_DATA_ATTR);
+      if (source == null) {
+        return;
+      }
+      const data = source.getAttribute(DRAG_DATA_ATTR) ?? "";
+      if (event.dataTransfer) {
+        event.dataTransfer.setData(DRAG_MIME, data);
+        event.dataTransfer.effectAllowed = "move";
+      }
+      const key = source.getAttribute(KEY_ATTR);
+      if (key != null) {
+        transport.sendEvent({ type: "drag", key, payload: dragPayload(event, data) });
+      }
+    };
+
+    /** @param {DragEvent} event */
+    const onDragOver = (event) => {
+      if (closestWithAttr(event.target, root, DROP_TARGET_ATTR) == null) {
+        return;
+      }
+      // Without this the browser refuses the drop and no `drop` ever fires.
+      event.preventDefault();
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = "move";
+      }
+    };
+
+    /** @param {DragEvent} event */
+    const onDrop = (event) => {
+      const target = closestWithAttr(event.target, root, DROP_TARGET_ATTR);
+      if (target == null) {
+        return;
+      }
+      event.preventDefault();
+      const data = event.dataTransfer ? event.dataTransfer.getData(DRAG_MIME) : "";
+      const key = target.getAttribute(KEY_ATTR);
+      if (key != null) {
+        transport.sendEvent({ type: "drop", key, payload: dragPayload(event, data) });
+      }
+    };
+
+    root.addEventListener("dragstart", onDragStart);
+    root.addEventListener("dragover", onDragOver);
+    root.addEventListener("drop", onDrop);
+    bound.push(
+      ["dragstart", onDragStart],
+      ["dragover", onDragOver],
+      ["drop", onDrop],
+    );
+  };
+  bindDrag();
 
   /** @type {Map<number, {key: string, x: number, y: number, t: number}>} */
   const pending = new Map();
@@ -198,9 +414,29 @@ export function bindEvents(root, transport) {
   root.addEventListener("pointerup", onPointerUp);
   bound.push(["pointerdown", onPointerDown], ["pointerup", onPointerUp]);
 
+  /**
+   * Dismiss the top-most modal overlay on Escape.
+   *
+   * Listened for on the document, not the mount root: an overlay rarely holds
+   * focus, so the key event would never reach the root.
+   * @param {KeyboardEvent} event
+   */
+  const onKeyDown = (event) => {
+    if (event.key === "Escape") {
+      sendOverlayDismiss(root, transport);
+    }
+  };
+  const doc = root.ownerDocument;
+  if (doc != null) {
+    doc.addEventListener("keydown", onKeyDown);
+  }
+
   return () => {
     for (const [domType, handler] of bound) {
       root.removeEventListener(domType, handler);
+    }
+    if (doc != null) {
+      doc.removeEventListener("keydown", onKeyDown);
     }
   };
 }

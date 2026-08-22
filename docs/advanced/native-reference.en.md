@@ -46,6 +46,16 @@ There are **two** capability shapes, and you can tell which from how you consume
     Streaming capabilities run over the **native event channel (T-EV)** — see the
     [event-channel tutorial](native-events.md).
 
+!!! info "In Mode B the call has a deadline"
+    In Mode A the capability runs in the same process. In Mode B it is
+    **proxied**: the server sends a `native_call` and waits for the browser's
+    `native_result`. A tab closed mid-call, or a capability that broke before
+    replying, would leave that `await` suspended forever — so it fails with
+    `NativeError("timeout")` after `DEFAULT_NATIVE_CALL_TIMEOUT` (30s), which is
+    ample for a permission prompt or a file picker. Treat `timeout` like any
+    other error code; to change the deadline, build the session with a
+    `ProxyBridge(send_frame, timeout=...)`.
+
 !!! warning "Secure context and Chromium-only"
     Many capabilities require **HTTPS** (or `localhost`) and some exist only in
     **Chromium** (Chrome/Edge). Each risky group exposes an `is_supported()` so you

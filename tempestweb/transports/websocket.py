@@ -18,6 +18,8 @@ still resolving proxied native calls.
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from collections.abc import Callable
 from contextlib import suppress
 from typing import Any
@@ -38,6 +40,8 @@ from tempestweb.transports.base import (
 )
 
 __all__ = ["WebSocketTransport"]
+
+_LOGGER = logging.getLogger("tempestweb.transports.websocket")
 
 
 class WebSocketTransport:
@@ -73,11 +77,50 @@ class WebSocketTransport:
         self._native_event_handler: Callable[[NativeEvent], None] | None = None
         self._closed: bool = False
         self._recv_task: asyncio.Task[None] | None = None
+        self._send_lock: asyncio.Lock = asyncio.Lock()
 
     def _ensure_pump(self) -> None:
         """Start the inbound demux task if it is not already running."""
         if self._recv_task is None and not self._closed:
             self._recv_task = asyncio.ensure_future(self._pump())
+
+    async def _receive_envelope(self) -> dict[str, Any] | None:
+        """Read the next frame from the socket and decode it as a wire envelope.
+
+        Both a text and a binary frame are accepted: the wire format is JSON
+        either way, and a client library or proxy is free to pick the binary
+        opcode. A frame that carries no payload, is not JSON, or is not a JSON
+        object is **dropped** (with a warning) rather than ending the pump — in
+        Mode B the connection *is* the session, so one malformed frame must not
+        cost the client its whole application state.
+
+        Returns:
+            The decoded envelope, or ``None`` when the frame was unusable.
+
+        Raises:
+            WebSocketDisconnect: If the peer disconnected.
+        """
+        message = await self.websocket.receive()
+        if message["type"] == "websocket.disconnect":
+            raise WebSocketDisconnect(message.get("code", 1000), message.get("reason"))
+        raw: str | None = message.get("text")
+        if raw is None:
+            payload: bytes | None = message.get("bytes")
+            raw = None if payload is None else payload.decode("utf-8", "replace")
+        if raw is None:
+            _LOGGER.warning("tempestweb: dropped a websocket frame with no payload")
+            return None
+        try:
+            envelope: Any = json.loads(raw)
+        except ValueError:
+            _LOGGER.warning("tempestweb: dropped a websocket frame that is not JSON")
+            return None
+        if not isinstance(envelope, dict):
+            _LOGGER.warning(
+                "tempestweb: dropped a websocket frame that is not a JSON object"
+            )
+            return None
+        return envelope
 
     async def _pump(self) -> None:
         """Read envelopes from the socket and route them by ``kind``.
@@ -88,11 +131,15 @@ class WebSocketTransport:
 
         A frame refused by ``allow_inbound`` (the per-IP event budget) ends the
         connection with ``1013`` rather than being dropped silently, so the peer
-        learns it is over budget instead of watching its events vanish.
+        learns it is over budget instead of watching its events vanish. An
+        undecodable frame is dropped by :meth:`_receive_envelope` and the pump
+        keeps reading.
         """
         try:
             while not self._closed:
-                envelope: dict[str, Any] = await self.websocket.receive_json()
+                envelope = await self._receive_envelope()
+                if envelope is None:
+                    continue
                 if self._allow_inbound is not None and not self._allow_inbound():
                     await self.websocket.close(code=1013)
                     break
@@ -181,19 +228,27 @@ class WebSocketTransport:
     async def _send(self, envelope: dict[str, Any]) -> None:
         """Serialize and send one envelope, mapping disconnects to closed errors.
 
+        Sends are serialized behind a lock. The session spawns one task per tick
+        (a coalesced rebuild cannot await), so without it two batches can be
+        in ``send_json`` at once and, under backpressure, reach the wire out of
+        order — and patches are index-relative, so a swapped pair corrupts the
+        client's tree. :class:`asyncio.Lock` wakes waiters FIFO, so the order the
+        session queued the batches in is the order they are written.
+
         Args:
             envelope: The JSON-able wire envelope to send.
 
         Raises:
             TransportClosedError: If the socket is closed or disconnects mid-send.
         """
-        if self._closed or self.websocket.client_state != WebSocketState.CONNECTED:
-            raise TransportClosedError("websocket is closed")
-        try:
-            await self.websocket.send_json(envelope)
-        except (WebSocketDisconnect, RuntimeError) as exc:
-            self._closed = True
-            raise TransportClosedError("websocket disconnected") from exc
+        async with self._send_lock:
+            if self._closed or self.websocket.client_state != WebSocketState.CONNECTED:
+                raise TransportClosedError("websocket is closed")
+            try:
+                await self.websocket.send_json(envelope)
+            except (WebSocketDisconnect, RuntimeError) as exc:
+                self._closed = True
+                raise TransportClosedError("websocket disconnected") from exc
 
     async def recv_event(self) -> Event:
         """Await the next user event from the client.
@@ -235,8 +290,12 @@ class WebSocketTransport:
         self._closed = True
         if self._recv_task is not None:
             self._recv_task.cancel()
-            with suppress(asyncio.CancelledError, Exception):
+            try:
                 await self._recv_task
+            except asyncio.CancelledError:
+                pass
+            except Exception:  # noqa: BLE001 - a pump crash must be logged, not lost
+                _LOGGER.exception("tempestweb: websocket inbound pump failed")
             self._recv_task = None
         if not was_closed and self.websocket.client_state == WebSocketState.CONNECTED:
             with suppress(WebSocketDisconnect, RuntimeError):

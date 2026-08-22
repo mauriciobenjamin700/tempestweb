@@ -6,7 +6,12 @@
 // transport-ws.js) implement the same `Transport` interface and plug in here
 // unchanged — the renderer and event capture are identical across both modes.
 
-import { applyPatches, buildElement } from "./dom.js";
+import {
+  applyPatches,
+  buildElement,
+  positionAnchoredOverlays,
+  repaintCanvases,
+} from "./dom.js";
 import { bindEvents } from "./events.js";
 import { installRouter } from "./router.js";
 import { installLayoutStyles } from "./layouts.js";
@@ -44,12 +49,19 @@ function isRootReplace(patch) {
  * root itself and returns the current root so the mount can keep tracking it;
  * all non-root patches apply in place.
  *
+ * A patch that cannot be applied stops the batch: the remaining patches are
+ * index-relative to a tree that no longer matches, so applying them would only
+ * mutate the wrong nodes. `onError` decides what happens next (the mount asks
+ * for a resync).
+ *
  * @param {HTMLElement} tree       The current root element.
  * @param {import("./transport.js").Patch[]} patches  The tree patch batch.
  * @param {HTMLElement} mountRoot  The mount host (insertion parent fallback).
+ * @param {(error: Error, patch: import("./transport.js").Patch) => void} onError
+ *        Called with the first patch that failed.
  * @returns {HTMLElement}          The current root element after the batch.
  */
-function applyTreePatches(tree, patches, mountRoot) {
+function applyTreePatches(tree, patches, mountRoot, onError) {
   let current = tree;
   for (const patch of patches) {
     if (isRootReplace(patch)) {
@@ -61,7 +73,12 @@ function applyTreePatches(tree, patches, mountRoot) {
       }
       current = fresh;
     } else {
-      applyPatches(current, [patch]);
+      let failed = false;
+      applyPatches(current, [patch], (error, badPatch) => {
+        failed = true;
+        onError(error, badPatch);
+      });
+      if (failed) break;
     }
   }
   return current;
@@ -99,14 +116,22 @@ function applyTreePatches(tree, patches, mountRoot) {
  * created lazily on the first overlay patch, so an app with no overlays adds no
  * extra DOM.
  *
+ * **Broken stream (resync).** A patch the renderer cannot apply means the tree
+ * here no longer matches the one the patches were computed against. The batch
+ * stops there and, when the transport supports it (Mode B), a resync is
+ * requested: the server answers with the whole scene as a root replace. Without
+ * it the mount would keep applying index-relative patches to a tree it knows is
+ * wrong, and the screen would drift further with every tick.
+ *
  * **Runtime wiring.** On mount the MD3 base stylesheet is injected once (it styles
  * bare Button/Input/Checkbox widgets and their interaction states, while an app's
  * inline Style still overrides it — see theme.js). When the transport implements
  * `onNavigate` (Mode B, imperative navigation), it is mirrored onto the browser
  * URL; Mode A transports omit it (the bridge wires pushState directly), so that is
- * a no-op there. A frame is scheduled after mount and after each patch batch to
- * recompute the off-window scroll space of any virtualized list, once the browser
- * has laid the window out so item heights can be measured.
+ * a no-op there. A frame is scheduled after mount, after each patch batch and on
+ * window resize to recompute what only exists once the browser has laid out: a
+ * virtualized list's off-window scroll space, and each Canvas's pixel buffer,
+ * which is sized to the box layout gave it so a chart is not a stretched bitmap.
  *
  * @param {HTMLElement} root  The host element to mount into.
  * @param {import("./transport.js").Transport} transport  The patch/event seam.
@@ -142,10 +167,54 @@ export function mount(root, transport, initialNode = null) {
   if (typeof transport.onNavigate === "function") {
     transport.onNavigate((path) => router.navigateTo(path));
   }
-  scheduleFrame(virtualization.refresh);
+  /**
+   * Recompute what only exists after layout: a virtualized list's off-window
+   * scroll space, every Canvas's pixel buffer (which is sized to the box the
+   * layout gave it, not to the widget's declared size), and the position of any
+   * overlay anchored to a widget key.
+   * @returns {void}
+   */
+  const afterLayout = () => {
+    virtualization.refresh();
+    repaintCanvases(root);
+    positionAnchoredOverlays(root);
+  };
+  scheduleFrame(afterLayout);
+
+  /** Resizing changes every Canvas's box, so their buffers are stale. */
+  const onResize = () => scheduleFrame(afterLayout);
+  if (typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener("resize", onResize);
+  }
+
+  let resyncPending = false;
+
+  /**
+   * Handle a patch the renderer could not apply: ask for a whole fresh scene.
+   *
+   * The DOM is only correct while every patch has applied in order, so once one
+   * fails the tree cannot be repaired by the patches that follow — they are
+   * index-relative to a tree that no longer exists. A resync (one root replace)
+   * is the only repair, and it is requested once until it arrives, so a broken
+   * stream cannot turn into a request flood.
+   *
+   * @param {Error} error   The failure the patch raised.
+   * @param {import("./transport.js").Patch} patch  The patch that failed.
+   * @returns {void}
+   */
+  const onPatchFailure = (error, patch) => {
+    if (typeof console !== "undefined" && console.error) {
+      console.error("tempestweb: patch could not be applied", error, patch);
+    }
+    if (resyncPending) return;
+    if (typeof transport.requestResync !== "function") return;
+    resyncPending = true;
+    transport.requestResync();
+  };
 
   transport.onPatches((patches) => {
     let batch = patches;
+    if (patches.some(isRootReplace)) resyncPending = false;
     if (tree == null) {
       const first = patches[0];
       if (first == null || !("node" in first)) {
@@ -168,17 +237,20 @@ export function mount(root, transport, initialNode = null) {
       }
     }
     if (treePatches.length > 0) {
-      tree = applyTreePatches(tree, treePatches, root);
+      tree = applyTreePatches(tree, treePatches, root, onPatchFailure);
     }
     if (overlayPatches.length > 0) {
-      applyPatches(overlayHost(), overlayPatches);
+      applyPatches(overlayHost(), overlayPatches, onPatchFailure);
     }
-    scheduleFrame(virtualization.refresh);
+    scheduleFrame(afterLayout);
   });
 
   return {
     root,
     unmount() {
+      if (typeof globalThis.removeEventListener === "function") {
+        globalThis.removeEventListener("resize", onResize);
+      }
       unbind();
       virtualization.dispose();
       listEvents.dispose();

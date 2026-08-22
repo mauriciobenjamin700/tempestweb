@@ -222,6 +222,19 @@ export function createSSETransport(config) {
     sendNativeResult,
 
     /**
+     * Ask the server to re-send the whole scene.
+     *
+     * The DOM is only correct while every patch has applied in order, so a batch
+     * the renderer could not apply leaves a tree no later index-relative patch
+     * fits. This asks for one root replace to start from instead.
+     *
+     * @returns {void}
+     */
+    requestResync() {
+      void post({ kind: "event", data: { type: "resync", key: "" } });
+    },
+
+    /**
      * Close the EventSource.
      * @returns {Promise<void>}
      */

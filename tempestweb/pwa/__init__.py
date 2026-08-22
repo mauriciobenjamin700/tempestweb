@@ -29,6 +29,7 @@ from tempestweb.pwa.manifest import (
 )
 from tempestweb.pwa.pyodide_vendor import (
     PYODIDE_CORE_FILES,
+    package_digests,
     pyodide_cdn_base,
     resolve_package_files,
     vendor_pyodide,
@@ -46,6 +47,7 @@ __all__: list[str] = [
     "emit_manifest",
     "placeholder_png",
     "pyodide_cdn_base",
+    "package_digests",
     "resolve_package_files",
     "validate_extras",
     "validate_installable",

@@ -45,6 +45,7 @@ from tempest_core.style import (
 )
 from tempest_core.theme import MediaQueryData, Theme, ThemeMode
 from tempest_core.widgets import Button, Column, Container, Row, Switch, Text
+from tempest_core.widgets.base import Semantics
 from tempest_core.widgets.events import ThemeChangeEvent, ToggleEvent
 
 # ---------------------------------------------------------------------------
@@ -499,10 +500,26 @@ def _accent_card(app: App[ThemeSwitcherState]) -> Widget:
                             ),
                             transition=_TWEEN,
                         ),
+                        # The swatch's colour is the Container's; the Button is
+                        # just its hit area, so it has to be transparent and the
+                        # same size. Without a Style the core gives it the filled
+                        # variant — a purple pill 48px tall — which covered every
+                        # swatch and left only a sliver of the real colour
+                        # showing. `semantics` names it, since a button with an
+                        # empty label has no accessible name at all.
                         child=Button(
                             label="",
                             on_click=_make_swatch_handler(i),
                             key=f"swatch-btn-{i}",
+                            semantics=Semantics(label=name),
+                            style=Style(
+                                width=44.0,
+                                height=44.0,
+                                min_height=0.0,
+                                radius=22.0,
+                                background=_TRANSPARENT,
+                                padding=Edge.all(0.0),
+                            ),
                         ),
                     ),
                     Text(

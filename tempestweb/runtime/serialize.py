@@ -55,6 +55,8 @@ EVENT_TYPE_TO_HANDLER_PROPS: dict[str, tuple[str, ...]] = {
     "dismiss": ("on_dismiss",),
     "validate": ("on_validate",),
     "scan": ("on_scan",),
+    "drag": ("on_drag",),
+    "drop": ("on_drop",),
 }
 
 

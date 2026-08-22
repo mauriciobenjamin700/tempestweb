@@ -9,6 +9,12 @@
 By default `create_app(state_factory, view)` is **open**: any client connects.
 For production, pass a `SecurityConfig`.
 
+!!! warning "An open host says so in the log"
+    With no `SecurityConfig` the server logs a `WARNING` naming exactly what is
+    off — no auth, no origin allowlist (so **any site** can open a WebSocket to
+    your host) and no limits. That is the right default for `tempestweb dev` and
+    the wrong one to reach production unnoticed.
+
 ```python
 from tempestweb.server import create_app, SecurityConfig, token_authenticator
 
@@ -36,6 +42,7 @@ It receives a `Credentials`:
 | `origin` | the `Origin` header |
 | `headers` | request headers (lower-cased keys) |
 | `query` | query parameters |
+| `client_ip` | the peer address — or `X-Forwarded-For`, if `trusted_proxies` allows |
 
 Two ready-made builders:
 
@@ -72,6 +79,11 @@ async def authenticate(cred):
 claims — unlike `observability.auth.decode_jwt`, which only reads claims
 (client-side).
 
+The `exp` claim is **required**: PyJWT only checks an expiry that is present, so
+a token minted without one would be accepted forever — which is not what
+"validates the expiry" can mean. For a token whose lifetime something else
+bounds, pass `require_expiry=False` (to `verify_jwt` and `jwt_authenticator`).
+
 ```python
 from tempestweb.server import verify_jwt, jwt_authenticator
 
@@ -95,6 +107,7 @@ SecurityConfig(
     max_message_bytes=65536,         # reject an SSE POST larger than this (413)
     max_connections_per_minute=60,   # per-IP connection flood (1013/429)
     max_events_per_minute=600,       # per-IP envelope flood (1013/429)
+    trusted_proxies=["10.0.0.1"],    # whose X-Forwarded-For may be read
 )
 ```
 
@@ -103,14 +116,61 @@ SecurityConfig(
 - **`max_message_bytes`** — a `POST /sse/{id}` with a larger body returns `413`.
   The cap is enforced **while the body is read**, not from `Content-Length`
   alone — a chunked POST declares no length and used to sail straight past it.
-- **`max_connections_per_minute`** — a rolling 60s per-IP window (from
-  `X-Forwarded-For` or peer); a flood is refused (WS `1013` / SSE `429`).
+- **`max_connections_per_minute`** — a rolling 60s per-IP window; a flood is
+  refused (WS `1013` / SSE `429`). The address is the **socket's peer**, unless
+  `trusted_proxies` says otherwise (below).
+- **`trusted_proxies`** — which peers' `X-Forwarded-For` may be believed. `None`
+  (the default) **ignores** the header; `["*"]` trusts any peer; a list of
+  addresses trusts only those.
 - **`max_events_per_minute`** — the same window, counting **inbound envelopes**
   (clicks, input, `native_result`) across both legs: a `POST /sse/{id}` over
   budget answers `429`, and a WebSocket frame over budget closes the socket with
   `1013`. A separate knob because the magnitudes differ: one connection per
   client, but one envelope per interaction. Size it above your app's legitimate
   peak — without it, an already-accepted connection sends without limit.
+
+!!! danger "`X-Forwarded-For` is client data"
+    A per-IP limit only means anything if the IP is not chosen by whoever is
+    being limited. The header is sent by the client: believing it unconditionally
+    makes every request look like a fresh client and the limit never fires —
+    against a cap of 3 connections/minute, 8 connections carrying a forged
+    `X-Forwarded-For` per request all got through.
+
+    With `trusted_proxies` the header is read **right to left**: a proxy appends
+    the address it saw, so the right-most hop that is not a declared proxy is the
+    furthest one this deployment can vouch for; anything the client prepended
+    sits to the left and is ignored.
+
+    ```python
+    # behind an nginx at 10.0.0.1
+    SecurityConfig(trusted_proxies=["10.0.0.1"], max_connections_per_minute=60)
+    ```
+
+## SSE sessions: the `session` in the URL authorizes nothing
+
+The SSE leg splits into `GET /sse?session=<id>` (the stream) and
+`POST /sse/<id>` (events), and the client picks the `id`. It *names* the session;
+it does not prove who may use it. Anyone who merely learned the `id` would read
+the victim's patch stream — which is the rendered state of her screen — and post
+events into her session.
+
+So the `GET` that **materializes** a session records a fingerprint of its
+opener — the auth token when the host authenticates, the client address when it
+does not — and every later `GET`/`POST` for that `id` must match it, or it is
+answered `403`.
+
+- **Reopening the stream is a takeover:** the newest stream owns the session, and
+  the one it replaced can no longer tear it down. That is the ordinary reconnect:
+  the network drops, the client reconnects, and only then does the old response
+  finish unwinding on the server.
+- **A gap in the replay becomes a resync:** if `Last-Event-ID` points at a tick
+  the buffer has evicted, the server sends the whole scene (one root replace)
+  before resuming, instead of index-relative patches that no longer fit.
+
+!!! tip "Pick an unguessable `session`"
+    Ownership protects the content, but the `id` still travels in a URL (logs,
+    referer, history). Generate it with `crypto.randomUUID()` — never a counter
+    or the user's id.
 
 !!! note "Dead + idle connections"
     A **dead/half-open** WS is already reaped by uvicorn's ping (~20–40s) — no

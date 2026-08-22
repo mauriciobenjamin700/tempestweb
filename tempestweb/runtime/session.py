@@ -25,7 +25,6 @@ import asyncio
 import logging
 from collections.abc import Callable, Coroutine
 from contextlib import suppress
-from itertools import count
 from typing import Any, Generic, TypeVar
 
 from tempest_core import App, Theme, Widget
@@ -33,6 +32,7 @@ from tempest_core import Patch as CorePatch
 from tempest_core.widgets import handler_accepts_event
 from tempestweb.native.bridges import ProxyBridge
 from tempestweb.native.dispatch import (
+    _next_call_id,
     install_bridge,
     native_call,
     uninstall_bridge,
@@ -117,8 +117,8 @@ class AppSession(Generic[S]):
         self._tasks: set[asyncio.Task[None]] = set()
         self._concurrent_dispatch: bool = concurrent_dispatch
         self._key_locks: dict[str, asyncio.Lock] = {}
+        self._key_lock_users: dict[str, int] = {}
         self._closed: bool = False
-        self._native_seq: count[int] = count(1)
         # The Mode-B native bridge: it owns the call_id -> Future registry and
         # proxies each native_call down the transport. Its send_frame spawns the
         # async transport send as a tracked task; its resolve() is fed by the
@@ -264,7 +264,11 @@ class AppSession(Generic[S]):
         coalesced rebuild that pushes the resulting patches back to the client.
 
         Unknown keys / missing handlers are silently ignored (a stale event from a
-        widget that no longer exists is not an error).
+        widget that no longer exists is not an error). Three event types are
+        handled by the runtime instead of an app handler: ``scroll`` slides a
+        virtualized window, ``navigate`` applies a URL change, and ``resync``
+        re-sends the whole scene (the client asks for it when it could not apply
+        a batch).
 
         Args:
             event: The JSON-able client event ``{"type", "key", "payload"}``.
@@ -277,6 +281,9 @@ class AppSession(Generic[S]):
         key = event.get("key")
         event_type = event.get("type")
         if not isinstance(key, str) or not isinstance(event_type, str):
+            return
+        if event_type == "resync":
+            await self.resync()
             return
         if event_type == "scroll":
             apply_scroll(self.app, key, event.get("payload", {}))
@@ -292,6 +299,24 @@ class AppSession(Generic[S]):
         result = handler(arg) if handler_accepts_event(handler) else handler()
         if asyncio.iscoroutine(result):
             await result
+
+    async def resync(self) -> None:
+        """Re-send the current scene as a full initial patch batch.
+
+        The client's tree is only correct while it has applied *every* patch in
+        order. When that chain breaks — a batch it could not apply, or an SSE
+        reconnect whose gap the replay buffer no longer covers — no further
+        index-relative patch can be trusted, and a resync is the only repair: one
+        root replace carrying the scene as it stands now.
+
+        A no-op before the session has mounted or after it closed.
+        """
+        if self._closed or self.app is None:
+            return
+        scene = self.app.current_tree
+        if scene is None:
+            return
+        await self.transport.send_patches(scene_to_initial_patches(scene))
 
     async def native_call(self, capability: str, args: dict[str, Any]) -> Any:  # noqa: ANN401 — value type depends on the capability
         """Proxy a native Web API capability to the client and await its result.
@@ -311,9 +336,10 @@ class AppSession(Generic[S]):
 
         Raises:
             NativeCallError: If the client reports the capability failed.
+            NativeError: With code ``timeout`` if the client never answers.
             TransportClosedError: If the connection drops before a result.
         """
-        call_id = f"c{next(self._native_seq)}"
+        call_id = _next_call_id()
         result = await self._bridge.call(native_call(capability, args, call_id))
         if not result.get("ok", False):
             raise NativeCallError(str(result.get("error")))
@@ -360,6 +386,13 @@ class AppSession(Generic[S]):
 
         Mounts (if not already) then loops: await the next event, dispatch it, let
         the rebuild loop flush patches. Returns cleanly when the transport closes.
+
+        A handler that raises is logged and the loop carries on, exactly as in
+        concurrent mode. It used to end the connection instead — and in Mode B the
+        connection *is* the session, so one buggy handler (a validation error in a
+        rebuilt widget, say) dropped the client's whole state; the client silently
+        reconnected onto a fresh session and the screen jumped back to its initial
+        view with nothing in the server log to explain it.
         """
         if self.app is None:
             await self.start()
@@ -369,7 +402,12 @@ class AppSession(Generic[S]):
                 if self._concurrent_dispatch:
                     self._spawn(self._dispatch_ordered_by_key(event))
                 else:
-                    await self.dispatch(event)
+                    try:
+                        await self.dispatch(event)
+                    except Exception:  # noqa: BLE001 - a bad handler must not end the session
+                        _LOGGER.exception(
+                            "tempestweb: handler for %r raised", event.get("key")
+                        )
         except TransportClosedError:
             return
         finally:
@@ -382,22 +420,37 @@ class AppSession(Generic[S]):
         order — two quick edits of the same field cannot apply out of order —
         while handlers for different widgets overlap.
 
-        A handler that raises is logged and dropped. In serial mode the exception
-        propagates out of :meth:`run` and ends the connection; here it must not,
-        or one failing handler would take down a session that is still serving
-        other events — and an unretrieved task exception would vanish into the
-        event loop's warning instead of the app's log.
+        A handler that raises is logged and dropped, as it is in serial mode: one
+        failing handler must not take down a session that is still serving other
+        events, and an unretrieved task exception would vanish into the event
+        loop's warning instead of the app's log.
+
+        The lock is reference-counted and dropped once nobody is queued behind
+        it: a long session over a list whose rows carry per-item keys would
+        otherwise accumulate one lock per key it ever saw, released only at
+        teardown.
 
         Args:
             event: The JSON-able client event.
         """
         key = str(event.get("key") or "")
-        lock = self._key_locks.setdefault(key, asyncio.Lock())
-        async with lock:
-            try:
-                await self.dispatch(event)
-            except Exception:  # noqa: BLE001 - one bad handler must not end the session
-                _LOGGER.exception("tempestweb: handler for %r raised", key)
+        lock = self._key_locks.get(key)
+        if lock is None:
+            lock = self._key_locks[key] = asyncio.Lock()
+        self._key_lock_users[key] = self._key_lock_users.get(key, 0) + 1
+        try:
+            async with lock:
+                try:
+                    await self.dispatch(event)
+                except Exception:  # noqa: BLE001 - one bad handler must not end the session
+                    _LOGGER.exception("tempestweb: handler for %r raised", key)
+        finally:
+            remaining = self._key_lock_users[key] - 1
+            if remaining > 0:
+                self._key_lock_users[key] = remaining
+            else:
+                del self._key_lock_users[key]
+                self._key_locks.pop(key, None)
 
     async def close(self) -> None:
         """Unmount the session: cancel orphan tasks and tear down the transport.
@@ -421,6 +474,7 @@ class AppSession(Generic[S]):
             uninstall_spawner()
             self._bridge_installed = False
         self._key_locks.clear()
+        self._key_lock_users.clear()
         tasks = list(self._tasks)
         for task in tasks:
             task.cancel()

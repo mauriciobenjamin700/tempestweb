@@ -106,6 +106,32 @@ nativo do vocabulário.
 O lado Python resolve a `key` → handler do nó na árvore atual, valida o `payload`
 (Pydantic) e invoca o handler. Sync ou `async`.
 
+### Tipos reservados (tratados pelo runtime, não por um handler)
+
+Três `type` não chegam a um handler do app — o runtime os intercepta antes:
+
+| `type` | Significa | Efeito |
+| --- | --- | --- |
+| `scroll` | a janela de uma lista virtualizada deslizou | `app.slide_window(...)` |
+| `navigate` | a URL mudou (load, `popstate`) | reseta a pilha para a rota |
+| `resync` | o cliente **não conseguiu aplicar** um batch | reenvia a cena inteira |
+
+```json
+{ "type": "resync", "key": "", "payload": {} }
+```
+
+O `resync` existe porque a árvore do cliente só está correta enquanto **todo**
+patch foi aplicado em ordem: os patches são relativos a índice, então depois de
+uma falha nenhum patch seguinte serve. O cliente para o batch, pede o `resync`, e
+o servidor responde com um único **Replace na raiz** carregando a cena como ela
+está agora (`AppSession.resync`).
+
+!!! note "Quem mais dispara um resync"
+    A perna SSE pede o mesmo reparo por conta própria: se o cliente reconecta com
+    `Last-Event-ID` apontando para um tick que o buffer de replay já descartou, o
+    servidor emite o Replace da raiz **antes** de retomar o stream, em vez de
+    continuar mandando patches que não encaixam mais.
+
 ## Regra de coalescência
 
 O core já coalesce múltiplos `set_state` do mesmo tick num único `diff`. O

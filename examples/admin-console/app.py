@@ -16,6 +16,7 @@ Both modes run this exact ``view`` unchanged::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import ceil
 
 from tempest_core import App, Style, Text, Widget
 from tempest_core.components import Badge, ChartSeries, LineChart
@@ -122,6 +123,10 @@ def _overview() -> Widget:
     )
 
 
+#: Rows per page in the user listing.
+PAGE_SIZE: int = 3
+
+
 def _users(app: App[State]) -> Widget:
     """Build the user listing screen.
 
@@ -139,6 +144,12 @@ def _users(app: App[State]) -> Widget:
         app.set_state(lambda s: setattr(s, "page", page))
 
     rows = _matching(app.state.query)
+    # Page the rows for real. Passing every row with a hard-coded page_count made
+    # the pager decorative: "Próxima" moved the label to "Página 2 de 2" and left
+    # the same five rows on screen.
+    page_count = max(1, ceil(len(rows) / PAGE_SIZE))
+    page = min(max(app.state.page, 1), page_count)
+    window = rows[(page - 1) * PAGE_SIZE : page * PAGE_SIZE]
     return list_page(
         title="Usuários",
         subtitle=f"{len(rows)} de {len(USERS)}",
@@ -150,13 +161,13 @@ def _users(app: App[State]) -> Widget:
         ],
         rows=[
             [name, email, Badge(label=role, tone="info", key=f"role-{email}"), balance]
-            for name, email, role, balance in rows
+            for name, email, role, balance in window
         ],
         search=app.state.query,
         on_search=search,
         actions=[Button(label="Novo usuário", on_click=lambda: None, key="new-user")],
-        page=app.state.page,
-        page_count=2,
+        page=page,
+        page_count=page_count,
         on_page=go,
         empty_title="Nenhum usuário encontrado",
         empty_subtitle="Ajuste a busca ou convide alguém para a equipe.",

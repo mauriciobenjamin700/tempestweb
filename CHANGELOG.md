@@ -4,6 +4,325 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.69.0] — 2026-08-22
+
+Uma auditoria da perna do Modo B, e depois um browser em cima dela.
+
+### Fixed — Modo B (transporte, sessão, segurança)
+
+- **Um frame de WebSocket inválido matava a sessão inteira — sem log.** O demux
+  de entrada capturava apenas `(WebSocketDisconnect, RuntimeError)`, mas o
+  `receive_json` do Starlette levanta `KeyError` num frame **binário** (ele lê
+  `message["text"]`) e `JSONDecodeError` num texto que não é JSON. Nenhum dos
+  dois era capturado, então um único frame ruim encerrava o pump — e no Modo B a
+  conexão **é** a sessão: o cliente perdia todo o estado da aplicação, reconectava
+  numa sessão nova e a tela voltava ao início. Medido contra um uvicorn real:
+
+  ```text
+  baseline                  -> sessão VIVA
+  frame texto "nao-json"    -> sessão MORTA (sem close frame)
+  frame binário JSON-válido -> sessão MORTA
+  ```
+
+  Pior: o `close()` aguardava a task morta sob `suppress(Exception)`, então o log
+  do servidor ficava **vazio** enquanto o app do usuário reiniciava. Agora os
+  frames passam por um decoder que aceita os dois opcodes (o wire format é JSON
+  de qualquer jeito) e **descarta** um frame indecifrável com um aviso, em vez de
+  encerrar o pump; um pump que ainda quebre é logado.
+
+- **Patches podiam chegar fora de ordem no WebSocket.** A sessão dispara uma task
+  de envio por tick (a reconstrução coalescida do core não pode `await`), então
+  dois batches podiam estar dentro do `send_json` ao mesmo tempo e, sob
+  backpressure, alcançar a rede trocados. Patch é relativo a índice: um par
+  invertido corrompe a árvore do cliente. Os envios agora passam por um lock FIFO.
+
+- **O replay do SSE reentregava, duplicava e perdia ticks.** Cada envelope era
+  escrito no buffer de replay **e** numa `asyncio.Queue`; o `stream()` replayava o
+  buffer e depois drenava a fila. Um cliente reconectando com `Last-Event-ID: 1`
+  contra um buffer de 3 e 6 ticks enfileirados recebia `4, 5, 6, 1, 2, 3, 4, 5, 6`
+  — fora de ordem e com três duplicatas. Pior, a fila fazia dois streams no mesmo
+  transporte **dividirem** o stream de ticks entre si: cada um recebia metade dos
+  envelopes e nenhum tinha a árvore inteira. O stream agora é um cursor sobre o
+  buffer, que é a única fonte de envelopes de saída, e abrir um stream **retira** o
+  anterior.
+
+- **O `session` da URL do SSE autorizava qualquer um.** O id é escolhido pelo
+  cliente, mas o `_open_sse` anexava quem o apresentasse à sessão já registrada
+  sob aquele id. Um segundo requisitante lia então o stream de patches da vítima —
+  o estado renderizado da tela dela — e podia postar eventos na sessão dela;
+  reusar um id vivo também pulava o rate limit e o teto de conexões, que são
+  condicionados ao id ser novo. Reproduzido contra um servidor real:
+
+  ```text
+  sessions vivas: 1          <- o atacante entrou na sessão da vítima
+  VITIMA    patches n=1
+  ATACANTE  patches n=2      <- leu o estado da vítima
+  VITIMA    patches n=3
+  ```
+
+  A sessão agora grava a impressão digital de quem a abriu (o token de auth
+  quando o host autentica, senão o endereço do cliente) e todo `GET`/`POST`
+  posterior naquele id precisa casar, ou responde `403`. Reabrir o stream é um
+  **takeover**: só o dono do token de stream mais novo pode desmontar a sessão —
+  a limpeza anterior derrubava a sessão que o cliente tinha acabado de retomar.
+
+- **`X-Forwarded-For` do cliente contornava todo limite por IP.** O header é dado
+  enviado pelo cliente; variá-lo por request comprava uma identidade nova, então
+  contra `max_connections_per_minute=3` oito conexões forjadas foram todas
+  aceitas. Agora ele só é lido quando `SecurityConfig.trusted_proxies` declara o
+  peer como proxy, e então **da direita para a esquerda** — um proxy anexa o
+  endereço que viu, então o hop mais à direita que não é proxy é o mais distante
+  de que o deploy pode dar fé. Default: o peer do socket.
+
+- **O `RateLimiter` guardava uma entrada por endereço já visto.** Os buckets só
+  eram podados quando a própria chave voltava, então 10 mil endereços distintos
+  deixavam 10 mil entradas — memória que um flood de valores forjados crescia à
+  vontade — enquanto a docstring afirmava o contrário. Chaves cuja janela passou
+  agora são varridas periodicamente.
+
+- **Dois espaços de `call_id` colidiam no mesmo registro.** `AppSession.native_call`
+  cunhava ids de um contador por sessão enquanto toda capacidade (`await native.*`)
+  usava o global do módulo de dispatch — e ambos caem no mesmo
+  `ProxyBridge._pending`. Dois chamadores podiam entregar o mesmo `"c1"`: o
+  segundo registro substituía o future do primeiro, então um `await` ficava
+  pendurado pela vida da sessão e a única resposta do cliente resolvia a chamada
+  que ainda detinha o id — a leitura de clipboard podia ser entregue a quem
+  esperava uma posição de GPS.
+
+- **`native_call` esperava para sempre.** Uma aba fechada no meio, ou uma
+  capacidade que quebrou antes de responder, suspendia o handler até a sessão
+  terminar. Agora falha com o código `timeout` documentado após
+  `DEFAULT_NATIVE_CALL_TIMEOUT` (30s).
+
+- **Uma prop `null` não limpava o DOM que ela mesma tinha escrito.** O conjunto
+  de props de um widget é fixo, então uma prop que o app deixa de passar chega
+  como `set_props: {"<nome>": null}` — e todo aplicador testava `!= null`, lendo
+  isso como "não mexa". Verificado com os patches que o core realmente emite: ao
+  limpar o `semantics` de um `Text`, o elemento continuava com
+  `aria-label="rotulo"` e `role="alert"`; um `max_length` limpo continuava
+  limitando o input. O `unset_props` tinha o mesmo buraco pelo outro lado, cobrindo
+  só `style`/`content`/`label` enquanto `src`, `value`, `attrs` e os atributos de
+  acessibilidade ficavam para trás. Confirmado em browser real (Mode B): a árvore
+  de acessibilidade ia de `status "the greeting"` para `generic` só depois da
+  correção.
+
+- **Um patch que não aplicava deixava a tela derivando.** O `applyPatches`
+  abortava o batch no meio com um `RangeError` e nenhum reparo: a árvore ficava
+  meio-atualizada e cada tick seguinte aplicava mais patches relativos a índice
+  sobre ela. Agora o batch para na primeira falha e o mount pede um **resync**.
+
+- **`RedisSessionRouter.deliver` mentia.** Retornava `True` houvesse ou não
+  instância assinando o canal, então um POST para uma sessão já encerrada
+  respondia `204` e o evento evaporava. Agora usa a contagem de assinantes que o
+  `PUBLISH` devolve, e o chamador responde `404` como o contrato do
+  `SessionRouter` manda.
+
+- **Um handler que levantava encerrava a sessão do Modo B.** No despacho serial a
+  exceção subia pelo `run()` e fechava a conexão — e a conexão é a sessão, então
+  um handler com bug jogava fora todo o estado do cliente, que reconectava numa
+  sessão nova e voltava à tela inicial sem nada no log explicando. Agora é logado
+  e o laço segue, como o despacho concorrente já fazia. (Encontrado ao verificar
+  as correções do DOM num browser.)
+
+- **Os locks de ordenação por key cresciam sem limite.** Um deles era guardado
+  para cada key já despachada, liberados só no teardown; agora são contados por
+  referência e descartados quando ninguém está na fila.
+
+- **Os wheels do Pyodide eram gravados sem conferência.** O `vendor_pyodide`
+  escrevia no artefato o que o CDN devolvesse, ignorando o `sha256` que cada
+  entrada do `pyodide-lock.json` publica. Os digests agora são verificados, então
+  um wheel truncado ou trocado quebra o build em vez de ser distribuído. Não
+  defende contra um lock errado — ele vem do mesmo host — e os arquivos de
+  runtime, que o lock não cobre, seguem sem verificação.
+
+### Changed
+
+- **`verify_jwt` passa a exigir o claim `exp`.** A função prometia validar
+  "assinatura e expiração", mas o PyJWT só confere uma expiração que existe: um
+  token emitido sem `exp` era aceito para sempre. Passe `require_expiry=False`
+  (em `verify_jwt` e `jwt_authenticator`) para um token cuja vida outra coisa
+  limita.
+- **`attrs` recusa atributo de evento inline** (`onclick`, `onerror`, …) nos dois
+  renderizadores. É um escape hatch para markup que o app possui (`id`, `class`,
+  `data-*`, `hx-*`); um valor `on*` é **código**, então um widget construído com
+  dado que o app não escreveu embarcaria um script na página. O SSR levanta, o
+  renderizador de DOM ignora com aviso.
+- **Servir sem `SecurityConfig` agora loga um `WARNING`** dizendo o que está
+  desligado: sem auth, sem allowlist de origem (qualquer site abre um WebSocket —
+  o CORS não protege o upgrade) e sem limites.
+
+### Fixed — renderização (encontrados no browser)
+
+- **`Draggable` e `DragTarget` não arrastavam.** O core sempre teve os dois
+  widgets, o renderizador SSR desenhava suas caixas e a documentação ships um
+  tutorial bilíngue inteiro do exemplo kanban — mas nada implementava a
+  interação. O renderizador do DOM os deixava como `div` anônimos (nada marcado
+  `draggable`, nenhum alvo de drop), o `events.js` não capturava evento de drag
+  algum, e a tabela de roteamento não tinha os tipos `drag`/`drop` — então mesmo
+  um envelope enviado à mão não resolvia handler. Verificado no Chrome antes da
+  correção: arrastar um cartão até a lixeira não fazia absolutamente nada.
+
+  É o modo de falha do `ProgressBar` em 0.65.0 outra vez: a árvore afirma uma
+  feature que a tela nunca teve. Agora um `Draggable` é um elemento arrastável de
+  verdade com seu payload em `data-tw-drag-data`, o `dragover` de um `DragTarget`
+  chama `preventDefault` (sem isso o browser recusa o drop inteiro), e o `drop`
+  emite o payload contra a key do alvo — nos três modos, porque o Modo C monta
+  pelo mesmo cliente.
+
+- **A camada de overlay não sobrepunha nada.** O `mount()` aplica os patches da
+  camada de overlay num host próprio, mas o host era um `<div>` sem estilo
+  anexado depois da árvore e nenhum widget de overlay tinha regra própria. O
+  "I am a floating dialog" do exemplo renderizava **no fluxo**, no fim da página:
+  sem card, sem scrim, sem centralização — e o `title` ("Hello") nunca era
+  desenhado, porque o título de um `Dialog` é prop, não filho.
+
+  O host agora é uma camada fixa de viewport inteiro, transparente ao ponteiro
+  (para não engolir cliques na app quando vazia), com cada overlay recuperando o
+  ponteiro. `Dialog` é card centralizado com scrim, `BottomSheet` é painel
+  inferior, `Toast` é pílula transitória sem scrim. O título é pintado a partir de
+  `data-tw-title` por `::before` — inserir um elemento deslocaria os índices a que
+  todo patch de filho é relativo — e espelhado em `aria-label`. `Dialog`/
+  `BottomSheet` ganham `role=dialog` + `aria-modal`; `Toast`, `role=status` +
+  `aria-live=polite`, porque um toast que ninguém anuncia é invisível para leitor
+  de tela.
+
+- **Um `Canvas` era um bitmap esticado.** Um canvas tem dois tamanhos — o buffer
+  de pixels e a caixa que o CSS lhe dá — e só o buffer era definido. Dentro de um
+  flex column, `align-items: stretch` (o default do CSS) puxava um gráfico de
+  320×200 para 909×568: os rótulos de eixo do admin-console saíam 2,8× maiores e
+  borrados, e o card superdimensionado empurrava o resto da página para fora da
+  tela. Em tela HiDPI o mesmo bitmap era esticado outra vez pelo device pixel
+  ratio. Agora a caixa é fixada no tamanho declarado (default que o `Style` da app
+  sobrescreve), o buffer é dimensionado pela caixa real vezes o DPR, e o contexto
+  é escalado para preservar o sistema de coordenadas em que os comandos de desenho
+  foram escritos. Canvases repintam depois do layout e no resize.
+
+- **O `role` default de cada widget era apagado.** A limpeza de prop `null`
+  (0.66.0) fez `semantics: null` remover `role`/`aria-label` — correto por si, mas
+  rodava **depois** de cada widget definir seus próprios defaults, então os
+  apagava. E o core põe toda prop declarada no fio, logo `semantics: null` é o que
+  um widget sem semantics sempre manda. Medido contra as props reais:
+
+  ```text
+  ProgressBar  role=null  aria-valuemin=0   <- valuemin sem role
+  Spinner      role=null
+  Toast        role=null                    <- não anunciava nada
+  Dialog       role=null  aria-label=null   <- e título sem nome acessível
+  ```
+
+- **Um campo de senha se desmascarava na primeira tecla.** O `type` do `Input`
+  era rederivado de todo bag de props (`props.secure ? "password" : "text"`).
+  Digitar aplica patch só em `value`, então o update seguinte não trazia `secure`,
+  lia `undefined` e definia `type="text"` — a senha ficava mascarada só até o
+  usuário digitar uma.
+
+- **O `label` de um container era escrito como seu texto.** Qualquer widget com
+  prop `label` tinha o `textContent` sobrescrito, então um `FormField` — cujo
+  label é metadado, e cujo `Text` filho o core já renderiza — mostrava um segundo
+  rótulo sem estilo, em Times New Roman ao lado do rótulo temático. O SSR nunca o
+  desenhou, então os dois renderizadores discordavam sobre a mesma árvore. Pior:
+  um Update com `label` teria substituído os filhos do campo por aquela string.
+
+- **O artefato do Modo A não bootava.** O timeout de chamada nativa (0.66.0)
+  importa `tempestweb.core.constants` em `native/bridges.py`, mas o bundle wasm
+  embarca um subconjunto explícito do pacote e `core` não estava nele. Todos os
+  testes Python seguiam verdes — o processo de teste tem o pacote inteiro
+  instalado — enquanto o artefato morria no browser com
+  `No module named 'tempestweb.core'`. Um guard novo caminha pelos arquivos
+  embarcados e exige que todo import de nível de módulo `tempestweb.X` nomeie uma
+  parte que também está embarcada.
+
+- **Nenhum artefato tinha ícone de aba.** Nenhum shell linkava um, então o browser
+  pedia `/favicon.ico` a cada carga e todo artefato respondia 404 — console de
+  deploy abrindo com um erro que ninguém pode resolver, e aba com ícone em branco.
+
+- **`Menu`, `ActionSheet`, `Popover` e `Tooltip` não desenhavam nada.** As
+  escolhas de um menu vivem na prop `items` (lista de dicts no fio) e nenhum
+  código as renderizava: o widget saía como caixa vazia, e não havia caminho para
+  o `on_select` que ele declara. `Popover` e `Menu` carregam a `key` da própria
+  âncora, ignorada. O `message` de um `Tooltip` nunca aparecia.
+
+  Como esses widgets são folhas da IR — nenhum caminho de patch desce neles — o
+  renderizador é livre para possuir seu conteúdo: os itens agora são botões
+  renderer-owned com `role=menuitem`, e um clique reporta `select` com
+  `{value, label}` contra a key do menu, que é o `MenuSelectEvent` que o handler
+  declara. Um overlay ancorado é posicionado sob sua âncora no mesmo passo
+  pós-layout que repinta canvases, com clamp na viewport para um menu aberto perto
+  da borda seguir alcançável. O título do `ActionSheet` é pintado como o do
+  `Dialog` (prop, não filho) e ele ganha scrim, porque é modal — `Menu` e
+  `Popover` não ganham, porque não são. O `message` do `Tooltip` vira o atributo
+  `title` nativo: aparece no hover e no foco por teclado, e leitor de tela já o lê;
+  uma bolha própria precisaria de um id para apontar `aria-describedby` e brigaria
+  com a do browser.
+
+- **O `on_dismiss` de um overlay modal nunca disparava.** `Dialog` e `BottomSheet`
+  declaram o handler e nada no cliente o acionava: com o scrim agora visível, ele
+  prometia "clique fora para fechar" e não cumpria, e uma app sem botão próprio
+  prendia o usuário. Um clique no scrim — que é o `::before` do host, então o
+  clique aterra no host, o que no DOM é exatamente "clicou fora" — e a tecla
+  `Escape` agora reportam `dismiss` para o overlay modal do topo. Clique **dentro**
+  do overlay não fecha, e `Menu`/`Popover` não entram nesse caminho porque não têm
+  scrim. Verificado no Chrome: abrir → clicar no scrim fecha; reabrir → `Escape`
+  fecha; clicar no corpo do dialog mantém aberto.
+
+### Fixed — exemplos
+
+- **kanban-board, dashboard-shell, notification-center:** `on_click=lambda c=col:
+  ...` é a forma usual de capturar variável de laço em Python e é uma armadilha
+  aqui: a lambda passa a **aceitar** um argumento posicional, e o runtime entrega
+  o evento tipado a todo handler que aceita um. O evento caía em `c`, então o
+  rótulo do kanban lia `New card in [x=None y=None]` em vez do nome da coluna.
+  `functools.partial` amarra o valor sem criar parâmetro.
+- **data-table:** a coluna de salário ordenava como texto, então `R$ 8.750`
+  caía depois de `R$ 20.000`. Célula que lê como número passa a ordenar por valor.
+- **admin-console:** a paginação era decorativa — todas as linhas iam para
+  `list_page` com `page_count` fixo em 2, então "Próxima" mudava o rótulo e
+  deixava as mesmas cinco linhas na tela.
+- **theme-switcher:** cada swatch de accent é um `Container` colorido cujo
+  `Button` é só a área de clique, mas o botão não tinha `Style` — então o core lhe
+  dava a variante filled: uma pílula roxa de 48px dentro de um círculo de 44px.
+  Todo swatch aparecia roxo com uma lasca da cor real na borda, num exemplo cujo
+  propósito é escolher cor.
+
+### Added
+
+- `SecurityConfig.trusted_proxies` — de quais peers o `X-Forwarded-For` pode ser
+  acreditado (`None` ignora o header; `["*"]` confia em qualquer peer).
+- `AppSession.resync()` e o tipo de evento reservado `resync` no contrato: o
+  cliente que não conseguiu aplicar um batch pede a cena inteira, e a perna SSE
+  emite o mesmo reparo quando o gap do `Last-Event-ID` já saiu do buffer.
+- `SSETransport.missed_since()` / `last_id`, `RateLimiter.tracked_keys()`,
+  `package_digests()` e o `timeout` do `ProxyBridge`.
+- `applyPatches(root, patches, onError)` e `Transport.requestResync` no cliente.
+
+- Tipos de evento `drag` / `drop` na tabela de roteamento, entregando o
+  `DragEvent` tipado que os widgets já declaravam.
+- `client/dom.js` exporta `DRAG_DATA_ATTR`, `DROP_TARGET_ATTR`, `TITLE_ATTR`,
+  `ITEM_ATTR`, `ITEM_VALUE_ATTR` e `ANCHOR_ATTR`; `repaintCanvases(root)` redesenha
+  os canvases depois do layout e `positionAnchoredOverlays(root)` coloca cada
+  overlay ancorado junto da sua âncora.
+
+### Tests
+
+- Os cenários de conformidade eram checados contra um aplicador de referência
+  escrito em Python, então o `client/dom.js` — o renderizador que de fato pinta
+  todos os modos — nunca era confrontado com os patches do próprio core. Foi por
+  aí que o caso `null` passou. Um cenário novo limpa props e um teste em jsdom faz
+  o round-trip de **todos** os cenários pelo renderizador real, afirmando que a
+  árvore patcheada é igual à construída.
+- A perna SSE ganhou testes ponta a ponta contra um servidor de verdade em porta
+  efêmera: o `TestClient` síncrono trava a thread num `GET` streaming (era por
+  isso que o teste do round-trip estava `skip`) e o transporte ASGI do httpx
+  bufferiza um corpo que nunca termina.
+
+- Round-trip de drag/drop em jsdom, camada de overlay (posicionamento + papéis
+  ARIA + o `role` default sobrevivendo a `semantics: null`), itens de menu
+  desenhados e a seleção chegando ao handler pelos dois lados do fio, máscara de
+  senha através de um update que só muda o valor, e o guard de fechamento de
+  imports do bundle do Modo A.
+- Os três modos foram exercitados num browser real: Modo B (kanban, overlays,
+  data-table, admin-console, list_demo, login-form, theme-switcher), Modo A
+  (counter sob Pyodide) e Modo C (counter transpilado).
 ## [0.68.0] — 2026-08-22
 
 Uma lista declarava as duas bordas e nenhuma delas existia na tela.
@@ -113,6 +432,7 @@ Um app podia montar a própria paleta e não tinha como usá-la.
 - Tokens de status (`--tw-success`, `--tw-warning`, `--tw-info`,
   `--tw-neutral`) agora saem também do tema do app, e não só dos valores
   fixos da folha.
+
 
 ## [0.65.0] — 2026-08-21
 

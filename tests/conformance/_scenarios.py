@@ -16,6 +16,8 @@ from __future__ import annotations
 from typing import Any
 
 from tempest_core import Button, Column, Row, Text, Widget, build, diff
+from tempest_core.widgets import Image, Input
+from tempest_core.widgets.base import Semantics
 
 
 def counter_views() -> list[Widget]:
@@ -91,12 +93,57 @@ def replace_views() -> list[Widget]:
     ]
 
 
+def cleared_prop_views() -> list[Widget]:
+    """Return a sequence where set props are taken back off the widgets.
+
+    A widget's prop set is fixed, so a prop the app stops passing comes across as
+    ``set_props: {"<name>": null}`` rather than disappearing from the tree. A
+    renderer that reads that as "leave the old value alone" keeps DOM state the
+    tree no longer describes — a stale ``aria-label`` still announced, a
+    ``maxlength`` still capping an input, an ``id`` from ``attrs`` still matched
+    by CSS. This scenario is what pins that.
+
+    Returns:
+        Two :class:`Widget` trees: everything set, then everything cleared.
+    """
+    return [
+        Column(
+            key="root",
+            children=[
+                Text(
+                    content="hello",
+                    key="label",
+                    semantics=Semantics(label="greeting", role="status"),
+                    focus_order=3,
+                ),
+                Input(
+                    value="typed",
+                    key="field",
+                    placeholder="type here",
+                    max_length=10,
+                    attrs={"id": "the-field", "data-role": "primary"},
+                ),
+                Image(src="/a.png", alt="a", key="pic", focusable=True),
+            ],
+        ),
+        Column(
+            key="root",
+            children=[
+                Text(content="hello", key="label"),
+                Input(value="typed", key="field"),
+                Image(src="/a.png", alt="a", key="pic"),
+            ],
+        ),
+    ]
+
+
 # Every scenario the harness knows about, keyed by a stable name used in the
 # golden fixture file. Order within each value is "tick order".
 SCENARIOS: dict[str, list[Widget]] = {
     "counter": counter_views(),
     "list": list_views(),
     "replace": replace_views(),
+    "cleared_props": cleared_prop_views(),
 }
 
 

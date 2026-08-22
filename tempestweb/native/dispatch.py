@@ -282,7 +282,7 @@ async def send_native_call(capability: str, args: dict[str, Any]) -> dict[str, A
         BrowserUnavailableError: If no bridge is installed (off-platform).
         NativeError: If the browser reports the call failed (``ok`` is false).
     """
-    call_id = f"c{next(_call_ids)}"
+    call_id = _next_call_id()
     result = await current_bridge().call(native_call(capability, args, call_id))
     if not result.get("ok", False):
         raise NativeError(
@@ -443,6 +443,22 @@ async def native_events(
             yield cast("dict[str, Any]", event) if isinstance(event, dict) else {}
     finally:
         await bridge.unsubscribe(sub_id)
+
+
+def _next_call_id() -> str:
+    """Return a fresh call id (``"c1"``, ``"c2"``, ...).
+
+    One source for the whole process, because every ``call_id`` — whichever entry
+    point minted it — is looked up in the *same* per-session registry on the
+    bridge. Two counters meant two callers could hand the bridge the same id: the
+    second overwrote the first's pending future, so one awaiter hung forever and
+    the client's answer could settle the wrong call, handing a capability's result
+    to a caller that asked for something else.
+
+    Returns:
+        The next monotonic call id.
+    """
+    return f"c{next(_call_ids)}"
 
 
 def _next_sub_id() -> str:

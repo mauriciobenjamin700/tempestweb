@@ -299,3 +299,159 @@ test("an Update that drops an attrs key removes it from the element", () => {
   assert.equal(el.getAttribute("data-tw-layout"), "shell");
   assert.equal(el.hasAttribute("data-tw-open"), false);
 });
+
+test("unset_props clears props beyond style/content/label", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "field",
+    props: {
+      value: "typed",
+      placeholder: "type here",
+      max_length: 10,
+      focus_order: 2,
+      semantics: { label: "the field", role: "textbox" },
+      attrs: { id: "the-field" },
+    },
+    children: [],
+  });
+  assert.equal(el.getAttribute("placeholder"), "type here");
+  assert.equal(el.getAttribute("id"), "the-field");
+
+  applyPatches(el, [
+    {
+      path: [],
+      unset_props: [
+        "placeholder",
+        "max_length",
+        "focus_order",
+        "semantics",
+        "attrs",
+      ],
+    },
+  ]);
+
+  assert.equal(el.hasAttribute("placeholder"), false);
+  assert.equal(el.hasAttribute("maxlength"), false);
+  assert.equal(el.hasAttribute("tabindex"), false);
+  assert.equal(el.hasAttribute("aria-label"), false);
+  assert.equal(el.hasAttribute("role"), false);
+  assert.equal(el.hasAttribute("id"), false);
+});
+
+test("a null prop clears the attribute a previous value set", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Image",
+    key: "pic",
+    props: { src: "/a.png", alt: "a", semantics: { label: "a picture" } },
+    children: [],
+  });
+  applyPatches(el, [
+    { path: [], set_props: { src: null, alt: null, semantics: null } },
+  ]);
+  assert.equal(el.hasAttribute("src"), false);
+  assert.equal(el.hasAttribute("alt"), false);
+  assert.equal(el.hasAttribute("aria-label"), false);
+});
+
+test("attrs refuses an inline event handler", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Text",
+    key: "t",
+    props: { content: "x", attrs: { onclick: "alert(1)", ONERROR: "boom()", id: "ok" } },
+    children: [],
+  });
+  assert.equal(el.hasAttribute("onclick"), false);
+  assert.equal(el.hasAttribute("onerror"), false);
+  assert.equal(el.getAttribute("id"), "ok");
+});
+
+test("applyPatches stops at a patch it cannot apply and reports it", () => {
+  withDocument();
+  const parent = buildElement({
+    type: "Column",
+    key: "root",
+    props: {},
+    children: [{ type: "Text", key: "a", props: { content: "a" }, children: [] }],
+  });
+  /** @type {Object[]} */
+  const failures = [];
+  applyPatches(
+    parent,
+    [
+      { path: [0], set_props: { content: "applied" } },
+      { path: [99], set_props: { content: "unreachable" } },
+      { path: [0], set_props: { content: "never" } },
+    ],
+    (error, patch) => failures.push({ error, patch }),
+  );
+
+  assert.equal(failures.length, 1);
+  assert.deepEqual(failures[0].patch.path, [99]);
+  // The batch stopped: the third patch must not have been applied.
+  assert.equal(parent.children[0].textContent, "applied");
+});
+
+test("applyPatches still throws when no error handler is given", () => {
+  withDocument();
+  const el = buildElement({ type: "Column", key: "r", props: {}, children: [] });
+  assert.throws(() => applyPatches(el, [{ path: [5], set_props: {} }]), RangeError);
+});
+
+test("a value-only update leaves a secure Input masked", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { value: "hunter2", secure: true, placeholder: "p" },
+    children: [],
+  });
+  assert.equal(el.getAttribute("type"), "password");
+
+  // Typing patches `value` alone; the type must not be re-derived from a props
+  // bag that never mentioned `secure`.
+  applyPatches(el, [{ path: [], set_props: { value: "hunter22" } }]);
+  assert.equal(el.getAttribute("type"), "password");
+
+  // Turning secure off is still honoured when the patch says so.
+  applyPatches(el, [{ path: [], set_props: { secure: false } }]);
+  assert.equal(el.getAttribute("type"), "text");
+});
+
+test("a container's label prop is metadata, not its text content", () => {
+  withDocument();
+  const el = buildElement({
+    type: "FormField",
+    key: "f",
+    props: { name: "email", label: "E-mail" },
+    children: [
+      { type: "Text", key: "field-label", props: { content: "E-mail" }, children: [] },
+      { type: "Input", key: "email-field", props: { value: "" }, children: [] },
+    ],
+  });
+
+  // The core renders its own label child; painting the prop too produced an
+  // unstyled duplicate (and the SSR renderer never drew it).
+  assert.equal(el.childNodes.length, 2);
+  assert.equal(el.children[0].getAttribute("data-tw-key"), "field-label");
+
+  // An Update carrying `label` must not wipe the field's children.
+  applyPatches(el, [{ path: [], set_props: { label: "Correo" } }]);
+  assert.equal(el.children.length, 2);
+  assert.equal(el.children[1].getAttribute("data-tw-key"), "email-field");
+});
+
+test("a Button's label is still its text", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Button",
+    key: "b",
+    props: { label: "Save" },
+    children: [],
+  });
+  assert.equal(el.textContent, "Save");
+  applyPatches(el, [{ path: [], set_props: { label: "Saved" } }]);
+  assert.equal(el.textContent, "Saved");
+});

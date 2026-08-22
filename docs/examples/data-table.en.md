@@ -45,6 +45,7 @@ represents one employee with four fields: name, department, city, and salary.
 ```python
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -76,6 +77,10 @@ _EMPLOYEES: list[tuple[str, str, str, str]] = [
     ("Nicolás Rocha", "HR", "Curitiba", "R$ 9.100"),
     ("Olivia Campos", "Engineering", "Rio de Janeiro", "R$ 20.000"),
 ]
+
+#: A cell that is a formatted number (currency prefix, digits, grouping
+#: separators) and therefore sorts numerically rather than as text.
+_NUMERIC_CELL_RE: re.Pattern[str] = re.compile(r"^[^\d]*[\d.,]+$")
 
 #: Column headers in display order.
 COLUMNS: list[str] = ["Nome", "Departamento", "Cidade", "Salário"]
@@ -183,8 +188,9 @@ def _filtered_rows(
     """Return the filtered and sorted string matrix for ``DataTable.rows``.
 
     Filtering is case-insensitive: a row passes when any cell contains the
-    ``query`` substring.  Sorting is lexicographic on the selected column;
-    an inactive sort (``sort_col == -1``) preserves insertion order.
+    ``query`` substring.  Sorting uses ``_cell_sort_key``, so a money or count
+    column sorts by value and a text column alphabetically; an inactive sort
+    (``sort_col == -1``) preserves insertion order.
 
     Args:
         rows: The full dataset.
@@ -202,7 +208,7 @@ def _filtered_rows(
     if sort_col >= 0:
         visible = sorted(
             visible,
-            key=lambda r: r[sort_col].lower(),
+            key=lambda r: _cell_sort_key(r[sort_col]),
             reverse=(sort_dir is SortDir.DESC),
         )
     return [list(row) for row in visible]
@@ -415,6 +421,7 @@ This exact ``view`` runs unchanged in both modes::
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 
@@ -470,6 +477,20 @@ def make_state() -> DataTableState:
     return DataTableState()
 
 
+def _cell_sort_key(cell: str) -> tuple[int, float, str]:
+    """Order a cell by its number when it reads as one, else by its text.
+
+    Formatted money ("R$ 18.500") sorted as text puts "R$ 8.750" *after*
+    "R$ 20.000" — 8 sorts after 2 — which on screen looks like a broken table.
+    """
+    stripped = cell.strip()
+    if _NUMERIC_CELL_RE.match(stripped):
+        digits = re.sub(r"\D", "", stripped)
+        if digits:
+            return (0, float(digits), "")
+    return (1, 0.0, stripped.lower())
+
+
 def _filtered_rows(
     rows: list[tuple[str, str, str, str]],
     query: str,
@@ -484,7 +505,7 @@ def _filtered_rows(
     if sort_col >= 0:
         visible = sorted(
             visible,
-            key=lambda r: r[sort_col].lower(),
+            key=lambda r: _cell_sort_key(r[sort_col]),
             reverse=(sort_dir is SortDir.DESC),
         )
     return [list(row) for row in visible]

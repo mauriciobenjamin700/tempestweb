@@ -48,6 +48,19 @@ const TAG_BY_TYPE = Object.freeze({
   // no patch path ever descends into what the renderer puts inside them.
   ProgressBar: "div",
   Spinner: "div",
+  // Draggable/DragTarget are plain boxes; what makes them work is the HTML5
+  // drag contract applied by applyDragProps + the listeners in events.js.
+  Draggable: "div",
+  DragTarget: "div",
+  // Overlay-layer widgets. They are boxes too; what makes them float is the
+  // base sheet (positioning + backdrop) plus the roles applyOverlayProps sets.
+  Dialog: "div",
+  BottomSheet: "div",
+  Toast: "div",
+  Menu: "div",
+  ActionSheet: "div",
+  Popover: "div",
+  Tooltip: "div",
 });
 
 // Font stack for Canvas draw_text commands (a literal, since a 2D context cannot
@@ -95,7 +108,8 @@ function applyNodeShape(el, type, key, props) {
  *
  * For text-bearing props, a Checkbox is a <label> wrapping an <input>, so its
  * caption is set as a trailing text node (see setCheckboxLabel) rather than
- * overwriting textContent, which would drop the nested input. An Icon is an inline
+ * overwriting textContent, which would drop the nested input. A `label` is drawn
+ * only for the widget types it actually names (see LABEL_AS_TEXT_TYPES). An Icon is an inline
  * <svg> whose glyph is (re)drawn when its name or size changes; a style-only
  * update leaves the existing glyph untouched.
  *
@@ -119,26 +133,269 @@ function applyProps(el, props) {
   if ("label" in props) {
     if (type === "Checkbox") {
       setCheckboxLabel(el, props.label == null ? "" : String(props.label));
-    } else {
+    } else if (type != null && LABEL_AS_TEXT_TYPES.has(type)) {
       el.textContent = props.label == null ? "" : String(props.label);
     }
   }
   if (type === "Icon" && ("name" in props || "size" in props)) {
     renderIcon(/** @type {any} */ (el), props);
   }
+  // The app's own semantics are applied FIRST, then each widget's defaults fill
+  // what is still missing. The other order looks equivalent and is not: a widget
+  // with no semantics sends `semantics: null`, which clears role/aria-label — so
+  // running it last stripped the role every widget had just set, leaving a
+  // ProgressBar with aria-valuemin and no role at all, and a Toast that
+  // announced nothing.
+  applyA11yProps(el, props);
   applyIndicatorProps(el, type, props);
   applyControlProps(el, type, props);
-  applyA11yProps(el, props);
+  applyDragProps(el, type, props);
+  applyOverlayProps(el, type, props);
   applyEscapeHatchAttrs(el, props);
   applyLazyProps(el, type, props);
   applyListEventProps(el, type, props);
 }
+
+/** Attribute holding a `Dialog`'s title, painted by the base sheet. */
+export const TITLE_ATTR = "data-tw-title";
+/** Attribute marking a renderer-owned menu item, read by the click listener. */
+export const ITEM_ATTR = "data-tw-part";
+/** Attribute holding the value a menu item selects. */
+export const ITEM_VALUE_ATTR = "data-tw-value";
+/** Attribute holding the widget key an overlay anchors itself to. */
+export const ANCHOR_ATTR = "data-tw-anchor";
+
+/**
+ * Render a `Menu`/`ActionSheet`'s items as renderer-owned buttons.
+ *
+ * `items` is a prop — a list of `{label, value, icon}` dicts — and these widgets
+ * are IR leaves, so no patch path ever descends into them and the renderer is
+ * free to own their contents. Without this the widget rendered as an empty box:
+ * the items existed on the wire and nothing drew them.
+ *
+ * The list is rebuilt whenever `items` arrives, which is what an Update carrying
+ * a changed menu looks like. Each button carries its value for the click
+ * listener, and `role=menuitem` so the menu reads as a menu.
+ *
+ * @param {HTMLElement} el     The Menu/ActionSheet element.
+ * @param {*} items            The `items` prop (anything else is treated empty).
+ * @returns {void}
+ */
+function renderMenuItems(el, items) {
+  const list = Array.isArray(items) ? items : [];
+  for (const existing of Array.from(el.querySelectorAll(`[${ITEM_ATTR}="item"]`))) {
+    existing.remove();
+  }
+  for (const item of list) {
+    const button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute(ITEM_ATTR, "item");
+    button.setAttribute("role", "menuitem");
+    button.setAttribute(ITEM_VALUE_ATTR, item?.value == null ? "" : String(item.value));
+    button.textContent = item?.label == null ? "" : String(item.label);
+    el.appendChild(button);
+  }
+}
+
+/**
+ * Position every anchored overlay next to the widget it names.
+ *
+ * A `Menu`/`Popover` carries the `key` of its anchor, which the renderer can
+ * only honour once layout exists — so this runs in the same post-layout pass
+ * that repaints canvases. The overlay is placed under the anchor, left-aligned,
+ * then clamped into the viewport so a menu opened near an edge stays reachable.
+ * An overlay whose anchor is absent keeps the sheet's default placement.
+ *
+ * @param {HTMLElement} root  The mount root to search under.
+ * @returns {void}
+ */
+export function positionAnchoredOverlays(root) {
+  const anchored = root.querySelectorAll(`[${ANCHOR_ATTR}]`);
+  for (const node of anchored) {
+    const el = /** @type {HTMLElement} */ (node);
+    const key = el.getAttribute(ANCHOR_ATTR);
+    if (!key) continue;
+    const anchor = root.querySelector(`[${KEY_ATTR}="${CSS.escape(key)}"]`);
+    if (anchor == null) continue;
+    const box = anchor.getBoundingClientRect();
+    const own = el.getBoundingClientRect();
+    const margin = 8;
+    // A harness without layout (jsdom) reports no viewport; skip the clamp there
+    // rather than pinning everything to the top-left corner.
+    const viewW = globalThis.innerWidth || 0;
+    const viewH = globalThis.innerHeight || 0;
+    const left = Math.max(margin, box.left);
+    const top = box.bottom + 4;
+    const maxLeft = viewW > 0 ? Math.max(margin, viewW - own.width - margin) : left;
+    const maxTop = viewH > 0 ? Math.max(margin, viewH - own.height - margin) : top;
+    el.style.position = "fixed";
+    el.style.left = `${Math.min(left, maxLeft)}px`;
+    el.style.top = `${Math.min(top, maxTop)}px`;
+    el.style.transform = "none";
+  }
+}
+
+/**
+ * Apply the overlay-layer widgets' text and accessibility semantics.
+ *
+ * A scene's overlays are patched into a separate host (see `mount`), which the
+ * base sheet positions; these are the per-widget bits the sheet cannot do.
+ *
+ * A `Dialog`'s title is *not* one of its children — it is a prop — so it cannot
+ * be inserted as an element without shifting the indices every child patch is
+ * relative to. It goes onto {@link TITLE_ATTR}, which the sheet paints via
+ * `::before`, and onto `aria-label`, so a screen reader announces the dialog by
+ * its title rather than reading a decorative pseudo-element. A `Toast` carries
+ * no children at all, so its message is plain text content, and it announces
+ * itself politely — a toast that appeared silently would be invisible to a
+ * screen reader.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyOverlayProps(el, type, props) {
+  if (type === "Dialog") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "dialog");
+      el.setAttribute("aria-modal", "true");
+    }
+    if ("title" in props) {
+      const title = props.title;
+      setOrRemove(el, TITLE_ATTR, title === "" ? null : title);
+      // An explicit semantics.label is the app naming the dialog on purpose; the
+      // title only supplies a name when the app did not.
+      const sem = props.semantics;
+      const named = sem != null && typeof sem === "object" && sem.label != null;
+      if (!named) {
+        setOrRemove(el, "aria-label", title === "" ? null : title);
+      }
+    }
+  } else if (type === "BottomSheet") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "dialog");
+      el.setAttribute("aria-modal", "true");
+    }
+  } else if (type === "Toast") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "status");
+      el.setAttribute("aria-live", "polite");
+    }
+    if ("message" in props) {
+      el.textContent = props.message == null ? "" : String(props.message);
+    }
+  } else if (type === "Menu" || type === "ActionSheet") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "menu");
+    }
+    if (type === "ActionSheet" && "title" in props) {
+      const title = props.title;
+      setOrRemove(el, TITLE_ATTR, title === "" ? null : title);
+      const sem = props.semantics;
+      const named = sem != null && typeof sem === "object" && sem.label != null;
+      if (!named) {
+        setOrRemove(el, "aria-label", title === "" ? null : title);
+      }
+    }
+    if ("items" in props) {
+      renderMenuItems(el, props.items);
+    }
+    if ("anchor" in props) {
+      setOrRemove(el, ANCHOR_ATTR, props.anchor);
+    }
+  } else if (type === "Popover") {
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "dialog");
+    }
+    if ("anchor" in props) {
+      setOrRemove(el, ANCHOR_ATTR, props.anchor);
+    }
+  } else if (type === "Tooltip") {
+    // The native `title` attribute, deliberately: it shows on hover and keyboard
+    // focus, and assistive tech already reads it. A custom bubble would need an
+    // id to point aria-describedby at, and would fight the browser's own.
+    if ("message" in props) {
+      setOrRemove(el, "title", props.message === "" ? null : props.message);
+    }
+  }
+}
+
+/** Attribute carrying a `Draggable`'s payload, read by the dragstart listener. */
+export const DRAG_DATA_ATTR = "data-tw-drag-data";
+/** Attribute marking a `DragTarget`, read by the dragover/drop listeners. */
+export const DROP_TARGET_ATTR = "data-tw-drop";
+
+/**
+ * Apply the HTML5 drag-and-drop contract for `Draggable` / `DragTarget`.
+ *
+ * The core has always had both widgets and the SSR renderer emitted their boxes,
+ * but the DOM renderer treated them as anonymous `div`s: nothing was marked
+ * `draggable`, so a "draggable" card could not be picked up in any mode, and a
+ * `DragTarget` never accepted a drop. The board rendered and did nothing.
+ *
+ * A `Draggable` becomes a real draggable element carrying its payload in
+ * {@link DRAG_DATA_ATTR}; `events.js` reads it on `dragstart` and hands it to the
+ * `DragTarget` marked with {@link DROP_TARGET_ATTR} on `drop`. The grab cursor is
+ * a default only — an explicit Style on the widget wins, and it is re-applied on
+ * every update because a `style` patch resets the element's inline cssText.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyDragProps(el, type, props) {
+  if (type === "Draggable") {
+    el.setAttribute("draggable", "true");
+    if ("drag_data" in props) {
+      const data = props.drag_data;
+      el.setAttribute(DRAG_DATA_ATTR, data == null ? "" : String(data));
+    } else if (!el.hasAttribute(DRAG_DATA_ATTR)) {
+      el.setAttribute(DRAG_DATA_ATTR, "");
+    }
+    if (!el.style.cursor) {
+      el.style.cursor = "grab";
+    }
+  } else if (type === "DragTarget") {
+    el.setAttribute(DROP_TARGET_ATTR, "");
+  }
+}
+
+/**
+ * Widget types whose `label` prop *is* their text content.
+ *
+ * Not every widget with a label wants it drawn: a `FormField` is a container
+ * whose label is metadata (the core renders its own `Text` child for it, and the
+ * SSR renderer ignores the prop). Writing it as text content painted an
+ * unstyled, duplicate label — Times New Roman next to the themed one — and an
+ * Update carrying `label` would have wiped the field's children along with it,
+ * since textContent replaces everything.
+ */
+const LABEL_AS_TEXT_TYPES = new Set([
+  "Button",
+  "IconButton",
+  "Switch",
+  "DatePicker",
+  "TimePicker",
+  "FilePicker",
+]);
 
 /** Valid HTML attribute name — mirrors `_ATTR_KEY_RE` in the SSR renderer. */
 const ATTR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9:_-]*$/;
 
 /** Attributes this renderer owns; `attrs` may never overwrite them. */
 const RESERVED_ATTRS = new Set([TYPE_ATTR, KEY_ATTR, "style"]);
+
+/**
+ * Inline event-handler attributes (`onclick`, `onerror`, …), refused by `attrs`.
+ *
+ * `attrs` is an escape hatch for markup an app owns — `id`, `class`, `data-*`,
+ * `hx-*`. An `on*` value is *code*, so a widget built from data the app did not
+ * write (a row label, a remote field) would execute it. The SSR renderer refuses
+ * the same names, so a tree behaves identically whichever renderer draws it.
+ */
+const EVENT_HANDLER_ATTR_RE = /^on/i;
 
 /**
  * Apply the core's `attrs` escape hatch (`id`, `class`, `data-*`, `hx-*`, …).
@@ -172,6 +429,14 @@ function applyEscapeHatchAttrs(el, props) {
       }
       continue;
     }
+    if (EVENT_HANDLER_ATTR_RE.test(name)) {
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn(
+          `tempestweb: ignoring inline event-handler attribute in attrs: ${name}`,
+        );
+      }
+      continue;
+    }
     if (RESERVED_ATTRS.has(name)) continue;
     el.setAttribute(name, value == null ? "" : String(value));
     applied.add(name);
@@ -197,24 +462,44 @@ function applyEscapeHatchAttrs(el, props) {
  * @returns {void}
  */
 function applyA11yProps(el, props) {
-  const sem = props.semantics;
-  if (sem != null && typeof sem === "object") {
-    if (sem.label != null) {
-      el.setAttribute("aria-label", String(sem.label));
-    }
-    if (sem.role != null) {
-      el.setAttribute("role", String(sem.role));
-    }
-    if (sem.hint != null) {
-      el.setAttribute("aria-description", String(sem.hint));
-    }
+  if ("semantics" in props) {
+    const sem = props.semantics;
+    const semantics = sem != null && typeof sem === "object" ? sem : {};
+    setOrRemove(el, "aria-label", semantics.label);
+    setOrRemove(el, "role", semantics.role);
+    setOrRemove(el, "aria-description", semantics.hint);
   }
+  if (!("focus_order" in props) && !("focusable" in props)) return;
   if (props.focus_order != null) {
     el.setAttribute("tabindex", String(props.focus_order));
   } else if (props.focusable === true) {
     el.setAttribute("tabindex", "0");
   } else if (props.focusable === false) {
     el.setAttribute("tabindex", "-1");
+  } else {
+    el.removeAttribute("tabindex");
+  }
+}
+
+/**
+ * Set an attribute, or remove it when the value is `null`/`undefined`.
+ *
+ * The IR keeps a widget's prop set fixed, so a prop the app stops passing comes
+ * across as `null` rather than disappearing. Treating that as "leave the old
+ * value alone" is what let a cleared `semantics` keep announcing a stale
+ * `aria-label`, and a cleared `max_length` keep capping an input — the DOM held
+ * state the tree no longer described.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {string} name        The attribute name.
+ * @param {*} value            The value, or null/undefined to remove it.
+ * @returns {void}
+ */
+function setOrRemove(el, name, value) {
+  if (value == null) {
+    el.removeAttribute(name);
+  } else {
+    el.setAttribute(name, String(value));
   }
 }
 
@@ -258,11 +543,11 @@ function applyLazyProps(el, type, props) {
   el.style.overflowY = horizontal ? "hidden" : "auto";
   el.style.overflowX = horizontal ? "auto" : "hidden";
   el.style.minHeight = "0";
-  if ("item_count" in props && props.item_count != null) {
-    el.setAttribute("data-tw-item-count", String(props.item_count));
+  if ("item_count" in props) {
+    setOrRemove(el, "data-tw-item-count", props.item_count);
   }
-  if ("window_size" in props && props.window_size != null) {
-    el.setAttribute("data-tw-window-size", String(props.window_size));
+  if ("window_size" in props) {
+    setOrRemove(el, "data-tw-window-size", props.window_size);
   }
   const start = Array.isArray(props.window) ? props.window[0] : 0;
   el.setAttribute("data-tw-window-start", String(start ?? 0));
@@ -402,8 +687,8 @@ function applyIndicatorProps(el, type, props) {
   if (type == null || !INDICATOR_TYPES.includes(type)) {
     return;
   }
-  if ("color_scheme" in props && props.color_scheme != null) {
-    el.setAttribute("data-tw-scheme", String(props.color_scheme));
+  if ("color_scheme" in props) {
+    setOrRemove(el, "data-tw-scheme", props.color_scheme);
   }
   if (type === "Spinner") {
     if ("size" in props) {
@@ -517,6 +802,17 @@ function canvasColor(c) {
  * required. A no-op when the 2D context is unavailable (e.g. a jsdom harness
  * without canvas support).
  *
+ * **Buffer vs. display size.** A canvas has two sizes: the pixel buffer
+ * (`width`/`height`) and the box CSS gives it. Painting only the buffer at the
+ * widget's declared size left the browser to stretch that bitmap over whatever
+ * box the layout produced — a 320×200 chart blown up to 909×568 inside a card,
+ * every label soft and oversized. And on a HiDPI screen the same bitmap was
+ * stretched again by the device pixel ratio. So the buffer is sized to the box
+ * actually on screen (times the DPR) while the context is scaled to keep the
+ * app's declared coordinate system, which is what its draw commands are written
+ * in. Before layout — first paint, or a jsdom harness with no layout at all —
+ * the box is unknown (`clientWidth` is 0) and the declared size is used as-is.
+ *
  * @param {HTMLCanvasElement} el  The Canvas element.
  * @param {Object} props          Props that may include width/height/commands.
  * @returns {void}
@@ -531,17 +827,38 @@ function paintCanvas(el, props) {
   if ("commands" in props && Array.isArray(props.commands)) {
     el._twCanvasCmds = props.commands;
   }
-  if (el._twCanvasW != null) {
-    el.width = el._twCanvasW;
+  const declaredW = el._twCanvasW;
+  const declaredH = el._twCanvasH;
+  if (declaredW == null || declaredH == null) {
+    return;
   }
-  if (el._twCanvasH != null) {
-    el.height = el._twCanvasH;
+  // Defaults only, and only when the app's Style did not size the canvas: a
+  // canvas declares 320x200 but a flex parent's `align-items: stretch` (the CSS
+  // default) pulls it to the container's width, and the intrinsic aspect ratio
+  // drags the height along — a chart drawn for 320x200 was being blown up to
+  // 909x568, so every label came out 2.8x too large. Pinning the box to the
+  // declared size keeps the drawing at the scale the app designed it for; an
+  // app that wants a bigger canvas sets the size on the widget's Style, and the
+  // scaling below then maps its commands onto that box.
+  if (!el.style.width) {
+    el.style.width = `${declaredW}px`;
   }
+  if (!el.style.height) {
+    el.style.height = `${declaredH}px`;
+  }
+  const dpr = globalThis.devicePixelRatio || 1;
+  const displayW = el.clientWidth || declaredW;
+  const displayH = el.clientHeight || declaredH;
+  el.width = Math.round(displayW * dpr);
+  el.height = Math.round(displayH * dpr);
   const ctx = typeof el.getContext === "function" ? el.getContext("2d") : null;
   if (ctx == null) {
     return;
   }
-  ctx.clearRect(0, 0, el.width, el.height);
+  if (typeof ctx.setTransform === "function") {
+    ctx.setTransform((displayW * dpr) / declaredW, 0, 0, (displayH * dpr) / declaredH, 0, 0);
+  }
+  ctx.clearRect(0, 0, declaredW, declaredH);
   for (const cmd of el._twCanvasCmds ?? []) {
     switch (cmd.kind) {
       case "move_to":
@@ -596,15 +913,23 @@ function applyControlProps(el, type, props) {
   if (type === "Canvas") {
     paintCanvas(el, props);
   } else if (type === "Input") {
-    el.setAttribute("type", props.secure ? "password" : "text");
+    // Only when the patch carries `secure`. Deriving the type from every props
+    // bag turned a password field back into a visible text field on the first
+    // update that did not mention it — which is every keystroke, since typing
+    // patches `value` alone. The password was masked until the user typed.
+    if ("secure" in props) {
+      el.setAttribute("type", props.secure ? "password" : "text");
+    } else if (!el.hasAttribute("type")) {
+      el.setAttribute("type", "text");
+    }
     if ("value" in props) {
       el.value = props.value == null ? "" : String(props.value);
     }
-    if ("placeholder" in props && props.placeholder != null) {
-      el.setAttribute("placeholder", String(props.placeholder));
+    if ("placeholder" in props) {
+      setOrRemove(el, "placeholder", props.placeholder);
     }
-    if (props.max_length != null) {
-      el.setAttribute("maxlength", String(props.max_length));
+    if ("max_length" in props) {
+      setOrRemove(el, "maxlength", props.max_length);
     }
   } else if (type === "Checkbox") {
     const input = ensureCheckboxInput(el);
@@ -624,12 +949,30 @@ function applyControlProps(el, type, props) {
       el.style.width = "fit-content";
     }
   } else if (type === "Image") {
-    if ("src" in props && props.src != null) {
-      el.setAttribute("src", String(props.src));
+    if ("src" in props) {
+      setOrRemove(el, "src", props.src);
     }
-    if ("alt" in props && props.alt != null) {
-      el.setAttribute("alt", String(props.alt));
+    if ("alt" in props) {
+      setOrRemove(el, "alt", props.alt);
     }
+  }
+}
+
+/**
+ * Repaint every Canvas under `root` at its current on-screen size.
+ *
+ * The first paint happens while the element is still detached, so it has no box
+ * to measure and falls back to the declared size; the same is true after the
+ * window resizes. Callers run this once layout exists (see `mount`), which is
+ * what keeps a chart sharp instead of a stretched bitmap.
+ *
+ * @param {HTMLElement} root  The mount root to search under.
+ * @returns {void}
+ */
+export function repaintCanvases(root) {
+  const canvases = root.querySelectorAll('[data-tw-type="Canvas"]');
+  for (const el of canvases) {
+    paintCanvas(/** @type {any} */ (el), {});
   }
 }
 
@@ -676,6 +1019,12 @@ function resolvePath(root, path) {
 
 /**
  * Apply a single Update patch: set/unset props on the node at `path`.
+ *
+ * An unset prop is applied as `null`, which every prop applier reads as "clear
+ * whatever a previous value put on the element". Handling the two cases
+ * separately is what let `unset_props` cover only `style`/`content`/`label`
+ * while `src`, `value`, `attrs` and the a11y attributes stayed behind.
+ *
  * @param {HTMLElement} root  The root element.
  * @param {{path:number[], set_props?:Object, unset_props?:string[]}} patch  The patch.
  * @returns {void}
@@ -685,14 +1034,9 @@ function applyUpdate(root, patch) {
   if (patch.set_props) {
     applyProps(el, patch.set_props);
   }
-  for (const key of patch.unset_props ?? []) {
-    if (key === "style") {
-      el.removeAttribute("style");
-    } else if (key === "label" && el.getAttribute(TYPE_ATTR) === "Checkbox") {
-      setCheckboxLabel(el, "");
-    } else if (key === "content" || key === "label") {
-      el.textContent = "";
-    }
+  const unset = patch.unset_props ?? [];
+  if (unset.length > 0) {
+    applyProps(el, Object.fromEntries(unset.map((name) => [name, null])));
   }
 }
 
@@ -789,12 +1133,27 @@ function applyPatch(root, patch) {
  * order the core emitted them — so index-relative ops (insert/remove/reorder)
  * stay consistent.
  *
+ * A patch that cannot be applied means the tree here no longer matches the one
+ * the patch was computed against, and every later patch is index-relative to
+ * that tree — so the batch **stops** at the failure and `onError` is called.
+ * Carrying on would keep mutating a tree that is already wrong. Without an
+ * `onError` the error is rethrown, which is the old behaviour.
+ *
  * @param {HTMLElement} root                       The mounted root element.
  * @param {import("./transport.js").Patch[]} patches  The tick's patch batch.
+ * @param {(error: Error, patch: import("./transport.js").Patch) => void} [onError]
+ *        Called with the first patch that failed; the rest of the batch is
+ *        skipped. Omit to have the error propagate.
  * @returns {void}
  */
-export function applyPatches(root, patches) {
+export function applyPatches(root, patches, onError) {
   for (const patch of patches) {
-    applyPatch(root, patch);
+    try {
+      applyPatch(root, patch);
+    } catch (error) {
+      if (!onError) throw error;
+      onError(/** @type {Error} */ (error), patch);
+      return;
+    }
   }
 }

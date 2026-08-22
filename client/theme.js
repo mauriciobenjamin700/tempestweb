@@ -349,6 +349,17 @@ export const BASE_THEME_CSS = `
   border-radius: 8px;
   cursor: pointer;
   min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+[data-tw-type="Menu"] > [data-tw-part="item"] > [data-tw-menu-icon],
+[data-tw-type="ActionSheet"] > [data-tw-part="item"] > [data-tw-menu-icon] {
+  flex: 0 0 auto;
+}
+[data-tw-type="Menu"] > [data-tw-part="item"] > [data-tw-menu-label],
+[data-tw-type="ActionSheet"] > [data-tw-part="item"] > [data-tw-menu-label] {
+  flex: 1 1 auto;
 }
 [data-tw-type="Menu"] > [data-tw-part="item"]:hover,
 [data-tw-type="ActionSheet"] > [data-tw-part="item"]:hover {

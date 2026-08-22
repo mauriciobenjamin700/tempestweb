@@ -324,3 +324,113 @@ test("a Menu is not dismissed by the scrim path (it has no scrim)", async () => 
   host.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
   assert.deepEqual(events, []);
 });
+
+test("a MenuItem's icon renders before its label", () => {
+  withDocument();
+  const menu = buildElement({
+    type: "Menu",
+    key: "m",
+    props: {
+      items: [
+        { label: "Delete", value: "del", icon: "trash" },
+        { label: "Rename", value: "ren", icon: null },
+      ],
+    },
+    children: [],
+  });
+
+  const items = menu.querySelectorAll('[data-tw-part="item"]');
+  const withIcon = items[0];
+  const withoutIcon = items[1];
+
+  const svg = withIcon.querySelector("[data-tw-menu-icon]");
+  assert.ok(svg != null, "the item that named an icon drew one");
+  assert.equal(svg.getAttribute("data-tw-icon"), "trash");
+  assert.equal(withIcon.firstChild, svg, "the icon comes before the label");
+  assert.ok(svg.querySelector("path") != null, "a known name resolves to a glyph");
+
+  const slot = withoutIcon.querySelector("[data-tw-menu-icon]");
+  assert.ok(slot != null, "the icon-less item keeps the slot, so labels align");
+  assert.equal(slot.querySelector("path"), null, "and the slot is empty");
+  assert.equal(withIcon.textContent, "Delete", "the icon adds no text");
+});
+
+test("a menu with no icons at all gets no slots", () => {
+  withDocument();
+  const menu = buildElement({
+    type: "Menu",
+    key: "m",
+    props: {
+      items: [
+        { label: "Copy", value: "copy" },
+        { label: "Paste", value: "paste", icon: null },
+      ],
+    },
+    children: [],
+  });
+
+  for (const item of menu.querySelectorAll('[data-tw-part="item"]')) {
+    assert.equal(item.querySelector("[data-tw-menu-icon]"), null);
+  }
+});
+
+test("an unknown icon name leaves the box and the label alone", () => {
+  withDocument();
+  const menu = buildElement({
+    type: "Menu",
+    key: "m",
+    props: { items: [{ label: "Mystery", value: "m", icon: "not-a-real-icon" }] },
+    children: [],
+  });
+
+  const item = menu.querySelector('[data-tw-part="item"]');
+  const svg = item.querySelector("[data-tw-menu-icon]");
+  assert.ok(svg != null, "the box is still there, so layout does not jump");
+  assert.equal(svg.querySelector("path"), null);
+  assert.equal(item.textContent, "Mystery");
+});
+
+test("clicking the icon selects the item it belongs to", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const { bindEvents } = await import("../../client/events.js");
+  /** @type {import("../../client/transport.js").TWEvent[]} */
+  const events = [];
+  const transport = { onPatches() {}, sendEvent: (e) => events.push(e), async close() {} };
+
+  const menu = buildElement({
+    type: "Menu",
+    key: "row-menu",
+    props: { items: [{ label: "Delete", value: "del", icon: "trash" }] },
+    children: [],
+  });
+  dom.root.appendChild(menu);
+  bindEvents(dom.root, transport);
+
+  // The glyph is the innermost node, so it is what a real pointer hits.
+  const glyph = menu.querySelector("[data-tw-menu-icon] path");
+  glyph.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+
+  assert.deepEqual(events, [
+    { type: "select", key: "row-menu", payload: { value: "del", label: "Delete" } },
+  ]);
+});
+
+test("an updated items list replaces the icons too", () => {
+  withDocument();
+  const menu = buildElement({
+    type: "Menu",
+    key: "m",
+    props: { items: [{ label: "One", value: "1", icon: "trash" }] },
+    children: [],
+  });
+
+  applyPatches(menu, [
+    { path: [], set_props: { items: [{ label: "Two", value: "2" }] } },
+  ]);
+
+  const items = menu.querySelectorAll('[data-tw-part="item"]');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].textContent, "Two");
+  assert.equal(items[0].querySelector("[data-tw-menu-icon]"), null, "the old icon went with it");
+});

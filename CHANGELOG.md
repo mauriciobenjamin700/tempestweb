@@ -4,6 +4,32 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.71.0] — 2026-08-22
+
+### Added
+
+- **`MenuItem.icon` passa a ser desenhado** (#77, item 2). `MenuItem` sempre
+  teve `label`, `value` e `icon`; o renderizador desenhava os dois primeiros e
+  descartava o terceiro, então o item saía só com texto. Agora o nome resolve
+  pelo `client/icons/` e vira um `<svg>` antes do rótulo, dimensionado `1em`
+  pelo renderizador de ícone — logo acompanha o tamanho de tipo que o item
+  herdar. Vale para `Menu` e `ActionSheet`.
+
+  O rótulo passou a morar num `<span>` próprio em vez do `textContent` do
+  botão: atribuir `textContent` apagaria o ícone recém-inserido. A seleção
+  continua funcionando ao clicar no ícone, porque o listener sobe do
+  `event.target` até o item.
+
+### Changed
+
+- **Item de menu alinha o rótulo quando o menu tem ícones.** Assim que
+  **algum** item nomeia um ícone, todos ganham o slot — vazio onde não há
+  ícone. Sem isso o rótulo dos itens sem ícone começava uma largura de glifo à
+  esquerda dos outros, o que lê como menu quebrado, não como menu com alguns
+  ícones. Menu sem ícone nenhum não ganha slot. O espaçamento vive na folha
+  base, por atributo (`data-tw-menu-icon` / `data-tw-menu-label`), não em style
+  inline.
+
 ## [0.69.0] — 2026-08-22
 
 Uma auditoria da perna do Modo B, e depois um browser em cima dela.

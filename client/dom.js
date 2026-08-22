@@ -160,6 +160,10 @@ function applyProps(el, props) {
 export const TITLE_ATTR = "data-tw-title";
 /** Attribute marking a renderer-owned menu item, read by the click listener. */
 export const ITEM_ATTR = "data-tw-part";
+/** Attribute marking a menu item's renderer-owned icon. */
+const ITEM_ICON_ATTR = "data-tw-menu-icon";
+/** Attribute marking a menu item's label span. */
+const ITEM_LABEL_ATTR = "data-tw-menu-label";
 /** Attribute holding the value a menu item selects. */
 export const ITEM_VALUE_ATTR = "data-tw-value";
 /** Attribute holding the widget key an overlay anchors itself to. */
@@ -177,6 +181,17 @@ export const ANCHOR_ATTR = "data-tw-anchor";
  * a changed menu looks like. Each button carries its value for the click
  * listener, and `role=menuitem` so the menu reads as a menu.
  *
+ * A `MenuItem` may name an `icon`, which becomes an `<svg>` before the label —
+ * sized `1em` by the icon renderer, so it matches whatever type size the item
+ * inherits. The label goes in its own `<span>` rather than the button's
+ * `textContent`, because assigning that would drop the icon that was just
+ * inserted. An unknown icon name leaves an empty box, like every other icon.
+ *
+ * Once any item in the list names an icon, every item gets the slot — an empty
+ * one where there is no icon. Otherwise the labels of the icon-less items start
+ * a glyph's width to the left of the others, which reads as a broken menu
+ * rather than as a menu with some icons.
+ *
  * @param {HTMLElement} el     The Menu/ActionSheet element.
  * @param {*} items            The `items` prop (anything else is treated empty).
  * @returns {void}
@@ -186,13 +201,24 @@ function renderMenuItems(el, items) {
   for (const existing of Array.from(el.querySelectorAll(`[${ITEM_ATTR}="item"]`))) {
     existing.remove();
   }
+  const anyIcon = list.some((item) => item?.icon != null && String(item.icon) !== "");
   for (const item of list) {
     const button = document.createElement("button");
     button.setAttribute("type", "button");
     button.setAttribute(ITEM_ATTR, "item");
     button.setAttribute("role", "menuitem");
     button.setAttribute(ITEM_VALUE_ATTR, item?.value == null ? "" : String(item.value));
-    button.textContent = item?.label == null ? "" : String(item.label);
+    const icon = item?.icon == null ? "" : String(item.icon);
+    if (anyIcon) {
+      const svg = createIconSvg();
+      svg.setAttribute(ITEM_ICON_ATTR, "");
+      renderIcon(svg, { name: icon });
+      button.appendChild(svg);
+    }
+    const label = document.createElement("span");
+    label.setAttribute(ITEM_LABEL_ATTR, "");
+    label.textContent = item?.label == null ? "" : String(item.label);
+    button.appendChild(label);
     el.appendChild(button);
   }
 }

@@ -16,6 +16,11 @@ distrusts the whole table.
 So the emitted set is **derived from the client**, not restated here, and the
 inert roster is pinned. Wiring a handler fails this test until the roster is
 updated — which is the moment to update the issue too.
+
+The roster is now **empty**: every handler the core declares is reachable. What
+the test guards from here on is the reverse direction — a handler added with no
+gesture behind it fails immediately, naming the pair, instead of shipping and
+being discovered by an audit months later.
 """
 
 from __future__ import annotations
@@ -45,27 +50,15 @@ _MAP_VALUE = re.compile(r':\s*"([a-z][a-z_]*)"')
 #: ("module", "window") are not wire events.
 _NOT_EVENT_SURFACES = ("sw",)
 
-#: Handlers no gesture reaches yet, as `(prop, widget)`. Shrinking this is the
-#: work; every removal is a handler that started firing.
-INERT: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("on_complete", "PinInput"),
-        ("on_double_tap", "DoubleTapHandler"),
-        ("on_double_tap", "GestureDetector"),
-        ("on_double_tap", "ScaleHandler"),
-        ("on_double_tap", "ScaleHandlerWidget"),
-        ("on_frame", "CameraPreview"),
-        ("on_interaction", "InteractiveViewer"),
-        ("on_page_change", "PageView"),
-        ("on_pan", "PanHandler"),
-        ("on_pan", "PanHandlerWidget"),
-        ("on_reorder", "ReorderableList"),
-        ("on_scale", "ScaleHandler"),
-        ("on_scale", "ScaleHandlerWidget"),
-        ("on_scan", "QrScanner"),
-        ("on_validate", "FormField"),
-    }
-)
+#: Handlers no gesture reaches yet, as `(prop, widget)`.
+#:
+#: **Empty, and that is the point.** It held fifteen pairs when this guard was
+#: written; the work of issue #77 emptied it — `on_reorder`, `on_page_change`,
+#: `on_pan`, `on_scale`, `on_double_tap`, `on_interaction`, `on_complete`,
+#: `on_validate`, `on_scan` and `on_frame` all fire now. So the test flipped
+#: meaning: instead of pinning a backlog, it is the regression guard that catches
+#: the *next* handler to be declared without a gesture, on the day it is added.
+INERT: frozenset[tuple[str, str]] = frozenset()
 
 
 def _client_sources() -> list[Path]:

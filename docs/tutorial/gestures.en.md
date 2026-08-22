@@ -25,19 +25,24 @@ def view(app: App[Board]) -> Widget:
     return DragTarget(
         key="done",
         on_drop=dropped,
-        children=[
-            Draggable(
-                key="card-7",
-                drag_data="card-7",
-                children=[Text(content="Write the post")],
-            )
-        ],
+        child=Draggable(
+            key="card-7",
+            drag_data="card-7",
+            child=Text(content="Write the post"),
+        ),
     )
 ```
 
 `drag_data` is what arrives as `event.data` in `on_drop` — usually the id of what
 was dragged. `on_drag` tells you the drag started, if you want to paint a
 "carrying this" state.
+
+!!! warning "`child`, not `children`"
+    `Draggable` and `DragTarget` wrap **one** widget: the field is `child`.
+    Passing `children=` raises `ValidationError` naming the field — the core
+    rejects a kwarg it does not declare. Need several children? Put a
+    `Column`/`Row` inside `child`, the way the
+    [Kanban board](../examples/kanban-board.md) does.
 
 ## Reordering a list
 

@@ -103,22 +103,39 @@ material_icon(MaterialIcons.STAR)
 
 ## Ícones dentro dos campos
 
-Os campos prontos (veja [Componentes prontos](components.md)) aceitam ícones nos
-seus _slots_ por **nome cru** — e um nome sem prefixo continua sendo **Lucide**,
-para compatibilidade com o `Icon` do core:
+Os widgets de entrada do core têm _slots_ de ícone: `Input`, `Dropdown` e
+`Autocomplete` aceitam `leading_icon` e `trailing_icon`; `IconButton` e `MenuItem`
+aceitam `icon`. O nome vai **cru** — sem prefixo ele resolve no **Lucide**, para
+compatibilidade com o `Icon` do core:
 
-```python
-from tempestweb.components import EmailField, PasswordField
+```python hl_lines="7 8"
+from tempest_core import Input
 
-EmailField(value="", on_change=..., leading_icon="mail")     # Lucide
-PasswordField(value="", on_change=..., leading_icon="lock")  # Lucide
+
+def email_input(value: str) -> Input:
+    """Build an e-mail input with a leading mail glyph."""
+    return Input(
+        key="email",
+        value=value,
+        placeholder="you@example.com",
+        leading_icon="mail",              # Lucide
+        trailing_icon="material:check",   # Material, pelo prefixo
+        on_change=lambda event: None,
+    )
 ```
+
+!!! warning "Os campos prontos não expõem o slot"
+    `EmailField` e `PasswordField` (de `tempestweb.components`) embrulham um
+    `Input` mas **não** publicam `leading_icon`/`trailing_icon` — passar o kwarg
+    levanta `ValidationError` com o nome do campo, porque o core recusa kwarg que
+    não declara. Precisa de ícone no campo? Use o `Input` do core direto, como
+    acima.
 
 !!! note "A gramática do nome"
     Por baixo, o conjunto é codificado como um **prefixo** no nome do `Icon`:
     `"material:home"`, `"lucide:mail"`. As funções `material_icon`/`lucide_icon`
     põem o prefixo por você. Um nome **sem** prefixo (`"mail"`) resolve no Lucide —
-    é por isso que os _slots_ dos campos só pedem o nome cru.
+    é por isso que os _slots_ de ícone só pedem o nome cru.
 
 ## Ícone customizado (SVG cru) { #icone-customizado-svg-cru }
 

@@ -23,6 +23,7 @@ from typing import Any
 
 import tempest_core
 import tempestweb.components as tempestweb_components
+from tempestweb.transpile._members import VALUE_MEMBERS
 from tempestweb.transpile._native import (
     NATIVE_ENUMS,
     NATIVE_EXPORTS,
@@ -258,6 +259,29 @@ _METHOD_RENAMES: dict[str, str] = {
     "endswith": "endsWith",
     "append": "push",
 }
+
+
+def _is_main_guard(test: ast.expr) -> bool:
+    """Return whether `test` is the `__name__ == "__main__"` script guard.
+
+    Both spellings count, since the comparison reads either way round. The block
+    it guards never runs when the file is imported as a module, which is exactly
+    how Mode C compiles it — so recognising it here is fidelity, not a shortcut.
+
+    Args:
+        test: The `if` test expression.
+
+    Returns:
+        True when the test compares `__name__` against `"__main__"`.
+    """
+    if not isinstance(test, ast.Compare) or len(test.ops) != 1:
+        return False
+    if not isinstance(test.ops[0], ast.Eq):
+        return False
+    sides = (test.left, test.comparators[0])
+    named = any(isinstance(s, ast.Name) and s.id == "__name__" for s in sides)
+    literal = any(isinstance(s, ast.Constant) and s.value == "__main__" for s in sides)
+    return named and literal
 
 
 def _js_name(name: str) -> str:
@@ -700,6 +724,13 @@ class _Generator:
           while ``String(-42).padStart(5, "0")`` gives ``"00-42"``. The emitted
           arrow keeps the sign outside the padding, and takes its argument once
           so an interpolated call is not evaluated twice.
+        - ``+`` before any of the above → forces the sign on a positive, which is
+          how a delta reads (``+12.3%``). The value is formatted **first** and the
+          prefix decided from the result, because prepending ``"+"`` to a negative
+          would give ``"+-3.0"``. Negative zero keeps its sign the way Python does,
+          which ``toFixed`` alone drops. Not combinable with ``0Nd``: Python counts
+          the sign inside that width and layering would give one character too
+          many.
 
         Args:
             expr: The already-emitted JS for the interpolated value.
@@ -713,6 +744,21 @@ class _Generator:
             TranspileError: For any spec outside the supported subset (e.g.
                 alignment/fill, sign, binary/hex, exponent).
         """
+        if text.startswith("+"):
+            rest = text[1:]
+            if re.fullmatch(r"0(\d+)d", rest):
+                raise TranspileError(
+                    "f-string format spec '+0Nd' is not supported: Python counts "
+                    "the sign inside the padded width, so the two cannot be "
+                    "layered (use `+d` or `0Nd`)",
+                    node,
+                    self.filename,
+                )
+            formatted = self._format_spec_js("v", rest, node)
+            return (
+                f'((v) => {{ const s = {formatted}; return s.startsWith("-") ? s '
+                f': (Object.is(v, -0) ? "-" : "+") + s; }})({expr})'
+            )
         zero_pad = re.fullmatch(r"0(\d+)d", text)
         if zero_pad:
             width = int(zero_pad.group(1))
@@ -727,7 +773,8 @@ class _Generator:
         if match is None or not (grouped or precision is not None or kind):
             raise TranspileError(
                 f"f-string format spec {text!r} is not supported "
-                "(supported: `.Nf`, `,`, `,.Nf`, `.N%`, `d`, `,d`, `0Nd`)",
+                "(supported: `.Nf`, `,`, `,.Nf`, `.N%`, `d`, `,d`, `0Nd`, and `+` "
+                "before any of them)",
                 node,
                 self.filename,
             )
@@ -977,17 +1024,18 @@ class _Generator:
         """Emit a dict literal as a JS object.
 
         String-constant keys become plain object keys (``"k": v``); any other key
-        expression becomes a computed key (``[expr]: v``). ``**spread`` keys
-        (a ``None`` key) are unsupported.
+        expression becomes a computed key (``[expr]: v``). A ``**spread`` key
+        (which the AST gives as a ``None`` key) becomes an object spread — the
+        idiom for replacing one entry without mutating the dict the state still
+        holds. Position is preserved, because in both languages a later key wins.
         """
         if not node.keys:
             return "{}"
         pairs: list[str] = []
         for key, value in zip(node.keys, node.values, strict=True):
             if key is None:
-                raise TranspileError(
-                    "dict unpacking (**) is not supported", node, self.filename
-                )
+                pairs.append(f"...{self.expr(value, indent)}")
+                continue
             val = self.expr(value, indent)
             if isinstance(key, ast.Constant) and isinstance(key.value, str):
                 pairs.append(f"{json.dumps(key.value)}: {val}")
@@ -1024,6 +1072,7 @@ class _Generator:
         ``native.http.request("GET", url, json=body)``) → the positional args
         followed by a trailing options object holding the keywords.
         """
+        self._refuse_unported_member(node)
         pattern = self._pattern_method(node, indent)
         if pattern is not None:
             return pattern
@@ -1247,6 +1296,46 @@ class _Generator:
             self.runtime_helpers.add(helper)
             return f"{helper}$({', '.join(args)})"
         return f"{mapped}({', '.join(args)})"
+
+    def _refuse_unported_member(self, node: ast.Call) -> None:
+        """Refuse `Name.member(...)` when the client's own object lacks `member`.
+
+        ``_served.py`` answers "does the client export this name?"; it cannot
+        answer "does that name have this method?". The gap is the same failure
+        with a different shape: ``Theme.from_seed(...)`` compiles, parses, loads
+        and throws ``is not a function`` at mount — a blank page and one console
+        line, which ``node --check`` cannot see because it parses without
+        executing.
+
+        Only a bare name imported from the core (or the component facade) is
+        checked, and only when it is called as a receiver: a method on a value the
+        app built (``app.push``, ``ctrl.forward``) is somebody else's contract.
+
+        Args:
+            node: The call node.
+
+        Raises:
+            TranspileError: When the member is not in the generated manifest.
+        """
+        func = node.func
+        if not isinstance(func, ast.Attribute) or not isinstance(func.value, ast.Name):
+            return
+        local = func.value.id
+        if local in self.class_names or local not in self.core_imports:
+            return
+        origin = self.core_imports[local]
+        if origin not in SERVED_NAMES:
+            return
+        if func.attr in VALUE_MEMBERS.get(origin, frozenset()):
+            return
+        carried = sorted(VALUE_MEMBERS.get(origin, frozenset()))
+        has = f" (it carries {', '.join(carried)})" if carried else ""
+        raise TranspileError(
+            f"`{origin}.{func.attr}()` is not available in Mode C: "
+            "the client's own object carries no such member" + has,
+            node,
+            self.filename,
+        )
 
     def _refuse_widget_method(self, node: ast.Call) -> None:
         """Refuse a method call on a core widget, which Mode C does not carry.
@@ -1941,6 +2030,8 @@ class _Generator:
             if self._scopes and target.id in self._scopes[-1]:
                 return [f"{pad}{target.id} = {value};"]
             return [f"{pad}const {target.id} = {value};"]
+        if isinstance(target, ast.Subscript) and isinstance(target.slice, ast.Slice):
+            return [self._slice_assign(target, value, pad, indent)]
         if isinstance(target, (ast.Attribute, ast.Subscript)):
             return [f"{pad}{self.expr(target, indent)} = {value};"]
         if isinstance(target, (ast.Tuple, ast.List)):
@@ -1956,6 +2047,45 @@ class _Generator:
             target,
             self.filename,
         )
+
+    def _slice_assign(
+        self, target: ast.Subscript, value: str, pad: str, indent: int
+    ) -> str:
+        """Emit ``xs[:] = value`` as an in-place replacement.
+
+        A slice *reads* as ``.slice(...)``, so routing the assignment through the
+        expression emitter produced ``xs.slice(0) = [...]``. That parses — which
+        is why ``node --check`` passed — and throws ``Invalid left-hand side in
+        assignment`` on the first run: measured in ``examples/router-drawer``,
+        whose drawer navigation silently did nothing.
+
+        Only the whole slice is supported. A partial one (``xs[1:3] = [...]``)
+        can grow or shrink the list, and quietly getting that wrong is worse than
+        refusing it.
+
+        Args:
+            target: The subscript being assigned to.
+            value: The already-emitted JS for the right-hand side.
+            pad: The current indentation prefix.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS statement replacing the list's contents.
+
+        Raises:
+            TranspileError: For a slice with bounds or a step.
+        """
+        piece = target.slice
+        assert isinstance(piece, ast.Slice)
+        if piece.lower is not None or piece.upper is not None or piece.step is not None:
+            raise TranspileError(
+                "a partial slice assignment (`xs[a:b] = …`) is not supported "
+                "(assign the whole slice, `xs[:] = …`, or rebind the name)",
+                target,
+                self.filename,
+            )
+        seq = self.expr(target.value, indent)
+        return f"{pad}{seq}.splice(0, {seq}.length, ...{value});"
 
     def _annassign(self, node: ast.AnnAssign, indent: int) -> list[str]:
         """Emit an annotated assignment (``total: int = 0`` → ``const total = 0;``).
@@ -2112,6 +2242,16 @@ class _Generator:
                 top_level.append(node)
             elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
                 continue  # module docstring
+            elif isinstance(node, ast.If) and _is_main_guard(node.test):
+                if node.orelse:
+                    raise TranspileError(
+                        'the `else` of an `if __name__ == "__main__":` guard runs '
+                        "on import, so Mode C cannot drop it with the guard "
+                        "(move it to module level)",
+                        node,
+                        self.filename,
+                    )
+                continue  # a script guard: dead in a module, in Python too
             else:
                 raise TranspileError(
                     f"top-level {type(node).__name__} is not supported",

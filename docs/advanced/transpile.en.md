@@ -673,6 +673,20 @@ spirit of `mypy --strict`.
       way the core's own enums already travel in `values.gen.js`.
     - **generator expressions** (`any(x for x in xs)`), `any`/`all`, `dict.get`
       with a default, and the `str` predicates (`c.isdigit()`).
+    - **`{**old, k: v}`**, the "new dict without mutating" idiom (sibling of
+      `[a, *rest]`), and **`xs[:] = [...]`**, the in-place replace — which
+      becomes a `splice`, not an assignment to a copy.
+    - **`f"{x:+.1f}"`**: `+` forces the sign on a positive, the way Python does.
+      The value is formatted **first** and the prefix decided from the result,
+      or a negative would come out `+-3.0`. It composes with `,`, `%` and `d`;
+      with `0Nd` it is refused, because Python counts the sign inside the width.
+    - **`if __name__ == "__main__":` is skipped**, not refused: the block is a
+      script guard and never runs when the file is imported as a module — which
+      is exactly how Mode C compiles it. An `else` on it is still refused,
+      because that one *does* run.
+    - **a core event constructor**: `ThemeChangeEvent(mode=ThemeMode.DARK)` and
+      the other 32 events are generated into `values.gen.js`. An app builds one
+      when it simulates a host event.
 
     - **native capabilities, in all three import forms:**
       `from tempestweb import native`, `from tempestweb.native import storage`
@@ -688,7 +702,7 @@ spirit of `mypy --strict`.
       window in the runtime, the way the server does in Mode B, and it survives
       the `view` re-running.
 
-    Measured on the corpus: **40 of 57 examples** transpile, up from 14.
+    Measured on the corpus: **42 of 57 examples** transpile, up from 14.
 
 !!! tip "Always give a component an explicit `key`"
     A component's default key is its own name (`card`, `alert`, `navbar`), so two

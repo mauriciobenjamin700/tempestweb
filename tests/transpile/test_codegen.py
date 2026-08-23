@@ -604,7 +604,7 @@ _UNSUPPORTED: dict[str, str] = {
     "fn_decorator": "@deco\ndef f():\n    pass\n",
     "class_decorator": "@deco\nclass C:\n    x: int = 0\n",
     "fstring_align_spec": "def f(x):\n    return f'{x:>5}'\n",
-    "fstring_sign_spec": "def f(x):\n    return f'{x:+.2f}'\n",
+    "fstring_sign_zero_pad": "def f(x):\n    return f'{x:+05d}'\n",
     "fstring_hex_spec": "def f(x):\n    return f'{x:x}'\n",
     "fstring_precision_no_type": "def f(x):\n    return f'{x:.3}'\n",
     "fstring_dynamic_spec": "def f(x, n):\n    return f'{x:.{n}f}'\n",
@@ -1044,6 +1044,114 @@ def test_a_facade_only_component_refuses_an_unknown_kwarg() -> None:
     assert "does not accept `subtitle`" in str(excinfo.value)
 
 
+def test_a_whole_slice_assignment_replaces_in_place() -> None:
+    """`xs[:] = [...]` is the in-place replace, and it compiled to garbage.
+
+    A slice *reads* as `.slice(...)`, so the assignment came out as
+    `xs.slice(0) = [...]` — which parses, so `node --check` passed, and threw
+    `Invalid left-hand side in assignment` on the first click. Measured in
+    `examples/router-drawer`, whose drawer navigation did nothing.
+    """
+    js = gen('def f(s, label):\n    s.history_labels[:] = ["Home", label]\n')
+    assert ".slice(0) =" not in js
+    assert "s.history_labels.splice(0, s.history_labels.length," in js
+
+
+def test_a_partial_slice_assignment_is_refused() -> None:
+    """`xs[1:3] = [...]` can grow or shrink the list, which `splice` alone does
+    not express faithfully here — refusing beats a subtly wrong list."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen("def f(xs):\n    xs[1:3] = [0]\n")
+    assert "slice assignment" in str(excinfo.value)
+
+
+def test_a_core_member_the_client_lacks_is_refused_by_name() -> None:
+    """`Theme.from_seed(...)` compiled, loaded, and died at mount.
+
+    `_served.py` answers "does the client export this name?" — it cannot answer
+    "does that name have this method?". `Theme` is served (Mode C's carries the
+    mode), but the seeded Material 3 palette is not ported: the base stylesheet
+    paints the tokens. Measured in `examples/theme-switcher`: a blank page and
+    one console line, with a build that passed.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from tempest_core import Color, Theme\n\n\n"
+            "def f():\n"
+            '    return Theme.from_seed(Color.from_hex("#123456"))\n'
+        )
+    message = str(excinfo.value)
+    assert "Theme.from_seed" in message
+    assert "carries no such member" in message
+
+
+def test_the_core_members_the_client_does_carry_still_pass() -> None:
+    """`Color.from_hex` and the two `Edge` helpers are ported, so they compile."""
+    js = gen(
+        "from tempest_core import Color, Edge\n\n\n"
+        "def f():\n"
+        "    return [\n"
+        '        Color.from_hex("#123456"),\n'
+        "        Edge.all(4.0),\n"
+        "        Edge.symmetric(vertical=2.0),\n"
+        "    ]\n"
+    )
+    assert "Color.from_hex" in js
+    assert "Edge.all(4.0)" in js
+    assert "Edge.symmetric(" in js
+
+
+def test_a_main_guard_is_skipped_not_refused() -> None:
+    """`if __name__ == "__main__":` is a script guard, dead in a module.
+
+    Real apps keep a local smoke test behind it (`examples/router-drawer` does).
+    Mode C compiles the file *as a module*, where Python would never run the
+    block either — so skipping it is the faithful reading, and refusing it barred
+    a file whose runtime behaviour was already identical.
+    """
+    js = gen(
+        "def view(app):\n"
+        "    return app\n"
+        "\n\n"
+        'if __name__ == "__main__":\n'
+        "    print(view(None))\n"
+    )
+    assert "export function view" in js
+    assert "__main__" not in js
+    assert "print" not in js
+
+
+def test_a_main_guard_with_an_else_is_still_refused() -> None:
+    """An `else` on the guard *does* run on import, so dropping it would lie."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen('if __name__ == "__main__":\n    x = 1\nelse:\n    x = 2\n')
+    assert "else" in str(excinfo.value)
+
+
+def test_another_top_level_if_is_still_refused() -> None:
+    """Only the main guard is skipped; a real top-level branch is not."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen("import math\n\nif math.pi > 3:\n    x = 1\n")
+    assert "top-level If" in str(excinfo.value)
+
+
+def test_a_double_starred_key_spreads_in_a_dict_literal() -> None:
+    """`{**old, k: v}` is the immutable-dict idiom, and JS spreads the same way.
+
+    The sibling of `[a, *rest]` for a mapping: it is how an app replaces one key
+    without mutating the dict its state still holds. Order matters in both
+    languages — a later key wins — and the spread keeps that position.
+    """
+    js = gen("def f(state, k, v):\n    return {**state.answers, k: v}\n")
+    assert "{ ...state.answers, [k]: v }" in js
+
+
+def test_a_double_starred_key_spreads_in_any_position() -> None:
+    """A spread can precede, follow or sit between literal pairs."""
+    js = gen('def f(a, b):\n    return {"x": 1, **a, "y": 2, **b}\n')
+    assert '{ "x": 1, ...a, "y": 2, ...b }' in js
+
+
 def test_a_starred_element_spreads_in_a_literal() -> None:
     """`[a, *rest]` is the immutable-state idiom, and JS spreads the same way."""
     js = gen("def f(state):\n    return [state.head, *state.tail]\n")
@@ -1099,6 +1207,42 @@ def test_a_zero_padded_int_keeps_the_sign_outside_the_padding() -> None:
     assert 'String(v).padStart(5, "0")' in js
     # Applied once: the value is not re-evaluated by the sign branch.
     assert js.count(")(n)") == 1
+
+
+def test_a_forced_sign_spec_shows_the_plus_python_shows() -> None:
+    """`f"{x:+.1f}"` is how a delta reads, and Mode C refused it outright.
+
+    Python's `+` forces the sign on a positive and leaves a negative alone, so
+    the emitted code formats first and only then decides the prefix — prepending
+    `"+"` before formatting would produce `"+-3.0"`.
+    """
+    js = gen('def f(x):\n    return f"{x:+.1f}"\n')
+    assert "(1)" in js or "toFixed(1)" in js
+    assert '"-"' in js and '"+"' in js
+    # Applied once: the sign branch must not re-evaluate the interpolated value.
+    assert js.count(")(x)") == 1
+
+
+def test_a_forced_sign_spec_composes_with_the_other_numeric_specs() -> None:
+    """`+` layers over the grouped, percent and integer specs alike."""
+    grouped = gen('def f(x):\n    return f"{x:+,.2f}"\n')
+    assert "minimumFractionDigits: 2" in grouped
+    percent = gen('def f(x):\n    return f"{x:+.0%}"\n')
+    assert "* 100" in percent
+    integer = gen('def f(x):\n    return f"{x:+d}"\n')
+    assert "Math.trunc" in integer
+
+
+def test_a_forced_sign_on_a_zero_padded_int_is_refused() -> None:
+    """`+05d` counts the sign inside the width, which the pad arrow does not.
+
+    Python renders `f"{42:+05d}"` as `"+0042"` — five characters including the
+    sign. Layering the sign over the pad would give six. Refusing beats a silent
+    off-by-one in a scoreboard.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen('def f(n):\n    return f"{n:+05d}"\n')
+    assert "+" in str(excinfo.value)
 
 
 def test_an_unsupported_format_spec_still_names_what_is_supported() -> None:

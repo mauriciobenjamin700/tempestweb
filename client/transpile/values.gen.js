@@ -68,6 +68,19 @@ const Border_DEFAULTS = Object.freeze({
   width: 0.0,
 });
 
+/**
+ * Build a `CameraFrameEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function CameraFrameEvent(partial = {}) {
+  return { ...CameraFrameEvent_DEFAULTS, ...partial };
+}
+
+const CameraFrameEvent_DEFAULTS = Object.freeze({
+  rotation: 0,
+});
+
 /** `CardVariant` — the core enum's members, by wire value. */
 export const CardVariant = Object.freeze({
   ELEVATED: "elevated",
@@ -197,6 +210,17 @@ export const ComponentState = Object.freeze({
   FOCUS: "focus",
 });
 
+/**
+ * Build a `ConnectivityEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function ConnectivityEvent(partial = {}) {
+  return { ...ConnectivityEvent_DEFAULTS, ...partial };
+}
+
+const ConnectivityEvent_DEFAULTS = Object.freeze({});
+
 /** `ConnectivityState` — the core enum's members, by wire value. */
 export const ConnectivityState = Object.freeze({
   CONNECTED: "connected",
@@ -229,6 +253,30 @@ export const DISABLED_CONTAINER_OPACITY = 0.12;
 
 /** `DISABLED_CONTENT_OPACITY` — a core design token. */
 export const DISABLED_CONTENT_OPACITY = 0.38;
+
+/**
+ * Build a `DateChangeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function DateChangeEvent(partial = {}) {
+  return { ...DateChangeEvent_DEFAULTS, ...partial };
+}
+
+const DateChangeEvent_DEFAULTS = Object.freeze({});
+
+/**
+ * Build a `DeepLinkEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function DeepLinkEvent(partial = {}) {
+  return { ...DeepLinkEvent_DEFAULTS, ...partial };
+}
+
+const DeepLinkEvent_DEFAULTS = Object.freeze({
+  params: {},
+});
 
 /**
  * Build a `DetectionBox` wire fragment.
@@ -279,6 +327,34 @@ export const Device = Object.freeze({
   MOTO_G52: "Motorola Moto G52",
   ONEPLUS_9: "OnePlus 9",
   ONEPLUS_11: "OnePlus 11",
+});
+
+/**
+ * Build a `DismissEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function DismissEvent(partial = {}) {
+  return { ...DismissEvent_DEFAULTS, ...partial };
+}
+
+const DismissEvent_DEFAULTS = Object.freeze({
+  overlay_id: null,
+});
+
+/**
+ * Build a `DragEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function DragEvent(partial = {}) {
+  return { ...DragEvent_DEFAULTS, ...partial };
+}
+
+const DragEvent_DEFAULTS = Object.freeze({
+  data: "",
+  x: null,
+  y: null,
 });
 
 /**
@@ -351,6 +427,19 @@ export const FieldVariant = Object.freeze({
   OUTLINE: "outline",
   FILLED: "filled",
   FLUSHED: "flushed",
+});
+
+/**
+ * Build a `FileSelectEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function FileSelectEvent(partial = {}) {
+  return { ...FileSelectEvent_DEFAULTS, ...partial };
+}
+
+const FileSelectEvent_DEFAULTS = Object.freeze({
+  name: null,
 });
 
 /**
@@ -509,6 +598,17 @@ export const KeyboardType = Object.freeze({
 });
 
 /**
+ * Build a `LifecycleEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function LifecycleEvent(partial = {}) {
+  return { ...LifecycleEvent_DEFAULTS, ...partial };
+}
+
+const LifecycleEvent_DEFAULTS = Object.freeze({});
+
+/**
  * Build a `LineTo` wire fragment.
  * @param {Object} [partial]  Fields to override, in the wire's snake_case.
  * @returns {Object}
@@ -519,6 +619,34 @@ export function LineTo(partial = {}) {
 
 const LineTo_DEFAULTS = Object.freeze({
   kind: "line_to",
+});
+
+/**
+ * Build a `LocaleChangeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function LocaleChangeEvent(partial = {}) {
+  return { ...LocaleChangeEvent_DEFAULTS, ...partial };
+}
+
+const LocaleChangeEvent_DEFAULTS = Object.freeze({
+  region: null,
+  rtl: false,
+});
+
+/**
+ * Build a `LongPressEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function LongPressEvent(partial = {}) {
+  return { ...LongPressEvent_DEFAULTS, ...partial };
+}
+
+const LongPressEvent_DEFAULTS = Object.freeze({
+  x: null,
+  y: null,
 });
 
 /** `MATERIAL_ALIASES` — a core design token. */
@@ -542,6 +670,17 @@ export function MenuItem(partial = {}) {
 const MenuItem_DEFAULTS = Object.freeze({
   icon: null,
 });
+
+/**
+ * Build a `MenuSelectEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function MenuSelectEvent(partial = {}) {
+  return { ...MenuSelectEvent_DEFAULTS, ...partial };
+}
+
+const MenuSelectEvent_DEFAULTS = Object.freeze({});
 
 /**
  * Build a `MotionScale` wire fragment.
@@ -582,10 +721,87 @@ export const ON_SURFACE = Object.freeze({"r": 249, "g": 250, "b": 251, "a": 1.0}
 /** `PRESSED_OPACITY` — a core design token. */
 export const PRESSED_OPACITY = 0.12;
 
+/**
+ * Build a `PageChangeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function PageChangeEvent(partial = {}) {
+  return { ...PageChangeEvent_DEFAULTS, ...partial };
+}
+
+const PageChangeEvent_DEFAULTS = Object.freeze({
+  previous: 0,
+});
+
+/**
+ * Build a `PanEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function PanEvent(partial = {}) {
+  return { ...PanEvent_DEFAULTS, ...partial };
+}
+
+const PanEvent_DEFAULTS = Object.freeze({
+  dx: 0.0,
+  dy: 0.0,
+  vx: 0.0,
+  vy: 0.0,
+});
+
 /** `Position` — the core enum's members, by wire value. */
 export const Position = Object.freeze({
   STATIC: "static",
   ABSOLUTE: "absolute",
+});
+
+/**
+ * Build a `QrScanEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function QrScanEvent(partial = {}) {
+  return { ...QrScanEvent_DEFAULTS, ...partial };
+}
+
+const QrScanEvent_DEFAULTS = Object.freeze({
+  format: "QR_CODE",
+});
+
+/**
+ * Build a `RangeChangeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function RangeChangeEvent(partial = {}) {
+  return { ...RangeChangeEvent_DEFAULTS, ...partial };
+}
+
+const RangeChangeEvent_DEFAULTS = Object.freeze({});
+
+/**
+ * Build a `ReorderEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function ReorderEvent(partial = {}) {
+  return { ...ReorderEvent_DEFAULTS, ...partial };
+}
+
+const ReorderEvent_DEFAULTS = Object.freeze({});
+
+/**
+ * Build a `RouteChangeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function RouteChangeEvent(partial = {}) {
+  return { ...RouteChangeEvent_DEFAULTS, ...partial };
+}
+
+const RouteChangeEvent_DEFAULTS = Object.freeze({
+  params: {},
 });
 
 /** `SELECTION_SIZE` — a core design token. */
@@ -606,6 +822,33 @@ export const SafeAreaEdge = Object.freeze({
 });
 
 /**
+ * Build a `ScaleEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function ScaleEvent(partial = {}) {
+  return { ...ScaleEvent_DEFAULTS, ...partial };
+}
+
+const ScaleEvent_DEFAULTS = Object.freeze({
+  focus_x: 0.0,
+  focus_y: 0.0,
+  rotation: 0.0,
+  scale: 1.0,
+});
+
+/**
+ * Build a `ScrollEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function ScrollEvent(partial = {}) {
+  return { ...ScrollEvent_DEFAULTS, ...partial };
+}
+
+const ScrollEvent_DEFAULTS = Object.freeze({});
+
+/**
  * Build a `SectionHeader` wire fragment.
  * @param {Object} [partial]  Fields to override, in the wire's snake_case.
  * @returns {Object}
@@ -620,6 +863,17 @@ const SectionHeader_DEFAULTS = Object.freeze({
 });
 
 /**
+ * Build a `SelectEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function SelectEvent(partial = {}) {
+  return { ...SelectEvent_DEFAULTS, ...partial };
+}
+
+const SelectEvent_DEFAULTS = Object.freeze({});
+
+/**
  * Build a `Semantics` wire fragment.
  * @param {Object} [partial]  Fields to override, in the wire's snake_case.
  * @returns {Object}
@@ -632,6 +886,20 @@ const Semantics_DEFAULTS = Object.freeze({
   hint: null,
   label: null,
   role: null,
+});
+
+/**
+ * Build a `SensorEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function SensorEvent(partial = {}) {
+  return { ...SensorEvent_DEFAULTS, ...partial };
+}
+
+const SensorEvent_DEFAULTS = Object.freeze({
+  timestamp_ms: 0,
+  values: [],
 });
 
 /** `SensorType` — the core enum's members, by wire value. */
@@ -705,6 +973,17 @@ export const Size = Object.freeze({
 });
 
 /**
+ * Build a `SlideEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function SlideEvent(partial = {}) {
+  return { ...SlideEvent_DEFAULTS, ...partial };
+}
+
+const SlideEvent_DEFAULTS = Object.freeze({});
+
+/**
  * Build a `SpacingScale` wire fragment.
  * @param {Object} [partial]  Fields to override, in the wire's snake_case.
  * @returns {Object}
@@ -750,12 +1029,39 @@ const StrokeCmd_DEFAULTS = Object.freeze({
   width: 1.0,
 });
 
+/**
+ * Build a `SubmitEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function SubmitEvent(partial = {}) {
+  return { ...SubmitEvent_DEFAULTS, ...partial };
+}
+
+const SubmitEvent_DEFAULTS = Object.freeze({
+  values: {},
+});
+
 /** `SwipeDirection` — the core enum's members, by wire value. */
 export const SwipeDirection = Object.freeze({
   LEFT: "left",
   RIGHT: "right",
   UP: "up",
   DOWN: "down",
+});
+
+/**
+ * Build a `SwipeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function SwipeEvent(partial = {}) {
+  return { ...SwipeEvent_DEFAULTS, ...partial };
+}
+
+const SwipeEvent_DEFAULTS = Object.freeze({
+  dx: 0.0,
+  dy: 0.0,
 });
 
 /**
@@ -787,12 +1093,39 @@ const TableRow_DEFAULTS = Object.freeze({
   style: null,
 });
 
+/**
+ * Build a `TapEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function TapEvent(partial = {}) {
+  return { ...TapEvent_DEFAULTS, ...partial };
+}
+
+const TapEvent_DEFAULTS = Object.freeze({
+  x: null,
+  y: null,
+});
+
 /** `TextAlign` — the core enum's members, by wire value. */
 export const TextAlign = Object.freeze({
   LEFT: "left",
   CENTER: "center",
   RIGHT: "right",
   JUSTIFY: "justify",
+});
+
+/**
+ * Build a `TextChangeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function TextChangeEvent(partial = {}) {
+  return { ...TextChangeEvent_DEFAULTS, ...partial };
+}
+
+const TextChangeEvent_DEFAULTS = Object.freeze({
+  valid: null,
 });
 
 /** `TextDecoration` — the core enum's members, by wire value. */
@@ -807,6 +1140,39 @@ export const TextOverflow = Object.freeze({
   CLIP: "clip",
   ELLIPSIS: "ellipsis",
 });
+
+/**
+ * Build a `ThemeChangeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function ThemeChangeEvent(partial = {}) {
+  return { ...ThemeChangeEvent_DEFAULTS, ...partial };
+}
+
+const ThemeChangeEvent_DEFAULTS = Object.freeze({});
+
+/**
+ * Build a `TimeChangeEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function TimeChangeEvent(partial = {}) {
+  return { ...TimeChangeEvent_DEFAULTS, ...partial };
+}
+
+const TimeChangeEvent_DEFAULTS = Object.freeze({});
+
+/**
+ * Build a `ToggleEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function ToggleEvent(partial = {}) {
+  return { ...ToggleEvent_DEFAULTS, ...partial };
+}
+
+const ToggleEvent_DEFAULTS = Object.freeze({});
 
 /**
  * Build a `TokenRef` wire fragment.
@@ -891,6 +1257,19 @@ const TypographyToken_DEFAULTS = Object.freeze({
 
 /** `VALID_COLOR_SCHEMES` — a core design token. */
 export const VALID_COLOR_SCHEMES = ["error", "info", "neutral", "primary", "secondary", "success", "tertiary", "warning"];
+
+/**
+ * Build a `ValidationEvent` wire fragment.
+ * @param {Object} [partial]  Fields to override, in the wire's snake_case.
+ * @returns {Object}
+ */
+export function ValidationEvent(partial = {}) {
+  return { ...ValidationEvent_DEFAULTS, ...partial };
+}
+
+const ValidationEvent_DEFAULTS = Object.freeze({
+  error: null,
+});
 
 /** `Variant` — the core enum's members, by wire value. */
 export const Variant = Object.freeze({

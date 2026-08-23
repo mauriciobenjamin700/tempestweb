@@ -375,6 +375,15 @@ in-process.
     you want to follow the OS, read `app.media.platform_dark_mode` in your `view`
     and call `set_theme` — then both halves move together.
 
+!!! check "The palette's pairs are contrast-gated"
+    axe's `color-contrast` rule needs real layout, so the a11y gate disables it and
+    the Lighthouse job is a soft signal — which is how an illegible dark palette
+    could have shipped unnoticed. What does **not** need layout is the pair of
+    roles: `--tw-on-surface` is by definition what goes on `--tw-surface`.
+    `tests/client/theme-contrast.test.js` computes the 12 pairs the sheet promises,
+    in both modes, and fails below AA. Tightest pair today: `warning` on `surface`
+    in light mode, **6.02:1** against a 4.5 minimum.
+
 !!! note "The first `light` is not sent"
     The sheet's tokens **are** the light palette, so marking light on mount would
     spend a frame saying what the CSS already says. Every later change is sent,

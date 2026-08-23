@@ -56,6 +56,24 @@ versioning.
 
 ### Added
 
+- **Gate de contraste da paleta** (`tests/client/theme-contrast.test.js`). A regra
+  `color-contrast` do axe precisa de layout, então o gate de a11y a desliga, e o
+  job Lighthouse que a pegaria num browser real roda com `|| echo soft-fail` —
+  ou seja, uma paleta escura inteira entrou sem nada no CI capaz de distinguir
+  legível de ilegível.
+
+  A metade que **não** precisa de layout é o par de papéis: `--tw-on-surface` é,
+  por definição, o que vai sobre `--tw-surface`. O teste calcula os 12 pares que a
+  folha promete, nos dois modos (o bloco escuro sobreposto ao claro, que é o que o
+  leitor recebe), e reprova abaixo de AA — 4,5:1 para texto, 3:1 para `outline`,
+  que é fronteira. Um terceiro caso prova que ele morde: escurecer um primeiro
+  plano sem o fundo reprova.
+
+  Medido: no claro o par mais apertado é `warning` sobre `surface`, **6,02:1**; no
+  escuro, `on-secondary-container` sobre `secondary-container`, **7,19:1**. O que
+  continua precisando de browser — se um widget de fato usou o par que devia — fica
+  com o Lighthouse.
+
 - `applyThemeMode` / `THEME_MODE_ATTR` em `client/theme.js`, `encode_theme` +
   `PatchTransport.send_theme` nos transportes, `on_theme` no `WasmRuntime` e no
   `bootstrap` do Modo A.

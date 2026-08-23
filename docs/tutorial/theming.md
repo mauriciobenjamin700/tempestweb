@@ -373,6 +373,15 @@ processo.
     quer seguir o SO, leia `app.media.platform_dark_mode` no seu `view` e chame
     `set_theme` — aí as duas metades andam juntas.
 
+!!! check "Os pares da paleta têm gate de contraste"
+    A regra `color-contrast` do axe precisa de layout real, então o gate de a11y a
+    desliga e o job Lighthouse é sinal fraco — o que deixava uma paleta escura
+    ilegível passar sem ninguém notar. O que **não** precisa de layout é o par de
+    papéis: `--tw-on-surface` é, por definição, o que vai sobre `--tw-surface`.
+    `tests/client/theme-contrast.test.js` calcula os 12 pares que a folha promete,
+    nos dois modos, e reprova abaixo de AA. Par mais apertado hoje: `warning` sobre
+    `surface` no claro, **6,02:1** para um mínimo de 4,5.
+
 !!! note "O primeiro `light` não é enviado"
     Os tokens da folha **são** a paleta clara, então marcar claro no mount gastaria
     um frame para dizer o que o CSS já diz. Toda mudança posterior é enviada,

@@ -12,6 +12,7 @@ import { fixture, freshDom } from "./setup.js";
 import { diff } from "../../client/transpile/diff.js";
 import {
   Button,
+  Color,
   Column,
   Container,
   Edge,
@@ -824,6 +825,20 @@ test("an invalid field paints its border and text in the error role", () => {
     color: red,
   });
   assert.notDeepEqual(cases.field_outline_valid.props.style.color, red);
+});
+
+test("Color.from_hex parses the three shapes the core accepts, and refuses the rest", () => {
+  const samples = fixture("transpile_color_samples.json");
+  for (const [hex, want] of Object.entries(samples.parsed)) {
+    assert.deepEqual(
+      Color.from_hex(hex),
+      { r: want.r, g: want.g, b: want.b, a: want.a },
+      `${hex} diverged from core`,
+    );
+  }
+  for (const hex of samples.invalid) {
+    assert.throws(() => Color.from_hex(hex), /invalid hex color/, `${JSON.stringify(hex)} should throw`);
+  }
 });
 
 test("Container is a layout box with the semantic-tag escape hatch", () => {

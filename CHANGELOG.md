@@ -4,6 +4,38 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.90.0] — 2026-08-23
+
+Três defeitos do tipo "compila e morre" (ou pior: compila e mente), todos
+encontrados dirigindo em Chrome real os exemplos que os commits anteriores
+destravaram. Nenhum aparecia na suíte: o guard de build roda `node --check`,
+que faz *parse* sem executar.
+
+### Fixed
+
+- **Props de componente do facade saíam em `snake_case`, e o handler sumia.**
+  A renomeação para `camelCase` era decidida resolvendo o nome no
+  `tempest_core`; um componente que só existe em `tempestweb.components`
+  (`LoginForm`, `SignupForm`, `TextField`, `EmailField`, `PasswordField`) não
+  resolvia lá, então `on_submit` chegava como `on_submit` no builder, que
+  desestrutura `onSubmit`, e **todo handler era descartado em silêncio**.
+  Medido no `login_demo`: o formulário montava, digitar funcionava, e o submit
+  não fazia absolutamente nada. Agora o nome é procurado no core e depois no
+  facade — e, de brinde, a checagem de kwarg do core volta a valer para esses
+  componentes (`LoginForm(subtitle="x")` falha com `arquivo:linha`).
+- **`Color.from_hex` não existia no Modo C.** No core `Color` é modelo com o
+  classmethod — o jeito de escrever cor literal, 65 chamadas nos exemplos —
+  e o cliente exportava só a fábrica. `Color.from_hex("#ef4444")` compilava,
+  carregava e matava a página na montagem. Portado com o parse do core
+  (`#RGB`/`#RRGGBB`/`#RRGGBBAA`, `#` opcional, alfa sobre 255) e fixado por
+  `tests/fixtures/transpile_color_samples.json`.
+- **`field(default_factory=OutraDataclass)` chamava a classe sem `new`.**
+  Dataclass compila para classe JS, e classe sem `new` é `TypeError` duro: o
+  default aninhado saía `(Address)()` e o app morria no primeiro
+  `makeState()`. Medido no `br-cadastro`.
+
+Cada um tem teste que falha sem a correção.
+
 ## [0.89.0] — 2026-08-23
 
 ### Added

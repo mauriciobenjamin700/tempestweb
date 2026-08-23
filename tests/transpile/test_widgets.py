@@ -16,6 +16,7 @@ from pathlib import Path
 from tempestweb.cli.commands import build as build_cmd
 from tempestweb.transpile._served import SERVED_NAMES
 from tempestweb.transpile.codegen import _camel_name
+from tests.conformance import _transpile_colors as colors_gen
 from tests.conformance import _transpile_component_styles as component_styles_gen
 from tests.conformance import _transpile_components as components_gen
 from tests.conformance import _transpile_fields as fields_gen
@@ -287,6 +288,15 @@ def test_lazy_samples_fixture_matches_core() -> None:
     assert on_disk == lazy_gen.render_fixture_text(), (
         "tests/fixtures/transpile_lazy_samples.json is stale — regenerate with "
         "`python -m tests.conformance._transpile_lazy`"
+    )
+
+
+def test_color_samples_fixture_matches_core() -> None:
+    """The committed `Color.from_hex` fixture byte-matches a fresh build."""
+    on_disk = colors_gen.COLORS_FIXTURE.read_text(encoding="utf-8")
+    assert on_disk == colors_gen.render_fixture_text(), (
+        "tests/fixtures/transpile_color_samples.json is stale — regenerate with "
+        "`python -m tests.conformance._transpile_colors`"
     )
 
 

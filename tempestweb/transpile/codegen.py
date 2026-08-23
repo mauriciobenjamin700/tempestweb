@@ -22,6 +22,7 @@ import re
 from typing import Any
 
 import tempest_core
+import tempestweb.components as tempestweb_components
 from tempestweb.transpile._native import (
     NATIVE_ENUMS,
     NATIVE_EXPORTS,
@@ -1392,17 +1393,28 @@ class _Generator:
         Args:
             node: The call being emitted.
 
+        The name is looked up on ``tempest_core`` first and then on
+        ``tempestweb.components``, because the facade both re-exports the core's
+        components *and* adds this repo's own (``LoginForm``, ``TextField``).
+        Missing the second lookup meant a facade-only component resolved to
+        nothing: its props kept the wire's snake_case, the generated builder
+        destructures camelCase, and every handler was dropped in silence.
+
         Returns:
-            The live core object, or ``None`` when the call is not a bare name
-            imported from ``tempest_core`` (a locally declared class wins over
-            the import, exactly as in Python).
+            The live component object, or ``None`` when the call is not a bare
+            name imported from one of those modules (a locally declared class
+            wins over the import, exactly as in Python).
         """
         if not isinstance(node.func, ast.Name):
             return None
         local = node.func.id
         if local in self.class_names or local not in self.core_imports:
             return None
-        return getattr(tempest_core, self.core_imports[local], None)
+        origin = self.core_imports[local]
+        target = getattr(tempest_core, origin, None)
+        if target is None:
+            target = getattr(tempestweb_components, origin, None)
+        return target
 
     def _check_core_kwargs(self, node: ast.Call, target: object | None) -> None:
         """Refuse a keyword the called core model does not declare.
@@ -2571,6 +2583,11 @@ class _Generator:
         ``default_factory=dict`` → ``{}`` (the common mutable-default forms). A
         plain value is emitted as-is.
 
+        A factory that names a class — a nested dataclass, or an imported JS class
+        — is constructed with ``new``: calling a JS class without it is a hard
+        ``TypeError``, so ``(Address)()`` compiled and then died on the first
+        ``makeState()``.
+
         Args:
             value: The field's default expression.
 
@@ -2592,6 +2609,10 @@ class _Generator:
                 if kw.arg == "default_factory":
                     if isinstance(kw.value, ast.Name) and kw.value.id in factories:
                         return factories[kw.value.id]
+                    if isinstance(kw.value, ast.Name) and (
+                        kw.value.id in self.class_names or kw.value.id in _JS_CLASSES
+                    ):
+                        return f"new {self.expr(kw.value, 2)}()"
                     # Parenthesized: an arrow (`lambda: …`) is not callable
                     # without it, and `() => x()` would store the function.
                     return f"({self.expr(kw.value, 2)})()"

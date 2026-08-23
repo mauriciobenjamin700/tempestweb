@@ -93,6 +93,36 @@ export function Color({ r = 0, g = 0, b = 0, a = 1.0 } = {}) {
 }
 
 /**
+ * Parse a `#RGB` / `#RRGGBB` / `#RRGGBBAA` string into a `Color`.
+ *
+ * How an app writes a literal color — the spelling behind 65 call sites in the
+ * examples — and Mode C shipped `Color` as a bare factory, so
+ * `Color.from_hex("#b3261e")` compiled, loaded and threw at mount with a blank
+ * page. Mirrors `tempest_core.style.Color._parse_hex`: the `#` is optional, a
+ * three-digit form doubles each digit, and the fourth byte is alpha over 255.
+ *
+ * @param {string} value  The hex string, with or without a leading `#`.
+ * @returns {{r: number, g: number, b: number, a: number}}
+ * @throws {Error} When the string is not a valid hex color.
+ */
+Color.from_hex = function from_hex(value) {
+  let text = String(value).replace(/^#+/, "");
+  if (text.length === 3) {
+    text = [...text].map((ch) => ch + ch).join("");
+  }
+  if ((text.length !== 6 && text.length !== 8) || !/^[0-9a-fA-F]+$/.test(text)) {
+    throw new Error(`invalid hex color: ${JSON.stringify(value)}`);
+  }
+  return {
+    r: parseInt(text.slice(0, 2), 16),
+    g: parseInt(text.slice(2, 4), 16),
+    b: parseInt(text.slice(4, 6), 16),
+    a: text.length === 8 ? parseInt(text.slice(6, 8), 16) / 255 : 1.0,
+  };
+};
+Object.freeze(Color);
+
+/**
  * A box's four side offsets in px (`{ top, right, bottom, left }`).
  *
  * Callable like the core's `Edge`, which is a model with four fields defaulting

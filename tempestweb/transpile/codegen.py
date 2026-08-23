@@ -154,7 +154,17 @@ _MODULE_CONSTANTS: dict[str, dict[str, str]] = {
 #: Helpers the emitted code calls, imported from ``./runtime.js`` aliased with a
 #: `$` — illegal in a Python identifier, so an app's own ``sleep`` cannot collide.
 _RUNTIME_HELPERS: frozenset[str] = frozenset(
-    {"reFindall", "reFullmatch", "reMatch", "reSearch", "reSub", "sleep"}
+    {
+        "dictPop",
+        "formValidate",
+        "reFindall",
+        "reFullmatch",
+        "reMatch",
+        "reSearch",
+        "reSub",
+        "sleep",
+        "toDict",
+    }
 )
 
 #: Methods of a compiled pattern, and the helper each maps to. Only a name bound
@@ -167,6 +177,14 @@ _PATTERN_METHODS: dict[str, str] = {
     "search": "reSearch",
     "sub": "reSub",
 }
+
+#: The widget methods Mode C ports, and the helper each routes to. The client
+#: carries every widget's *builder* and none of its class's Python methods, so
+#: this table is the exception list — a method absent from it is refused, which
+#: is what keeps a page from compiling and then dying. `Form.validate` is here
+#: because its inputs survive: `validators` never crosses a wire in Mode C, so
+#: the live functions are on the node when the helper runs.
+_WIDGET_METHODS: dict[str, str] = {"validate": "formValidate"}
 
 #: Bases that turn a class into a frozen JS object of its members.
 _ENUM_BASES: frozenset[str] = frozenset({"Enum", "IntEnum", "StrEnum"})
@@ -242,11 +260,17 @@ _INDENT: str = "  "
 # `native.storage.get(...)` — use subscript instead).
 # `str` predicates with no JS counterpart: each is a full-string pattern test.
 # Emitting `c.isdigit()` shipped a call to a method the browser does not have.
+#: `str` predicates and the ASCII pattern each is a full match against. The case
+#: predicates need "at least one cased character, none of the other case" —
+#: `"1".isupper()` is False in Python, and a naive `[A-Z]*` would say True. The
+#: patterns are ASCII like the rest of this table, which the docs state.
 _STRING_TESTS: dict[str, tuple[str, str]] = {
     "isdigit": ("[0-9]+", "reFullmatch"),
     "isalpha": ("[A-Za-z]+", "reFullmatch"),
     "isalnum": ("[A-Za-z0-9]+", "reFullmatch"),
     "isspace": ("\\s+", "reFullmatch"),
+    "isupper": ("[^a-z]*[A-Z][^a-z]*", "reFullmatch"),
+    "islower": ("[^A-Z]*[a-z][^A-Z]*", "reFullmatch"),
 }
 
 _METHOD_RENAMES: dict[str, str] = {
@@ -1173,7 +1197,11 @@ class _Generator:
             if name == "set":
                 return f"new Set({args[0]})"
             if name == "dict":
-                return f"Object.fromEntries({args[0]})"
+                # A mapping copy and a build-from-pairs are the same call in
+                # Python and different operations in JS, and which one it is is
+                # only knowable at runtime.
+                self.runtime_helpers.add("toDict")
+                return f"toDict$({args[0]})"
         if count == 0 and name in ("list", "tuple", "dict", "set"):
             empty = {"list": "[]", "tuple": "[]", "dict": "{}", "set": "new Set()"}
             return empty[name]
@@ -1341,11 +1369,14 @@ class _Generator:
         """Refuse a method call on a core widget, which Mode C does not carry.
 
         The client ports each widget's *builder* — a function returning the IR
-        node — and none of the Python methods the widget class also has. So
-        ``form.validate(values)`` type-checks, transpiles, and then throws
-        ``form1.validate is not a function`` on the first render: measured in
-        ``examples/signup-wizard``. Compiling something that dies is worse than
-        refusing it, which is the whole point of the served-name check.
+        node — and none of the Python methods the widget class also has. So a
+        method call type-checks, transpiles, and then throws
+        ``… is not a function`` on the first render. Compiling something that dies
+        is worse than refusing it, which is the whole point of the served-name
+        check.
+
+        The exception is :data:`_WIDGET_METHODS`, the methods the client does
+        carry: those are routed to their helper instead of refused.
 
         Args:
             node: The call node.
@@ -1357,7 +1388,7 @@ class _Generator:
         if not isinstance(func, ast.Attribute) or not isinstance(func.value, ast.Name):
             return
         widget = self.widget_names.get(func.value.id)
-        if widget is None:
+        if widget is None or func.attr in _WIDGET_METHODS:
             return
         raise TranspileError(
             f"`{widget}.{func.attr}()` is not available in Mode C: the client "
@@ -1445,6 +1476,15 @@ class _Generator:
         method = node.func.attr
         receiver = self.expr(node.func.value, indent)
         args = [self.expr(a, indent) for a in node.args]
+        if method in _WIDGET_METHODS and len(args) == 1:
+            helper = _WIDGET_METHODS[method]
+            self.runtime_helpers.add(helper)
+            return f"{helper}$({receiver}, {args[0]})"
+        if method == "pop" and len(args) == 2:
+            # `dict.pop(key, default)`. A dict is a plain object, so the name
+            # resolved to nothing at all and threw on the first call.
+            self.runtime_helpers.add("dictPop")
+            return f"dictPop$({receiver}, {args[0]}, {args[1]})"
         if method in _METHOD_RENAMES:
             return f"{receiver}.{_METHOD_RENAMES[method]}({', '.join(args)})"
         if not args and method in _STRING_TESTS:
@@ -2099,6 +2139,11 @@ class _Generator:
         A bare declaration with no value (``total: int``) is a type statement
         with nothing to run, so it still emits nothing.
 
+        The annotated form also records the same bindings the bare one does —
+        which name holds a compiled pattern, which holds a core widget — because
+        a typed local is the spelling this repo's style rules ask for, and losing
+        the binding meant emitting a method call that dies at runtime.
+
         Args:
             node: The annotated assignment.
             indent: The current indentation depth.
@@ -2108,6 +2153,11 @@ class _Generator:
         """
         if node.value is None:
             return []
+        # The annotated form is what this repo's own style rules ask for, so it
+        # has to feed the same bindings the bare one does — otherwise a typed
+        # `re.Pattern` or `Form` local is invisible and its methods emit raw JS
+        # that dies on the first call.
+        self._note_regex_binding(node.target, node.value)
         value = self.expr(node.value, indent)
         return self._assign_target(node.target, value, _INDENT * indent, indent)
 

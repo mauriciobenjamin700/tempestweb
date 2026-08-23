@@ -193,6 +193,44 @@ is not available in Mode C (the transpile client exports no such name)
 
 Referência: [Modo C — transpile](advanced/transpile.md).
 
+### `object is not iterable` ou `X.pop is not a function` (Modo C)
+
+Um clique morre no console e a tela não muda. É um **dict** sendo tratado como
+lista.
+
+- **`dict(outro)`** compilava para `Object.fromEntries(outro)`, que exige um
+  iterável de pares e explode num mapeamento. O compilador não sabe qual dos dois
+  você tem — `dict(pares)` também é legítimo — então desde 0.93.0 a decisão é em
+  runtime.
+- **`d.pop(chave, default)`** caía no `pop` de array, que num objeto não existe.
+
+Medidos no `examples/form`, cujo submit morria seis vezes por clique com a página
+renderizada e o formulário inerte.
+
+---
+
+### `_pattern.match is not a function` (Modo C)
+
+O validador com `re.compile(...)` morre, mas o mesmo código com atribuição sem
+anotação funciona.
+
+O compilador rastreia qual nome guarda um padrão compilado — é isso que deixa
+`.match()` virar o helper certo sem sequestrar um `.match()` alheio — mas só
+rastreava a forma **sem** anotação. `_pattern: re.Pattern[str] = re.compile(…)`,
+que é a forma que as regras de estilo deste repo pedem, perdia o rastro e emitia
+`.match` cru num `RegExp`, que não tem esse método. Corrigido em 0.93.0; vale
+também para `form: Form = Form(…)`.
+
+---
+
+### `c.isupper is not a function` (Modo C)
+
+A tabela de predicados de `str` do Modo C tinha `isdigit`/`isalpha`/`isalnum`/
+`isspace` e faltavam os de caixa. Adicionados em 0.93.0, com a semântica do
+Python: exige ao menos um caractere com caixa, então `"1".isupper()` é `False`.
+
+---
+
 ### `Theme.from_seed is not a function` (Modo C)
 
 Página em branco, um erro só no console, e o build tinha passado.

@@ -193,6 +193,45 @@ is not available in Mode C (the transpile client exports no such name)
 
 Reference: [Mode C — transpile](advanced/transpile.md).
 
+### `object is not iterable` or `X.pop is not a function` (Mode C)
+
+A click dies in the console and the screen does not change. It is a **dict**
+being treated as a list.
+
+- **`dict(other)`** compiled to `Object.fromEntries(other)`, which needs an
+  iterable of pairs and blows up on a mapping. The compiler cannot tell which one
+  you hold — `dict(pairs)` is legitimate too — so since 0.93.0 the decision is
+  made at runtime.
+- **`d.pop(key, default)`** fell through to the array `pop`, which an object does
+  not have.
+
+Both measured in `examples/form`, whose submit died six times per click with the
+page rendered and the form inert.
+
+---
+
+### `_pattern.match is not a function` (Mode C)
+
+A validator using `re.compile(...)` dies, while the same code with an unannotated
+assignment works.
+
+The compiler tracks which name holds a compiled pattern — that is what lets
+`.match()` become the right helper without hijacking someone else's `.match()` —
+but it only tracked the form **without** an annotation.
+`_pattern: re.Pattern[str] = re.compile(…)`, the spelling this repo's style rules
+ask for, lost the tracking and emitted a raw `.match` on a `RegExp`, which has no
+such method. Fixed in 0.93.0; it holds for `form: Form = Form(…)` too.
+
+---
+
+### `c.isupper is not a function` (Mode C)
+
+Mode C's `str` predicate table had `isdigit`/`isalpha`/`isalnum`/`isspace` and
+was missing the case ones. Added in 0.93.0, with Python's semantics: at least one
+cased character is required, so `"1".isupper()` is `False`.
+
+---
+
 ### `Theme.from_seed is not a function` (Mode C)
 
 A blank page, a single console error, and a build that passed.

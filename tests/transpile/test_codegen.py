@@ -1065,6 +1065,104 @@ def test_a_partial_slice_assignment_is_refused() -> None:
     assert "slice assignment" in str(excinfo.value)
 
 
+def test_the_case_predicates_need_a_cased_character() -> None:
+    """`isupper`/`islower` were missing, so they threw as an unknown method.
+
+    Measured in `examples/signup-wizard`, whose password rule counts uppercase
+    characters: `c.isupper is not a function`, inside a validator, on the click
+    that should have advanced the wizard.
+
+    The pattern is not `[A-Z]*`: Python answers False for `"1".isupper()`, so at
+    least one cased character is required and none of the other case allowed.
+    """
+    js = gen("def f(c):\n    return c.isupper() or c.islower()\n")
+    assert '"[^a-z]*[A-Z][^a-z]*"' in js
+    assert '"[^A-Z]*[a-z][^A-Z]*"' in js
+    assert "c.isupper()" not in js
+
+
+def test_an_annotated_binding_is_tracked_like_a_bare_one() -> None:
+    """A typed local still tells the compiler what it holds.
+
+    Only `x = re.compile(...)` was noted, never
+    `x: re.Pattern[str] = re.compile(...)` — the annotated form this repo's own
+    style rules ask for. So `_pattern.match(v)` emitted a raw `.match` on a
+    `RegExp`, which has none, and threw `_pattern.match is not a function` inside
+    a validator. Measured in `examples/signup-wizard`.
+    """
+    js = gen(
+        "import re\n\n\n"
+        "def f(value):\n"
+        '    pattern: re.Pattern[str] = re.compile("^a+$")\n'
+        "    return pattern.match(value)\n"
+    )
+    assert "reMatch$(pattern, value)" in js
+    assert "pattern.match(value)" not in js
+
+
+def test_dict_of_a_mapping_copies_it_instead_of_iterating_pairs() -> None:
+    """`dict(other)` is a copy; `dict(pairs)` builds from pairs.
+
+    The compiler cannot tell which one it holds, and emitting
+    `Object.fromEntries(x)` for both threw `object is not iterable` on a mapping.
+    Measured in `examples/form`, whose submit died on `dict(result.errors)` with
+    the page rendered and the form inert.
+    """
+    js = gen("def f(errors):\n    return dict(errors)\n")
+    assert "toDict$(errors)" in js
+    assert "Object.fromEntries(errors)" not in js
+
+
+def test_dict_pop_removes_the_key_instead_of_calling_array_pop() -> None:
+    """A dict is a plain object, which has no `pop` — the call resolved to
+    nothing and threw."""
+    js = gen("def f(errors, name):\n    return errors.pop(name, None)\n")
+    assert "dictPop$(errors, name, null)" in js
+
+
+def test_form_validate_routes_to_the_client_helper() -> None:
+    """`form.validate(values)` is the one widget method the client carries.
+
+    Every other method stays refused — the client ports each widget's *builder*
+    and none of its class's Python methods. `validate` is the exception because
+    its input survives: `validators` never crosses a wire in Mode C, so the live
+    functions are on the node when the helper runs.
+    """
+    js = gen(
+        "from tempest_core import Form, FormField\n\n\n"
+        "def view(app):\n"
+        '    form = Form(key="f", fields=[FormField(name="email")])\n'
+        '    result = form.validate({"email": app.state.email})\n'
+        "    return form\n"
+    )
+    assert 'import { formValidate as formValidate$ } from "./runtime.js";' in js
+    assert "formValidate$(form, " in js
+
+
+def test_form_validate_routes_even_when_the_binding_is_out_of_sight() -> None:
+    """The routing does not depend on the compiler having seen the assignment.
+
+    The old refusal keyed off a local the module bound to a `Form(...)` call, so a
+    form built in another scope slipped through and compiled into
+    `form1.validate is not a function`. Measured in `examples/signup-wizard`,
+    which passed the build and threw three times per click.
+    """
+    js = gen("def view(app):\n    result = app.form1.validate({})\n    return result\n")
+    assert "formValidate$(app.form1, {})" in js
+
+
+def test_another_widget_method_is_still_refused() -> None:
+    """The exception is one table entry, not an open door."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from tempest_core import Form\n\n\n"
+            "def view(app):\n"
+            '    form = Form(key="f", fields=[])\n'
+            "    return form.model_dump()\n"
+        )
+    assert "Form.model_dump()" in str(excinfo.value)
+
+
 def test_a_core_member_the_client_lacks_is_refused_by_name() -> None:
     """`Theme.from_seed(...)` compiled, loaded, and died at mount.
 
@@ -1343,7 +1441,7 @@ def test_container_builtins_convert_instead_of_calling_a_missing_name() -> None:
     assert "const a = [...xs];" in js
     assert "const b = [...xs];" in js
     assert "const c = new Set(xs);" in js
-    assert "const d = Object.fromEntries(pairs);" in js
+    assert "const d = toDict$(pairs);" in js
     assert "const e = [];" in js
 
 
@@ -1495,18 +1593,17 @@ def test_the_native_facade_keeps_its_own_get() -> None:
 def test_a_core_widget_method_is_refused_at_build_time() -> None:
     """Mode C ports a widget's builder, not the widget's Python methods.
 
-    `form.validate(values)` transpiled cleanly and then threw
-    `form1.validate is not a function` on the first render — measured in
-    `examples/signup-wizard`. Compiling something that dies is worse than
-    refusing it.
+    A method call transpiled cleanly and then threw `… is not a function` on the
+    first render. Compiling something that dies is worse than refusing it. The
+    one exception is `Form.validate`, which the client now carries.
     """
     with pytest.raises(TranspileError) as excinfo:
         gen(
             "from tempest_core import Form, Text\n\n"
             "form1 = Form(fields=[])\n\n\n"
             "def view(app):\n"
-            "    return Text(content=str(form1.validate({})))\n"
+            "    return Text(content=str(form1.model_dump()))\n"
         )
     message = str(excinfo.value)
-    assert "`Form.validate()`" in message
+    assert "`Form.model_dump()`" in message
     assert "not the widget's Python methods" in message

@@ -227,6 +227,49 @@ export function resolveFieldStyle(widget, fieldVariant, size, colorScheme, error
 }
 
 /**
+ * Run a `Form`'s field validators over `values`, the way the core's method does.
+ *
+ * The client carries each widget's *builder* and none of the Python methods its
+ * class also has, so `form.validate(values)` had nowhere to land: it was refused
+ * where the compiler could tell the receiver was a `Form`, and compiled into
+ * `form1.validate is not a function` where it could not.
+ *
+ * The port is possible because `validators` never crosses a wire in Mode C — the
+ * generated builder puts the array straight on the node, so the live functions
+ * are right here. Mirrors `Form.validate` + `FormField.run_validators`: the first
+ * failing validator per field wins, a name absent from `values` validates as the
+ * empty string, and `valid` means no field failed.
+ *
+ * A receiver that is not a `Form` node keeps its own `validate`, so an app object
+ * that happens to have one is untouched.
+ *
+ * @param {Object} target  The `Form` IR node (or any object with `.validate`).
+ * @param {Object<string, *>} values  Field name -> its raw value.
+ * @returns {{errors: Object<string, string>, valid: boolean}}  The `FormState`.
+ */
+export function formValidate(target, values) {
+  if (target?.type !== "Form") {
+    return target.validate(values);
+  }
+  const errors = {};
+  for (const field of target.children ?? []) {
+    const name = field?.props?.name;
+    if (name == null) {
+      continue;
+    }
+    const value = Object.hasOwn(values ?? {}, name) ? values[name] : "";
+    for (const rule of field.props.validators ?? []) {
+      const error = rule(value);
+      if (error != null) {
+        errors[name] = error;
+        break;
+      }
+    }
+  }
+  return { errors, valid: Object.keys(errors).length === 0 };
+}
+
+/**
  * The window each virtualized list is currently slid to, by widget key.
  *
  * The core injects a tracked window into the widget tree *before* the children

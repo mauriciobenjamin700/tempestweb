@@ -20,6 +20,7 @@ from tests.conformance import _transpile_colors as colors_gen
 from tests.conformance import _transpile_component_styles as component_styles_gen
 from tests.conformance import _transpile_components as components_gen
 from tests.conformance import _transpile_fields as fields_gen
+from tests.conformance import _transpile_forms as forms_gen
 from tests.conformance import _transpile_lazy as lazy_gen
 from tests.conformance import _transpile_served as served_gen
 from tests.conformance import _transpile_spacing as spacing_gen
@@ -311,6 +312,15 @@ def test_field_samples_fixture_matches_core() -> None:
     assert on_disk == fields_gen.render_fixture_text(), (
         "tests/fixtures/transpile_field_samples.json is stale — regenerate with "
         "`python -m tests.conformance._transpile_fields`"
+    )
+
+
+def test_form_samples_fixture_matches_core() -> None:
+    """The committed form-validation fixture byte-matches a fresh build."""
+    on_disk = forms_gen.FORMS_FIXTURE.read_text(encoding="utf-8")
+    assert on_disk == forms_gen.render_fixture_text(), (
+        "tests/fixtures/transpile_form_samples.json is stale — regenerate with "
+        "`python -m tests.conformance._transpile_forms`"
     )
 
 

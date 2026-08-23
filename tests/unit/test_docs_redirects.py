@@ -123,6 +123,8 @@ def test_every_moved_page_kept_its_old_url() -> None:
             "responsive",
             "overlays",
             "gestures",
+            # Written for #143; never had a published URL of its own.
+            "controls",
         }
     )
     assert not unmapped, (

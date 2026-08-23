@@ -4,6 +4,75 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.98.0] — 2026-08-23
+
+### Fixed
+
+- **Onze widgets de IR interativos desenhavam um `<div>` anônimo**
+  ([#143](https://github.com/mauriciobenjamin700/tempestweb/issues/143)) — a
+  auditoria que a [#130](https://github.com/mauriciobenjamin700/tempestweb/issues/130)
+  pediu, feita e medida. `Switch`, `Slider`, `RangeSlider`, `Dropdown`,
+  `Autocomplete`, `DatePicker`, `TimePicker`, `FilePicker` e `TabBar` passam a
+  renderizar o controle nativo equivalente; `TabView` e `RouteDrawer` continuam
+  `div` por decisão documentada (os dois têm filho de IR, então strip criado pelo
+  renderizador cairia no índice que os patch paths endereçam) e passam a dizer o
+  estado — `role=tabpanel` + nome da aba ativa, `data-tw-open` + `aria-expanded`.
+
+  Vale nos três modos, porque `client/dom.js` é o renderizador compartilhado.
+
+- **O payload do evento tinha a forma do DOM, não a do widget.**
+  `ToggleEvent(checked)` nunca validava contra `{"value": "on"}`, então o handler
+  de **todo `Checkbox`** recebia o dict cru — `event.checked` era um
+  `AttributeError` esperando o primeiro clique. Agora `Checkbox`/`Switch` mandam
+  `checked`, `Slider` manda número, `RangeSlider` manda o par `low`/`high`
+  normalizado, `Dropdown`/`FilePicker` reportam `select` com índice/nome.
+
+- **Modo C mapeava `on_change` para `click`** em seis widgets (`Switch`,
+  `Slider`, `RangeSlider`, `Autocomplete`, `DatePicker`, `TimePicker`): cada um
+  renderizava, aceitava input e nunca avisava a app. A derivação lia a tabela de
+  tags e somava `Checkbox` à mão — qualquer widget que embrulha o controle num
+  `<label>` lia como `div`. O gerador passa a ler `NATIVE_CONTROL_TYPES` /
+  `CHANGE_REPORTING_TYPES` declarados no próprio renderizador.
+
+- **O Style resolvido descreve peças desenhadas à mão.** Medido em Chrome: o
+  `Switch` era um quadrado de 20x20 com um checkbox de 52x32 pendurado para fora,
+  os `Slider` tinham 4px de altura (alvo de toque de 4px) e o `Checkbox` escondia
+  a própria legenda. `styleToCss` e o port `style_to_css` passam a descartar a
+  geometria/pintura de peça desses quatro tipos e a reemitir a cor resolvida como
+  `accent-color` — e também como `--tw-control-accent`, porque a folha base
+  pinta o track do `Switch` e não consegue ler `accent-color`: um app azul
+  mostrava um switch roxo.
+
+- **Pickers estouravam a tela em 390px** (um `<input type=file>` não encolhe:
+  empurrava a página 101px) e o **`aria-label` do `TabView` ficava preso na
+  primeira aba** (era escrito só quando ausente, e o Update que troca de aba
+  carrega `active` sozinho).
+
+- **O renderizador SSR estava cinco widgets atrás do cliente**: os campos da
+  #142 (`TextArea`, `MaskedInput`, `PinInput`) nunca foram portados, então a
+  mesma árvore era campo digitável no browser e caixa morta na página estática.
+  Portados, com um teste que trava as duas tabelas de tags.
+
+### Added
+
+- **`examples/booking-form`** — `DatePicker`, `TimePicker`, `RangeSlider`,
+  `Dropdown` e `FilePicker` ligados a um dataclass, com resumo ao vivo. Os quatro
+  primeiros não tinham exemplo nenhum, então não havia onde exercitá-los.
+- **`docs/tutorial/controls.md`** (PT + EN) — o mapa widget → elemento → evento
+  dos catorze controles, e por que `TabBar` desenha a faixa que o `TabView` não
+  pode desenhar.
+- **`tests/unit/test_renderer_control_coverage.py`** — a auditoria manual virou
+  gate: todo widget interativo do core é controle desenhado ou exceção listada, e
+  o motivo de cada exceção é conferido contra o core.
+
+Medido em Chrome real (Modo B e Modo C, 390px e 1280px, console limpo): clique
+real no `Switch` alterna o estado, arrasto move o `Slider` de 70% para 25%,
+`ArrowRight` move a fonte de 16pt para 18pt, arrastar o polegar baixo do
+`RangeSlider` reporta o par normalizado, seleção no `Dropdown` reporta índice 2,
+upload real chega como `passaporte.txt`, digitar filtra o `Autocomplete` de 20
+para 3 opções, clique na 3ª aba troca o painel, e a gaveta sai de
+`translateX(-260px)` para `0`.
+
 ## [0.97.0] — 2026-08-23
 
 ### Fixed

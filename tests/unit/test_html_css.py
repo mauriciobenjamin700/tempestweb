@@ -229,3 +229,28 @@ def test_float_values_stringify_like_javascript() -> None:
     assert style_to_css({"color": {"r": 1, "g": 2, "b": 3, "a": 1.0}}) == (
         "color: rgba(1, 2, 3, 1)"
     )
+
+
+def test_native_control_style_is_adapted_like_the_client() -> None:
+    """A native control's part geometry is dropped and its tint becomes accent-color.
+
+    Parity with ``adaptNativeControlRules`` in ``client/style.js``: what the core
+    resolves for a Switch is the knob a hand-drawing renderer paints, and applying
+    it verbatim deformed the real control (a 20x20 host around a 52x32 checkbox).
+    """
+    style: dict[str, Any] = {
+        "width": 20,
+        "height": 20,
+        "background": {"r": 88, "g": 71, "b": 133, "a": 1},
+        "color": {"r": 88, "g": 71, "b": 133, "a": 1},
+        "border_radius": 999,
+    }
+    assert style_to_css(style, "Switch") == (
+        "accent-color: rgba(88, 71, 133, 1); --tw-control-accent: rgba(88, 71, 133, 1)"
+    )
+
+
+def test_the_same_style_on_a_plain_widget_is_untouched() -> None:
+    """Only the native-control types are adapted; everything else is verbatim."""
+    style: dict[str, Any] = {"width": 20, "height": 20}
+    assert style_to_css(style, "Container") == "width: 20px; height: 20px"

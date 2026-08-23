@@ -52,11 +52,35 @@ _TAG_BY_TYPE: dict[str, str] = {
     # ``div`` fallback made the static page carry an unfocusable, unnamed box.
     "IconButton": "button",
     "Input": "input",
+    # The fields #142 gave the client and this renderer never got: a TextArea that
+    # is a real one, and the two inputs the base sheet was already styling as
+    # fields (a static page showed a CPF box nobody could type into either).
+    "TextArea": "textarea",
+    "MaskedInput": "input",
+    "PinInput": "input",
     "Checkbox": "label",
+    # The controls of #143. A Switch and the pickers wrap their control in the
+    # keyed <label> (the caption names it natively); a Slider is a range input, a
+    # Dropdown a real <select> with its options.
+    "Switch": "label",
+    "Slider": "input",
+    "Dropdown": "select",
+    "Autocomplete": "label",
+    "DatePicker": "label",
+    "TimePicker": "label",
+    "FilePicker": "label",
     "Image": "img",
     "Canvas": "canvas",
     "ProgressBar": "div",
     "Spinner": "div",
+}
+
+# The native input ``type`` each picker renders. A port of ``PICKER_INPUT_TYPES``
+# in ``client/dom.js``.
+_PICKER_INPUT_TYPES: dict[str, str] = {
+    "DatePicker": "date",
+    "TimePicker": "time",
+    "FilePicker": "file",
 }
 
 # Widget types the base stylesheet paints as progress indicators. A port of
@@ -221,7 +245,53 @@ def _control_attributes(node: Node) -> list[str]:
     """
     props = node.props
     attributes: list[str] = []
-    if node.type == "Input":
+    if node.type == "Slider":
+        attributes.append('type="range"')
+        attributes.extend(_range_attributes(props, value=props.get("value")))
+    elif node.type == "MaskedInput":
+        attributes.append('type="text"')
+        if "value" in props:
+            attributes.append(f'value="{escape_attr(props.get("value"))}"')
+        if props.get("placeholder") is not None:
+            attributes.append(f'placeholder="{escape_attr(props["placeholder"])}"')
+        if props.get("mask") is not None:
+            attributes.append(f'data-tw-mask="{escape_attr(props["mask"])}"')
+    elif node.type == "PinInput":
+        secure = bool(props.get("secure"))
+        attributes.append(f'type="{"password" if secure else "text"}"')
+        attributes.append('inputmode="numeric"')
+        attributes.append('autocomplete="one-time-code"')
+        if props.get("length") is not None:
+            length = max(1, int(props["length"]))
+            attributes.append(f'maxlength="{length}"')
+            attributes.append(f'data-tw-length="{length}"')
+        if "value" in props:
+            attributes.append(f'value="{escape_attr(props.get("value"))}"')
+    elif node.type == "TextArea":
+        if props.get("placeholder") is not None:
+            attributes.append(f'placeholder="{escape_attr(props["placeholder"])}"')
+        if props.get("rows") is not None:
+            attributes.append(f'rows="{escape_attr(props["rows"])}"')
+        if props.get("max_length") is not None:
+            attributes.append(f'maxlength="{escape_attr(props["max_length"])}"')
+    elif node.type == "FilePicker" and props.get("value"):
+        attributes.append(f'data-tw-value="{escape_attr(props["value"])}"')
+    elif node.type == "TabBar":
+        attributes.append('role="tablist"')
+        attributes.append(f'data-tw-active="{escape_attr(props.get("active", 0))}"')
+    elif node.type == "TabView":
+        attributes.append('role="tabpanel"')
+        attributes.append(f'data-tw-active="{escape_attr(props.get("active", 0))}"')
+        tabs = props.get("tabs")
+        active = int(props.get("active", 0) or 0)
+        if isinstance(tabs, list) and 0 <= active < len(tabs):
+            attributes.append(f'aria-label="{escape_attr(tabs[active])}"')
+    elif node.type == "RouteDrawer":
+        open_ = bool(props.get("open"))
+        attributes.append(f'aria-expanded="{"true" if open_ else "false"}"')
+        if open_:
+            attributes.append('data-tw-open=""')
+    elif node.type == "Input":
         attributes.append(f'type="{"password" if props.get("secure") else "text"}"')
         if "value" in props:
             attributes.append(f'value="{escape_attr(props.get("value"))}"')
@@ -237,6 +307,51 @@ def _control_attributes(node: Node) -> list[str]:
     elif node.type in _INDICATOR_TYPES:
         attributes.extend(_indicator_attributes(node))
     return attributes
+
+
+def _range_attributes(props: dict[str, Any], value: Any) -> list[str]:  # noqa: ANN401 — wire-shaped prop value
+    """Build a range input's bounds and current value.
+
+    Args:
+        props: The node's props, read for ``min_value``/``max_value``/``step``.
+        value: The value this particular input holds (a Slider's ``value``, or one
+            of a RangeSlider's two ends).
+
+    Returns:
+        The attribute strings, bounds before value — the order the client applies
+        them in, because a range input clamps to the bounds it has at the time.
+    """
+    attributes: list[str] = []
+    bounds = (("min_value", "min"), ("max_value", "max"), ("step", "step"))
+    for prop, attribute in bounds:
+        if props.get(prop) is not None:
+            attributes.append(f'{attribute}="{escape_attr(props[prop])}"')
+    if value is not None:
+        attributes.append(f'value="{escape_attr(value)}"')
+    return attributes
+
+
+def _options_html(options: Any, placeholder: str | None) -> str:  # noqa: ANN401 — wire-shaped prop value
+    """Render an ``options`` list as ``<option>`` markup.
+
+    Args:
+        options: The option values, in order (anything else renders nothing).
+        placeholder: A leading disabled option, or None for none.
+
+    Returns:
+        The options markup, placeholder first when there is one.
+    """
+    parts: list[str] = []
+    if placeholder:
+        parts.append(
+            f'<option value="" disabled data-tw-part="placeholder">'
+            f"{escape_text(placeholder)}</option>"
+        )
+    if isinstance(options, list):
+        for option in options:
+            value = escape_attr(option)
+            parts.append(f'<option value="{value}">{escape_text(option)}</option>')
+    return "".join(parts)
 
 
 def _indicator_attributes(node: Node) -> list[str]:
@@ -395,6 +510,52 @@ def _inner_html(node: Node) -> str:
         checked = " checked" if node.props.get("checked") else ""
         caption = escape_text(node.props.get("label"))
         return f'<input type="checkbox"{checked}>{caption}'
+    if node.type == "Switch":
+        checked = " checked" if node.props.get("checked") else ""
+        caption = escape_text(node.props.get("label"))
+        return f'<input type="checkbox" role="switch"{checked}>{caption}'
+    if node.type == "TextArea":
+        return escape_text(node.props.get("value"))
+    if node.type == "Dropdown":
+        return _options_html(node.props.get("options"), node.props.get("placeholder"))
+    if node.type == "Autocomplete":
+        list_id = f"tw-list-{node.key or 'anon'}"
+        value = escape_attr(node.props.get("value"))
+        placeholder = node.props.get("placeholder")
+        hint = f' placeholder="{escape_attr(placeholder)}"' if placeholder else ""
+        options = _options_html(node.props.get("options"), None)
+        return (
+            f'<input type="text" list="{escape_attr(list_id)}" value="{value}"{hint}>'
+            f'<datalist id="{escape_attr(list_id)}">{options}</datalist>'
+        )
+    if node.type in _PICKER_INPUT_TYPES:
+        input_type = _PICKER_INPUT_TYPES[node.type]
+        caption = escape_text(node.props.get("label"))
+        # A file input's value is unassignable — the renderer reflects it as the
+        # attribute the base sheet prints instead (see _control_attributes).
+        held = node.props.get("value")
+        shown = (
+            ""
+            if node.type == "FilePicker" or held is None
+            else f' value="{escape_attr(held)}"'
+        )
+        return f'<input type="{input_type}"{shown}>{caption}'
+    if node.type == "RangeSlider":
+        props = node.props
+        low_attrs = " ".join(_range_attributes(props, props.get("low")))
+        high_attrs = " ".join(_range_attributes(props, props.get("high")))
+        return (
+            f'<input type="range" data-tw-part="low" {low_attrs}>'
+            f'<input type="range" data-tw-part="high" {high_attrs}>'
+        )
+    if node.type == "TabBar":
+        tabs = node.props.get("tabs")
+        active = int(node.props.get("active", 0) or 0)
+        if not isinstance(tabs, list):
+            return ""
+        return "".join(
+            _tab_html(index, label, active) for index, label in enumerate(tabs)
+        )
     if node.type in ("Icon", "Canvas", "Spinner", "IconButton"):
         # The static renderer carries no icon path data (an ``Icon`` is an empty
         # ``<span>`` here too), so an IconButton is an empty, *named* button —
@@ -410,6 +571,26 @@ def _inner_html(node: Node) -> str:
         width = _bar_value(node) * 100
         return f'<div data-tw-part="fill" style="{fill} width: {width:g}%"></div>'
     return "".join(_node_to_html(child) for child in node.children)
+
+
+def _tab_html(index: int, label: Any, active: int) -> str:  # noqa: ANN401 — wire-shaped prop value
+    """Render one `TabBar` tab as the button the client would draw.
+
+    Args:
+        index: The tab's position in the strip.
+        label: Its caption.
+        active: The index of the selected tab.
+
+    Returns:
+        The button markup, carrying its index and selected state.
+    """
+    selected = "true" if index == active else "false"
+    focusable = "0" if index == active else "-1"
+    return (
+        f'<button type="button" role="tab" data-tw-part="tab"'
+        f' data-tw-value="{index}" aria-selected="{selected}"'
+        f' tabindex="{focusable}">{escape_text(label)}</button>'
+    )
 
 
 def _node_to_html(node: Node) -> str:

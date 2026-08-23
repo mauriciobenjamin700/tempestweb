@@ -33,39 +33,76 @@ WIDGETS_MODULE: Path = CLIENT_DIR / "widgets.gen.js"
 _NONE = "_"
 
 
-# IR types the shared renderer (client/dom.js TAG_BY_TYPE) renders as a native
-# form control that fires DOM `input`/`change`. Every other widget is a div/span
-# whose interaction is a `click`, so a change/toggle handler on it binds to click.
+# IR types the shared renderer (client/dom.js) draws as a native form control
+# firing DOM `input`/`change`. Every other widget is a div/span whose interaction
+# is a `click`, so a change/toggle handler on it binds to click.
 def _native_input_types() -> frozenset[str]:
     """Widgets the DOM renderer draws as a real form control.
 
-    Derived from ``client/dom.js``'s tag table rather than hand-listed, because a
-    hand-list drifts the moment the renderer learns a new control — and the drift
-    is silent: the builder maps ``on_change`` to ``click``, so the widget renders,
-    accepts typing, and never tells the app. Measured on ``MaskedInput``, whose
-    CEP field in ``examples/br-cadastro`` swallowed every keystroke.
-
-    ``Checkbox`` is included explicitly: it renders as a ``<label>`` wrapping a
-    real checkbox input, so the tag alone does not say it.
+    Read from ``NATIVE_CONTROL_TYPES`` in ``client/dom.js`` — the renderer's own
+    declaration — rather than inferred here, because inference is what drifts. It
+    used to read the tag table and add ``Checkbox`` by hand; that hand-add is the
+    whole tell, since a Switch, an Autocomplete and the three pickers are
+    ``<label>``s wrapping the control and a RangeSlider a div holding two range
+    inputs. Every one of them would have been read as a div, so its ``on_change``
+    would bind to ``click``: the widget renders, accepts input, and never tells
+    the app. Measured on ``MaskedInput``, whose CEP field in
+    ``examples/br-cadastro`` swallowed every keystroke (#142), and on the ten
+    widgets of #143.
 
     Returns:
         The IR type names whose ``on_change`` binds to ``input``/``change``.
+
+    Raises:
+        ValueError: If ``client/dom.js`` no longer declares the set — a rename
+            there must fail loudly here instead of yielding an empty set, which
+            would silently map every value handler onto ``click``.
+    """
+    return _declared_types("NATIVE_CONTROL_TYPES")
+
+
+def _declared_types(name: str) -> frozenset[str]:
+    """Read one widget-type set the DOM renderer declares.
+
+    Args:
+        name: The exported constant's name in ``client/dom.js``.
+
+    Returns:
+        The IR type names it lists.
+
+    Raises:
+        ValueError: If the renderer no longer declares it — a rename there must
+            fail loudly here instead of yielding an empty set, which would
+            silently map every value handler onto ``click``.
     """
     dom = (Path(__file__).resolve().parents[2] / "client" / "dom.js").read_text(
         encoding="utf-8"
     )
-    start = dom.index("const TAG_BY_TYPE = Object.freeze({")
-    table = dom[start : dom.index("});", start)]
-    controls = {"input", "textarea", "select"}
-    names = {
-        name
-        for name, tag in re.findall(r'^\s*(\w+): "(\w+)"', table, re.M)
-        if tag in controls
-    }
-    return frozenset(names | {"Checkbox"})
+    marker = f"export const {name} = new Set(["
+    if marker not in dom:
+        raise ValueError(f"client/dom.js no longer declares {name}")
+    start = dom.index(marker)
+    declaration = dom[start : dom.index("]);", start)]
+    return frozenset(re.findall(r'"(\w+)"', declaration))
+
+
+def _change_reporting_types() -> frozenset[str]:
+    """Widgets whose ``on_change`` the renderer reports as a ``change`` event.
+
+    A superset of the native controls: a ``TabBar`` is a div of buttons, so no
+    tag says "change", yet a tab click is reported as one. Read from the renderer
+    for the same reason as :func:`_native_input_types` — the alternative is a
+    second list here that drifts from the one that does the reporting.
+
+    Returns:
+        The IR type names whose ``on_change`` binds to a ``change`` event.
+    """
+    declared = _declared_types("CHANGE_REPORTING_TYPES")
+    return frozenset(declared | _NATIVE_INPUT_TYPES)
 
 
 _NATIVE_INPUT_TYPES: frozenset[str] = _native_input_types()
+_CHANGE_REPORTING_TYPES: frozenset[str] = _change_reporting_types()
 
 # Handler props whose DOM event is fixed regardless of the widget's rendered tag.
 _FIXED_HANDLER_EVENTS: dict[str, list[str]] = {
@@ -84,10 +121,11 @@ def _events_for(handler: str, ir_type: str) -> list[str]:
     """Return the DOM event types a handler binds, given the widget's IR type.
 
     Value handlers (``on_change``/``on_input``/``on_toggle``) bind to the native
-    ``input``/``change`` events only on widgets the renderer draws as a real form
-    control (see :data:`_NATIVE_INPUT_TYPES`); on every other widget — a div/span
-    toggle like ``Switch`` — they bind to ``click``. Other handlers use a fixed
-    mapping, falling back to the ``on_``-stripped name.
+    ``input``/``change`` events on widgets the renderer draws as a real form
+    control (see :data:`_NATIVE_INPUT_TYPES`), and to ``change`` alone on the ones
+    it reports a change for without being a control (a ``TabBar``'s tab click).
+    On everything else they bind to ``click``. Other handlers use a fixed mapping,
+    falling back to the ``on_``-stripped name.
 
     Args:
         handler: The ``on_*`` prop name.
@@ -99,6 +137,8 @@ def _events_for(handler: str, ir_type: str) -> list[str]:
     if handler in ("on_change", "on_input", "on_toggle"):
         if ir_type in _NATIVE_INPUT_TYPES:
             return ["input", "change"] if handler != "on_input" else ["input"]
+        if ir_type in _CHANGE_REPORTING_TYPES:
+            return ["change"]
         return ["click"]
     if handler in _FIXED_HANDLER_EVENTS:
         return _FIXED_HANDLER_EVENTS[handler]

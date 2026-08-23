@@ -30,6 +30,15 @@ import {
   TYPE_ATTR,
 } from "./dom.js";
 
+/**
+ * Widget types whose change IS a selection: they report `select`, not `change`.
+ *
+ * A `<select>` and a file input both fire `input` *and* `change` for one choice,
+ * so only `change` is reported — the pair would call the handler twice for a
+ * single pick.
+ */
+const SELECTION_CONTROL_TYPES = new Set(["Dropdown", "FilePicker"]);
+
 // The DOM event names captured and their corresponding TWEvent `type`. Identity
 // here, but kept explicit so the captured set is the contract, not "whatever fires".
 const EVENT_TYPES = Object.freeze({
@@ -135,6 +144,38 @@ function sendMenuSelection(event, root, transport) {
       value: item.getAttribute(ITEM_VALUE_ATTR) ?? "",
       label: (labelEl ?? item).textContent ?? "",
     },
+  });
+  return true;
+}
+
+/**
+ * Report a click on a `TabBar` tab as the `change` its handler is declared against.
+ *
+ * The tabs are renderer-owned buttons, so the click lands on an element the IR
+ * knows nothing about; the event belongs to the bar. The payload follows the
+ * core's `RouteChangeEvent` convention — the tab's label as `name`, its position
+ * under `params["index"]`, which is what every tabbed example reads.
+ *
+ * @param {Event} event      The click event.
+ * @param {HTMLElement} root The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {boolean}        True when the click was a tab selection.
+ */
+function sendTabSelection(event, root, transport) {
+  const tab = closestWithAttr(event.target, root, ITEM_ATTR);
+  if (tab == null || tab.getAttribute(ITEM_ATTR) !== "tab") {
+    return false;
+  }
+  const bar = tab.closest('[data-tw-type="TabBar"]');
+  const key = bar == null ? null : bar.getAttribute(KEY_ATTR);
+  if (key == null) {
+    return false;
+  }
+  const index = Number(tab.getAttribute(ITEM_VALUE_ATTR) ?? 0);
+  transport.sendEvent({
+    type: "change",
+    key,
+    payload: { name: tab.textContent ?? "", params: { index } },
   });
   return true;
 }
@@ -343,11 +384,15 @@ function dragPayload(event, data) {
  * an ancestor (e.g. a click lands on text inside a keyed Button). Walks up until a
  * `data-tw-key` is found or the delegation root is passed.
  *
+ * The element is returned, not just its key, because the payload's shape depends
+ * on which widget owns the event — a Switch reports `checked`, a RangeSlider a
+ * `low`/`high` pair — and the nested control that fired is not the keyed widget.
+ *
  * @param {EventTarget|null} target  The event's target node.
  * @param {HTMLElement} root         The delegation root (search stops above it).
- * @returns {?string}                The widget key, or null when none is keyed.
+ * @returns {?HTMLElement}           The keyed widget element, or null when none is.
  */
-function keyedAncestor(target, root) {
+function keyedAncestorEl(target, root) {
   let node = /** @type {Node|null} */ (target);
   while (node != null && node.nodeType !== 1) {
     node = node.parentNode;
@@ -355,7 +400,7 @@ function keyedAncestor(target, root) {
   let el = /** @type {HTMLElement|null} */ (node);
   while (el != null) {
     if (el.hasAttribute && el.hasAttribute(KEY_ATTR)) {
-      return el.getAttribute(KEY_ATTR);
+      return el;
     }
     if (el === root) {
       break;
@@ -365,16 +410,6 @@ function keyedAncestor(target, root) {
   return null;
 }
 
-/**
- * Build the TWEvent payload for a captured DOM event.
- *
- * `input`/`change` carry the control's current `value`; other event types carry an
- * empty payload (the key alone identifies the action server-side).
- *
- * @param {string} domType   The DOM event type ("click", "input", ...).
- * @param {EventTarget|null} target  The event target.
- * @returns {{value?: string}}  The TWEvent `payload` ({ value } for input/change, else {}).
- */
 /**
  * Format `raw` against a `MaskedInput`'s mask.
  *
@@ -457,14 +492,152 @@ function reformatMasked(target) {
   target.setSelectionRange?.(position, position);
 }
 
-function payloadFor(domType, target) {
-  if (domType === "input" || domType === "change") {
-    const value = target && "value" in target ? target.value : undefined;
-    if (value !== undefined) {
-      return { value };
-    }
+/**
+ * Build the TWEvent payload for a captured DOM event, in the widget's own shape.
+ *
+ * The typed event a handler receives is the widget's, not the DOM's: a Switch and
+ * a Checkbox declare `ToggleEvent(checked)`, a Slider `SlideEvent(value)`, a
+ * RangeSlider `RangeChangeEvent(low, high)`. Reporting the DOM's generic
+ * `{ value }` for all of them is why a checkbox toggle arrived as
+ * `{"value": "on"}` and failed to validate — the handler got the raw dict, so
+ * `event.checked` was an AttributeError waiting for the first click. Anything
+ * whose event really is a value edit (Input, TextArea, MaskedInput, PinInput, the
+ * pickers, an Autocomplete's typing) keeps `{ value }`.
+ *
+ * Non-value events carry an empty payload: the key alone identifies the action.
+ *
+ * @param {string} domType   The DOM event type ("click", "input", ...).
+ * @param {EventTarget|null} target  The element the event fired on.
+ * @param {?HTMLElement} widget      The keyed widget that owns it.
+ * @returns {Object}  The TWEvent `payload`.
+ */
+function payloadFor(domType, target, widget) {
+  if (domType !== "input" && domType !== "change") {
+    return {};
   }
-  return {};
+  const type = widget == null ? null : widget.getAttribute(TYPE_ATTR);
+  if (type === "Checkbox" || type === "Switch") {
+    const box = /** @type {HTMLInputElement|null} */ (widget?.querySelector("input"));
+    return { checked: Boolean(box?.checked) };
+  }
+  if (type === "Slider") {
+    return { value: Number(/** @type {HTMLInputElement} */ (widget).value) };
+  }
+  if (type === "RangeSlider") {
+    return rangePayload(/** @type {HTMLElement} */ (widget));
+  }
+  const value = target && "value" in target ? target.value : undefined;
+  return value === undefined ? {} : { value };
+}
+
+/**
+ * Read a `RangeSlider`'s pair of thumbs as the `low`/`high` the core declares.
+ *
+ * Reported as a pair however one thumb moved, and normalized so `low <= high`:
+ * the two inputs are independent, and dragging the low one past the high one
+ * would otherwise report an inverted window the app has to defend against.
+ *
+ * @param {HTMLElement} widget  The RangeSlider element.
+ * @returns {{low: number, high: number}}  The window it currently shows.
+ */
+function rangePayload(widget) {
+  const read = (part) => {
+    const thumb = /** @type {HTMLInputElement|null} */ (
+      widget.querySelector(`input[${ITEM_ATTR}="${part}"]`)
+    );
+    return Number(thumb?.value ?? 0);
+  };
+  const low = read("low");
+  const high = read("high");
+  return { low: Math.min(low, high), high: Math.max(low, high) };
+}
+
+/**
+ * Report a `Dropdown` / `FilePicker` choice as the `select` its handler declares.
+ *
+ * A Dropdown reports the chosen option and its index among the real options —
+ * the placeholder is not one of them, so it does not shift the count. A
+ * FilePicker reports what the browser will actually let a page have: the file's
+ * name, and a blob URL for its bytes (`value` is unassignable on a file input,
+ * and there is no path). A cancelled pick reports nothing.
+ *
+ * @param {HTMLElement} widget  The keyed widget element.
+ * @param {string} key          Its widget key.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {void}
+ */
+function sendControlSelection(widget, key, transport) {
+  const type = widget.getAttribute(TYPE_ATTR);
+  if (type === "FilePicker") {
+    const input = /** @type {HTMLInputElement|null} */ (widget.querySelector("input"));
+    const file = input?.files?.[0];
+    if (file == null) {
+      return;
+    }
+    transport.sendEvent({
+      type: "select",
+      key,
+      payload: { uri: blobUri(file), name: file.name },
+    });
+    return;
+  }
+  const select = /** @type {HTMLSelectElement} */ (widget);
+  const options = Array.from(select.querySelectorAll("option")).filter(
+    (option) => option.getAttribute(ITEM_ATTR) !== "placeholder",
+  );
+  const chosen = options.findIndex((option) => option.value === select.value);
+  transport.sendEvent({
+    type: "select",
+    key,
+    payload: { value: select.value, index: chosen },
+  });
+}
+
+/**
+ * Mint a blob URL for a picked file, or an empty string when that is impossible.
+ *
+ * The name alone is what a page is allowed to know about a file; a URL for its
+ * bytes is what makes it usable (an `Image` src, an upload body). Guarded rather
+ * than feature-detected: the call also throws on a host object that is not a
+ * real `File`, and a throw inside the delegated listener would take the whole
+ * event report down with it.
+ *
+ * @param {*} file  The picked file.
+ * @returns {string}  A blob URL, or `""`.
+ */
+function blobUri(file) {
+  try {
+    return URL.createObjectURL(file);
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Report an `Autocomplete` suggestion pick as `select`, alongside the `change`.
+ *
+ * The browser gives a datalist pick no event of its own — it is an ordinary edit
+ * of the field. What distinguishes it is the result: the field now holds exactly
+ * one of the offered options. That is the occasion `on_select` is declared for,
+ * and the typed change the app already gets from `on_change` is unaffected.
+ *
+ * @param {HTMLElement} widget  The Autocomplete element.
+ * @param {string} key          Its widget key.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {void}
+ */
+function reportOptionSelection(widget, key, transport) {
+  const input = /** @type {HTMLInputElement|null} */ (widget.querySelector("input"));
+  const value = input?.value ?? "";
+  if (!value) {
+    return;
+  }
+  const options = Array.from(widget.querySelectorAll("datalist > option"));
+  const index = options.findIndex((option) => option.value === value);
+  if (index < 0) {
+    return;
+  }
+  transport.sendEvent({ type: "select", key, payload: { value, index } });
 }
 
 /**
@@ -492,13 +665,24 @@ export function bindEvents(root, transport) {
       if (domType === "click" && sendMenuSelection(event, root, transport)) {
         return;
       }
+      if (domType === "click" && sendTabSelection(event, root, transport)) {
+        return;
+      }
       if (domType === "click" && isOverlayHost(event.target)) {
         if (sendOverlayDismiss(root, transport)) {
           return;
         }
       }
-      const key = keyedAncestor(event.target, root);
-      if (key == null) {
+      const widget = keyedAncestorEl(event.target, root);
+      const key = widget == null ? null : widget.getAttribute(KEY_ATTR);
+      if (key == null || widget == null) {
+        return;
+      }
+      const widgetType = widget.getAttribute(TYPE_ATTR);
+      if (widgetType != null && SELECTION_CONTROL_TYPES.has(widgetType)) {
+        if (domType === "change") {
+          sendControlSelection(widget, key, transport);
+        }
         return;
       }
       if (domType === "input") {
@@ -509,10 +693,13 @@ export function bindEvents(root, transport) {
       transport.sendEvent({
         type: EVENT_TYPES[domType],
         key,
-        payload: payloadFor(domType, event.target),
+        payload: payloadFor(domType, event.target, widget),
       });
       if (domType === "input" || domType === "change") {
         reportPinComplete(event.target, transport);
+      }
+      if (domType === "change" && widgetType === "Autocomplete") {
+        reportOptionSelection(widget, key, transport);
       }
     };
     root.addEventListener(domType, handler);

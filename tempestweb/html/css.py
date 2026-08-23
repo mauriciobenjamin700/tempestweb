@@ -246,6 +246,21 @@ def _transition_to_css(transition: dict[str, Any]) -> str:
     return f"all {_num(transition['duration_ms'])}ms {curve}{delay}"
 
 
+#: Widget types the DOM draws as a native control, which paints its own parts. A
+#: port of ``NATIVE_CONTROL_STYLE_TYPES`` in ``client/style.js``.
+_NATIVE_CONTROL_STYLE_TYPES: frozenset[str] = frozenset(
+    {"Checkbox", "Switch", "Slider", "RangeSlider"}
+)
+
+#: CSS properties describing one of those hand-drawn parts, dropped for the types
+#: above. A port of ``NATIVE_CONTROL_PART_PROPS`` in ``client/style.js``.
+#: ``color`` is the control's tint, not its caption's — it is re-emitted as
+#: ``accent-color`` so the caption keeps the sheet's on-surface colour.
+_NATIVE_CONTROL_PART_PROPS: frozenset[str] = frozenset(
+    {"width", "height", "background", "border", "border-radius", "color"}
+)
+
+
 def style_to_css(style: dict[str, Any] | None, widget_type: str | None = None) -> str:
     """Translate a Style dump into a CSS string (declarations joined by ``"; "``).
 
@@ -363,4 +378,38 @@ def style_to_css(style: dict[str, Any] | None, widget_type: str | None = None) -
     if style.get("transition") is not None:
         rules.append(f"transition: {_transition_to_css(style['transition'])}")
 
+    if widget_type in _NATIVE_CONTROL_STYLE_TYPES:
+        rules = _adapt_native_control_rules(rules)
     return "; ".join(rules)
+
+
+def _adapt_native_control_rules(rules: list[str]) -> list[str]:
+    """Rewrite a native control's declarations so the browser draws its own parts.
+
+    A port of ``adaptNativeControlRules`` in ``client/style.js``: the part
+    geometry and paint are dropped and the resolved foreground colour becomes
+    ``accent-color``, which is how a checkbox, a switch and a range input take a
+    theme colour. The colour still comes from the core; only the shape of a part
+    the platform already draws is discarded.
+
+    Args:
+        rules: The declarations translated so far.
+
+    Returns:
+        The declarations to emit.
+    """
+    kept: list[str] = []
+    accent: str | None = None
+    for rule in rules:
+        prop, _, value = rule.partition(":")
+        prop = prop.strip()
+        if prop == "color":
+            accent = value.strip()
+        if prop not in _NATIVE_CONTROL_PART_PROPS:
+            kept.append(rule)
+    if accent is not None:
+        kept.append(f"accent-color: {accent}")
+        # A Switch's track is painted by the base sheet, which cannot read
+        # ``accent-color``; the same colour travels as a custom property it can.
+        kept.append(f"--tw-control-accent: {accent}")
+    return kept

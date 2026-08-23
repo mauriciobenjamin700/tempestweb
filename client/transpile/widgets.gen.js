@@ -135,7 +135,7 @@ export function Autocomplete({ key = null, colorScheme = "primary", fieldVariant
       value: value,
     },
     children: [],
-    __handlers: { "click": onChange, "select": onSelect },
+    __handlers: { "input": onChange, "change": onChange, "select": onSelect },
   };
 }
 
@@ -398,7 +398,7 @@ export function DatePicker({ key = null, colorScheme = "primary", fieldVariant =
       value: value,
     },
     children: [],
-    __handlers: { "click": onChange },
+    __handlers: { "input": onChange, "change": onChange },
   };
 }
 
@@ -1225,7 +1225,7 @@ export function RangeSlider({ key = null, colorScheme = "primary", focusOrder = 
       tag: tag,
     },
     children: [],
-    __handlers: { "click": onChange },
+    __handlers: { "input": onChange, "change": onChange },
   };
 }
 
@@ -1516,7 +1516,7 @@ export function Slider({ key = null, colorScheme = "primary", focusOrder = null,
       value: value,
     },
     children: [],
-    __handlers: { "click": onChange },
+    __handlers: { "input": onChange, "change": onChange },
   };
 }
 
@@ -1632,7 +1632,7 @@ export function Switch({ key = null, checked = false, colorScheme = "primary", f
       tag: tag,
     },
     children: [],
-    __handlers: { "click": onChange },
+    __handlers: { "input": onChange, "change": onChange },
   };
 }
 
@@ -1657,7 +1657,7 @@ export function TabBar({ tabs, key = null, active = 0, focusOrder = null, focusa
       tag: tag,
     },
     children: [],
-    __handlers: { "click": onChange },
+    __handlers: { "change": onChange },
   };
 }
 
@@ -1762,7 +1762,7 @@ export function TimePicker({ key = null, colorScheme = "primary", fieldVariant =
       value: value,
     },
     children: [],
-    __handlers: { "click": onChange },
+    __handlers: { "input": onChange, "change": onChange },
   };
 }
 

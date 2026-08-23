@@ -103,6 +103,7 @@ Listas virtualizadas, galerias, chat, busca e drag-and-drop.
 Controles, disclosure e estados de feedback.
 
 - [**Painel de configurações**](settings-panel.md) — `Switch`, `Checkbox`, `Slider`, `RadioGroup` e `SegmentedControl` ligados ao estado. **[A/B]**
+- [**Formulário de reserva**](booking-form.md) — `DatePicker`, `TimePicker`, `RangeSlider`, `Dropdown` e `FilePicker`, os controles nativos do navegador. **[A/B/C]**
 - [**Avaliação e review**](rating-review.md) — estrelas `Rating` + `Chip` tags + `TextArea` num formulário validado. **[A/B]**
 - [**FAQ accordion**](faq-accordion.md) — `Accordion` com política de "um aberto por vez" e filtro de busca. **[A/B]**
 - [**Central de notificações**](notification-center.md) — `Banner`, `Badge` de não-lidas e `EmptyState` na caixa vazia. **[A/B]**

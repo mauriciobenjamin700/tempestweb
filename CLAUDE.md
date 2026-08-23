@@ -25,7 +25,7 @@ Leia o documento antes da tarefa correspondente — não improvise de memória.
 | trabalhar em capacidade nativa (browser API) | `docs/advanced/capabilities.md` · `.../native-reference.md` · `.../native-events.md` |
 | mexer no servidor Modo B (auth, rate limit, sessão) | `docs/advanced/security.md` · `docs/advanced/observability.md` |
 | responder "como o usuário faz X?" | `docs/tutorial/` (progressivo: view → state → patches → modos) |
-| ver um app inteiro funcionando | `examples/` (56 apps) + `docs/examples/` |
+| ver um app inteiro funcionando | `examples/` (58 apps) + `docs/examples/` |
 | conferir superfície pública de um módulo | `docs/reference/<módulo>.md` (mkdocstrings) |
 
 Docs são **bilíngues**: `<page>.md` (PT-BR, default) + `<page>.en.md` (EN-US), as

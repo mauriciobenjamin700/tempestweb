@@ -280,6 +280,36 @@ uv add "tempestweb>=0.94.0"
 
 ---
 
+### O switch não alterna, o slider não arrasta, o seletor de data não abre
+
+O mesmo defeito da entrada acima, nos **onze** widgets que faltavam — a auditoria
+que a #130 pediu, feita na #143. `Switch`, `Slider`, `RangeSlider`, `Dropdown`,
+`Autocomplete`, `DatePicker`, `TimePicker`, `FilePicker` e `TabBar` viravam `div`
+anônimo: sem controle para operar e sem evento para reportar, nos três modos.
+
+Corrigido em 0.98.0 — cada um vira o controle nativo equivalente (veja
+[Controles](tutorial/controls.md)). Três detalhes que vinham no mesmo pacote:
+
+- **O `Checkbox` já existia e o `on_change` dele chegava como dicionário cru.**
+  O cliente reportava `{"value": "on"}`, que não valida como
+  `ToggleEvent(checked)` — `event.checked` era um `AttributeError` esperando o
+  primeiro clique. O payload passou a ter a forma do widget.
+- **`TabView` e `RouteDrawer` continuam `div`, por decisão.** Os dois têm filho de
+  IR, e filho criado pelo renderizador só é legal dentro de folha da IR. Quem
+  desenha a faixa de abas é o `TabBar`, ao lado; o `open` do `RouteDrawer` virou
+  `data-tw-open`, que a folha base usa para deslizar a gaveta.
+- **O `Switch` era um quadrado, o `Slider` tinha 4px de altura.** O Style que o
+  core resolve para esses widgets descreve as **peças** que um renderizador de
+  desenho à mão pinta (a caixa, o knob, a trilha), e style inline ganha da folha
+  base. Agora a geometria de peça é descartada e a cor resolvida vira
+  `accent-color`.
+
+```bash
+uv add "tempestweb>=0.98.0"
+```
+
+---
+
 ### `setattr is not defined` (Modo C)
 
 `setattr(obj, nome, valor)` só era portado na forma `lambda s: setattr(s, "campo", v)`

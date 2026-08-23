@@ -625,7 +625,14 @@ spirit of `mypy --strict`.
     core's style resolvers travels in a generated table
     (`component-styles.gen.js`), the same way `widget-styles.gen.js` does for the
     widgets. Every builder is pinned by a matrix of props built from the real core
-    — 140 cases — so a drift in composition or resolved style fails the test.
+    — 151 cases — so a drift in composition or resolved style fails the test.
+
+    And tempestweb's **own** components (`tempestweb.components`) too:
+    `TextField`, `EmailField`, `PasswordField`, the ready-made `LoginForm` and
+    `SignupForm`, and the `PhoneField`/`CPFField`/`CNPJField`/`AddressField`
+    aliases over the core's fields. They derive every child key from the
+    component's own key, so two of them on one screen do not fight over the name
+    of the `Input` that emits the event — and Mode C carries that derivation.
 
     `examples/mode-c-components` exercises the whole batch in one app.
 
@@ -674,7 +681,7 @@ spirit of `mypy --strict`.
       window in the runtime, the way the server does in Mode B, and it survives
       the `view` re-running.
 
-    Measured on the corpus: **39 of 57 examples** transpile, up from 14.
+    Measured on the corpus: **40 of 57 examples** transpile, up from 14.
 
 !!! tip "Always give a component an explicit `key`"
     A component's default key is its own name (`card`, `alert`, `navbar`), so two

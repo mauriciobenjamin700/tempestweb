@@ -622,7 +622,14 @@ no espírito do `mypy --strict`.
     resolvedores de estilo do core viaja em tabela gerada
     (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
     pelos widgets. Cada builder é fixado por uma matriz de props construída do
-    core real — 140 casos — então drift de composição ou de estilo falha no teste.
+    core real — 151 casos — então drift de composição ou de estilo falha no teste.
+
+    E os componentes **do próprio tempestweb** (`tempestweb.components`) também:
+    `TextField`, `EmailField`, `PasswordField`, os formulários prontos
+    `LoginForm` e `SignupForm`, e os apelidos `PhoneField`/`CPFField`/
+    `CNPJField`/`AddressField` sobre os campos do core. Eles derivam a chave de
+    cada filho da chave do componente, então dois na mesma tela não disputam o
+    nome do `Input` que emite o evento — e o Modo C carrega essa derivação.
 
     `examples/mode-c-components` exercita o lote inteiro num app só.
 
@@ -672,7 +679,7 @@ no espírito do `mypy --strict`.
       desliza a janela no runtime, como o servidor faz no Modo B, e ela
       sobrevive ao `view` re-rodando.
 
-    Medido no corpus: **39 dos 57 exemplos** transpilam (eram 14).
+    Medido no corpus: **40 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),

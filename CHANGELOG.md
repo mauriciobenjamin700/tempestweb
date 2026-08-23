@@ -4,6 +4,26 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.89.0] — 2026-08-23
+
+### Added
+
+- **Os componentes do próprio tempestweb rodam em Modo C**: `TextField`,
+  `EmailField`, `PasswordField`, os formulários prontos `LoginForm` e
+  `SignupForm`, e os apelidos `PhoneField`/`CPFField`/`CNPJField`/`AddressField`
+  sobre os campos do core. Eles derivam a chave de cada filho da chave do
+  componente — que é como o roteador de evento acha o handler que disparou — e o
+  Modo C carrega essa derivação, senão dois campos na mesma tela disputariam o
+  nome do `Input` que emite o evento.
+- **11 casos novos na matriz de paridade** (`transpile_component_samples.json`,
+  agora 151), incluindo a assimetria de chave do `LoginForm` (os filhos saem de
+  `key or "login"`, a coluna de `key or "login-form"`) e o fato de o `EmailField`
+  do tempestweb **não** passar `error` para o `Input` interno — a mensagem
+  aparece na linha própria e a caixa mantém o contorno de repouso, ao contrário
+  do `EmailInput` do core.
+
+Corpus do Modo C: **40 dos 57 exemplos** (era 39). Desbloqueado: `login_demo`.
+
 ## [0.88.0] — 2026-08-23
 
 ### Added

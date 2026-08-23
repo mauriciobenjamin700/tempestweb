@@ -69,6 +69,13 @@ from tempest_core import (
     VStack,
     build,
 )
+from tempestweb.components import (
+    EmailField,
+    LoginForm,
+    PasswordField,
+    SignupForm,
+    TextField,
+)
 from tempestweb.runtime.wasm import serialize_node
 
 FIXTURES_DIR: Path = Path(__file__).resolve().parents[1] / "fixtures"
@@ -420,6 +427,63 @@ def _cases() -> dict[str, Any]:
         ),
         "address_input_unlabelled_sm": AddressInput(
             label="", size="sm", on_change=_noop_pair
+        ),
+        "text_field_default": TextField(on_change=_noop_event),
+        "text_field_labelled_error": TextField(
+            value="Ana",
+            label="Nome",
+            placeholder="seu nome",
+            error="obrigatório",
+            key="name",
+            on_change=_noop_event,
+        ),
+        "email_field_default": EmailField(on_change=_noop_event),
+        "email_field_keyed_error": EmailField(
+            value="a@b.c", error="inválido", key="signup-email", on_change=_noop_event
+        ),
+        "email_field_unlabelled": EmailField(label="", on_change=_noop_event),
+        "password_field_default": PasswordField(on_change=_noop_event),
+        "password_field_labelled_error": PasswordField(
+            value="x",
+            label="Confirmar senha",
+            error="não confere",
+            key="signup-confirm",
+            on_change=_noop_event,
+        ),
+        "login_form_default": LoginForm(
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_submit=lambda: None,
+        ),
+        "login_form_title_errors_keyed": LoginForm(
+            email="a@b.c",
+            password="x",
+            email_error="inválido",
+            password_error="curta",
+            title="Entrar",
+            submit_label="Continuar",
+            key="auth",
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_submit=lambda: None,
+        ),
+        "signup_form_default": SignupForm(
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_confirm_change=_noop_event,
+            on_submit=lambda: None,
+        ),
+        "signup_form_full": SignupForm(
+            email="a@b.c",
+            password="x",
+            confirm="y",
+            confirm_error="não confere",
+            title="Criar conta",
+            key="reg",
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_confirm_change=_noop_event,
+            on_submit=lambda: None,
         ),
     }
     return cases

@@ -1916,3 +1916,270 @@ export function AddressInput({
     children,
   });
 }
+
+/**
+ * The label color the tempestweb-native fields paint with (`#49454f`).
+ *
+ * These fields predate the theme-resolved BR inputs above and carry their own
+ * two constants, tuned for the light Material 3 surface the base stylesheet
+ * renders against. They are not the theme's `on_surface_variant`/`error` roles —
+ * porting them as such would shift the color a few units and break parity.
+ * @type {Readonly<Object>}
+ */
+const FIELD_LABEL_COLOR = Object.freeze({ r: 73, g: 69, b: 79, a: 1.0 });
+
+/**
+ * The error color the tempestweb-native fields paint with (`#b3261e`).
+ * @type {Readonly<Object>}
+ */
+const FIELD_ERROR_COLOR = Object.freeze({ r: 179, g: 38, b: 30, a: 1.0 });
+
+/**
+ * Wrap an input in the tempestweb field's label + error column.
+ *
+ * Every child key is derived from `key`: keys are how the event router finds the
+ * handler that fired, so a literal key here would be shared by every field of
+ * this kind on the screen and edits would land on the wrong one.
+ *
+ * @param {string} label   The label text; empty means no label.
+ * @param {import("../transport.js").Node} field  The input to wrap.
+ * @param {string} error   The validation message; empty means no error line.
+ * @param {string} key     The column's key, and the prefix of its children's.
+ * @returns {import("../transport.js").Node}
+ */
+function tempestwebField(label, field, error, key) {
+  const children = [];
+  if (label) {
+    children.push(
+      Text({
+        content: label,
+        key: `${key}-label`,
+        style: Style({ font_size: 13.0, font_weight: 500, color: FIELD_LABEL_COLOR }),
+      }),
+    );
+  }
+  children.push(field);
+  if (error) {
+    children.push(
+      Text({
+        content: error,
+        key: `${key}-error`,
+        style: Style({ font_size: 12.0, color: FIELD_ERROR_COLOR }),
+      }),
+    );
+  }
+  return Column({ key, style: Style({ gap: 4.0 }), children });
+}
+
+/**
+ * `TextField` — a generic labelled text field (name, title, …).
+ *
+ * The plain sibling of the BR fields: an unstyled label, a controlled `Input`
+ * and an optional error line, in a column that also carries vertical padding.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function TextField({
+  value = "",
+  label = "",
+  placeholder = "",
+  error = "",
+  onChange = null,
+  key = null,
+} = {}) {
+  const base = key ?? "text-field";
+  const children = [];
+  if (label) {
+    children.push(Text({ content: label, key: `${base}-label` }));
+  }
+  children.push(
+    Input({ value, placeholder, onChange: onValue(onChange), key: `${base}-input` }),
+  );
+  if (error) {
+    children.push(
+      Text({ content: error, key: `${base}-error`, style: Style({ color: FIELD_ERROR_COLOR }) }),
+    );
+  }
+  return Column({
+    key: base,
+    style: Style({ gap: 4.0, padding: Edge.symmetric({ vertical: 4.0 }) }),
+    children,
+  });
+}
+
+/**
+ * `EmailField` — the tempestweb-native labelled e-mail field.
+ *
+ * The message is shown on its own line only: unlike the core's `EmailInput`,
+ * this field does not hand `error` to the inner `Input`, so the box itself keeps
+ * its resting outline.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function EmailField({
+  value = "",
+  label = "E-mail",
+  placeholder = "you@example.com",
+  error = "",
+  onChange = null,
+  key = null,
+} = {}) {
+  const base = key ?? "email-field";
+  const field = Input({
+    value,
+    placeholder,
+    keyboard: "email",
+    onChange: onValue(onChange),
+    key: `${base}-input`,
+  });
+  return tempestwebField(label, field, error, base);
+}
+
+/**
+ * `PasswordField` — the tempestweb-native labelled secure field.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function PasswordField({
+  value = "",
+  label = "Senha",
+  placeholder = "",
+  error = "",
+  onChange = null,
+  key = null,
+} = {}) {
+  const base = key ?? "password-field";
+  const field = Input({
+    value,
+    placeholder,
+    secure: true,
+    onChange: onValue(onChange),
+    key: `${base}-input`,
+  });
+  return tempestwebField(label, field, error, base);
+}
+
+/**
+ * `LoginForm` — a complete e-mail + password form with a submit button.
+ *
+ * Controlled: the app holds both values and updates them from the `on*Change`
+ * handlers, and `onSubmit` fires on the button. The children key off `key` (or
+ * `"login"`) while the column itself keys off `key` or `"login-form"` — the
+ * core's own asymmetry, kept so a patch addresses the same node in every mode.
+ *
+ * @param {{email?: string, password?: string, onEmailChange?: ?Function,
+ *          onPasswordChange?: ?Function, onSubmit?: ?Function,
+ *          emailError?: string, passwordError?: string, title?: string,
+ *          submitLabel?: string, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function LoginForm({
+  email = "",
+  password = "",
+  onEmailChange = null,
+  onPasswordChange = null,
+  onSubmit = null,
+  emailError = "",
+  passwordError = "",
+  title = "",
+  submitLabel = "Entrar",
+  key = null,
+} = {}) {
+  const base = key ?? "login";
+  const children = [];
+  if (title) {
+    children.push(Text({ content: title, key: `${base}-title` }));
+  }
+  children.push(
+    EmailField({
+      value: email,
+      onChange: onEmailChange,
+      error: emailError,
+      key: `${base}-email`,
+    }),
+    PasswordField({
+      value: password,
+      onChange: onPasswordChange,
+      error: passwordError,
+      key: `${base}-password`,
+    }),
+    Button({ label: submitLabel, onClick: onSubmit, key: `${base}-submit` }),
+  );
+  return Column({
+    key: key ?? "login-form",
+    style: Style({ gap: 12.0, padding: Edge.all(16) }),
+    children,
+  });
+}
+
+/**
+ * `SignupForm` — e-mail + password + confirm, with a submit button.
+ *
+ * @param {{email?: string, password?: string, confirm?: string,
+ *          onEmailChange?: ?Function, onPasswordChange?: ?Function,
+ *          onConfirmChange?: ?Function, onSubmit?: ?Function,
+ *          emailError?: string, passwordError?: string, confirmError?: string,
+ *          title?: string, submitLabel?: string, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function SignupForm({
+  email = "",
+  password = "",
+  confirm = "",
+  onEmailChange = null,
+  onPasswordChange = null,
+  onConfirmChange = null,
+  onSubmit = null,
+  emailError = "",
+  passwordError = "",
+  confirmError = "",
+  title = "",
+  submitLabel = "Cadastrar",
+  key = null,
+} = {}) {
+  const base = key ?? "signup";
+  const children = [];
+  if (title) {
+    children.push(Text({ content: title, key: `${base}-title` }));
+  }
+  children.push(
+    EmailField({
+      value: email,
+      onChange: onEmailChange,
+      error: emailError,
+      key: `${base}-email`,
+    }),
+    PasswordField({
+      value: password,
+      onChange: onPasswordChange,
+      error: passwordError,
+      key: `${base}-password`,
+    }),
+    PasswordField({
+      value: confirm,
+      onChange: onConfirmChange,
+      error: confirmError,
+      label: "Confirmar senha",
+      key: `${base}-confirm`,
+    }),
+    Button({ label: submitLabel, onClick: onSubmit, key: `${base}-submit` }),
+  );
+  return Column({
+    key: key ?? "signup-form",
+    style: Style({ gap: 12.0, padding: Edge.all(16) }),
+    children,
+  });
+}
+
+export {
+  AddressInput as AddressField,
+  CNPJInput as CNPJField,
+  CPFInput as CPFField,
+  PhoneInput as PhoneField,
+};

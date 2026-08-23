@@ -955,20 +955,34 @@ def test_the_component_facade_routes_like_the_core() -> None:
 
 
 def test_a_facade_name_the_client_cannot_serve_is_refused_by_name() -> None:
-    """This repo's own `*Field` layer is refused by name, not by module.
+    """A component the facade re-exports but the client lacks is refused by name.
 
     The distinction matters: the module is legal, the name is what is missing, so
     the diagnostic points at the component instead of the import path.
+    ``DataTable`` is the standing example — its tree shape depends on the rows it
+    is handed, so it is deliberately not ported.
     """
     with pytest.raises(TranspileError) as excinfo:
         gen(
-            "from tempestweb.components import EmailField\n\n\n"
+            "from tempestweb.components import DataTable\n\n\n"
             "def view(app):\n"
-            '    return EmailField(key="e")\n'
+            '    return DataTable(key="t")\n'
         )
     message = str(excinfo.value)
-    assert "EmailField" in message
+    assert "DataTable" in message
     assert "is not available in Mode C" in message
+
+
+def test_the_repos_own_field_layer_is_served() -> None:
+    """`tempestweb.components`' own fields and forms route to the client."""
+    js = gen(
+        "from tempestweb.components import EmailField, LoginForm\n\n\n"
+        "def view(app):\n"
+        "    return Column(\n"
+        '        children=[EmailField(key="e"), LoginForm(key="l")], key="c"\n'
+        "    )\n"
+    )
+    assert 'import { EmailField, LoginForm } from "./widgets.js";' in js
 
 
 def test_a_starred_element_spreads_in_a_literal() -> None:

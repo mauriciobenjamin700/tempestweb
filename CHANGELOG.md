@@ -48,10 +48,10 @@ versioning.
   inicial. Console limpo, sem overflow horizontal a 390px e 1280px.
 - **Dois achados de paridade, medidos nos dois modos e fora do escopo deste
   bloco:** `LazyGrid.columns` é ignorado pelo renderizador compartilhado (Modos
-  B e C rendem `display: block`, 1 item por linha), e uma janela deslizada contra
-  uma lista que **encurta** clampa para vazio no core (`_resolve_window` prende o
-  `start` na contagem em vez da última página), deixando a lista sem item e sem
-  scroll para se corrigir.
+  B e C rendem `display: block`, 1 item por linha) — #132; e uma janela deslizada
+  contra uma lista que **encurta** clampa para vazio no core
+  (`_resolve_window` prende o `start` na contagem em vez da última página),
+  deixando a lista sem item e sem scroll para se corrigir — #133.
 
 ## [0.85.0] — 2026-08-23
 

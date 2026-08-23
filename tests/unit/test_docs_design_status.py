@@ -13,6 +13,15 @@ count of our own widgets, components, fixture cases or generated-artifact bytes.
 Each of those has a source of truth in the repo — ``buildable_widgets()``, the
 fixture itself, the file on disk — so the doc should point at it instead of
 copying the number. This test fails when one is copied.
+
+**What it does not cover, so nobody reads more into it than it says:** the other
+half of the #123 drift was a *status marker* — "🚧 Button feito" while every
+styled widget was already tabled. A marker is a claim about our code the same way
+a count is, but it has no shape to match on: "🚧" next to a sentence is not
+distinguishable, by regex, from "🚧" that is still true. Keeping a marker honest
+is a review duty, not a gate, and the way to make it cheap is to write the marker
+next to the thing that answers it (the generator, the fixture, the test) so the
+next reader can check in one command instead of trusting the prose.
 """
 
 from __future__ import annotations

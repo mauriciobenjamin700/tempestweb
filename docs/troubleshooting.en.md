@@ -193,6 +193,32 @@ is not available in Mode C (the transpile client exports no such name)
 
 Reference: [Mode C — transpile](advanced/transpile.md).
 
+### The virtualized list went empty and will not come back
+
+A window slid deep into a list that then **shrinks** — a pull-to-refresh back to
+the first page, a filter that narrows the result, a bulk delete — resolved to
+nothing: the core's `_resolve_window` clamps the start to the item count, so
+`[45, 75)` against 25 items becomes `[25, 25)`, zero rows. With no rows there is
+no scroll, and with no scroll no event can reposition the window: the list is
+stuck empty with its data loaded.
+
+Since 0.97.0 the virtualization controller recovers: after each patch batch, a
+list **with** items that materialized none (or whose window starts past the last
+page) asks for the **last page** — the end of the list when it is still longer
+than the window, and the top when the whole list fits.
+
+```bash
+uv add "tempestweb>=0.97.0"
+```
+
+!!! note "The resolution rule still lives in the core"
+    This is a safety net, not a fix to the rule: `_resolve_window` still clamps
+    the start to the count. Making a shrunken window **resolve** to the last page
+    instead of nothing has to happen there — and then all three modes change at
+    once.
+
+---
+
 ### The handler receives the event instead of the value it captured
 
 The classic loop-capture idiom — a parameter with a default, to escape Python's

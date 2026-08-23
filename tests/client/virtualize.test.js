@@ -155,3 +155,114 @@ test("the spacers refuse to shrink, or the scrollbar describes only the window",
 function transportNoop() {
   return { onPatches() {}, sendEvent() {}, async close() {} };
 }
+
+test("a window past the end of a shrunken list asks for the last page", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  // The stuck state: the app slid to [45, 75), then a refresh cut the list to 25
+  // items. The core's clamp takes that to [25, 25) — zero rows — and with no rows
+  // there is no scroll, so no event can ever put it back. Measured in
+  // examples/list_demo: "25 of 200 items" over an empty box.
+  const el = buildElement({
+    type: "LazyColumn",
+    key: "rows",
+    props: { item_count: 25, window_size: 30, window: [45, 75] },
+    children: [],
+  });
+  dom.root.appendChild(el);
+  const transport = mockTransport();
+  const v = installVirtualization(dom.root, transport);
+  v.refresh();
+
+  assert.deepEqual(transport.events, [
+    { type: "scroll", key: "rows", payload: { start: 0, end: 25 } },
+  ]);
+});
+
+test("the recovery asks for the last page, not the top", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  const el = buildElement({
+    type: "LazyColumn",
+    key: "rows",
+    props: { item_count: 100, window_size: 30, window: [90, 120] },
+    children: [],
+  });
+  dom.root.appendChild(el);
+  const transport = mockTransport();
+  installVirtualization(dom.root, transport).refresh();
+
+  // 100 items over a 30-row window: the last page starts at 70, and the reader
+  // keeps the end of the list they were looking at.
+  assert.deepEqual(transport.events, [
+    { type: "scroll", key: "rows", payload: { start: 70, end: 100 } },
+  ]);
+});
+
+test("a window that still fits is left alone", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  lazyViewport(dom, { count: 200, windowSize: 30, start: 40, rendered: 30, h: 20 });
+  const transport = mockTransport();
+  installVirtualization(dom.root, transport).refresh();
+  assert.deepEqual(transport.events, [], "no corrective scroll for a valid window");
+});
+
+test("the recovery is asked for once, not on every patch batch", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  const el = buildElement({
+    type: "LazyColumn",
+    key: "rows",
+    props: { item_count: 25, window_size: 30, window: [45, 75] },
+    children: [],
+  });
+  dom.root.appendChild(el);
+  const transport = mockTransport();
+  const v = installVirtualization(dom.root, transport);
+  v.refresh();
+  v.refresh();
+  assert.equal(transport.events.length, 1);
+});
+
+test("a list with items and no rendered rows is recovered, whatever the attribute says", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  // The shape the stuck state actually has in Mode C: the slide lives in the
+  // app, so the element still reads window-start 0 — what gives it away is that
+  // a list of 25 items materialized none.
+  const el = buildElement({
+    type: "LazyColumn",
+    key: "rows",
+    props: { item_count: 25, window_size: 30 },
+    children: [],
+  });
+  dom.root.appendChild(el);
+  const transport = mockTransport();
+  installVirtualization(dom.root, transport).refresh();
+
+  assert.deepEqual(transport.events, [
+    { type: "scroll", key: "rows", payload: { start: 0, end: 25 } },
+  ]);
+});
+
+test("an empty list is left alone — there is nothing to recover to", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  const el = buildElement({
+    type: "LazyColumn",
+    key: "rows",
+    props: { item_count: 0, window_size: 30 },
+    children: [],
+  });
+  dom.root.appendChild(el);
+  const transport = mockTransport();
+  installVirtualization(dom.root, transport).refresh();
+  assert.deepEqual(transport.events, []);
+});

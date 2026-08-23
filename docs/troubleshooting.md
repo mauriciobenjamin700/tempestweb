@@ -193,6 +193,32 @@ is not available in Mode C (the transpile client exports no such name)
 
 Referência: [Modo C — transpile](advanced/transpile.md).
 
+### A lista virtualizada ficou vazia e não volta
+
+Uma janela deslizada fundo contra uma lista que **encurta** — pull-to-refresh que
+volta para a primeira página, filtro que reduz o resultado, remoção em massa —
+resolvia para vazio: o `_resolve_window` do core prende o `start` na contagem, e
+`[45, 75)` contra 25 itens vira `[25, 25)`, zero linha. Sem linha não há scroll, e
+sem scroll não há evento que reposicione a janela: a lista fica travada vazia com
+os dados carregados no estado.
+
+Desde 0.97.0 o controlador de virtualização se recupera: depois de cada lote de
+patches, uma lista **com** itens que não materializou nenhum (ou cuja janela
+começa além da última página) pede a **última página** — que é o fim da lista, se
+ela ainda for maior que a janela, e o topo quando ela couber inteira.
+
+```bash
+uv add "tempestweb>=0.97.0"
+```
+
+!!! note "A regra de resolução continua no core"
+    Isto é rede de segurança, não a correção da regra: `_resolve_window` ainda
+    prende o `start` na contagem. Quem quiser que uma janela encurtada **resolva**
+    para a última página em vez de vazio precisa mudar lá — e aí os três modos
+    mudam de uma vez.
+
+---
+
 ### O handler recebe o evento no lugar do valor que capturou
 
 O idioma clássico de captura em laço — parâmetro com default, para fugir do late

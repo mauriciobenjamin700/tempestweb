@@ -76,7 +76,7 @@ está em [Plano de design](plan.md).
 
 | Fase | Escopo | Status |
 |---|---|---|
-| 0.0 | Extrair IR/reconciliador/estado/estilo/widgets/validators para o pacote `tempest-core`; tempestroid passa a depender dele | 🔶 fase 1 (pacote `tempest-core` 0.1.0 criado — ruff/pyright/pytest verdes; **tempestweb** adota e dropa `_core/` vendorado, branch `feat/adopt-tempest-core`, ambos modos verificados ao vivo). **tempestroid** depender dele + conformância Qt↔Compose = fase 2 pendente |
+| 0.0 | Extrair IR/reconciliador/estado/estilo/widgets/validators para o pacote `tempest-core`; tempestroid passa a depender dele | ✅ **fase 2 fechada** (verificado 2026-08-23): **tempestweb** pina `tempest-core>=0.15.0` sem `_core/` vendorado; **tempestroid** pina `tempest-core>=0.11.0`, também sem core vendorado, e tem suíte de conformância Qt↔Compose própria (`tests/conformance/test_conformance.py` — goldens dos **dois** tradutores de `Style`, paridade de cobertura campo a campo e tripwire das divergências intencionais de widget; 234 testes verdes). O core tem dois consumidores de fato, que era o ponto |
 | 0.1 | Extrair extras de paridade (navigation, theme, i18n, animation, forms, lists) sob demanda da web | ✅ (o pacote já carrega navigation/theme/i18n/animation/forms/lists — incluídos no core extraído) |
 
 !!! warning "Guarda do Trilho 0"

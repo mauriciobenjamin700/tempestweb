@@ -193,6 +193,69 @@ is not available in Mode C (the transpile client exports no such name)
 
 Reference: [Mode C — transpile](advanced/transpile.md).
 
+### The component's `on_change` never fires (Mode C)
+
+The component renders, the text you type stays in the box, and the handler never
+runs — clicking "Sign in" does nothing at all.
+
+Widget props travel as `camelCase` in the generated builder (`on_submit` becomes
+`onSubmit`), and the rename was decided by resolving the name on `tempest_core`.
+A component that only exists on the facade — `LoginForm`, `SignupForm`,
+`TextField`, `EmailField`, `PasswordField` — did not resolve there, so its props
+kept the wire's `snake_case` and the builder, which destructures `camelCase`,
+dropped **every handler in silence**.
+
+Fixed in 0.90.0 — the name is looked up on `tempest_core` and then on
+`tempestweb.components`. As a welcome side effect, an unknown kwarg is refused at
+build time again: `LoginForm(subtitle="x")` now fails with `file:line`.
+
+```bash
+uv add "tempestweb>=0.90.0"
+```
+
+---
+
+### `Color.from_hex is not a function` / `Class constructor X cannot be invoked without 'new'`
+
+A blank page, a single console error, and a build that passed.
+
+- **`Color.from_hex`**: in the core `Color` is a model with a `from_hex`
+  classmethod — how you write a literal color (65 calls across the examples).
+  Mode C exported only the factory, so the call compiled and died at mount.
+  Ported in 0.90.0.
+- **`field(default_factory=OtherDataclass)`**: a dataclass compiles to a JS
+  class, and calling a class without `new` is a hard `TypeError`. The nested
+  default came out as `(Address)()` and the app died on the first `makeState()`.
+  Fixed in 0.90.0.
+
+Both are the family of the `Edge` that was not callable (0.86.0): a core value
+whose helper was missing from the client. The build guard runs `node --check`,
+which *parses* without executing — which is why they got through.
+
+---
+
+### The field with an error message is not red (Mode C)
+
+The `Input` shows the message underneath, but its border and text stay the
+normal color — in Mode A or B the same code paints both red.
+
+A field with `error` set is **invalid**, and the core repaints its border and
+text in the `error` role **while building it**. That rule lives in the built
+style, not in the stylesheet, so the Mode C builder — a passthrough — dropped it
+silently: the field compiled, mounted and lied.
+
+Fixed in 0.88.0 — `Input` resolves through `resolveFieldStyle`, which applies the
+core's rule (a 1px border in the `error` role, a bottom-only `SideBorder` when
+`field_variant` is `flushed`, and the caller's `style` still winning last).
+
+If you see this, update the package:
+
+```bash
+uv add "tempestweb>=0.88.0"
+```
+
+---
+
 ### The app loads with the **old** version of the code
 
 No error, no warning: you rebuilt, you reloaded, and the fix is not there. It is

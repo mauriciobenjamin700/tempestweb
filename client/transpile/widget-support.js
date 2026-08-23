@@ -8,6 +8,8 @@
 // See docs/contract.md (wire format) and docs/modo-c-transpile.md (Mode C).
 
 import { WIDGET_STYLES } from "./widget-styles.gen.js";
+import { COLOR_ROLES } from "./component-styles.gen.js";
+import { Border, SideBorder } from "./values.gen.js";
 
 /**
  * The complete set of `Style` field names in the core's serialized shape
@@ -91,6 +93,36 @@ export function Color({ r = 0, g = 0, b = 0, a = 1.0 } = {}) {
 }
 
 /**
+ * Parse a `#RGB` / `#RRGGBB` / `#RRGGBBAA` string into a `Color`.
+ *
+ * How an app writes a literal color — the spelling behind 65 call sites in the
+ * examples — and Mode C shipped `Color` as a bare factory, so
+ * `Color.from_hex("#b3261e")` compiled, loaded and threw at mount with a blank
+ * page. Mirrors `tempest_core.style.Color._parse_hex`: the `#` is optional, a
+ * three-digit form doubles each digit, and the fourth byte is alpha over 255.
+ *
+ * @param {string} value  The hex string, with or without a leading `#`.
+ * @returns {{r: number, g: number, b: number, a: number}}
+ * @throws {Error} When the string is not a valid hex color.
+ */
+Color.from_hex = function from_hex(value) {
+  let text = String(value).replace(/^#+/, "");
+  if (text.length === 3) {
+    text = [...text].map((ch) => ch + ch).join("");
+  }
+  if ((text.length !== 6 && text.length !== 8) || !/^[0-9a-fA-F]+$/.test(text)) {
+    throw new Error(`invalid hex color: ${JSON.stringify(value)}`);
+  }
+  return {
+    r: parseInt(text.slice(0, 2), 16),
+    g: parseInt(text.slice(2, 4), 16),
+    b: parseInt(text.slice(4, 6), 16),
+    a: text.length === 8 ? parseInt(text.slice(6, 8), 16) / 255 : 1.0,
+  };
+};
+Object.freeze(Color);
+
+/**
  * A box's four side offsets in px (`{ top, right, bottom, left }`).
  *
  * Callable like the core's `Edge`, which is a model with four fields defaulting
@@ -154,6 +186,44 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override)
     }
   }
   return Style(merged);
+}
+
+/**
+ * The resolved style for a field widget, honoring the invalid (error) state.
+ *
+ * The generated table carries the **resting** style per variant/size/scheme,
+ * which is the whole story for every widget but a field: the core repaints an
+ * invalid field's border and text in the `error` role at build time, so the rule
+ * lives in the built style and not in the stylesheet. Without it a Mode C field
+ * carrying a validation message rendered as if it were fine. A flushed field
+ * keeps its single bottom edge, and the caller's own `style` still wins last —
+ * both mirroring `_apply_field_state` in `tempest_core.variants`.
+ *
+ * @param {string} widget       The core widget name (a `WIDGET_STYLES` key).
+ * @param {string} fieldVariant The field treatment (outline/filled/flushed).
+ * @param {string} size         The density size.
+ * @param {string} colorScheme  The Material 3 scheme name.
+ * @param {string} error        The validation message; empty means valid.
+ * @param {?Object} override    The caller's style, or null.
+ * @returns {Object}            The complete Style object.
+ */
+export function resolveFieldStyle(widget, fieldVariant, size, colorScheme, error, override) {
+  if (!error) {
+    return resolveWidgetStyle(widget, fieldVariant, size, colorScheme, override);
+  }
+  const edge = Border({ width: 1.0, color: COLOR_ROLES.error });
+  const layered = {
+    border: fieldVariant === "flushed" ? SideBorder({ bottom: edge }) : edge,
+    color: COLOR_ROLES.error,
+  };
+  if (override != null) {
+    for (const [field, value] of Object.entries(override)) {
+      if (value !== null && value !== undefined) {
+        layered[field] = value;
+      }
+    }
+  }
+  return resolveWidgetStyle(widget, fieldVariant, size, colorScheme, layered);
 }
 
 /**

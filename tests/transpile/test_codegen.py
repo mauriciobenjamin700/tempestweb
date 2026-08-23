@@ -955,20 +955,93 @@ def test_the_component_facade_routes_like_the_core() -> None:
 
 
 def test_a_facade_name_the_client_cannot_serve_is_refused_by_name() -> None:
-    """This repo's own `*Field` layer is refused by name, not by module.
+    """A component the facade re-exports but the client lacks is refused by name.
 
     The distinction matters: the module is legal, the name is what is missing, so
     the diagnostic points at the component instead of the import path.
+    ``DataTable`` is the standing example — its tree shape depends on the rows it
+    is handed, so it is deliberately not ported.
     """
     with pytest.raises(TranspileError) as excinfo:
         gen(
-            "from tempestweb.components import EmailField\n\n\n"
+            "from tempestweb.components import DataTable\n\n\n"
             "def view(app):\n"
-            '    return EmailField(key="e")\n'
+            '    return DataTable(key="t")\n'
         )
     message = str(excinfo.value)
-    assert "EmailField" in message
+    assert "DataTable" in message
     assert "is not available in Mode C" in message
+
+
+def test_the_repos_own_field_layer_is_served() -> None:
+    """`tempestweb.components`' own fields and forms route to the client."""
+    js = gen(
+        "from tempestweb.components import EmailField, LoginForm\n\n\n"
+        "def view(app):\n"
+        "    return Column(\n"
+        '        children=[EmailField(key="e"), LoginForm(key="l")], key="c"\n'
+        "    )\n"
+    )
+    assert 'import { EmailField, LoginForm } from "./widgets.js";' in js
+
+
+def test_a_dataclass_default_factory_of_a_dataclass_is_constructed() -> None:
+    """`field(default_factory=Nested)` builds the nested state with `new`.
+
+    A dataclass compiles to a JS class, and calling a class without `new` is a
+    hard `TypeError` at construction — so a nested state default compiled, loaded
+    and died on the very first `makeState()` with a blank page. Measured in
+    `examples/br-cadastro`.
+    """
+    js = gen(
+        "from dataclasses import dataclass, field\n\n\n"
+        "@dataclass\n"
+        "class Address:\n"
+        '    city: str = ""\n\n\n'
+        "@dataclass\n"
+        "class Form:\n"
+        "    address: Address = field(default_factory=Address)\n"
+    )
+    assert "new Address()" in js
+    assert "(Address)()" not in js
+
+
+def test_a_facade_only_component_still_gets_camelcase_props() -> None:
+    """A component that lives only in `tempestweb.components` is renamed too.
+
+    The prop rename is driven by resolving the called name on the core, so a
+    component the core does not re-export (`LoginForm`, `TextField`) fell through
+    to the wire's snake_case — and the generated builder, which destructures
+    camelCase, dropped every handler in silence. Measured in
+    `examples/login_demo`: the form rendered, typing worked, and submit did
+    nothing at all.
+    """
+    js = gen(
+        "from tempestweb.components import LoginForm\n\n\n"
+        "def view(app):\n"
+        "    return LoginForm(\n"
+        "        on_email_change=app.set_email,\n"
+        "        on_password_change=app.set_password,\n"
+        "        on_submit=app.submit,\n"
+        '        email_error="bad",\n'
+        '        key="login",\n'
+        "    )\n"
+    )
+    assert "onEmailChange:" in js
+    assert "onSubmit:" in js
+    assert "emailError:" in js
+    assert "on_submit:" not in js
+
+
+def test_a_facade_only_component_refuses_an_unknown_kwarg() -> None:
+    """Resolving the facade component also restores the core's kwarg check."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from tempestweb.components import LoginForm\n\n\n"
+            "def view(app):\n"
+            '    return LoginForm(on_submit=app.go, subtitle="x", key="l")\n'
+        )
+    assert "does not accept `subtitle`" in str(excinfo.value)
 
 
 def test_a_starred_element_spreads_in_a_literal() -> None:

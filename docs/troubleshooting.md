@@ -193,6 +193,69 @@ is not available in Mode C (the transpile client exports no such name)
 
 Referência: [Modo C — transpile](advanced/transpile.md).
 
+### O `on_change` do componente não dispara (Modo C)
+
+O componente aparece, o texto que você digita fica na caixa, e o handler nunca
+roda — clicar em "Entrar" não faz nada.
+
+Os props de widget viajam em `camelCase` no builder gerado (`on_submit` vira
+`onSubmit`), e a renomeação era decidida resolvendo o nome no `tempest_core`.
+Um componente que só existe no facade — `LoginForm`, `SignupForm`, `TextField`,
+`EmailField`, `PasswordField` — não resolvia lá, então os props saíam no
+`snake_case` do fio e o builder, que desestrutura `camelCase`, descartava
+**todos os handlers em silêncio**.
+
+Corrigido em 0.90.0 — o nome é procurado no `tempest_core` e depois em
+`tempestweb.components`. Como efeito colateral bom, o kwarg desconhecido volta
+a ser recusado no build: `LoginForm(subtitle="x")` agora falha com
+`arquivo:linha`.
+
+```bash
+uv add "tempestweb>=0.90.0"
+```
+
+---
+
+### `Color.from_hex is not a function` / `Class constructor X cannot be invoked without 'new'`
+
+Página em branco, um erro só no console, e o build tinha passado.
+
+- **`Color.from_hex`**: no core, `Color` é um modelo com o classmethod
+  `from_hex` — o jeito de escrever cor literal (65 chamadas nos exemplos). O
+  Modo C exportava só a fábrica, então a chamada compilava e morria na
+  montagem. Portado em 0.90.0.
+- **`field(default_factory=OutraDataclass)`**: dataclass compila para classe
+  JS, e chamar classe sem `new` é `TypeError` duro. O default aninhado saía
+  `(Address)()` e o app morria no primeiro `makeState()`. Corrigido em 0.90.0.
+
+Os dois são a mesma família do `Edge` que não era chamável (0.86.0): valor do
+core cujo helper faltava no cliente. O guard de build roda `node --check`, que
+faz *parse* sem executar — por isso passavam.
+
+---
+
+### O campo com mensagem de erro não fica vermelho (Modo C)
+
+O `Input` mostra a mensagem embaixo, mas a borda e o texto continuam na cor
+normal — em Modo A ou B, o mesmo código pinta os dois de vermelho.
+
+Um campo com `error` preenchido está **inválido**, e o core repinta a borda e o
+texto no papel `error` **na hora de construir**. Essa regra mora no estilo
+construído, não na folha de estilo, então o builder do Modo C, que é
+passthrough, a perdia em silêncio: o campo compilava, montava e mentia.
+
+Corrigido em 0.88.0 — `Input` resolve por `resolveFieldStyle`, que aplica a
+regra do core (borda de 1px no papel `error`, `SideBorder` só embaixo quando o
+`field_variant` é `flushed`, e o `style` do chamador ainda ganha por último).
+
+Se você vê isso, atualize o pacote:
+
+```bash
+uv add "tempestweb>=0.88.0"
+```
+
+---
+
 ### O app carrega com a versão **antiga** do código
 
 Nenhum erro, nenhum aviso: você reconstruiu, recarregou, e a correção não está

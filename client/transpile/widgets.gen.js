@@ -3,7 +3,7 @@
 // non-wire `__handlers` map (DOM event type -> closure); the runtime dispatches from it.
 // Regenerate: python -m tests.conformance._transpile_widgets. Do not edit.
 
-import { lazyChildren, resolveWidgetStyle, Style } from "./widget-support.js";
+import { lazyChildren, resolveFieldStyle, resolveWidgetStyle, Style } from "./widget-support.js";
 export { Color, Edge, Style } from "./widget-support.js";
 
 // `Style` is re-exported for apps; reference it so linters see the import as used.
@@ -777,7 +777,7 @@ export function Input({ key = null, colorScheme = "primary", error = "", fieldVa
       secure: secure,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("Input", fieldVariant, size, colorScheme, style),
+      style: resolveFieldStyle("Input", fieldVariant, size, colorScheme, error, style),
       tag: tag,
       trailing_icon: trailingIcon,
       value: value,

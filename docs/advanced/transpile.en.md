@@ -599,7 +599,7 @@ spirit of `mypy --strict`.
     the options.
 
 !!! check "The structural components are ported"
-    All 35 structural components of the core run in Mode C:
+    All 42 structural components of the core run in Mode C:
 
     - **surface and structure:** `Surface`, `StyledContainer`, `Card`,
       `Scaffold`, `Grid`, `Sidebar`, `Drawer`, `Divider`, plus the
@@ -608,8 +608,16 @@ spirit of `mypy --strict`.
       `Breadcrumb`, `Burger`, `SegmentedControl`;
     - **content:** `ListTile`, `Avatar`, `Chip`, `Tag`, `Rating`, `Stepper`,
       `SearchBar`, `RadioGroup`;
+    - **disclosure and panel selection:** `Accordion` (the body is only in the
+      tree while `open`, so closing is a *remove*, not a hide) and `Tabs` (the
+      active tab takes its underline from a `SideBorder`, with no new style
+      field);
     - **feedback:** `Banner`, `Alert`, `Badge`, `EmptyState`, `Stat`,
       `ProgressStepper`;
+    - **Brazilian fields:** `EmailInput`, `PasswordInput`, `PhoneInput`,
+      `CPFInput`, `CNPJInput` and `AddressInput` — each is the muted label, the
+      `Input`/`MaskedInput` with the right mask and the error line, and
+      `on_change` receives the new **string**, not the event;
     - **composition:** `MetricCard`, `StatCard`, `ConfidenceBadge` — plus the pure
       `confidence_scheme` function, which is how an app picks the badge's scheme.
 
@@ -617,7 +625,14 @@ spirit of `mypy --strict`.
     core's style resolvers travels in a generated table
     (`component-styles.gen.js`), the same way `widget-styles.gen.js` does for the
     widgets. Every builder is pinned by a matrix of props built from the real core
-    — 117 cases — so a drift in composition or resolved style fails the test.
+    — 151 cases — so a drift in composition or resolved style fails the test.
+
+    And tempestweb's **own** components (`tempestweb.components`) too:
+    `TextField`, `EmailField`, `PasswordField`, the ready-made `LoginForm` and
+    `SignupForm`, and the `PhoneField`/`CPFField`/`CNPJField`/`AddressField`
+    aliases over the core's fields. They derive every child key from the
+    component's own key, so two of them on one screen do not fight over the name
+    of the `Input` that emits the event — and Mode C carries that derivation.
 
     `examples/mode-c-components` exercises the whole batch in one app.
 
@@ -666,7 +681,7 @@ spirit of `mypy --strict`.
       window in the runtime, the way the server does in Mode B, and it survives
       the `view` re-running.
 
-    Measured on the corpus: **35 of 57 examples** transpile, up from 14.
+    Measured on the corpus: **40 of 57 examples** transpile, up from 14.
 
 !!! tip "Always give a component an explicit `key`"
     A component's default key is its own name (`card`, `alert`, `navbar`), so two
@@ -688,10 +703,12 @@ spirit of `mypy --strict`.
     dies on the first render.
 
     The **data-driven** components of `tempest_core.components` (`DataTable`,
-    `Table`, `Tabs`, `Accordion`, `BarChart`/`LineChart`, `DetectionOverlay`,
-    `ResultView`, `Calendar`/`Clock`, the media and form pickers, and
-    `CollapsingAppBar`, which depends on the scroll): their tree depends on the
-    data they are handed, so there is no fixed composition to port — unlike the
+    `Table`, `BarChart`/`LineChart`, `DetectionOverlay`, `ResultView`,
+    `Calendar`/`Clock`, the media and form pickers, and `CollapsingAppBar`, which
+    depends on the scroll): their tree *shape* depends on the data they are
+    handed — one row of cells per record, one bar per datum — so there is no
+    fixed composition to port. Looping over a flat list of labels is not that:
+    `Tabs` and `Accordion` are fixed compositions and are served, like the
     structural ones above
     ([#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107) tracks
     what is left). Also out:

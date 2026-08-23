@@ -23,6 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from tempest_core import (
+    Accordion,
+    AddressInput,
     Alert,
     AppBar,
     Avatar,
@@ -33,9 +35,12 @@ from tempest_core import (
     Button,
     Card,
     Chip,
+    CNPJInput,
     ConfidenceBadge,
+    CPFInput,
     Divider,
     Drawer,
+    EmailInput,
     EmptyState,
     Footer,
     Grid,
@@ -44,6 +49,8 @@ from tempest_core import (
     ListTile,
     MetricCard,
     NavBar,
+    PasswordInput,
+    PhoneInput,
     ProgressStepper,
     RadioGroup,
     Rating,
@@ -56,10 +63,18 @@ from tempest_core import (
     Stepper,
     StyledContainer,
     Surface,
+    Tabs,
     Tag,
     Text,
     VStack,
     build,
+)
+from tempestweb.components import (
+    EmailField,
+    LoginForm,
+    PasswordField,
+    SignupForm,
+    TextField,
 )
 from tempestweb.runtime.wasm import serialize_node
 
@@ -81,6 +96,16 @@ def _noop_event(_: Any) -> None:
 
     Args:
         _: The change event the widget reports.
+    """
+    return None
+
+
+def _noop_pair(_field: str, _value: str) -> None:
+    """Absorb an address-block change callback.
+
+    Args:
+        _field: The address field that changed.
+        _value: The field's new value.
     """
     return None
 
@@ -320,6 +345,145 @@ def _cases() -> dict[str, Any]:
         "confidence_badge_labelled": ConfidenceBadge(confidence=0.92, label="cat"),
         "confidence_badge_custom_thresholds": ConfidenceBadge(
             confidence=0.61, high=0.6, mid=0.3
+        ),
+        "accordion_closed": Accordion(title="Details", on_toggle=lambda: None),
+        "accordion_open": Accordion(
+            title="Details", open=True, children=[child], on_toggle=lambda: None
+        ),
+        "accordion_outlined_primary": Accordion(
+            title="Details",
+            variant="outlined",
+            color_scheme="primary",
+            on_toggle=lambda: None,
+        ),
+        "accordion_open_elevated_error": Accordion(
+            title="Details",
+            open=True,
+            children=[child],
+            variant="elevated",
+            color_scheme="error",
+            on_toggle=lambda: None,
+        ),
+        "tabs_default": Tabs(tabs=["a", "b"], on_select=_noop),
+        "tabs_second_lg": Tabs(
+            tabs=["a", "b", "c"], active=1, on_select=_noop, size="lg"
+        ),
+        "tabs_secondary_sm": Tabs(
+            tabs=["a"], on_select=_noop, color_scheme="secondary", size="sm"
+        ),
+        "tabs_empty": Tabs(tabs=[], on_select=_noop),
+        "tabs_active_out_of_range": Tabs(tabs=["a", "b"], active=7, on_select=_noop),
+        "email_input_default": EmailInput(on_change=_noop_event),
+        "email_input_value_and_error": EmailInput(
+            value="a@b.c",
+            error="inválido",
+            placeholder="seu e-mail",
+            on_change=_noop_event,
+        ),
+        "email_input_filled_lg_unlabelled": EmailInput(
+            label="",
+            field_variant="filled",
+            size="lg",
+            color_scheme="secondary",
+            on_change=_noop_event,
+        ),
+        "password_input_default": PasswordInput(on_change=_noop_event),
+        "password_input_flushed_sm_error": PasswordInput(
+            value="hunter2",
+            error="curta demais",
+            field_variant="flushed",
+            size="sm",
+            on_change=_noop_event,
+        ),
+        "phone_input_default": PhoneInput(on_change=_noop_event),
+        "phone_input_value_filled": PhoneInput(
+            value="(11) 99999-1234", field_variant="filled", on_change=_noop_event
+        ),
+        "cpf_input_default": CPFInput(on_change=_noop_event),
+        "cpf_input_error_lg": CPFInput(
+            value="529.982.247-25",
+            error="CPF inválido",
+            size="lg",
+            on_change=_noop_event,
+        ),
+        "cnpj_input_default": CNPJInput(on_change=_noop_event),
+        "cnpj_input_outline_error_scheme": CNPJInput(
+            value="11.222.333/0001-81",
+            error="CNPJ inválido",
+            color_scheme="error",
+            on_change=_noop_event,
+        ),
+        "address_input_default": AddressInput(on_change=_noop_pair),
+        "address_input_filled_values": AddressInput(
+            cep="01001-000",
+            street="Praça da Sé",
+            number="1",
+            complement="lado ímpar",
+            neighborhood="Sé",
+            city="São Paulo",
+            state="SP",
+            field_variant="filled",
+            on_change=_noop_pair,
+        ),
+        "address_input_unlabelled_sm": AddressInput(
+            label="", size="sm", on_change=_noop_pair
+        ),
+        "text_field_default": TextField(on_change=_noop_event),
+        "text_field_labelled_error": TextField(
+            value="Ana",
+            label="Nome",
+            placeholder="seu nome",
+            error="obrigatório",
+            key="name",
+            on_change=_noop_event,
+        ),
+        "email_field_default": EmailField(on_change=_noop_event),
+        "email_field_keyed_error": EmailField(
+            value="a@b.c", error="inválido", key="signup-email", on_change=_noop_event
+        ),
+        "email_field_unlabelled": EmailField(label="", on_change=_noop_event),
+        "password_field_default": PasswordField(on_change=_noop_event),
+        "password_field_labelled_error": PasswordField(
+            value="x",
+            label="Confirmar senha",
+            error="não confere",
+            key="signup-confirm",
+            on_change=_noop_event,
+        ),
+        "login_form_default": LoginForm(
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_submit=lambda: None,
+        ),
+        "login_form_title_errors_keyed": LoginForm(
+            email="a@b.c",
+            password="x",
+            email_error="inválido",
+            password_error="curta",
+            title="Entrar",
+            submit_label="Continuar",
+            key="auth",
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_submit=lambda: None,
+        ),
+        "signup_form_default": SignupForm(
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_confirm_change=_noop_event,
+            on_submit=lambda: None,
+        ),
+        "signup_form_full": SignupForm(
+            email="a@b.c",
+            password="x",
+            confirm="y",
+            confirm_error="não confere",
+            title="Criar conta",
+            key="reg",
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_confirm_change=_noop_event,
+            on_submit=lambda: None,
         ),
     }
     return cases

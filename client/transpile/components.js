@@ -11,10 +11,13 @@
 // built from the real core over a matrix of props: if a component's composition or
 // resolved style drifts, the JS test fails until this file follows.
 //
-// Still out of scope: the data-driven components (DataTable, Table, charts, Tabs,
-// Accordion, the date/media pickers, DetectionOverlay, ResultView) whose
-// composition depends on the data they are handed. Compose them from primitives,
-// or use Modes A/B. See docs/advanced/transpile.md.
+// Still out of scope: the components whose *tree shape* depends on the data they
+// are handed (DataTable, Table, the charts, the date/media pickers,
+// DetectionOverlay, ResultView) — one row of cells per record, one bar per
+// datum. A component that merely loops over a flat list of labels or widgets
+// (Tabs, Accordion, SegmentedControl) is a fixed composition and ports fine.
+// Compose the rest from primitives, or use Modes A/B. See
+// docs/advanced/transpile.md.
 
 import {
   Button,
@@ -22,13 +25,15 @@ import {
   Container,
   IconButton,
   Input,
+  MaskedInput,
   Row,
   ScrollView,
   Text,
 } from "./widgets.gen.js";
+import { EMAIL_PATTERN } from "./validators.js";
 import { SPACING_STEPS } from "./spacing.gen.js";
 import { Color, Edge, Style, resolveWidgetStyle } from "./widget-support.js";
-import { MUTED, ON_SURFACE } from "./values.gen.js";
+import { Border, MUTED, ON_SURFACE, SideBorder } from "./values.gen.js";
 import {
   ALERT_STYLES,
   AVATAR_COLORS,
@@ -1443,3 +1448,738 @@ export function ConfidenceBadge({
     style,
   });
 }
+
+/**
+ * `Accordion` — a titled section whose body shows only when `open`.
+ *
+ * The header is a resolved surface button carrying the disclosure marker; the
+ * body is a padded column rendered only while open, so a closed accordion is a
+ * single child and the reconciler removes the body rather than hiding it.
+ * `open` is controlled — the app flips it from `onToggle`.
+ *
+ * @param {{title?: string, open?: boolean,
+ *          children?: import("../transport.js").Node[], onToggle?: ?Function,
+ *          variant?: string, colorScheme?: string, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Accordion({
+  title = "",
+  open = false,
+  children = [],
+  onToggle = null,
+  variant = "filled",
+  colorScheme = "neutral",
+  style = null,
+  key = null,
+} = {}) {
+  const header = Button({
+    label: `${open ? "▾" : "▸"}  ${title}`,
+    onClick: onToggle,
+    key: "accordion-header",
+    style: Style({
+      ...surfaceStyle(variant, colorScheme, null, "sm"),
+      padding: Edge.all(SPACING_STEPS.sm),
+      font_weight: 700,
+    }),
+  });
+  const body = open
+    ? [
+        Column({
+          key: "accordion-body",
+          style: Style({
+            gap: SPACING_STEPS.sm,
+            padding: Edge.all(SPACING_STEPS.md),
+          }),
+          children,
+        }),
+      ]
+    : [];
+  return Column({
+    key: key ?? "accordion",
+    style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
+    children: [header, ...body],
+  });
+}
+
+/**
+ * `Tabs` — a tab strip whose active tab carries an underline indicator.
+ *
+ * Each tab is a ghost button that grows to share the strip evenly; the active
+ * one resolves against `colorScheme` instead of neutral and takes a thin bottom
+ * `SideBorder` in the accent role — the indicator uses the existing border
+ * fields, never a new style field. The active index is app state, reported back
+ * through `onSelect`.
+ *
+ * @param {{tabs?: string[], active?: number, onSelect?: ?Function,
+ *          colorScheme?: string, size?: string, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Tabs({
+  tabs = [],
+  active = 0,
+  onSelect = null,
+  colorScheme = "primary",
+  size = "md",
+  style = null,
+  key = null,
+} = {}) {
+  const accent = COLOR_ROLES[colorScheme] ?? COLOR_ROLES.primary;
+  const children = tabs.map((label, index) => {
+    const chosen = index === active;
+    const base = resolveWidgetStyle(
+      "Button",
+      "ghost",
+      size,
+      chosen ? colorScheme : "neutral",
+      null,
+    );
+    const overrides = chosen
+      ? { grow: 1.0, border: SideBorder({ bottom: Border({ width: 2.0, color: accent }) }) }
+      : { grow: 1.0 };
+    return Button({
+      label,
+      key: `tab-${index}`,
+      onClick: onSelect == null ? null : () => onSelect(index),
+      style: mergeStyle(base, overrides),
+    });
+  });
+  const strip = {
+    ...surfaceStyle("filled", "neutral", null, "none"),
+    gap: 4.0,
+    padding: Edge.symmetric({ vertical: 0.0, horizontal: 4.0 }),
+    justify: "center",
+    align: "stretch",
+  };
+  return Row({ key: key ?? "tabs", style: mergeStyle(strip, style), children });
+}
+
+/**
+ * The muted label shown above a labelled field.
+ *
+ * @param {string} label  The label text.
+ * @param {string} key    The reconciler key.
+ * @returns {import("../transport.js").Node}
+ */
+function labelText(label, key) {
+  return Text({
+    content: label,
+    key,
+    style: Style({ font_size: 13.0, font_weight: 500, color: COLOR_ROLES.on_surface_variant }),
+  });
+}
+
+/**
+ * Wrap an input in its optional label and optional error line.
+ *
+ * The label and the error line are *absent* from the tree when empty, never
+ * rendered blank, so the reconciler inserts and removes them — the same shape
+ * `_labelled_field` builds in `tempest_core.components.brforms`.
+ *
+ * @param {string} label   The label text; empty means no label.
+ * @param {import("../transport.js").Node} field  The input to wrap.
+ * @param {string} error   The validation message; empty means no error line.
+ * @param {string} key     The wrapping column's key.
+ * @param {?Object} style  The caller's style for the column.
+ * @returns {import("../transport.js").Node}
+ */
+function labelledField(label, field, error, key, style) {
+  const children = [];
+  if (label) {
+    children.push(labelText(label, "field-label"));
+  }
+  children.push(field);
+  if (error) {
+    children.push(
+      Text({
+        content: error,
+        key: "field-error",
+        style: Style({ font_size: 12.0, color: COLOR_ROLES.error }),
+      }),
+    );
+  }
+  return Column({ key, style: mergeStyle({ gap: 4.0 }, style), children });
+}
+
+/**
+ * Adapt the app's string handler to the input's typed change event.
+ *
+ * A BR field's `on_change` takes the new *value*, so the caller never touches
+ * the event object — the adapter the core installs, kept here so a view written
+ * against the core behaves the same in Mode C.
+ *
+ * @param {?Function} handler  The app's `(value: string) => void`, or null.
+ * @returns {?Function}
+ */
+function onValue(handler) {
+  return handler == null ? null : (event) => handler(event.value);
+}
+
+/**
+ * `EmailInput` — a labelled e-mail field with the e-mail keyboard and a mail icon.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, fieldVariant?: string, size?: string,
+ *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function EmailInput({
+  value = "",
+  label = "E-mail",
+  placeholder = "",
+  error = "",
+  onChange = null,
+  fieldVariant = "outline",
+  size = "md",
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  const field = Input({
+    value,
+    placeholder,
+    keyboard: "email",
+    pattern: EMAIL_PATTERN,
+    leadingIcon: "mail",
+    error,
+    onChange: onValue(onChange),
+    key: "email-field",
+    fieldVariant,
+    size,
+    colorScheme,
+  });
+  return labelledField(label, field, error, key ?? "email-input", style);
+}
+
+/**
+ * `PasswordInput` — a labelled password field (secure, with the eye toggle).
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, fieldVariant?: string, size?: string,
+ *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function PasswordInput({
+  value = "",
+  label = "Senha",
+  placeholder = "Senha",
+  error = "",
+  onChange = null,
+  fieldVariant = "outline",
+  size = "md",
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  const field = Input({
+    value,
+    placeholder,
+    secure: true,
+    leadingIcon: "lock",
+    error,
+    onChange: onValue(onChange),
+    key: "password-field",
+    fieldVariant,
+    size,
+    colorScheme,
+  });
+  return labelledField(label, field, error, key ?? "password-input", style);
+}
+
+/**
+ * A labelled masked field — the shape `PhoneInput`/`CPFInput`/`CNPJInput` share.
+ *
+ * @param {{mask: string, keyboard: string, fieldKey: string,
+ *          defaultKey: string, label: string, value: string,
+ *          placeholder: string, error: string, onChange: ?Function,
+ *          fieldVariant: string, size: string, colorScheme: string,
+ *          style: ?Object, key: ?string}} args
+ * @returns {import("../transport.js").Node}
+ */
+function maskedField({
+  mask,
+  keyboard,
+  fieldKey,
+  defaultKey,
+  label,
+  value,
+  placeholder,
+  error,
+  onChange,
+  fieldVariant,
+  size,
+  colorScheme,
+  style,
+  key,
+}) {
+  const field = MaskedInput({
+    value,
+    placeholder,
+    mask,
+    keyboard,
+    onChange: onValue(onChange),
+    key: fieldKey,
+    fieldVariant,
+    size,
+    colorScheme,
+  });
+  return labelledField(label, field, error, key ?? defaultKey, style);
+}
+
+/**
+ * `PhoneInput` — a labelled Brazilian phone field, masked `(99) 99999-9999`.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, fieldVariant?: string, size?: string,
+ *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function PhoneInput({
+  value = "",
+  label = "Telefone",
+  placeholder = "",
+  error = "",
+  onChange = null,
+  fieldVariant = "outline",
+  size = "md",
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  return maskedField({
+    mask: "(99) 99999-9999",
+    keyboard: "phone",
+    fieldKey: "phone-field",
+    defaultKey: "phone-input",
+    label,
+    value,
+    placeholder,
+    error,
+    onChange,
+    fieldVariant,
+    size,
+    colorScheme,
+    style,
+    key,
+  });
+}
+
+/**
+ * `CPFInput` — a labelled CPF field, masked `999.999.999-99`.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, fieldVariant?: string, size?: string,
+ *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function CPFInput({
+  value = "",
+  label = "CPF",
+  placeholder = "",
+  error = "",
+  onChange = null,
+  fieldVariant = "outline",
+  size = "md",
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  return maskedField({
+    mask: "999.999.999-99",
+    keyboard: "number",
+    fieldKey: "cpf-field",
+    defaultKey: "cpf-input",
+    label,
+    value,
+    placeholder,
+    error,
+    onChange,
+    fieldVariant,
+    size,
+    colorScheme,
+    style,
+    key,
+  });
+}
+
+/**
+ * `CNPJInput` — a labelled CNPJ field, masked `99.999.999/9999-99`.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, fieldVariant?: string, size?: string,
+ *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function CNPJInput({
+  value = "",
+  label = "CNPJ",
+  placeholder = "",
+  error = "",
+  onChange = null,
+  fieldVariant = "outline",
+  size = "md",
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  return maskedField({
+    mask: "99.999.999/9999-99",
+    keyboard: "number",
+    fieldKey: "cnpj-field",
+    defaultKey: "cnpj-input",
+    label,
+    value,
+    placeholder,
+    error,
+    onChange,
+    fieldVariant,
+    size,
+    colorScheme,
+    style,
+    key,
+  });
+}
+
+/**
+ * `AddressInput` — a grouped Brazilian address block of labelled fields.
+ *
+ * One handler serves the whole block: it is called as
+ * `onChange(fieldName, newValue)` for whichever of `cep`, `street`, `number`,
+ * `complement`, `neighborhood`, `city` or `state` changed.
+ *
+ * @param {{cep?: string, street?: string, number?: string, complement?: string,
+ *          neighborhood?: string, city?: string, state?: string, label?: string,
+ *          onChange?: ?Function, fieldVariant?: string, size?: string,
+ *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function AddressInput({
+  cep = "",
+  street = "",
+  number = "",
+  complement = "",
+  neighborhood = "",
+  city = "",
+  state = "",
+  label = "Endereço",
+  onChange = null,
+  fieldVariant = "outline",
+  size = "md",
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  const report = (fieldName) =>
+    onChange == null ? null : (event) => onChange(fieldName, event.value);
+  const children = [];
+  if (label) {
+    children.push(labelText(label, "address-label"));
+  }
+  children.push(
+    MaskedInput({
+      value: cep,
+      placeholder: "CEP",
+      mask: "99999-999",
+      keyboard: "number",
+      onChange: report("cep"),
+      key: "address-cep",
+      fieldVariant,
+      size,
+      colorScheme,
+    }),
+  );
+  const textFields = [
+    ["street", street, "Rua"],
+    ["number", number, "Número"],
+    ["complement", complement, "Complemento"],
+    ["neighborhood", neighborhood, "Bairro"],
+    ["city", city, "Cidade"],
+    ["state", state, "UF"],
+  ];
+  for (const [fieldName, fieldValue, placeholder] of textFields) {
+    children.push(
+      Input({
+        value: fieldValue,
+        placeholder,
+        onChange: report(fieldName),
+        key: `address-${fieldName}`,
+        fieldVariant,
+        size,
+        colorScheme,
+      }),
+    );
+  }
+  return Column({
+    key: key ?? "address-input",
+    style: mergeStyle({ gap: 8.0 }, style),
+    children,
+  });
+}
+
+/**
+ * The label color the tempestweb-native fields paint with (`#49454f`).
+ *
+ * These fields predate the theme-resolved BR inputs above and carry their own
+ * two constants, tuned for the light Material 3 surface the base stylesheet
+ * renders against. They are not the theme's `on_surface_variant`/`error` roles —
+ * porting them as such would shift the color a few units and break parity.
+ * @type {Readonly<Object>}
+ */
+const FIELD_LABEL_COLOR = Object.freeze({ r: 73, g: 69, b: 79, a: 1.0 });
+
+/**
+ * The error color the tempestweb-native fields paint with (`#b3261e`).
+ * @type {Readonly<Object>}
+ */
+const FIELD_ERROR_COLOR = Object.freeze({ r: 179, g: 38, b: 30, a: 1.0 });
+
+/**
+ * Wrap an input in the tempestweb field's label + error column.
+ *
+ * Every child key is derived from `key`: keys are how the event router finds the
+ * handler that fired, so a literal key here would be shared by every field of
+ * this kind on the screen and edits would land on the wrong one.
+ *
+ * @param {string} label   The label text; empty means no label.
+ * @param {import("../transport.js").Node} field  The input to wrap.
+ * @param {string} error   The validation message; empty means no error line.
+ * @param {string} key     The column's key, and the prefix of its children's.
+ * @returns {import("../transport.js").Node}
+ */
+function tempestwebField(label, field, error, key) {
+  const children = [];
+  if (label) {
+    children.push(
+      Text({
+        content: label,
+        key: `${key}-label`,
+        style: Style({ font_size: 13.0, font_weight: 500, color: FIELD_LABEL_COLOR }),
+      }),
+    );
+  }
+  children.push(field);
+  if (error) {
+    children.push(
+      Text({
+        content: error,
+        key: `${key}-error`,
+        style: Style({ font_size: 12.0, color: FIELD_ERROR_COLOR }),
+      }),
+    );
+  }
+  return Column({ key, style: Style({ gap: 4.0 }), children });
+}
+
+/**
+ * `TextField` — a generic labelled text field (name, title, …).
+ *
+ * The plain sibling of the BR fields: an unstyled label, a controlled `Input`
+ * and an optional error line, in a column that also carries vertical padding.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function TextField({
+  value = "",
+  label = "",
+  placeholder = "",
+  error = "",
+  onChange = null,
+  key = null,
+} = {}) {
+  const base = key ?? "text-field";
+  const children = [];
+  if (label) {
+    children.push(Text({ content: label, key: `${base}-label` }));
+  }
+  children.push(
+    Input({ value, placeholder, onChange: onValue(onChange), key: `${base}-input` }),
+  );
+  if (error) {
+    children.push(
+      Text({ content: error, key: `${base}-error`, style: Style({ color: FIELD_ERROR_COLOR }) }),
+    );
+  }
+  return Column({
+    key: base,
+    style: Style({ gap: 4.0, padding: Edge.symmetric({ vertical: 4.0 }) }),
+    children,
+  });
+}
+
+/**
+ * `EmailField` — the tempestweb-native labelled e-mail field.
+ *
+ * The message is shown on its own line only: unlike the core's `EmailInput`,
+ * this field does not hand `error` to the inner `Input`, so the box itself keeps
+ * its resting outline.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function EmailField({
+  value = "",
+  label = "E-mail",
+  placeholder = "you@example.com",
+  error = "",
+  onChange = null,
+  key = null,
+} = {}) {
+  const base = key ?? "email-field";
+  const field = Input({
+    value,
+    placeholder,
+    keyboard: "email",
+    onChange: onValue(onChange),
+    key: `${base}-input`,
+  });
+  return tempestwebField(label, field, error, base);
+}
+
+/**
+ * `PasswordField` — the tempestweb-native labelled secure field.
+ *
+ * @param {{value?: string, label?: string, placeholder?: string, error?: string,
+ *          onChange?: ?Function, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function PasswordField({
+  value = "",
+  label = "Senha",
+  placeholder = "",
+  error = "",
+  onChange = null,
+  key = null,
+} = {}) {
+  const base = key ?? "password-field";
+  const field = Input({
+    value,
+    placeholder,
+    secure: true,
+    onChange: onValue(onChange),
+    key: `${base}-input`,
+  });
+  return tempestwebField(label, field, error, base);
+}
+
+/**
+ * `LoginForm` — a complete e-mail + password form with a submit button.
+ *
+ * Controlled: the app holds both values and updates them from the `on*Change`
+ * handlers, and `onSubmit` fires on the button. The children key off `key` (or
+ * `"login"`) while the column itself keys off `key` or `"login-form"` — the
+ * core's own asymmetry, kept so a patch addresses the same node in every mode.
+ *
+ * @param {{email?: string, password?: string, onEmailChange?: ?Function,
+ *          onPasswordChange?: ?Function, onSubmit?: ?Function,
+ *          emailError?: string, passwordError?: string, title?: string,
+ *          submitLabel?: string, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function LoginForm({
+  email = "",
+  password = "",
+  onEmailChange = null,
+  onPasswordChange = null,
+  onSubmit = null,
+  emailError = "",
+  passwordError = "",
+  title = "",
+  submitLabel = "Entrar",
+  key = null,
+} = {}) {
+  const base = key ?? "login";
+  const children = [];
+  if (title) {
+    children.push(Text({ content: title, key: `${base}-title` }));
+  }
+  children.push(
+    EmailField({
+      value: email,
+      onChange: onEmailChange,
+      error: emailError,
+      key: `${base}-email`,
+    }),
+    PasswordField({
+      value: password,
+      onChange: onPasswordChange,
+      error: passwordError,
+      key: `${base}-password`,
+    }),
+    Button({ label: submitLabel, onClick: onSubmit, key: `${base}-submit` }),
+  );
+  return Column({
+    key: key ?? "login-form",
+    style: Style({ gap: 12.0, padding: Edge.all(16) }),
+    children,
+  });
+}
+
+/**
+ * `SignupForm` — e-mail + password + confirm, with a submit button.
+ *
+ * @param {{email?: string, password?: string, confirm?: string,
+ *          onEmailChange?: ?Function, onPasswordChange?: ?Function,
+ *          onConfirmChange?: ?Function, onSubmit?: ?Function,
+ *          emailError?: string, passwordError?: string, confirmError?: string,
+ *          title?: string, submitLabel?: string, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function SignupForm({
+  email = "",
+  password = "",
+  confirm = "",
+  onEmailChange = null,
+  onPasswordChange = null,
+  onConfirmChange = null,
+  onSubmit = null,
+  emailError = "",
+  passwordError = "",
+  confirmError = "",
+  title = "",
+  submitLabel = "Cadastrar",
+  key = null,
+} = {}) {
+  const base = key ?? "signup";
+  const children = [];
+  if (title) {
+    children.push(Text({ content: title, key: `${base}-title` }));
+  }
+  children.push(
+    EmailField({
+      value: email,
+      onChange: onEmailChange,
+      error: emailError,
+      key: `${base}-email`,
+    }),
+    PasswordField({
+      value: password,
+      onChange: onPasswordChange,
+      error: passwordError,
+      key: `${base}-password`,
+    }),
+    PasswordField({
+      value: confirm,
+      onChange: onConfirmChange,
+      error: confirmError,
+      label: "Confirmar senha",
+      key: `${base}-confirm`,
+    }),
+    Button({ label: submitLabel, onClick: onSubmit, key: `${base}-submit` }),
+  );
+  return Column({
+    key: key ?? "signup-form",
+    style: Style({ gap: 12.0, padding: Edge.all(16) }),
+    children,
+  });
+}
+
+export {
+  AddressInput as AddressField,
+  CNPJInput as CNPJField,
+  CPFInput as CPFField,
+  PhoneInput as PhoneField,
+};

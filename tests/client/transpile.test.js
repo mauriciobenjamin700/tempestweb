@@ -12,6 +12,7 @@ import { fixture, freshDom } from "./setup.js";
 import { diff } from "../../client/transpile/diff.js";
 import {
   Button,
+  Color,
   Column,
   Container,
   Edge,
@@ -26,6 +27,8 @@ import {
 import { mountApp, State } from "../../client/transpile/runtime.js";
 import * as widgets from "../../client/transpile/widgets.gen.js";
 import {
+  Accordion,
+  AddressInput,
   Alert,
   AppBar,
   Avatar,
@@ -35,18 +38,26 @@ import {
   Burger,
   Card,
   Chip,
+  CNPJInput,
+  CPFInput,
   ConfidenceBadge,
   confidence_scheme,
   Divider,
   Drawer,
+  EmailField,
+  EmailInput,
   EmptyState,
   Footer,
   Grid,
   Header,
   HStack,
   ListTile,
+  LoginForm,
   MetricCard,
   NavBar,
+  PasswordField,
+  PasswordInput,
+  PhoneInput,
   ProgressStepper,
   RadioGroup,
   Rating,
@@ -54,12 +65,15 @@ import {
   SearchBar,
   SegmentedControl,
   Sidebar,
+  SignupForm,
   Stat,
   StatCard,
   Stepper,
   StyledContainer,
   Surface,
+  Tabs,
   Tag,
+  TextField,
   VStack,
 } from "../../client/transpile/components.js";
 import { native, NativeError } from "../../client/transpile/native.js";
@@ -592,6 +606,147 @@ test("every ported component matches the core build (order-agnostic)", () => {
     confidence_badge_low: ConfidenceBadge({ confidence: 0.2 }),
     confidence_badge_labelled: ConfidenceBadge({ confidence: 0.92, label: "cat" }),
     confidence_badge_custom_thresholds: ConfidenceBadge({ confidence: 0.61, high: 0.6, mid: 0.3 }),
+    accordion_closed: Accordion({ title: "Details", onToggle: noop }),
+    accordion_open: Accordion({
+      title: "Details",
+      open: true,
+      children: [child()],
+      onToggle: noop,
+    }),
+    accordion_outlined_primary: Accordion({
+      title: "Details",
+      variant: "outlined",
+      colorScheme: "primary",
+      onToggle: noop,
+    }),
+    accordion_open_elevated_error: Accordion({
+      title: "Details",
+      open: true,
+      children: [child()],
+      variant: "elevated",
+      colorScheme: "error",
+      onToggle: noop,
+    }),
+    tabs_default: Tabs({ tabs: ["a", "b"], onSelect: noop }),
+    tabs_second_lg: Tabs({ tabs: ["a", "b", "c"], active: 1, onSelect: noop, size: "lg" }),
+    tabs_secondary_sm: Tabs({ tabs: ["a"], onSelect: noop, colorScheme: "secondary", size: "sm" }),
+    tabs_empty: Tabs({ tabs: [], onSelect: noop }),
+    tabs_active_out_of_range: Tabs({ tabs: ["a", "b"], active: 7, onSelect: noop }),
+    email_input_default: EmailInput({ onChange: noop }),
+    email_input_value_and_error: EmailInput({
+      value: "a@b.c",
+      error: "inválido",
+      placeholder: "seu e-mail",
+      onChange: noop,
+    }),
+    email_input_filled_lg_unlabelled: EmailInput({
+      label: "",
+      fieldVariant: "filled",
+      size: "lg",
+      colorScheme: "secondary",
+      onChange: noop,
+    }),
+    password_input_default: PasswordInput({ onChange: noop }),
+    password_input_flushed_sm_error: PasswordInput({
+      value: "hunter2",
+      error: "curta demais",
+      fieldVariant: "flushed",
+      size: "sm",
+      onChange: noop,
+    }),
+    phone_input_default: PhoneInput({ onChange: noop }),
+    phone_input_value_filled: PhoneInput({
+      value: "(11) 99999-1234",
+      fieldVariant: "filled",
+      onChange: noop,
+    }),
+    cpf_input_default: CPFInput({ onChange: noop }),
+    cpf_input_error_lg: CPFInput({
+      value: "529.982.247-25",
+      error: "CPF inválido",
+      size: "lg",
+      onChange: noop,
+    }),
+    cnpj_input_default: CNPJInput({ onChange: noop }),
+    cnpj_input_outline_error_scheme: CNPJInput({
+      value: "11.222.333/0001-81",
+      error: "CNPJ inválido",
+      colorScheme: "error",
+      onChange: noop,
+    }),
+    address_input_default: AddressInput({ onChange: noop }),
+    address_input_filled_values: AddressInput({
+      cep: "01001-000",
+      street: "Praça da Sé",
+      number: "1",
+      complement: "lado ímpar",
+      neighborhood: "Sé",
+      city: "São Paulo",
+      state: "SP",
+      fieldVariant: "filled",
+      onChange: noop,
+    }),
+    address_input_unlabelled_sm: AddressInput({ label: "", size: "sm", onChange: noop }),
+    text_field_default: TextField({ onChange: noop }),
+    text_field_labelled_error: TextField({
+      value: "Ana",
+      label: "Nome",
+      placeholder: "seu nome",
+      error: "obrigatório",
+      key: "name",
+      onChange: noop,
+    }),
+    email_field_default: EmailField({ onChange: noop }),
+    email_field_keyed_error: EmailField({
+      value: "a@b.c",
+      error: "inválido",
+      key: "signup-email",
+      onChange: noop,
+    }),
+    email_field_unlabelled: EmailField({ label: "", onChange: noop }),
+    password_field_default: PasswordField({ onChange: noop }),
+    password_field_labelled_error: PasswordField({
+      value: "x",
+      label: "Confirmar senha",
+      error: "não confere",
+      key: "signup-confirm",
+      onChange: noop,
+    }),
+    login_form_default: LoginForm({
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onSubmit: noop,
+    }),
+    login_form_title_errors_keyed: LoginForm({
+      email: "a@b.c",
+      password: "x",
+      emailError: "inválido",
+      passwordError: "curta",
+      title: "Entrar",
+      submitLabel: "Continuar",
+      key: "auth",
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onSubmit: noop,
+    }),
+    signup_form_default: SignupForm({
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onConfirmChange: noop,
+      onSubmit: noop,
+    }),
+    signup_form_full: SignupForm({
+      email: "a@b.c",
+      password: "x",
+      confirm: "y",
+      confirmError: "não confere",
+      title: "Criar conta",
+      key: "reg",
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onConfirmChange: noop,
+      onSubmit: noop,
+    }),
   };
   assert.equal(
     Object.keys(cases).length,
@@ -601,6 +756,88 @@ test("every ported component matches the core build (order-agnostic)", () => {
   for (const [name, built] of Object.entries(cases)) {
     // diff() ignores prop key order, so an empty diff means the trees are equal.
     assert.deepEqual(diff(drop(samples[name]), drop(built)), [], `${name} diverged from core`);
+  }
+});
+
+test("an invalid field paints its border and text in the error role", () => {
+  const samples = fixture("transpile_field_samples.json");
+  const drop = (n) => ({
+    type: n.type,
+    key: n.key,
+    props: n.props,
+    children: (n.children ?? []).map(drop),
+  });
+  const red = { r: 165, g: 46, b: 39, a: 1.0 };
+  const cases = {
+    field_outline_valid: widgets.Input({ value: "a", key: "f" }),
+    field_outline_invalid: widgets.Input({ value: "a", error: "obrigatório", key: "f" }),
+    field_filled_valid: widgets.Input({ value: "a", fieldVariant: "filled", key: "f" }),
+    field_filled_invalid: widgets.Input({
+      value: "a",
+      fieldVariant: "filled",
+      error: "obrigatório",
+      key: "f",
+    }),
+    field_flushed_valid: widgets.Input({ value: "a", fieldVariant: "flushed", key: "f" }),
+    field_flushed_invalid: widgets.Input({
+      value: "a",
+      fieldVariant: "flushed",
+      error: "obrigatório",
+      key: "f",
+    }),
+    field_invalid_lg_secondary: widgets.Input({
+      value: "a",
+      size: "lg",
+      colorScheme: "secondary",
+      error: "x",
+      key: "f",
+    }),
+    field_invalid_sm_error_scheme: widgets.Input({
+      value: "a",
+      size: "sm",
+      colorScheme: "error",
+      error: "x",
+      key: "f",
+    }),
+    field_invalid_keeps_caller_style: widgets.Input({
+      value: "a",
+      error: "x",
+      style: { background: { r: 1, g: 2, b: 3, a: 1.0 }, radius: 3.0 },
+      key: "f",
+    }),
+    field_invalid_caller_border_wins: widgets.Input({
+      value: "a",
+      error: "x",
+      style: { color: { r: 9, g: 9, b: 9, a: 1.0 } },
+      key: "f",
+    }),
+  };
+  assert.equal(Object.keys(cases).length, Object.keys(samples).length);
+  for (const [name, built] of Object.entries(cases)) {
+    assert.deepEqual(diff(drop(samples[name]), drop(built)), [], `${name} diverged from core`);
+  }
+  // The rule the fixture encodes, stated once in the open: a message repaints the
+  // field, a flushed one keeps its single bottom edge, and a valid one is untouched.
+  assert.deepEqual(cases.field_outline_invalid.props.style.border, { width: 1.0, color: red });
+  assert.deepEqual(cases.field_outline_invalid.props.style.color, red);
+  assert.deepEqual(cases.field_flushed_invalid.props.style.border.bottom, {
+    width: 1.0,
+    color: red,
+  });
+  assert.notDeepEqual(cases.field_outline_valid.props.style.color, red);
+});
+
+test("Color.from_hex parses the three shapes the core accepts, and refuses the rest", () => {
+  const samples = fixture("transpile_color_samples.json");
+  for (const [hex, want] of Object.entries(samples.parsed)) {
+    assert.deepEqual(
+      Color.from_hex(hex),
+      { r: want.r, g: want.g, b: want.b, a: want.a },
+      `${hex} diverged from core`,
+    );
+  }
+  for (const hex of samples.invalid) {
+    assert.throws(() => Color.from_hex(hex), /invalid hex color/, `${JSON.stringify(hex)} should throw`);
   }
 });
 

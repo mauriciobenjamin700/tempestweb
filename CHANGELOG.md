@@ -4,6 +4,125 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.90.0] — 2026-08-23
+
+Três defeitos do tipo "compila e morre" (ou pior: compila e mente), todos
+encontrados dirigindo em Chrome real os exemplos que os commits anteriores
+destravaram. Nenhum aparecia na suíte: o guard de build roda `node --check`,
+que faz *parse* sem executar.
+
+### Fixed
+
+- **Props de componente do facade saíam em `snake_case`, e o handler sumia.**
+  A renomeação para `camelCase` era decidida resolvendo o nome no
+  `tempest_core`; um componente que só existe em `tempestweb.components`
+  (`LoginForm`, `SignupForm`, `TextField`, `EmailField`, `PasswordField`) não
+  resolvia lá, então `on_submit` chegava como `on_submit` no builder, que
+  desestrutura `onSubmit`, e **todo handler era descartado em silêncio**.
+  Medido no `login_demo`: o formulário montava, digitar funcionava, e o submit
+  não fazia absolutamente nada. Agora o nome é procurado no core e depois no
+  facade — e, de brinde, a checagem de kwarg do core volta a valer para esses
+  componentes (`LoginForm(subtitle="x")` falha com `arquivo:linha`).
+- **`Color.from_hex` não existia no Modo C.** No core `Color` é modelo com o
+  classmethod — o jeito de escrever cor literal, 65 chamadas nos exemplos —
+  e o cliente exportava só a fábrica. `Color.from_hex("#ef4444")` compilava,
+  carregava e matava a página na montagem. Portado com o parse do core
+  (`#RGB`/`#RRGGBB`/`#RRGGBBAA`, `#` opcional, alfa sobre 255) e fixado por
+  `tests/fixtures/transpile_color_samples.json`.
+- **`field(default_factory=OutraDataclass)` chamava a classe sem `new`.**
+  Dataclass compila para classe JS, e classe sem `new` é `TypeError` duro: o
+  default aninhado saía `(Address)()` e o app morria no primeiro
+  `makeState()`. Medido no `br-cadastro`.
+
+Cada um tem teste que falha sem a correção.
+
+Quatro achados de paridade ficaram **fora** deste ciclo por serem do core ou do
+renderizador compartilhado — medidos em Modo B e Modo C antes de atribuir:
+[#134](https://github.com/mauriciobenjamin700/tempestweb/issues/134) (handler
+com parâmetro default-bound recebe o evento no lugar do valor capturado),
+[#135](https://github.com/mauriciobenjamin700/tempestweb/issues/135) (a chave
+literal `accordion-header` colide entre instâncias),
+[#136](https://github.com/mauriciobenjamin700/tempestweb/issues/136)
+(`MaskedInput` renderiza um `div` vazio nos três modos) e
+[#137](https://github.com/mauriciobenjamin700/tempestweb/issues/137) (o Modo C
+trata `dict` como lista em `if`, `len` e `in`).
+
+## [0.89.0] — 2026-08-23
+
+### Added
+
+- **Os componentes do próprio tempestweb rodam em Modo C**: `TextField`,
+  `EmailField`, `PasswordField`, os formulários prontos `LoginForm` e
+  `SignupForm`, e os apelidos `PhoneField`/`CPFField`/`CNPJField`/`AddressField`
+  sobre os campos do core. Eles derivam a chave de cada filho da chave do
+  componente — que é como o roteador de evento acha o handler que disparou — e o
+  Modo C carrega essa derivação, senão dois campos na mesma tela disputariam o
+  nome do `Input` que emite o evento.
+- **11 casos novos na matriz de paridade** (`transpile_component_samples.json`,
+  agora 151), incluindo a assimetria de chave do `LoginForm` (os filhos saem de
+  `key or "login"`, a coluna de `key or "login-form"`) e o fato de o `EmailField`
+  do tempestweb **não** passar `error` para o `Input` interno — a mensagem
+  aparece na linha própria e a caixa mantém o contorno de repouso, ao contrário
+  do `EmailInput` do core.
+
+Corpus do Modo C: **40 dos 57 exemplos** (era 39). Desbloqueado: `login_demo`.
+
+## [0.88.0] — 2026-08-23
+
+### Added
+
+- **Os seis campos brasileiros do core rodam em Modo C**: `EmailInput`,
+  `PasswordInput`, `PhoneInput`, `CPFInput`, `CNPJInput` e `AddressInput`. Cada
+  um é o rótulo mudo acima, o `Input`/`MaskedInput` com a máscara e o teclado
+  certos, e a linha de erro abaixo — presentes na árvore só quando têm conteúdo,
+  para o reconciliador inserir e remover em vez de renderizar em branco. O
+  `on_change` recebe a **string** nova (o `AddressInput` recebe `(campo, valor)`),
+  como no core: o app nunca toca no objeto de evento.
+- **14 casos novos na matriz de paridade** (`transpile_component_samples.json`,
+  agora 140), cobrindo rótulo ausente, erro presente, os três tratamentos de
+  campo, tamanho, esquema e o bloco de endereço preenchido.
+
+### Fixed
+
+- **Campo inválido não ficava vermelho no Modo C.** Um `Input` com `error`
+  preenchido está inválido, e o core repinta a borda e o texto no papel `error`
+  **ao construir** — regra que mora no estilo construído, não na folha, então o
+  builder gerado (passthrough) a perdia em silêncio. O campo compilava, montava
+  e mentia: a mensagem aparecia embaixo e o campo continuava com cara de válido.
+  Agora `Input` resolve por `resolveFieldStyle`, que aplica a regra do core:
+  borda de 1px no papel `error`, `SideBorder` só embaixo quando o `field_variant`
+  é `flushed`, e o `style` do chamador ainda ganha por último. Fixado por
+  `tests/fixtures/transpile_field_samples.json` (10 cenários construídos do core
+  real) — o teste falha sem a correção.
+
+Corpus do Modo C: **39 dos 57 exemplos** (era 38). Desbloqueado: `br-cadastro`.
+
+## [0.87.0] — 2026-08-23
+
+### Added
+
+- **`Accordion` e `Tabs` rodam em Modo C.** Estavam na lista de "componentes
+  dirigidos por dados", junto de `DataTable` e dos gráficos, e a classificação
+  estava errada: a árvore do `Accordion` é header + corpo opcional, e a do
+  `Tabs` é um botão por rótulo — composição fixa, do mesmo tipo que
+  `SegmentedControl` e `RadioGroup`, que já estavam portados. O que é
+  genuinamente dirigido por dado é a *forma* da árvore mudar com o registro (uma
+  linha de células por linha de dado, uma barra por ponto), e isso continua fora.
+- **Nove casos novos na matriz de paridade** (`transpile_component_samples.json`,
+  agora 126): `Accordion` fechado, aberto, `outlined`/`primary` e
+  `elevated`/`error`; `Tabs` default, ativo com `size="lg"`, `secondary`/`sm`,
+  lista vazia e `active` fora de alcance.
+
+### Changed
+
+- **O teste que fixa o fora-de-escopo passou a dizer o critério certo.**
+  `test_a_data_driven_component_is_still_out_of_scope` agora guarda `DataTable`,
+  `Table`, os gráficos e `DetectionOverlay` — a *forma* da árvore depender do
+  dado — e um teste irmão exige que `Accordion` e `Tabs` estejam servidos.
+
+Corpus do Modo C: **38 dos 57 exemplos** (era 35). Desbloqueados:
+`core-profile-cards`, `core-tabbed-settings`, `faq-accordion`.
+
 ## [0.86.0] — 2026-08-23
 
 ### Added

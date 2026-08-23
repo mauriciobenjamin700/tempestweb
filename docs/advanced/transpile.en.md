@@ -625,7 +625,14 @@ spirit of `mypy --strict`.
     core's style resolvers travels in a generated table
     (`component-styles.gen.js`), the same way `widget-styles.gen.js` does for the
     widgets. Every builder is pinned by a matrix of props built from the real core
-    — 151 cases — so a drift in composition or resolved style fails the test.
+    — 185 cases — so a drift in composition or resolved style fails the test.
+    Thirty-four of them are the **`__keyed` twin**: the same component built with
+    an explicit `key=`, because the unkeyed build hides the very derivation
+    (`Accordion()` emits `accordion-header` whether or not the builder derives it,
+    while `Accordion(key="faq-3")` emits `faq-3-header` only when it really does).
+    The comparison now also looks at every **descendant** key — it used to check
+    shape and style alone, which is how a port with literal child keys survived a
+    whole release.
 
     And tempestweb's **own** components (`tempestweb.components`) too:
     `TextField`, `EmailField`, `PasswordField`, the ready-made `LoginForm` and

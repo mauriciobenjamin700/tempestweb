@@ -489,22 +489,76 @@ def _cases() -> dict[str, Any]:
     return cases
 
 
+#: One representative case per component that namespaces an inner key under its
+#: own. Each gets a ``__keyed`` twin built with an explicit ``key``, because the
+#: unkeyed build hides the namespacing: ``Accordion()`` emits
+#: ``accordion-header`` either way, while ``Accordion(key="faq-3")`` emits
+#: ``faq-3-header`` only when the builder actually derives it. That hole is how a
+#: hand-written port kept literal child keys through a whole release.
+KEYED_TWINS: tuple[str, ...] = (
+    "accordion_open",
+    "address_input_default",
+    "alert_title_only",
+    "appbar_title_only",
+    "avatar_default",
+    "banner_default",
+    "breadcrumb_navigable",
+    "card_default",
+    "cnpj_input_default",
+    "cpf_input_default",
+    "email_field_keyed_error",
+    "email_input_value_and_error",
+    "emptystate_full",
+    "grid_three_in_two",
+    "header_title_only",
+    "listtile_with_subtitle",
+    "login_form_default",
+    "metric_card_delta",
+    "navbar_first_active",
+    "password_field_default",
+    "password_input_flushed_sm_error",
+    "phone_input_default",
+    "progress_stepper_second",
+    "radio_default",
+    "rating_three_stars",
+    "scaffold_body_only",
+    "searchbar_with_value_and_clear",
+    "segmented_second_lg",
+    "signup_form_default",
+    "stat_plain",
+    "stat_card_default",
+    "stepper_bounded",
+    "tabs_second_lg",
+    "text_field_default",
+)
+
+
 def build_samples() -> dict[str, Any]:
     """Build each sample to its serialized IR (the component's own key dropped).
 
-    The auto-assigned component key is dropped so the fixture pins the *shape and
+    The component's own root key is dropped so the fixture pins the *shape and
     style* the builder must reproduce, not the core's incidental keying. The wire
     serializer is the runtime's own, so a handler prop is ``null`` here exactly as
     it is on the wire — which is what the JS builders emit.
 
+    Every entry in :data:`KEYED_TWINS` is built a second time with an explicit
+    ``key``, under a ``__keyed`` name. Only the root key is dropped, so the twin
+    pins what the unkeyed build cannot: that each *inner* key is namespaced under
+    the caller's, the way ``Component.child_key`` does.
+
     Returns:
         A scenario → serialized IR node map.
     """
+    cases = _cases()
     samples: dict[str, Any] = {}
-    for name, widget in _cases().items():
+    for name, widget in cases.items():
         node = serialize_node(build(widget))
         node["key"] = None
         samples[name] = node
+    for name in KEYED_TWINS:
+        twin = serialize_node(build(cases[name].model_copy(update={"key": "k9"})))
+        twin["key"] = None
+        samples[f"{name}__keyed"] = twin
     return samples
 
 

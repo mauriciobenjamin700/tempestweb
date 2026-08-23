@@ -171,17 +171,18 @@ export function Card({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "card";
   const inner = Container({
-    key: "card-body",
+    key: `${base}-body`,
     style: Style({ padding: Edge.all(SPACING_STEPS[paddingStep] ?? 0.0) }),
     child: Column({
-      key: "card-col",
+      key: `${base}-col`,
       style: Style({ gap: SPACING_STEPS[gapStep] ?? 0.0 }),
       children,
     }),
   });
   return Container({
-    key: key ?? "card",
+    key: base,
     style: mergeStyle(surfaceStyle(variant, colorScheme, elevation, radiusStep), style),
     child: inner,
   });
@@ -247,23 +248,24 @@ export function SegmentedControl({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "segmented";
   const children = options.map((label, index) => {
     const variant = index === selected ? "solid" : "ghost";
     const segment = resolveWidgetStyle("Button", variant, size, colorScheme, null);
     return Button({
       label,
-      key: `seg-${index}`,
+      key: `${base}-item-${index}`,
       onClick: onSelect == null ? null : () => onSelect(index),
       style: mergeStyle(segment, { grow: 1.0 }),
     });
   });
-  const base = {
+  const strip = {
     gap: SPACING_STEPS.xs,
     padding: Edge.all(SPACING_STEPS.xs),
     radius: SHAPE_STEPS.md,
     background: COLOR_ROLES.surface_variant,
   };
-  return Row({ key: key ?? "segmented", style: mergeStyle(base, style), children });
+  return Row({ key: base, style: mergeStyle(strip, style), children });
 }
 
 /**
@@ -288,6 +290,7 @@ export function AppBar({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "appbar";
   const surface = surfaceStyle(variant, colorScheme, elevation, "md");
   const content = surface.color ?? COLOR_ROLES.on_surface;
   const children = [];
@@ -297,20 +300,22 @@ export function AppBar({
   children.push(
     Text({
       content: title,
-      key: "appbar-title",
+      key: `${base}-title`,
       style: Style({ grow: 1.0, font_size: 20.0, font_weight: 700, color: content }),
     }),
   );
   if (actions.length > 0) {
-    children.push(Row({ key: "appbar-actions", style: Style({ gap: 8.0 }), children: actions }));
+    children.push(
+      Row({ key: `${base}-actions`, style: Style({ gap: 8.0 }), children: actions }),
+    );
   }
-  const base = {
+  const bar = {
     ...surface,
     padding: Edge.symmetric({ vertical: 14.0, horizontal: 16.0 }),
     gap: 12.0,
     align: "center",
   };
-  return Row({ key: key ?? "appbar", style: mergeStyle(base, style), children });
+  return Row({ key: base, style: mergeStyle(bar, style), children });
 }
 
 /**
@@ -330,6 +335,7 @@ export function RadioGroup({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "radiogroup";
   const surface = COLOR_ROLES.surface;
   const children = options.map((label, index) => {
     const chosen = index === selected;
@@ -338,7 +344,7 @@ export function RadioGroup({
     const marker = chosen && accent != null ? accent : COLOR_ROLES.on_surface_variant;
     return Button({
       label: `${chosen ? "\u25c9" : "\u25cb"}  ${label}`,
-      key: `radio-${index}`,
+      key: `${base}-item-${index}`,
       onClick: onSelect == null ? null : () => onSelect(index),
       style: Style({
         padding: Edge.symmetric({ vertical: 10.0, horizontal: 14.0 }),
@@ -349,7 +355,7 @@ export function RadioGroup({
     });
   });
   return Column({
-    key: key ?? "radiogroup",
+    key: base,
     style: mergeStyle({ gap: SPACING_STEPS.sm }, style),
     children,
   });
@@ -372,6 +378,7 @@ export function Scaffold({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "scaffold";
   const children = [];
   if (appBar != null) {
     children.push(appBar);
@@ -379,14 +386,14 @@ export function Scaffold({
   const content = body ?? Column({});
   children.push(
     scroll
-      ? ScrollView({ key: "scaffold-body", style: Style({ grow: 1.0 }), children: [content] })
-      : Container({ key: "scaffold-body", style: Style({ grow: 1.0 }), child: content }),
+      ? ScrollView({ key: `${base}-body`, style: Style({ grow: 1.0 }), children: [content] })
+      : Container({ key: `${base}-body`, style: Style({ grow: 1.0 }), child: content }),
   );
   if (bottomBar != null) {
     children.push(bottomBar);
   }
-  const base = { gap: 0.0, background: COLOR_ROLES.background };
-  return Column({ key: key ?? "scaffold", style: mergeStyle(base, style), children });
+  const shell = { gap: 0.0, background: COLOR_ROLES.background };
+  return Column({ key: base, style: mergeStyle(shell, style), children });
 }
 
 /**
@@ -446,21 +453,26 @@ export function StyledContainer({ child = null, padding = "md", style = null, ke
  * @returns {import("../transport.js").Node}
  */
 export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key = null } = {}) {
+  const base = key ?? "grid";
   const perRow = Math.max(1, columns);
   const space = typeof gap === "string" ? SPACING_STEPS[gap] ?? 0.0 : gap;
   const rows = [];
   for (let start = 0; start < children.length; start += perRow) {
     const chunk = children.slice(start, start + perRow);
     const cells = chunk.map((child, offset) =>
-      Container({ key: `cell-${start + offset}`, style: Style({ grow: 1.0 }), child }),
+      Container({ key: `${base}-cell-${start + offset}`, style: Style({ grow: 1.0 }), child }),
     );
     for (let pad = chunk.length; pad < perRow; pad += 1) {
-      cells.push(Container({ key: `cell-pad-${start}-${pad}`, style: Style({ grow: 1.0 }) }));
+      cells.push(
+        Container({ key: `${base}-cell-pad-${start}-${pad}`, style: Style({ grow: 1.0 }) }),
+      );
     }
-    rows.push(Row({ key: `grid-row-${start}`, style: Style({ gap: space }), children: cells }));
+    rows.push(
+      Row({ key: `${base}-row-${start}`, style: Style({ gap: space }), children: cells }),
+    );
   }
   return Column({
-    key: key ?? "grid",
+    key: base,
     style: mergeStyle({ gap: space }, style),
     children: rows,
   });
@@ -479,13 +491,13 @@ export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key 
  * @returns {import("../transport.js").Node}
  */
 function lateralPanel(key, children, width, variant, colorScheme, elevation, style) {
-  const base = {
+  const frame = {
     ...surfaceStyle(variant, colorScheme, elevation, "md"),
     width,
     padding: Edge.all(16.0),
     gap: 10.0,
   };
-  return Column({ key, style: mergeStyle(base, style), children });
+  return Column({ key, style: mergeStyle(frame, style), children });
 }
 
 /**
@@ -578,6 +590,7 @@ export function Burger({
  * @returns {import("../transport.js").Node}
  */
 export function Header({ title = "", subtitle = null, colorScheme = null, style = null, key = null } = {}) {
+  const base = key ?? "header";
   const titleColor =
     colorScheme != null && colorScheme !== "neutral"
       ? COLOR_ROLES[colorScheme]
@@ -585,7 +598,7 @@ export function Header({ title = "", subtitle = null, colorScheme = null, style 
   const children = [
     Text({
       content: title,
-      key: "header-title",
+      key: `${base}-title`,
       style: Style({
         font_size: TYPOGRAPHY.headline_small.font_size,
         font_weight: 700,
@@ -597,7 +610,7 @@ export function Header({ title = "", subtitle = null, colorScheme = null, style 
     children.push(
       Text({
         content: subtitle,
-        key: "header-subtitle",
+        key: `${base}-subtitle`,
         style: Style({
           font_size: TYPOGRAPHY.body_medium.font_size,
           color: COLOR_ROLES.on_surface_variant,
@@ -605,12 +618,12 @@ export function Header({ title = "", subtitle = null, colorScheme = null, style 
       }),
     );
   }
-  const base = {
+  const chrome = {
     padding: Edge.all(SPACING_STEPS.lg),
     gap: SPACING_STEPS.xs,
     background: COLOR_ROLES.surface_variant,
   };
-  return Column({ key: key ?? "header", style: mergeStyle(base, style), children });
+  return Column({ key: base, style: mergeStyle(chrome, style), children });
 }
 
 /**
@@ -661,6 +674,7 @@ export function NavBar({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "navbar";
   const children = items.map((label, index) => {
     const itemStyle =
       index === active
@@ -668,18 +682,18 @@ export function NavBar({
         : resolveWidgetStyle("Button", "ghost", size, "neutral", null);
     return Button({
       label,
-      key: `nav-${index}`,
+      key: `${base}-item-${index}`,
       onClick: onSelect == null ? null : () => onSelect(index),
       style: mergeStyle(itemStyle, { grow: 1.0 }),
     });
   });
-  const base = {
+  const bar = {
     ...surfaceStyle("filled", "neutral", null, "md"),
     gap: 8.0,
     padding: Edge.all(8.0),
     justify: "center",
   };
-  return Row({ key: key ?? "navbar", style: mergeStyle(base, style), children });
+  return Row({ key: base, style: mergeStyle(bar, style), children });
 }
 
 /**
@@ -700,13 +714,14 @@ export function Breadcrumb({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "breadcrumb";
   const children = [];
   items.forEach((label, index) => {
     if (index) {
       children.push(
         Text({
           content: separator,
-          key: `sep-${index}`,
+          key: `${base}-sep-${index}`,
           style: Style({ color: COLOR_ROLES.on_surface_variant, font_size: 14.0 }),
         }),
       );
@@ -716,7 +731,7 @@ export function Breadcrumb({
       children.push(
         Button({
           label,
-          key: `crumb-${index}`,
+          key: `${base}-item-${index}`,
           onClick: () => onSelect(index),
           style: resolveWidgetStyle("Button", "link", "sm", colorScheme, null),
         }),
@@ -726,7 +741,7 @@ export function Breadcrumb({
     children.push(
       Text({
         content: label,
-        key: `crumb-${index}`,
+        key: `${base}-item-${index}`,
         style: Style({
           color: isLast ? COLOR_ROLES.on_surface : COLOR_ROLES.on_surface_variant,
           font_size: 14.0,
@@ -736,7 +751,7 @@ export function Breadcrumb({
     );
   });
   return Row({
-    key: key ?? "breadcrumb",
+    key: base,
     style: mergeStyle({ gap: 6.0, align: "center" }, style),
     children,
   });
@@ -763,6 +778,7 @@ export function ListTile({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "listtile";
   const titleColor =
     colorScheme != null && colorScheme !== "neutral"
       ? COLOR_ROLES[colorScheme]
@@ -770,7 +786,7 @@ export function ListTile({
   const textChildren = [
     Text({
       content: title,
-      key: "tile-title",
+      key: `${base}-title`,
       style: Style({
         font_size: TYPOGRAPHY.body_large.font_size,
         font_weight: TYPOGRAPHY.body_large.font_weight,
@@ -782,7 +798,7 @@ export function ListTile({
     textChildren.push(
       Text({
         content: subtitle,
-        key: "tile-subtitle",
+        key: `${base}-subtitle`,
         style: Style({
           font_size: TYPOGRAPHY.body_small.font_size,
           color: COLOR_ROLES.on_surface_variant,
@@ -796,7 +812,7 @@ export function ListTile({
   }
   children.push(
     Column({
-      key: "tile-text",
+      key: `${base}-text`,
       style: Style({ grow: 1.0, gap: SPACING_STEPS.xs }),
       children: textChildren,
     }),
@@ -804,12 +820,12 @@ export function ListTile({
   if (trailing != null) {
     children.push(trailing);
   }
-  const base = {
+  const tile = {
     gap: SPACING_STEPS.sm,
     align: "center",
     padding: Edge.symmetric({ vertical: SPACING_STEPS.sm, horizontal: SPACING_STEPS.md }),
   };
-  return Row({ key: key ?? "listtile", style: mergeStyle(base, style), children });
+  return Row({ key: base, style: mergeStyle(tile, style), children });
 }
 
 /**
@@ -823,8 +839,9 @@ export function ListTile({
  * @returns {import("../transport.js").Node}
  */
 export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", style = null, key = null } = {}) {
+  const base = key ?? "avatar";
   const pair = AVATAR_COLORS[colorScheme] ?? AVATAR_COLORS.primary;
-  const base = {
+  const disc = {
     width: size,
     height: size,
     radius: size / 2.0,
@@ -832,11 +849,11 @@ export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", st
     align: "center",
   };
   return Container({
-    key: key ?? "avatar",
-    style: mergeStyle(base, style),
+    key: base,
+    style: mergeStyle(disc, style),
     child: Text({
       content: initials,
-      key: "avatar-text",
+      key: `${base}-text`,
       style: Style({ color: pair.color, font_weight: 700, text_align: "center" }),
     }),
   });
@@ -875,6 +892,7 @@ export function Rating({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "rating";
   const color = COLOR_ROLES[colorScheme];
   const children = [];
   for (let index = 0; index < maxStars; index += 1) {
@@ -883,7 +901,7 @@ export function Rating({
       children.push(
         Button({
           label: glyph,
-          key: `star-${index}`,
+          key: `${base}-star-${index}`,
           variant: "ghost",
           onClick: () => onRate(index + 1),
           style: Style({ font_size: 24.0, color, background: Color({ a: 0.0 }) }),
@@ -891,12 +909,16 @@ export function Rating({
       );
     } else {
       children.push(
-        Text({ content: glyph, key: `star-${index}`, style: Style({ font_size: 24.0, color }) }),
+        Text({
+          content: glyph,
+          key: `${base}-star-${index}`,
+          style: Style({ font_size: 24.0, color }),
+        }),
       );
     }
   }
   return Row({
-    key: key ?? "rating",
+    key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
     children,
   });
@@ -922,6 +944,7 @@ export function Stepper({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "stepper";
   const clamped = (candidate) => {
     if (minValue != null && candidate < minValue) {
       return minValue;
@@ -945,16 +968,16 @@ export function Stepper({
       }),
     });
   return Row({
-    key: key ?? "stepper",
+    key: base,
     style: mergeStyle({ gap: 10.0, align: "center" }, style),
     children: [
-      button("-", -step, "step-down"),
+      button("-", -step, `${base}-down`),
       Text({
         content: String(value),
-        key: "step-value",
+        key: `${base}-value`,
         style: Style({ font_size: 18.0, font_weight: 700, color: ON_SURFACE }),
       }),
-      button("+", step, "step-up"),
+      button("+", step, `${base}-up`),
     ],
   });
 }
@@ -981,13 +1004,14 @@ export function SearchBar({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "searchbar";
   const field = FIELD_STYLES[fieldVariant]?.[size]?.[colorScheme] ?? {};
   const children = [
     Input({
       value,
       placeholder,
       onChange,
-      key: "search-input",
+      key: `${base}-input`,
       style: mergeStyle(field, { grow: 1.0 }),
     }),
   ];
@@ -1000,17 +1024,17 @@ export function SearchBar({
         variant: "ghost",
         colorScheme,
         size,
-        key: "search-clear",
+        key: `${base}-clear`,
       }),
     );
   }
-  const base = {
+  const box = {
     ...surfaceStyle("filled", colorScheme, null, "lg"),
     gap: 8.0,
     align: "center",
     padding: Edge.all(8.0),
   };
-  return Row({ key: key ?? "searchbar", style: mergeStyle(base, style), children });
+  return Row({ key: base, style: mergeStyle(box, style), children });
 }
 
 /**
@@ -1043,20 +1067,21 @@ export function Banner({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "banner";
   const scheme = colorScheme ?? toneScheme(tone);
   const resolved = ALERT_STYLES[variant]?.[scheme] ?? {};
   const children = [
     Text({
       content: message,
-      key: "banner-text",
+      key: `${base}-text`,
       style: Style({ grow: 1.0, color: resolved.color ?? null, font_size: 14.0 }),
     }),
   ];
   if (action != null) {
     children.push(action);
   }
-  const base = { ...resolved, gap: 12.0, align: "center" };
-  return Row({ key: key ?? "banner", style: mergeStyle(base, style), children });
+  const strip = { ...resolved, gap: 12.0, align: "center" };
+  return Row({ key: base, style: mergeStyle(strip, style), children });
 }
 
 /**
@@ -1081,29 +1106,38 @@ export function Alert({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "alert";
   const resolved = ALERT_STYLES[variant]?.[colorScheme] ?? {};
   const content = resolved.color ?? null;
   const columnChildren = [
     Text({
       content: title,
-      key: "alert-title",
+      key: `${base}-title`,
       style: Style({ color: content, font_size: 15.0, font_weight: 700 }),
     }),
   ];
   if (body != null) {
     columnChildren.push(
-      Text({ content: body, key: "alert-body", style: Style({ color: content, font_size: 13.0 }) }),
+      Text({
+        content: body,
+        key: `${base}-body`,
+        style: Style({ color: content, font_size: 13.0 }),
+      }),
     );
   }
   const children = [];
   if (glyph != null) {
     children.push(
-      Text({ content: glyph, key: "alert-glyph", style: Style({ color: content, font_size: 20.0 }) }),
+      Text({
+        content: glyph,
+        key: `${base}-glyph`,
+        style: Style({ color: content, font_size: 20.0 }),
+      }),
     );
   }
   children.push(
     Column({
-      key: "alert-col",
+      key: `${base}-col`,
       style: Style({ grow: 1.0, gap: SPACING_STEPS.xs }),
       children: columnChildren,
     }),
@@ -1111,8 +1145,8 @@ export function Alert({
   if (dismiss != null) {
     children.push(dismiss);
   }
-  const base = { ...resolved, gap: SPACING_STEPS.sm, align: "center" };
-  return Row({ key: key ?? "alert", style: mergeStyle(base, style), children });
+  const block = { ...resolved, gap: SPACING_STEPS.sm, align: "center" };
+  return Row({ key: base, style: mergeStyle(block, style), children });
 }
 
 /**
@@ -1157,16 +1191,17 @@ export function EmptyState({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "emptystate";
   const muted = COLOR_ROLES.on_surface_variant;
   const children = [
     Text({
       content: glyph,
-      key: "empty-glyph",
+      key: `${base}-glyph`,
       style: Style({ font_size: 48.0, color: muted, text_align: "center" }),
     }),
     Text({
       content: title,
-      key: "empty-title",
+      key: `${base}-title`,
       style: Style({
         font_size: 18.0,
         font_weight: 700,
@@ -1179,7 +1214,7 @@ export function EmptyState({
     children.push(
       Text({
         content: subtitle,
-        key: "empty-subtitle",
+        key: `${base}-subtitle`,
         style: Style({ font_size: 14.0, color: muted, text_align: "center" }),
       }),
     );
@@ -1187,12 +1222,12 @@ export function EmptyState({
   if (action != null) {
     children.push(action);
   }
-  const base = {
+  const frame = {
     gap: SPACING_STEPS.sm,
     align: "center",
     padding: Edge.all(SPACING_STEPS.lg),
   };
-  return Column({ key: key ?? "emptystate", style: mergeStyle(base, style), children });
+  return Column({ key: base, style: mergeStyle(frame, style), children });
 }
 
 /**
@@ -1206,15 +1241,16 @@ export function EmptyState({
  * @returns {import("../transport.js").Node}
  */
 export function Stat({ label = "", value = "", delta = null, deltaUp = true, style = null, key = null } = {}) {
+  const base = key ?? "stat";
   const children = [
     Text({
       content: label,
-      key: "stat-label",
+      key: `${base}-label`,
       style: Style({ color: COLOR_ROLES.on_surface_variant, font_size: 13.0 }),
     }),
     Text({
       content: value,
-      key: "stat-value",
+      key: `${base}-value`,
       style: Style({ color: COLOR_ROLES.on_surface, font_size: 28.0, font_weight: 700 }),
     }),
   ];
@@ -1222,7 +1258,7 @@ export function Stat({ label = "", value = "", delta = null, deltaUp = true, sty
     children.push(
       Text({
         content: `${deltaUp ? "▲" : "▼"} ${delta}`,
-        key: "stat-delta",
+        key: `${base}-delta`,
         style: Style({
           color: deltaUp ? COLOR_ROLES.success : COLOR_ROLES.error,
           font_size: 13.0,
@@ -1232,7 +1268,7 @@ export function Stat({ label = "", value = "", delta = null, deltaUp = true, sty
     );
   }
   return Column({
-    key: key ?? "stat",
+    key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
     children,
   });
@@ -1248,9 +1284,10 @@ export function Stat({ label = "", value = "", delta = null, deltaUp = true, sty
  * @param {string} label        The step's caption.
  * @param {number} current      The active step index.
  * @param {string} colorScheme  A Material 3 scheme name.
+ * @param {string} base         The stepper's key, which the cell's hangs off.
  * @returns {import("../transport.js").Node}
  */
-function stepCell(index, label, current, colorScheme) {
+function stepCell(index, label, current, colorScheme, base) {
   const doneOrActive = index <= current;
   const muted = COLOR_ROLES.on_surface_variant;
   const disc = doneOrActive
@@ -1276,13 +1313,13 @@ function stepCell(index, label, current, colorScheme) {
         font_size: 13.0,
       });
   return Column({
-    key: `step-${index}`,
+    key: `${base}-step-${index}`,
     style: Style({ gap: SPACING_STEPS.xs, align: "center" }),
     children: [
-      Text({ content: String(index + 1), key: `step-disc-${index}`, style: disc }),
+      Text({ content: String(index + 1), key: `${base}-step-disc-${index}`, style: disc }),
       Text({
         content: label,
-        key: `step-label-${index}`,
+        key: `${base}-step-label-${index}`,
         style: Style({
           color: doneOrActive ? COLOR_ROLES.on_surface : muted,
           font_size: 12.0,
@@ -1309,13 +1346,14 @@ export function ProgressStepper({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "progress-stepper";
   const children = [];
   steps.forEach((label, index) => {
     if (index > 0) {
       children.push(
         Text({
           content: "",
-          key: `step-conn-${index}`,
+          key: `${base}-step-conn-${index}`,
           style: Style({
             grow: 1.0,
             height: 2.0,
@@ -1325,10 +1363,10 @@ export function ProgressStepper({
         }),
       );
     }
-    children.push(stepCell(index, label, current, colorScheme));
+    children.push(stepCell(index, label, current, colorScheme, base));
   });
   return Row({
-    key: key ?? "progress-stepper",
+    key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs, align: "center" }, style),
     children,
   });
@@ -1357,17 +1395,25 @@ export function MetricCard({
   style = null,
   key = null,
 } = {}) {
-  const stat = Stat({ label, value, delta, deltaUp, key: "metric-stat", style: Style({ grow: 1.0 }) });
+  const base = key ?? "metric-card";
+  const stat = Stat({
+    label,
+    value,
+    delta,
+    deltaUp,
+    key: `${base}-stat`,
+    style: Style({ grow: 1.0 }),
+  });
   const body =
     trailing == null
       ? stat
       : Row({
-          key: "metric-row",
+          key: `${base}-row`,
           style: Style({ gap: SPACING_STEPS.md, align: "center" }),
           children: [stat, trailing],
         });
   return Card({
-    key: key ?? "metric-card",
+    key: base,
     variant,
     colorScheme,
     style,
@@ -1395,7 +1441,17 @@ export function StatCard({
   style = null,
   key = null,
 } = {}) {
-  return MetricCard({ label, value, delta, deltaUp, colorScheme, variant, trailing, style, key });
+  return MetricCard({
+    label,
+    value,
+    delta,
+    deltaUp,
+    colorScheme,
+    variant,
+    trailing,
+    style,
+    key: key ?? "stat-card",
+  });
 }
 
 /**
@@ -1473,10 +1529,11 @@ export function Accordion({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "accordion";
   const header = Button({
     label: `${open ? "▾" : "▸"}  ${title}`,
     onClick: onToggle,
-    key: "accordion-header",
+    key: `${base}-header`,
     style: Style({
       ...surfaceStyle(variant, colorScheme, null, "sm"),
       padding: Edge.all(SPACING_STEPS.sm),
@@ -1486,7 +1543,7 @@ export function Accordion({
   const body = open
     ? [
         Column({
-          key: "accordion-body",
+          key: `${base}-body`,
           style: Style({
             gap: SPACING_STEPS.sm,
             padding: Edge.all(SPACING_STEPS.md),
@@ -1496,7 +1553,7 @@ export function Accordion({
       ]
     : [];
   return Column({
-    key: key ?? "accordion",
+    key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
     children: [header, ...body],
   });
@@ -1525,10 +1582,11 @@ export function Tabs({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "tabs";
   const accent = COLOR_ROLES[colorScheme] ?? COLOR_ROLES.primary;
   const children = tabs.map((label, index) => {
     const chosen = index === active;
-    const base = resolveWidgetStyle(
+    const resting = resolveWidgetStyle(
       "Button",
       "ghost",
       size,
@@ -1540,9 +1598,9 @@ export function Tabs({
       : { grow: 1.0 };
     return Button({
       label,
-      key: `tab-${index}`,
+      key: `${base}-item-${index}`,
       onClick: onSelect == null ? null : () => onSelect(index),
-      style: mergeStyle(base, overrides),
+      style: mergeStyle(resting, overrides),
     });
   });
   const strip = {
@@ -1552,7 +1610,7 @@ export function Tabs({
     justify: "center",
     align: "stretch",
   };
-  return Row({ key: key ?? "tabs", style: mergeStyle(strip, style), children });
+  return Row({ key: base, style: mergeStyle(strip, style), children });
 }
 
 /**
@@ -1587,14 +1645,14 @@ function labelText(label, key) {
 function labelledField(label, field, error, key, style) {
   const children = [];
   if (label) {
-    children.push(labelText(label, "field-label"));
+    children.push(labelText(label, `${key}-field-label`));
   }
   children.push(field);
   if (error) {
     children.push(
       Text({
         content: error,
-        key: "field-error",
+        key: `${key}-field-error`,
         style: Style({ font_size: 12.0, color: COLOR_ROLES.error }),
       }),
     );
@@ -1636,6 +1694,7 @@ export function EmailInput({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "email-input";
   const field = Input({
     value,
     placeholder,
@@ -1644,12 +1703,12 @@ export function EmailInput({
     leadingIcon: "mail",
     error,
     onChange: onValue(onChange),
-    key: "email-field",
+    key: `${base}-field`,
     fieldVariant,
     size,
     colorScheme,
   });
-  return labelledField(label, field, error, key ?? "email-input", style);
+  return labelledField(label, field, error, base, style);
 }
 
 /**
@@ -1672,6 +1731,7 @@ export function PasswordInput({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "password-input";
   const field = Input({
     value,
     placeholder,
@@ -1679,19 +1739,19 @@ export function PasswordInput({
     leadingIcon: "lock",
     error,
     onChange: onValue(onChange),
-    key: "password-field",
+    key: `${base}-field`,
     fieldVariant,
     size,
     colorScheme,
   });
-  return labelledField(label, field, error, key ?? "password-input", style);
+  return labelledField(label, field, error, base, style);
 }
 
 /**
  * A labelled masked field — the shape `PhoneInput`/`CPFInput`/`CNPJInput` share.
  *
- * @param {{mask: string, keyboard: string, fieldKey: string,
- *          defaultKey: string, label: string, value: string,
+ * @param {{mask: string, keyboard: string, defaultKey: string,
+ *          label: string, value: string,
  *          placeholder: string, error: string, onChange: ?Function,
  *          fieldVariant: string, size: string, colorScheme: string,
  *          style: ?Object, key: ?string}} args
@@ -1700,7 +1760,6 @@ export function PasswordInput({
 function maskedField({
   mask,
   keyboard,
-  fieldKey,
   defaultKey,
   label,
   value,
@@ -1713,18 +1772,19 @@ function maskedField({
   style,
   key,
 }) {
+  const base = key ?? defaultKey;
   const field = MaskedInput({
     value,
     placeholder,
     mask,
     keyboard,
     onChange: onValue(onChange),
-    key: fieldKey,
+    key: `${base}-field`,
     fieldVariant,
     size,
     colorScheme,
   });
-  return labelledField(label, field, error, key ?? defaultKey, style);
+  return labelledField(label, field, error, base, style);
 }
 
 /**
@@ -1750,7 +1810,6 @@ export function PhoneInput({
   return maskedField({
     mask: "(99) 99999-9999",
     keyboard: "phone",
-    fieldKey: "phone-field",
     defaultKey: "phone-input",
     label,
     value,
@@ -1788,7 +1847,6 @@ export function CPFInput({
   return maskedField({
     mask: "999.999.999-99",
     keyboard: "number",
-    fieldKey: "cpf-field",
     defaultKey: "cpf-input",
     label,
     value,
@@ -1826,7 +1884,6 @@ export function CNPJInput({
   return maskedField({
     mask: "99.999.999/9999-99",
     keyboard: "number",
-    fieldKey: "cnpj-field",
     defaultKey: "cnpj-input",
     label,
     value,
@@ -1870,6 +1927,7 @@ export function AddressInput({
   style = null,
   key = null,
 } = {}) {
+  const base = key ?? "address-input";
   const report = (fieldName) =>
     onChange == null ? null : (event) => onChange(fieldName, event.value);
   const children = [];
@@ -1883,7 +1941,7 @@ export function AddressInput({
       mask: "99999-999",
       keyboard: "number",
       onChange: report("cep"),
-      key: "address-cep",
+      key: `${base}-cep`,
       fieldVariant,
       size,
       colorScheme,
@@ -1903,7 +1961,7 @@ export function AddressInput({
         value: fieldValue,
         placeholder,
         onChange: report(fieldName),
-        key: `address-${fieldName}`,
+        key: `${base}-${fieldName}`,
         fieldVariant,
         size,
         colorScheme,
@@ -1911,7 +1969,7 @@ export function AddressInput({
     );
   }
   return Column({
-    key: key ?? "address-input",
+    key: base,
     style: mergeStyle({ gap: 8.0 }, style),
     children,
   });

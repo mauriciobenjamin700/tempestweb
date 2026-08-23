@@ -622,7 +622,14 @@ no espírito do `mypy --strict`.
     resolvedores de estilo do core viaja em tabela gerada
     (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
     pelos widgets. Cada builder é fixado por uma matriz de props construída do
-    core real — 151 casos — então drift de composição ou de estilo falha no teste.
+    core real — 185 casos — então drift de composição ou de estilo falha no teste.
+    Trinta e quatro deles são o **par `__keyed`**: o mesmo componente construído
+    com `key=` explícita, porque o build sem chave esconde justamente a derivação
+    (`Accordion()` emite `accordion-header` derivando ou não, enquanto
+    `Accordion(key="faq-3")` só emite `faq-3-header` se o builder deriva de
+    verdade). O comparador também passou a olhar a chave de cada **descendente** —
+    antes só comparava forma e estilo, e por isso um port com chave literal
+    atravessou um release inteiro.
 
     E os componentes **do próprio tempestweb** (`tempestweb.components`) também:
     `TextField`, `EmailField`, `PasswordField`, os formulários prontos

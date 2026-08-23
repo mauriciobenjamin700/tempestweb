@@ -4,6 +4,40 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.91.0] — 2026-08-23
+
+### Changed
+
+- **`tempest-core` 0.14.0 → 0.15.0**, que passa a *namespacear* a chave de todo
+  filho de componente: a base é o `key` do componente (ou o `default_key` dele,
+  quando não vem chave) e cada filho vira `<base>-<papel>`. Era exatamente o
+  defeito reportado em
+  [#135](https://github.com/mauriciobenjamin700/tempestweb/issues/135) — dois
+  `SegmentedControl` na mesma tela disputavam `seg-0`, e como o evento roteia por
+  chave o clique ia para o controle errado.
+- **Os 42 componentes portados para o Modo C carregam a derivação.** Um port com
+  chave literal é o mesmo defeito de volta, só que no cliente: medido em
+  `examples/faq-accordion`, os sete headers agora saem `faq-0-header` …
+  `faq-6-header`, e `resolve_handler("faq-3-header")` devolve o closure que
+  captura `3` (antes devolvia sempre o do primeiro).
+- **`StatCard` deixou de herdar a chave default do `MetricCard`.** Ele delega, e
+  delegava sem chave própria, então um `StatCard` sem `key` respondia por
+  `metric-card`.
+
+### Fixed
+
+- **A matriz de paridade não comparava chave nenhuma.** O comparador reduzia cada
+  nó a `{type, props, children}`, então um builder com chave literal passava
+  intacto — foi assim que o port entrou. Agora compara a chave de todo
+  **descendente** (a do nó raiz continua fora, porque a fixture a anula de
+  propósito).
+- **A matriz não exercia `key=` em componente nenhum.** Sem chave, a derivação é
+  invisível: `Accordion()` emite `accordion-header` derivando ou não. Cada um dos
+  34 componentes que emitem chave de filho ganhou um par `__keyed`, construído do
+  core com `key="k9"` — 151 → **185 casos**.
+
+Corpus do Modo C: **40 dos 57 exemplos**, sem mudança.
+
 ## [0.90.0] — 2026-08-23
 
 Três defeitos do tipo "compila e morre" (ou pior: compila e mente), todos

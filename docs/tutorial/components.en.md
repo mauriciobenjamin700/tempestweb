@@ -199,23 +199,27 @@ function:
 | **Charts** | `BarChart` · `LineChart` · `ChartSeries` | tempest-core |
 | **Vision** | `DetectionBox` · `DetectionOverlay` · `ConfidenceBadge` · `ResultView` · `confidence_scheme` | tempest-core |
 
-!!! warning "Two instances of the same component on one screen collide"
-    Every component that builds interactive children keys them with a **fixed**
-    name, unscoped by the component's own key. Measured on a screen holding two
-    of each: `SegmentedControl` (`seg-N`), `RadioGroup` (`radio-N`), `Rating`
-    (`star-N`), `NavBar` (`nav-N`), `Breadcrumb` (`crumb-N`/`sep-N`), `Stepper`
-    (`step-up`/`step-down`/`step-value`) and `SearchBar`
-    (`search-input`/`search-clear`) — every key duplicates. Since an event is
-    routed **by key**, the two instances fight over the same name: Python
-    resolves the **first** match and Mode C the **last**, so a click on one
-    control moves the other. Passing a distinct `key=` per component does **not**
-    help: a child's key does not inherit the parent's.
+!!! check "Two instances of the same component coexist — since tempest-core 0.15.0"
+    Every component now derives each child's key from its **own**: the base is the
+    `key` you passed (or the component's name, when you pass none), and each child
+    becomes `<base>-<role>`. Two `SegmentedControl`s on one screen emit
+    `filter-item-0` and `order-item-0`, not `seg-0` twice — and since an event is
+    routed **by key**, the click lands on the right control.
 
-    This is a `tempest-core` defect, not your app's, and it holds in all three
-    modes — tracked in
-    [tempest-core#20](https://github.com/mauriciobenjamin700/tempest-core/issues/20).
-    Until it is fixed there, keep one per screen or build the control from
-    `Button`s/`Input`s with a key of your own per child.
+    ```python
+    SegmentedControl(key="filter", options=["All", "Active"], on_select=set_filter)
+    SegmentedControl(key="order", options=["A-Z", "Z-A"], on_select=set_order)
+    ```
+
+    It holds for `SegmentedControl`, `RadioGroup`, `Rating`, `NavBar`,
+    `Breadcrumb`, `Stepper`, `SearchBar`, `Tabs`, `Accordion`, `Card`, `Grid` and
+    the fields — in all three modes.
+
+    !!! warning "Two **unkeyed** ones still collide"
+        With no `key`, the base is the component's name (`segmented`), so two
+        anonymous instances fight over the name again. Give each a `key=` when a
+        screen holds more than one — it is one line, and it is what the
+        namespacing uses.
 
 !!! tip "Field vs Input"
     The pair exists on purpose: the **`*Input`** (from the core) is the low-level

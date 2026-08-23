@@ -859,6 +859,7 @@ def _bootstrap_js(name: str, pyodide_base: str, packages: tuple[str, ...] = ()) 
 import {{ mount }} from "./client/tempestweb.js";
 import {{ createWasmTransport }} from "./client/transport-wasm.js";
 import {{ installNativeBridge }} from "./client/native/index.js";
+import {{ applyThemeMode }} from "./client/theme.js";
 
 const PYODIDE_BASE = "{pyodide_base}";
 
@@ -870,10 +871,10 @@ const PY_GLUE = `
 import app
 from tempestweb.runtime.wasm_main import bootstrap
 
-def _start(on_patches, dispatch, on_navigate, subscribe, unsubscribe):
+def _start(on_patches, dispatch, on_navigate, on_theme, subscribe, unsubscribe):
     return bootstrap(
         app.make_state(), app.view, on_patches, dispatch, on_navigate,
-        subscribe, unsubscribe, getattr(app, "THEME", None),
+        subscribe, unsubscribe, getattr(app, "THEME", None), on_theme=on_theme,
     )
 
 _start
@@ -910,6 +911,10 @@ export async function boot() {{
       history.pushState({{}}, "", path);
     }}
   }};
+  // The theme's other half: the colours ride in each widget's inline style, but
+  // the page, the field surfaces and the hover/focus states are CSS, so the base
+  // sheet needs the resolved mode marked on the document.
+  const onTheme = (mode) => applyThemeMode(mode);
 
   // Native capabilities (geolocation/clipboard/http/…): expose the in-process
   // dispatch on window, and bridge it to Python as a JSON-string seam (so the
@@ -947,6 +952,7 @@ export async function boot() {{
     onPatches,
     onNative,
     onNavigate,
+    onTheme,
     onNativeSubscribe,
     onNativeUnsubscribe,
   );

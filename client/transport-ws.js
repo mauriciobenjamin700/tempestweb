@@ -23,6 +23,7 @@
 // reconciliation is a server-side follow-up.
 
 import { dispatch, subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
+import { applyThemeMode } from "./theme.js";
 
 /**
  * @typedef {import("./transport.js").Patch} Patch
@@ -233,6 +234,11 @@ export function createWebSocketTransport(url, options = {}) {
       unsubscribeDispatch(envelope.sub_id);
     } else if (envelope.kind === "navigate") {
       if (navigateHandler) navigateHandler(envelope.path);
+    } else if (envelope.kind === "theme") {
+      // The half of dark mode that lives in CSS: the base sheet reads this
+      // attribute for its token block, so the page, the field surfaces and every
+      // hover/focus state follow the app's theme instead of the OS alone.
+      applyThemeMode(envelope.mode);
     }
   }
 

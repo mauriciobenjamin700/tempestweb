@@ -60,6 +60,50 @@ export const BASE_THEME_CSS = `
   --tw-motion: 180ms cubic-bezier(0.2, 0, 0, 1);
 }
 
+
+/* ── Dark mode ───────────────────────────────────────────────────────────────
+   The other half of dark mode. What tempest-core resolves travels as inline
+   style, so a Card and a Button follow the app's theme on their own; what only
+   this sheet paints — the page, a field's surface, every hover/focus state — had
+   no mode axis at all, so a dark app showed a white field inside a dark card.
+
+   The trigger is the data-tw-theme attribute on the root, which the renderer
+   writes from the app's own theme (Mode B/SSE receive a "theme" envelope; Mode A
+   and Mode C write it in-process). Deliberately NOT prefers-color-scheme: the
+   core resolves a SYSTEM theme as light for every widget (a widget never sees the
+   OS), so darkening the sheet from the OS alone would put a light tree on a dark
+   page. An app that wants to follow the OS reads app.media.platform_dark_mode in
+   its view and calls set_theme — then both halves move together.
+
+   The block redefines only tokens: no rule below this point knows which mode is
+   active, which is what keeps each widget's styling in one place. */
+:root[data-tw-theme="dark"] {
+  --tw-primary: #d0bcff;
+  --tw-on-primary: #381e72;
+  --tw-primary-container: #4f378b;
+  --tw-on-primary-container: #eaddff;
+  --tw-secondary-container: #4a4458;
+  --tw-on-secondary-container: #e8def8;
+  --tw-surface: #141218;
+  --tw-on-surface: #e6e0e9;
+  --tw-on-surface-variant: #cac4d0;
+  --tw-outline: #938f99;
+  --tw-error: #f2b8b5;
+  --tw-success: #7ddc9a;
+  --tw-warning: #f5c26b;
+  --tw-info: #a8c7fa;
+  --tw-neutral: #c9c8cf;
+  --tw-elevation-1: 0 1px 2px rgba(0,0,0,0.60), 0 1px 3px 1px rgba(0,0,0,0.40);
+  --tw-elevation-2: 0 1px 2px rgba(0,0,0,0.60), 0 2px 6px 2px rgba(0,0,0,0.40);
+}
+
+/* The page itself. Without this the tree went dark over a white document — the
+   app looked broken in exactly the way a theme is supposed to prevent. */
+body {
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+}
+
 /* Sensible page baseline so apps don't sit on Times New Roman. */
 [data-tw-type] { box-sizing: border-box; }
 
@@ -835,6 +879,32 @@ export const BASE_THEME_CSS = `
  * @returns {?HTMLStyleElement}  The injected (or pre-existing) style element, or
  *                               `null` when no document is available.
  */
+/** Attribute the renderer writes on <html> to pin the active theme mode. */
+export const THEME_MODE_ATTR = "data-tw-theme";
+
+/**
+ * Mark the document with the app's resolved theme mode.
+ *
+ * The base sheet reads this attribute to pick its token block, so this is how the
+ * half of dark mode that lives in CSS follows the app instead of the OS. Only
+ * `"light"` and `"dark"` are written; anything else (including `"system"`, which
+ * the app resolves before sending) removes the attribute and hands the page back
+ * to `prefers-color-scheme`.
+ *
+ * @param {?string} mode  `"light"`, `"dark"`, or null/unknown to unset.
+ * @returns {void}
+ */
+export function applyThemeMode(mode) {
+  if (typeof document === "undefined" || document.documentElement == null) {
+    return;
+  }
+  if (mode === "light" || mode === "dark") {
+    document.documentElement.setAttribute(THEME_MODE_ATTR, mode);
+  } else {
+    document.documentElement.removeAttribute(THEME_MODE_ATTR);
+  }
+}
+
 export function installBaseTheme() {
   if (typeof document === "undefined") {
     return null;

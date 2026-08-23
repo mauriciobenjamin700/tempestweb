@@ -235,6 +235,8 @@ class WasmRuntime(Generic[S]):
         transport: PatchTransport,
         on_navigate: Callable[[str], Any] | None = None,
         theme: Theme | None = None,
+        *,
+        on_theme: Callable[[str], Any] | None = None,
     ) -> None:
         """Initialize the runtime.
 
@@ -246,6 +248,12 @@ class WasmRuntime(Generic[S]):
                 whenever the app's navigation changes (so the client can sync the
                 URL via ``history.pushState``). The reverse of the ``navigate``
                 event (URL → view).
+            on_theme: Optional callback invoked with the resolved theme mode
+                (``"light"``/``"dark"``) on mount and whenever it changes, so the
+                client can mark the document for the base stylesheet. The colours
+                the core resolves ride along in each widget's inline style; the
+                page background, a field's surface and the hover/focus states are
+                CSS, and without the mode they stayed light under a dark tree.
             theme: The palette every component resolves its colors against.
                 ``None`` keeps the Material baseline. Mode B has taken this since
                 0.66.0 and Mode A had no way to accept it at all, so an app with
@@ -256,7 +264,9 @@ class WasmRuntime(Generic[S]):
         self._transport: PatchTransport = transport
         self._handlers: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
         self._on_navigate: Callable[[str], Any] | None = on_navigate
+        self._on_theme: Callable[[str], Any] | None = on_theme
         self._last_path: str = "/"
+        self._last_mode: str | None = None
         self._sends: set[asyncio.Future[None]] = set()
         self._tasks: set[asyncio.Future[None]] = set()
         self._theme: Theme | None = theme
@@ -344,6 +354,31 @@ class WasmRuntime(Generic[S]):
             if path != self._last_path:
                 self._last_path = path
                 self._on_navigate(path)
+        self._emit_theme_if_changed()
+
+    def _emit_theme_if_changed(self) -> None:
+        """Report the resolved theme mode to the client when it changed.
+
+        The Mode A counterpart of the ``theme`` envelope Mode B sends: same
+        semantics, no wire. The mode is resolved the way a widget resolves it
+        (``Theme.is_dark()``, no platform flag), so the sheet agrees with the
+        inline styles already in the tree. No-op when nothing is wired or the mode
+        is unchanged.
+        """
+        if self._on_theme is None:
+            return
+        theme = getattr(self._app, "theme", None)
+        if theme is None:
+            return
+        mode = "dark" if theme.is_dark() else "light"
+        if mode == self._last_mode:
+            return
+        first_and_light = self._last_mode is None and mode == "light"
+        self._last_mode = mode
+        if first_and_light:
+            # The sheet is already light; the first "light" would say nothing.
+            return
+        self._on_theme(mode)
 
     async def dispatch_event(self, event: Event) -> None:
         """Route one client event to its Python handler and invoke it.

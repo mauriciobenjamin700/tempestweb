@@ -4,6 +4,57 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.100.0] — 2026-08-23
+
+### Fixed
+
+- **Metade do dark mode continuava clara: a folha base não tinha eixo de modo**
+  ([#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148)). O
+  `Style` que o core resolve viaja inline e ganha do stylesheet, então `Card` e
+  `Button` já seguiam o tema. O que só a folha pinta — fundo da página,
+  superfície de campo, `::placeholder`, `:hover`/`:focus`, superfície de overlay —
+  não tinha modo nenhum: um app escuro mostrava campo branco dentro de cartão
+  escuro.
+
+  A folha ganha um bloco de tokens dark sob `[data-tw-theme="dark"]`, e o
+  renderizador marca o documento com o modo resolvido. O canal segue o padrão que
+  o `navigate` já usava: envelope `{"kind": "theme", "mode": "dark"}` nos Modos B
+  e SSE, callback `on_theme` no Modo A (o Python divide a aba), e marcação
+  em-processo no `set_theme` do Modo C.
+
+  Três decisões que valem a leitura, porque cada uma tem um jeito errado óbvio:
+
+  - **O modo é resolvido como um widget resolve** (`Theme.is_dark()`, sem a flag
+    de plataforma). Um tema `SYSTEM` resolve claro no core, então escurecer por
+    `prefers-color-scheme` colocaria árvore clara em página escura — motivo pelo
+    qual a media query **não** entrou. Quem quer seguir o SO lê
+    `app.media.platform_dark_mode` no `view` e chama `set_theme`.
+  - **O primeiro `light` não é enviado:** os tokens da folha são a paleta clara,
+    então seria um frame dizendo o que o CSS já diz. Toda mudança posterior vai,
+    inclusive a volta ao claro.
+  - **O modo é checado depois de cada handler**, não só quando há patch: uma troca
+    de tema numa app cujo `view` não repassa o tema reconstrói para a IR idêntica,
+    o core não emite patch, e a folha ficaria clara sob uma app que foi ao escuro.
+
+### Added
+
+- `applyThemeMode` / `THEME_MODE_ATTR` em `client/theme.js`, `encode_theme` +
+  `PatchTransport.send_theme` nos transportes, `on_theme` no `WasmRuntime` e no
+  `bootstrap` do Modo A.
+- Seção **"A folha base segue o modo que você declara"** no tutorial de tema
+  (PT + EN), com o aviso medido: declarou escuro, repasse `app.theme` aos widgets
+  — senão a folha escurece e o inline continua claro (campo ilegível).
+- `docs/contract.md` documenta o envelope ao lado do `navigate`.
+- `tests/unit/test_theme_envelope.py` fixa as três decisões acima;
+  `tests/client/theme.test.js` fixa o bloco de tokens e a marcação;
+  `tests/client/transport-ws.test.js` fixa o roteamento do envelope.
+
+Medido em Chrome real (Modo B): clicar "Dark" no `examples/theme-switcher` leva o
+documento a `data-tw-theme="dark"`, os tokens de `#fef7ff`/`#1d1b20`/`#6750a4`
+para `#141218`/`#e6e0e9`/`#d0bcff` e o `body` para `rgb(20,18,24)`; voltar desfaz.
+Num app que repassa o tema, o campo vai de `rgb(254,247,255)/rgb(25,25,26)` para
+`rgb(20,18,24)/rgb(229,229,230)` — fundo escuro **com** texto claro — o
+`::placeholder` acompanha, e digitar continua funcionando. Console limpo.
 ## [0.98.0] — 2026-08-23
 
 ### Fixed

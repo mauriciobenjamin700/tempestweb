@@ -334,6 +334,45 @@ As duas pontas que o host cobre:
     Se a troca em runtime é o coração do seu app, declare `THEME` com a paleta que
     ele abre.
 
+## A folha base segue o modo que você declara
+
+O `Style` que o core resolve viaja **inline** em cada widget, e inline ganha do
+stylesheet. Mas metade da tela não é inline: o fundo da página, a superfície de um
+campo, o `::placeholder`, todo estado de `:hover`/`:focus`, a superfície de um
+overlay. Isso é CSS — e o CSS não tinha eixo de modo, então um app escuro mostrava
+campo branco dentro de cartão escuro.
+
+Agora tem. O renderizador marca o documento com o modo resolvido:
+
+```html
+<html data-tw-theme="dark">
+```
+
+e a folha base redefine seus tokens sob esse seletor. Você não escreve nada para
+isso acontecer: no Modo B (e SSE) o servidor manda um envelope `theme`; no Modo A
+o runtime chama o callback direto; no Modo C o `set_theme` marca o documento em
+processo.
+
+!!! warning "Declarou escuro? Repasse `app.theme` aos widgets"
+    A marcação segue o **tema do app**; a cor de cada widget segue o `theme` que
+    **aquele widget** recebeu. Se você chama `app.set_theme(Theme(mode=DARK))` e
+    não repassa `theme=app.theme` aos widgets, a folha escurece e os widgets
+    continuam claros — medido: um `Input` sem `theme` fica com fundo escuro (folha)
+    e texto escuro (inline), ou seja, ilegível. Passe o tema; é a mesma regra do
+    core.
+
+!!! info "Por que não `prefers-color-scheme`"
+    Seria a resposta óbvia — e estaria errada. Um widget construído com
+    `Theme(mode=SYSTEM)` resolve **claro** no core: ele não vê o SO. Escurecer a
+    folha por causa do SO colocaria uma árvore clara numa página escura. Se você
+    quer seguir o SO, leia `app.media.platform_dark_mode` no seu `view` e chame
+    `set_theme` — aí as duas metades andam juntas.
+
+!!! note "O primeiro `light` não é enviado"
+    Os tokens da folha **são** a paleta clara, então marcar claro no mount gastaria
+    um frame para dizer o que o CSS já diz. Toda mudança posterior é enviada,
+    inclusive a volta ao claro.
+
 ## Indicadores de progresso
 
 `ProgressBar` e `Spinner` não têm tamanho próprio: sem folha de estilo, os dois

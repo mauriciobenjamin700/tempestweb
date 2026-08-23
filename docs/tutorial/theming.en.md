@@ -336,6 +336,45 @@ The two ends the host covers:
     If runtime switching is the heart of your app, declare `THEME` with the
     palette it opens on.
 
+## The base sheet follows the mode you declare
+
+The `Style` the core resolves travels **inline** on each widget, and inline beats
+the stylesheet. But half the screen is not inline: the page background, a field's
+surface, its `::placeholder`, every `:hover`/`:focus` state, an overlay's surface.
+That is CSS — and the CSS had no mode axis, so a dark app showed a white field
+inside a dark card.
+
+Now it has one. The renderer marks the document with the resolved mode:
+
+```html
+<html data-tw-theme="dark">
+```
+
+and the base sheet redefines its tokens under that selector. You write nothing for
+this: in Mode B (and SSE) the server sends a `theme` envelope; in Mode A the
+runtime calls the callback directly; in Mode C `set_theme` marks the document
+in-process.
+
+!!! warning "Declared dark? Pass `app.theme` to the widgets"
+    The marking follows the **app's** theme; each widget's colour follows the
+    `theme` **that widget** received. If you call
+    `app.set_theme(Theme(mode=DARK))` and do not pass `theme=app.theme` to the
+    widgets, the sheet goes dark and the widgets stay light — measured: an `Input`
+    with no `theme` ends up with a dark background (sheet) and dark text (inline),
+    i.e. unreadable. Pass the theme; it is the core's own rule.
+
+!!! info "Why not `prefers-color-scheme`"
+    It would be the obvious answer — and it would be wrong. A widget built with
+    `Theme(mode=SYSTEM)` resolves **light** in the core: it never sees the OS.
+    Darkening the sheet from the OS alone would put a light tree on a dark page. If
+    you want to follow the OS, read `app.media.platform_dark_mode` in your `view`
+    and call `set_theme` — then both halves move together.
+
+!!! note "The first `light` is not sent"
+    The sheet's tokens **are** the light palette, so marking light on mount would
+    spend a frame saying what the CSS already says. Every later change is sent,
+    including the return to light.
+
 ## Progress indicators
 
 `ProgressBar` and `Spinner` have no intrinsic size: with no stylesheet both

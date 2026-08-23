@@ -1,7 +1,11 @@
-"""Tabbed profile — demonstrates Layout & navigation with TabView.
+"""Tabbed profile — demonstrates Layout & navigation with TabBar + TabView.
 
 Three profile sections — Overview, Activity, Settings — are surfaced via a
-:class:`~tempest_core.widgets.TabView`.  Switching tabs fires a
+:class:`~tempest_core.widgets.TabBar` (the strip the reader clicks) above a
+:class:`~tempest_core.widgets.TabView` (the panel).  The two are separate widgets
+on purpose: a TabView holds an IR child, so the renderer may not inject a tab
+strip into it — the strip is its own widget, wired to the same handler.
+Switching tabs fires a
 :class:`~tempest_core.widgets.events.RouteChangeEvent`; the index stored
 in ``params["index"]`` is written back to state so the reconciler can diff
 the active ``child`` to the correct section.
@@ -41,6 +45,7 @@ from tempest_core import (
     Scaffold,
     Style,
     Switch,
+    TabBar,
     TabView,
     Text,
     ToggleEvent,
@@ -449,11 +454,22 @@ def view(app: App[ProfileState]) -> Widget:
     return Scaffold(
         key="profile-scaffold",
         app_bar=AppBar(title="Profile", key="profile-appbar"),
-        body=TabView(
-            key="profile-tabs",
-            tabs=_TABS,
-            active=state.active_tab,
-            on_change=on_tab_change,
-            child=body,
+        body=Column(
+            key="profile-body",
+            children=[
+                TabBar(
+                    key="profile-tabbar",
+                    tabs=_TABS,
+                    active=state.active_tab,
+                    on_change=on_tab_change,
+                ),
+                TabView(
+                    key="profile-tabs",
+                    tabs=_TABS,
+                    active=state.active_tab,
+                    on_change=on_tab_change,
+                    child=body,
+                ),
+            ],
         ),
     )

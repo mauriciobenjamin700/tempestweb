@@ -236,3 +236,48 @@ test("shadow with a null color falls back to a neutral tint", () => {
   const css = styleToCss({ shadow: { color: null, blur: 4, offset_x: 1, offset_y: 1 } });
   assert.equal(declarations(css)["box-shadow"], "1px 1px 4px rgba(0, 0, 0, 0.3)");
 });
+
+test("a native control's part geometry is dropped and its tint becomes accent-color", () => {
+  // What tempest-core resolves for a Switch: the knob a hand-drawing renderer
+  // paints. Applied verbatim it made a 20x20 purple square with the real 52x32
+  // checkbox hanging out of it (measured in examples/settings-panel), because an
+  // inline style always beats the base sheet.
+  const style = {
+    width: 20,
+    height: 20,
+    background: { r: 88, g: 71, b: 133, a: 1 },
+    color: { r: 88, g: 71, b: 133, a: 1 },
+    border_radius: 999,
+  };
+  const css = styleToCss(style, "Switch");
+  const d = declarations(css);
+
+  assert.equal(d["width"], undefined);
+  assert.equal(d["height"], undefined);
+  assert.equal(d["background"], undefined);
+  assert.equal(d["border-radius"], undefined);
+  // The colour still comes from the core — as the property a native control
+  // actually themes from.
+  assert.equal(d["accent-color"], "rgba(88, 71, 133, 1)");
+  assert.equal(d["color"], undefined);
+});
+
+test("the same style on a plain widget is emitted untouched", () => {
+  const style = { width: 20, height: 20, background: { r: 1, g: 2, b: 3, a: 1 } };
+  const d = declarations(styleToCss(style, "Container"));
+
+  assert.equal(d["width"], "20px");
+  assert.equal(d["height"], "20px");
+  assert.equal(d["background"], "rgba(1, 2, 3, 1)");
+  assert.equal(d["accent-color"], undefined);
+});
+
+test("a slider keeps what is not a track: its margin and opacity survive", () => {
+  const d = declarations(
+    styleToCss({ height: 4, margin: { top: 8, right: 0, bottom: 8, left: 0 }, opacity: 0.5 }, "Slider"),
+  );
+
+  assert.equal(d["height"], undefined);
+  assert.equal(d["margin"], "8px 0px 8px 0px");
+  assert.equal(d["opacity"], "0.5");
+});

@@ -475,3 +475,39 @@ test("a TabBar click is not swallowed as a generic click on the bar", () => {
   assert.equal(transport.events.length, 1);
   assert.equal(transport.events[0].type, "change");
 });
+
+test("TabView renames its panel when the active tab moves", () => {
+  withDocument();
+  const el = buildElement({
+    type: "TabView",
+    key: "tabs",
+    props: { tabs: ["Overview", "Activity", "Settings"], active: 0 },
+    children: [{ type: "Text", key: "panel", props: { content: "x" }, children: [] }],
+  });
+  assert.equal(el.getAttribute("aria-label"), "Overview");
+
+  // An Update carries `active` alone; naming only on first build left a screen
+  // reader announcing "Overview" while Settings was on screen.
+  applyPatches(el, [{ path: [], set_props: { active: 2 } }]);
+
+  assert.equal(el.getAttribute("aria-label"), "Settings");
+  assert.equal(el.getAttribute("data-tw-active"), "2");
+});
+
+test("TabView keeps an aria-label the app set through semantics", () => {
+  withDocument();
+  const el = buildElement({
+    type: "TabView",
+    key: "tabs",
+    props: {
+      tabs: ["Overview", "Settings"],
+      active: 0,
+      semantics: { label: "Profile sections" },
+    },
+    children: [{ type: "Text", key: "panel", props: { content: "x" }, children: [] }],
+  });
+
+  applyPatches(el, [{ path: [], set_props: { active: 1 } }]);
+
+  assert.equal(el.getAttribute("aria-label"), "Profile sections");
+});

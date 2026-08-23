@@ -72,6 +72,39 @@
 // "flex-start"/"flex-end". Everything else (center, space-*, stretch) is identity.
 const FLEX_EDGE = Object.freeze({ start: "flex-start", end: "flex-end" });
 
+/**
+ * Widget types the DOM draws as a native control, which paints its own parts.
+ *
+ * The core resolves these widgets' Style the way a hand-drawing renderer needs
+ * it: a Checkbox's box, a Switch's knob, a Slider's track — each arrives as a
+ * width/height/background/border on the widget itself. A native control already
+ * has those parts, and an inline style always beats the base sheet, so applying
+ * them verbatim deformed the control: a Switch became a 20x20 purple square with
+ * a 52x32 checkbox hanging out of it, and both Sliders became 4px-tall strips
+ * with no room for a thumb (measured in `examples/settings-panel`).
+ */
+const NATIVE_CONTROL_STYLE_TYPES = new Set([
+  "Checkbox",
+  "Switch",
+  "Slider",
+  "RangeSlider",
+]);
+
+// CSS properties that describe one of those hand-drawn parts. Dropped for the
+// types above; every other declaration (color, margin, font, flex) is kept, so
+// an app still styles the row the control sits in.
+const NATIVE_CONTROL_PART_PROPS = new Set([
+  "width",
+  "height",
+  "background",
+  "border",
+  "border-radius",
+  // `color` is the control's tint, not its caption's: emitted verbatim it painted
+  // "Send e-mail alerts" primary-purple next to its box. It is re-emitted as
+  // `accent-color`, and the caption falls back to the sheet's on-surface.
+  "color",
+]);
+
 // Widget types that are flex containers by nature: they render `display: flex`
 // with this axis unless the style sets an explicit `direction`. Matches the
 // native (Qt/Compose) behaviour where a Column/Row is always a flex container,
@@ -396,5 +429,40 @@ export function styleToCss(style, type) {
     rules.push(`transition: ${transitionToCss(style.transition)}`);
   }
 
-  return rules.join("; ");
+  return (
+    type != null && NATIVE_CONTROL_STYLE_TYPES.has(type)
+      ? adaptNativeControlRules(rules)
+      : rules
+  ).join("; ");
+}
+
+/**
+ * Rewrite a native control's declarations so the browser draws its own parts.
+ *
+ * The part geometry and paint are dropped (see `NATIVE_CONTROL_PART_PROPS`), and
+ * the resolved foreground colour is handed to `accent-color` — which is how a
+ * checkbox, a switch and a range input take a theme colour. The colour therefore
+ * still comes from the core (light and dark alike); what is discarded is only the
+ * shape of a part the platform already draws.
+ *
+ * @param {string[]} rules  The declarations translated so far.
+ * @returns {string[]}      The declarations to emit.
+ */
+function adaptNativeControlRules(rules) {
+  /** @type {string[]} */
+  const kept = [];
+  let accent = null;
+  for (const rule of rules) {
+    const property = rule.slice(0, rule.indexOf(":")).trim();
+    if (property === "color") {
+      accent = rule.slice(rule.indexOf(":") + 1).trim();
+    }
+    if (!NATIVE_CONTROL_PART_PROPS.has(property)) {
+      kept.push(rule);
+    }
+  }
+  if (accent != null) {
+    kept.push(`accent-color: ${accent}`);
+  }
+  return kept;
 }

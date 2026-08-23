@@ -1678,6 +1678,39 @@ function applyTabBarProps(el, props) {
 }
 
 /**
+ * Name a `TabView`'s panel after the tab it is showing, and keep it named.
+ *
+ * Written on every apply, not only when the attribute is missing: an Update
+ * carries `active` alone, so a panel first named "Overview" stayed "Overview"
+ * after the reader moved to Settings — a screen reader announcing the wrong
+ * section, measured in `examples/tabs-profile`. The tab labels are remembered on
+ * the element for the same reason (the Update that switches tabs does not repeat
+ * them).
+ *
+ * An `aria-label` the app set through `semantics` wins: only a name this function
+ * wrote is overwritten.
+ *
+ * @param {HTMLElement} el  The TabView element.
+ * @returns {void}
+ */
+function nameActivePanel(el) {
+  const tabs = el.__twTabs;
+  if (!Array.isArray(tabs)) {
+    return;
+  }
+  const label = tabs[Number(el.getAttribute(ACTIVE_ATTR) ?? 0)];
+  if (label == null) {
+    return;
+  }
+  const current = el.getAttribute("aria-label");
+  if (current != null && current !== el.__twPanelLabel) {
+    return;
+  }
+  el.__twPanelLabel = String(label);
+  el.setAttribute("aria-label", el.__twPanelLabel);
+}
+
+/**
  * Reflect a `TabView`'s active tab, and a `RouteDrawer`'s open state.
  *
  * Neither widget can be *driven* by this renderer: both hold IR children (a
@@ -1697,17 +1730,16 @@ function applyTabBarProps(el, props) {
  */
 function applyPanelProps(el, type, props) {
   if (type === "TabView") {
-    const tabs = Array.isArray(props.tabs) ? props.tabs : null;
+    if ("tabs" in props) {
+      el.__twTabs = Array.isArray(props.tabs) ? props.tabs : [];
+    }
     if ("active" in props) {
       setOrRemove(el, ACTIVE_ATTR, props.active);
     }
     if (!el.hasAttribute("role")) {
       el.setAttribute("role", "tabpanel");
     }
-    const active = Number(el.getAttribute(ACTIVE_ATTR) ?? 0);
-    if (tabs != null && tabs[active] != null && !el.hasAttribute("aria-label")) {
-      el.setAttribute("aria-label", String(tabs[active]));
-    }
+    nameActivePanel(el);
     return;
   }
   if ("open" in props) {

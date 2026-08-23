@@ -311,6 +311,10 @@ export const BASE_THEME_CSS = `
 [data-tw-type="FilePicker"] {
   display: inline-flex;
   align-items: center;
+  /* A file input is as wide as its button plus the file name, and it does not
+     shrink: on a 390px screen one pushed the page 100px sideways. Wrapping puts
+     the caption on its own line and lets the control take the width it has. */
+  flex-wrap: wrap;
   gap: 8px;
   max-width: 100%;
   width: fit-content;
@@ -323,6 +327,9 @@ export const BASE_THEME_CSS = `
 [data-tw-type="TimePicker"] > input,
 [data-tw-type="FilePicker"] > input {
   order: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   min-height: 40px;
   margin: 0;
   padding: 9px 12px;

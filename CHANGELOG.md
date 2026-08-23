@@ -4,6 +4,65 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.83.0] — 2026-08-23
+
+### Added
+
+- **O subset do Modo C aceita as formas que um app real escreve.** Medido no
+  corpus: **25 dos 57 exemplos transpilam** (eram 14). Sete mudanças, nenhuma
+  delas uma capacidade nova — todas eram recusa por forma:
+    - **import só de anotação** (#111): `collections.abc` e `typing` são fontes
+      type-only, então o nome custa zero JS. Alias de tipo em nível de módulo
+      (`Fetcher = Callable[[], Awaitable[list[str]]]`) é reconhecido e descartado;
+      usar nome type-only como **valor** virou erro com `arquivo:linha`, em vez de
+      identificador nu que só quebra na linha que roda.
+    - **`from tempestweb.components import …`** (#113): o import que o tutorial
+      ensina, e que era recusado como módulo — embora **63 dos 77 nomes que ele
+      exporta sejam o objeto do core** (identidade medida com `is`). Agora roteia
+      como um import de `tempest_core`; nome que o cliente não tem é recusado
+      **pelo nome** (#114 acompanha o port da camada própria).
+    - **`*` em literal** (#116): `[a, *rest]`, o idioma de "nova lista sem mutar".
+    - **alvo destructurado** (#116): `for i, (q, a) in enumerate(pairs)`, no `for`
+      e no assignment, aninhado quanto o Python aninhar.
+    - **`is` / `is not`** (#116): contra `None` emite `== null` / `!= null` — a
+      única tradução correta aqui, porque campo que o objeto JS nunca atribuiu é
+      `undefined` e o `is None` do Python responde verdadeiro para ele. Contra
+      qualquer outro operando é identidade (`===`/`!==`).
+    - **`f"{n:0Nd}"`** (#116): zero-pad de relógio e placar. `padStart` sozinho
+      está errado para negativo (Python dá `-0042`, `padStart` dá `00-42`): o
+      emitido mantém o sinal fora do preenchimento e avalia o argumento uma vez.
+    - **dataclass como se escreve** (#115): campo sem default (fica `undefined`
+      até o `make_state` preencher), `@dataclass(frozen=True)` e as demais opções
+      que não mudam o JS emitido, e `field(default_factory=…)` com callable
+      próprio. Opção fora da lista de no-ops é recusada citando a chave.
+- **Conversão de container:** `list(xs)`/`tuple(xs)` → `[...xs]`, `set(xs)` →
+  `new Set(xs)`, `dict(pairs)` → `Object.fromEntries(pairs)`, mais as formas sem
+  argumento.
+
+### Fixed
+
+- **Fábrica de default guardava a função em vez do valor.**
+  `field(default_factory=lambda: list(NAV_ITEMS))` emitia
+  `() => list(NAV_ITEMS)()`, que pela precedência guardava a arrow. Achado
+  dirigindo o `core-app-shell` em Chrome real: compilava, gate verde, e a página
+  ficava **em branco** com `state.items.map is not a function`. Junto veio a
+  segunda causa: `list(NAV_ITEMS)` chamava um `list` que não existe em JS.
+  `node --check` parseia as duas e o golden compara texto, então nada na suíte
+  via o app morto na primeira renderização.
+
+### Notas
+
+- A mensagem de allowlist de import mudou, então `docs/troubleshooting.md` e o
+  `.en` foram atualizados — o guard `test_docs_troubleshooting.py` pegou a
+  defasagem. Para a página continuar pesquisável, a mensagem ficou **literal** em
+  vez de interpolar o nome do módulo: o guard não resolve f-string, e mensagem que
+  ele não acha é mensagem que o usuário também não acha.
+- Verificado em Chrome real, service worker e caches limpos antes de medir:
+  `stopwatch` (Modo C) mostra `00:00.1` → `00:00.9` → `00:01.0` → `00:01.2` e, com
+  100 ticks, `00:10.0`; `core-app-shell` renderiza 28 nós com `AppBar`, `Sidebar`
+  de 260px e três `ListTile`, e clicar `nav-1` move a pílula ativa. **Modo B mede
+  idêntico** nos dois. Console limpo.
+
 ## [0.82.0] — 2026-08-22
 
 ### Added

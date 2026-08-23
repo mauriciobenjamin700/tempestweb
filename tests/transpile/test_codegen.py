@@ -867,3 +867,260 @@ def test_a_type_only_import_is_never_emitted() -> None:
     )
     assert "DragEvent" not in js
     assert 'import { Text } from "./widgets.js";' in js
+
+
+def test_a_stdlib_annotation_source_costs_no_import() -> None:
+    """`collections.abc`/`typing` names annotate handlers and emit nothing.
+
+    Eleven example apps stopped at this import while the name they wanted was
+    only ever written in an annotation — which the emitter drops.
+    """
+    js = gen(
+        "from collections.abc import Awaitable, Callable\n"
+        "from typing import Any\n"
+        "from tempest_core import Text\n\n\n"
+        "def handle(fetch: Callable[[], Awaitable[str]], extra: Any) -> Text:\n"
+        '    return Text(content="x")\n'
+    )
+    assert "Callable" not in js
+    assert "Awaitable" not in js
+    assert "Any" not in js
+    assert "collections" not in js
+    assert 'import { Text } from "./widgets.js";' in js
+
+
+def test_a_module_level_type_alias_is_dropped() -> None:
+    """`Fetcher = Callable[...]` is an alias, not a constant, so nothing is emitted.
+
+    It reads as an assignment, so emitting it would declare a `const` whose value
+    references identifiers nothing imports — a `ReferenceError` at load.
+    """
+    js = gen(
+        "from collections.abc import Awaitable, Callable\n"
+        "from tempest_core import Text\n\n"
+        "Fetcher = Callable[[], Awaitable[list[str]]]\n"
+        "LIMIT = 3\n\n\n"
+        "def handle(fetch: Fetcher) -> Text:\n"
+        "    return Text(content=str(LIMIT))\n"
+    )
+    assert "Fetcher" not in js
+    assert "const LIMIT = 3;" in js
+
+
+def test_a_type_only_name_used_as_a_value_is_refused() -> None:
+    """Using an annotation-only name as a value is an error, not a dead identifier.
+
+    Without the guard the emitter wrote a bare `Any` with no import, so the module
+    loaded and died on the line that ran it. A module-level `X = Any` is not this
+    case: that reads as a type alias in Python too, so it is dropped.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from typing import Any\nfrom tempest_core import Text\n\n\n"
+            "def describe() -> str:\n"
+            "    return str(Any)\n"
+        )
+    assert "type-only name" in str(excinfo.value)
+
+
+def test_a_constant_built_from_a_runtime_name_is_still_emitted() -> None:
+    """A `const` whose value carries a real term is not mistaken for an alias."""
+    js = gen(
+        "from typing import Any\n\n"
+        "BASE = 10\n"
+        "LIMIT = BASE\n\n\n"
+        "def read(x: Any) -> int:\n"
+        "    return LIMIT\n"
+    )
+    assert "const LIMIT = BASE;" in js
+
+
+def test_the_component_facade_routes_like_the_core() -> None:
+    """`from tempestweb.components import Card` reaches the same served builder.
+
+    Of the 77 names the facade exports, 63 are the core object itself, and it is
+    the import the tutorial teaches — while Mode C used to refuse the module
+    outright.
+    """
+    js = gen(
+        "from tempestweb.components import Card, Text\n\n\n"
+        "def view(app):\n"
+        '    return Card(children=[Text(content="x", key="t")], key="c")\n'
+    )
+    assert 'import { Card, Text } from "./widgets.js";' in js
+
+
+def test_a_facade_name_the_client_cannot_serve_is_refused_by_name() -> None:
+    """This repo's own `*Field` layer is refused by name, not by module.
+
+    The distinction matters: the module is legal, the name is what is missing, so
+    the diagnostic points at the component instead of the import path.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from tempestweb.components import EmailField\n\n\n"
+            "def view(app):\n"
+            '    return EmailField(key="e")\n'
+        )
+    message = str(excinfo.value)
+    assert "EmailField" in message
+    assert "is not available in Mode C" in message
+
+
+def test_a_starred_element_spreads_in_a_literal() -> None:
+    """`[a, *rest]` is the immutable-state idiom, and JS spreads the same way."""
+    js = gen("def f(state):\n    return [state.head, *state.tail]\n")
+    assert "...state.tail," in js
+
+
+def test_a_nested_loop_target_destructures() -> None:
+    """`for i, (q, a) in enumerate(pairs)` binds the nested pair."""
+    js = gen(
+        "def f(pairs):\n"
+        "    for idx, (question, answer) in enumerate(pairs):\n"
+        "        print(idx, question, answer)\n"
+    )
+    assert "for (const [idx, [question, answer]] of" in js
+
+
+def test_a_nested_assignment_target_destructures() -> None:
+    """`first, (second, third) = value` binds every leaf."""
+    js = gen("def f(value):\n    first, (second, third) = value\n    return first\n")
+    assert "const [first, [second, third]] = value;" in js
+
+
+def test_is_none_uses_loose_equality_and_identity_otherwise() -> None:
+    """`is None` answers "no value"; `is` on anything else is identity.
+
+    `== null` is the one correct use of loose equality here: a field a JS object
+    never assigned is `undefined`, and Python's `is None` has to answer True for
+    it just as it does for an explicit `None`.
+    """
+    js = gen(
+        "def f(state):\n"
+        "    a = state.dialog is not None\n"
+        "    b = state.other is None\n"
+        "    c = state.x is state.y\n"
+        "    d = state.x is not state.y\n"
+        "    return a\n"
+    )
+    assert "state.dialog != null" in js
+    assert "state.other == null" in js
+    assert "state.x === state.y" in js
+    assert "state.x !== state.y" in js
+
+
+def test_a_zero_padded_int_keeps_the_sign_outside_the_padding() -> None:
+    """`f"{n:05d}"` matches Python for negatives, which `padStart` alone does not.
+
+    `String(-42).padStart(5, "0")` is `"00-42"`; Python's is `"-0042"`. The
+    emitted arrow also takes its argument once, so an interpolated call is not
+    evaluated twice.
+    """
+    js = gen('def f(n):\n    return f"{n:05d}"\n')
+    assert 'String(-v).padStart(4, "0")' in js
+    assert 'String(v).padStart(5, "0")' in js
+    # Applied once: the value is not re-evaluated by the sign branch.
+    assert js.count(")(n)") == 1
+
+
+def test_an_unsupported_format_spec_still_names_what_is_supported() -> None:
+    """The diagnostic lists the specs that work, `0Nd` included."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen('def f(n):\n    return f"{n:>5}"\n')
+    assert "`0Nd`" in str(excinfo.value)
+
+
+def test_a_field_without_a_default_is_undefined_not_an_error() -> None:
+    """A required field is `undefined` until `make_state` fills it.
+
+    Four examples stopped here, and the emitted class has no notion of a
+    required field: the constructor takes overrides, so the honest translation
+    of "no default" is `undefined`.
+    """
+    js = gen("@dataclass\nclass S:\n    items: list[int]\n")
+    assert "this.items = opts.items !== undefined ? opts.items : undefined;" in js
+
+
+def test_a_parameterized_dataclass_decorator_is_accepted() -> None:
+    """`@dataclass(frozen=True)` emits the same class as a bare `@dataclass`.
+
+    `frozen`/`slots`/`eq` describe Python-side behaviour the generated JS class
+    does not have, so accepting and ignoring them is faithful; three examples in
+    this repo are written that way.
+    """
+    js = gen("@dataclass(frozen=True, slots=True)\nclass S:\n    value: int = 0\n")
+    assert "export class S extends State {" in js
+    assert "this.value = opts.value !== undefined ? opts.value : 0;" in js
+
+
+def test_an_unknown_dataclass_option_is_refused_by_name() -> None:
+    """An option that is not a known no-op is refused, not dropped in silence."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen("@dataclass(weird=True)\nclass S:\n    value: int = 0\n")
+    assert "'weird'" in str(excinfo.value)
+
+
+def test_a_custom_default_factory_is_called() -> None:
+    """`field(default_factory=fresh)` calls the factory, like the dataclass does."""
+    js = gen(
+        "@dataclass\nclass S:\n"
+        "    log: list[str] = field(default_factory=fresh)\n"
+        "    tags: list[str] = field(default_factory=list)\n"
+    )
+    assert "opts.log !== undefined ? opts.log : (fresh)();" in js
+    assert "opts.tags !== undefined ? opts.tags : [];" in js
+
+
+def test_a_field_option_that_shapes_python_only_is_ignored() -> None:
+    """`repr`/`compare`/`init` shape behaviour the emitted constructor lacks."""
+    js = gen(
+        "@dataclass\nclass S:\n"
+        '    note: str = field(default="", repr=False)\n'
+        "    seq: int = field(init=False)\n"
+    )
+    assert 'opts.note !== undefined ? opts.note : "";' in js
+    assert "opts.seq !== undefined ? opts.seq : undefined;" in js
+
+
+def test_an_unknown_field_option_is_refused_by_name() -> None:
+    """A `field(...)` option that could change the value is refused."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen("@dataclass\nclass S:\n    value: int = field(converter=int)\n")
+    assert "'converter'" in str(excinfo.value)
+
+
+def test_a_lambda_default_factory_is_applied_not_stored() -> None:
+    """`field(default_factory=lambda: list(SEED))` holds the list, not the arrow.
+
+    Measured in Chrome before the parentheses: `core-app-shell` compiled, the
+    page loaded, and the first render died on `state.items.map is not a
+    function`, because the field held the function.
+    """
+    js = gen(
+        "@dataclass\nclass S:\n"
+        "    items: list[int] = field(default_factory=lambda: list(SEED))\n"
+    )
+    assert "(() => [...SEED])()" in js
+
+
+def test_container_builtins_convert_instead_of_calling_a_missing_name() -> None:
+    """`list(xs)` emitted a call to an undefined `list` — a blank page.
+
+    `node --check` parses it and the golden compares text, so nothing caught it
+    until a browser ran the line.
+    """
+    js = gen(
+        "def f(xs, pairs):\n"
+        "    a = list(xs)\n"
+        "    b = tuple(xs)\n"
+        "    c = set(xs)\n"
+        "    d = dict(pairs)\n"
+        "    e = list()\n"
+        "    return a\n"
+    )
+    assert "const a = [...xs];" in js
+    assert "const b = [...xs];" in js
+    assert "const c = new Set(xs);" in js
+    assert "const d = Object.fromEntries(pairs);" in js
+    assert "const e = [];" in js

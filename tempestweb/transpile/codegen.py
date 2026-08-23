@@ -16,6 +16,7 @@ attribute/name/number/string/BinOp expressions, keyword-only widget calls, and
 from __future__ import annotations
 
 import ast
+import builtins
 import json
 import re
 from typing import Any
@@ -72,6 +73,46 @@ _VALIDATOR_NAMES: frozenset[str] = frozenset(
 )
 # Type-only imports that carry no runtime value and are dropped from the output.
 _TYPE_ONLY_NAMES: frozenset[str] = frozenset({"Widget"})
+# Modules whose names exist only in annotations, which the emitter drops. The
+# import carries no runtime value, so nothing is emitted for it — but a name from
+# here used as a *value* is refused, because a bare identifier with no import is
+# a `ReferenceError` the browser raises only when the line runs.
+_TYPE_ONLY_MODULES: frozenset[str] = frozenset({"collections.abc", "typing"})
+# The component facade this package re-exports the core's components through. Of
+# the 77 names it exports, 63 are the core object itself (identity-equal), so
+# they route exactly like a `tempest_core` import; the rest are this repo's own
+# layer and are refused by name against the served manifest.
+_COMPONENT_MODULE: str = "tempestweb.components"
+# Builtin names a type alias may mention besides the type-only ones themselves
+# (`list[str]`, `dict[str, int]`, `tuple[int, ...]`).
+_BUILTIN_NAMES: frozenset[str] = frozenset(dir(builtins))
+
+
+# `@dataclass` options that change nothing about the emitted JS: the generated
+# class has no `repr`, no ordering and no equality of its own, and `frozen`/`slots`
+# have no counterpart. Refusing them was conservatism, not a limit.
+_IGNORED_DATACLASS_OPTIONS: frozenset[str] = frozenset(
+    {"frozen", "slots", "eq", "order", "repr", "init", "unsafe_hash", "kw_only"}
+)
+# `field(...)` options with the same property: they shape Python-side behaviour
+# the emitted constructor does not have.
+_IGNORED_FIELD_OPTIONS: frozenset[str] = frozenset(
+    {"init", "repr", "compare", "hash", "kw_only", "metadata"}
+)
+
+
+def _is_none(node: ast.expr) -> bool:
+    """Whether an expression is the literal ``None``.
+
+    Args:
+        node: The expression to inspect.
+
+    Returns:
+        Whether it is ``None``.
+    """
+    return isinstance(node, ast.Constant) and node.value is None
+
+
 # API identifiers renamed from Python's snake_case to the JS client's camelCase.
 _NAME_MAP: dict[str, str] = {
     "make_state": "makeState",
@@ -312,6 +353,10 @@ class _Generator:
         # Local name → the import statement that introduced it, so refusing a
         # name the client cannot serve can point at a line.
         self.import_nodes: dict[str, ast.ImportFrom] = {}
+        # Names that exist only in annotations: imported from a type-only module,
+        # or bound to a type alias built from one. Referencing them as a value is
+        # refused instead of emitting an identifier nothing imports.
+        self.type_only: set[str] = set()
 
     # -- expressions --------------------------------------------------------
 
@@ -331,6 +376,13 @@ class _Generator:
         if isinstance(node, ast.Constant):
             return self._constant(node)
         if isinstance(node, ast.Name):
+            if node.id in self.type_only:
+                raise TranspileError(
+                    f"{node.id!r} is a type-only name (annotations are dropped), "
+                    "so it cannot be used as a value",
+                    node,
+                    self.filename,
+                )
             self.referenced.add(node.id)
             return _js_name(node.id)
         if isinstance(node, ast.Attribute):
@@ -455,6 +507,12 @@ class _Generator:
         - ``,`` → ``(x).toLocaleString("en-US")`` — grouped thousands.
         - ``.N%`` → ``((x) * 100).toFixed(N) + "%"`` — percent (``N`` defaults 0).
         - ``d`` / ``,d`` → truncated integer, optionally grouped.
+        - ``0Nd`` → zero-padded integer, the spec every clock, counter and
+          scoreboard needs. A bare ``padStart`` is **wrong** for a negative
+          value: Python pads after the sign (``f"{-42:05d}"`` is ``"-0042"``)
+          while ``String(-42).padStart(5, "0")`` gives ``"00-42"``. The emitted
+          arrow keeps the sign outside the padding, and takes its argument once
+          so an interpolated call is not evaluated twice.
 
         Args:
             expr: The already-emitted JS for the interpolated value.
@@ -468,6 +526,13 @@ class _Generator:
             TranspileError: For any spec outside the supported subset (e.g.
                 alignment/fill, sign, binary/hex, exponent).
         """
+        zero_pad = re.fullmatch(r"0(\d+)d", text)
+        if zero_pad:
+            width = int(zero_pad.group(1))
+            return (
+                f'((v) => v < 0 ? "-" + String(-v).padStart({max(width - 1, 0)}, "0")'
+                f' : String(v).padStart({width}, "0"))({expr})'
+            )
         match = re.fullmatch(r"(,)?(?:\.(\d+))?([fF%d])?", text)
         grouped = bool(match and match.group(1))
         precision = match.group(2) if match else None
@@ -475,7 +540,7 @@ class _Generator:
         if match is None or not (grouped or precision is not None or kind):
             raise TranspileError(
                 f"f-string format spec {text!r} is not supported "
-                "(supported: `.Nf`, `,`, `,.Nf`, `.N%`, `d`, `,d`)",
+                "(supported: `.Nf`, `,`, `,.Nf`, `.N%`, `d`, `,d`, `0Nd`)",
                 node,
                 self.filename,
             )
@@ -564,6 +629,12 @@ class _Generator:
         """Emit a comparison. Chained comparisons are joined with ``&&``.
 
         ``in`` / ``not in`` become ``.includes(...)`` membership tests.
+
+        ``is`` / ``is not`` against ``None`` use the loose ``== null`` /
+        ``!= null``, which is the one place loose equality is the *correct*
+        translation: it answers "no value" for both `null` and `undefined`, and a
+        field a JS object never assigned is `undefined`. Against any other
+        operand, identity is `===` / `!==`.
         """
         ops: dict[type[ast.cmpop], str] = {
             ast.Eq: "===",
@@ -582,15 +653,22 @@ class _Generator:
                 parts.append(f"{right_js}.includes({left_js})")
             elif isinstance(op, ast.NotIn):
                 parts.append(f"!{right_js}.includes({left_js})")
+            elif isinstance(op, (ast.Is, ast.IsNot)):
+                against_none = _is_none(left) or _is_none(right)
+                if against_none:
+                    symbol = "==" if isinstance(op, ast.Is) else "!="
+                else:
+                    symbol = "===" if isinstance(op, ast.Is) else "!=="
+                parts.append(f"{left_js} {symbol} {right_js}")
             else:
-                symbol = ops.get(type(op))
-                if symbol is None:
+                mapped = ops.get(type(op))
+                if mapped is None:
                     raise TranspileError(
                         f"comparison {type(op).__name__} is not supported",
                         node,
                         self.filename,
                     )
-                parts.append(f"{left_js} {symbol} {right_js}")
+                parts.append(f"{left_js} {mapped} {right_js}")
             left = right
         return parts[0] if len(parts) == 1 else "(" + " && ".join(parts) + ")"
 
@@ -679,8 +757,26 @@ class _Generator:
             return "[]"
         inner = indent + 1
         pad = _INDENT * inner
-        items = ",\n".join(f"{pad}{self.expr(el, inner)}" for el in elts)
+        items = ",\n".join(f"{pad}{self._element(el, inner)}" for el in elts)
         return "[\n" + items + ",\n" + _INDENT * indent + "]"
+
+    def _element(self, node: ast.expr, indent: int) -> str:
+        """Emit one element of a literal, spreading a starred one.
+
+        ``[a, *rest]`` is the idiom for "new list without mutating", so it shows
+        up in any app that keeps immutable state; JS spreads with the same
+        syntax, which is why the element is the only place that has to know.
+
+        Args:
+            node: The element expression.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS source for the element.
+        """
+        if isinstance(node, ast.Starred):
+            return f"...{self.expr(node.value, indent)}"
+        return self.expr(node, indent)
 
     def _dict(self, node: ast.Dict, indent: int) -> str:
         """Emit a dict literal as a JS object.
@@ -815,6 +911,18 @@ class _Generator:
             }
             if name in simple:
                 return f"{simple[name]}({args[0]})"
+            # Container conversions. Without these, `list(xs)` emitted a call to
+            # an undefined `list`: the module parsed, the page loaded, and the
+            # first render died — a blank screen from a green build.
+            if name in ("list", "tuple"):
+                return f"[...{args[0]}]"
+            if name == "set":
+                return f"new Set({args[0]})"
+            if name == "dict":
+                return f"Object.fromEntries({args[0]})"
+        if count == 0 and name in ("list", "tuple", "dict", "set"):
+            empty = {"list": "[]", "tuple": "[]", "dict": "{}", "set": "new Set()"}
+            return empty[name]
         return None
 
     def _method_call(self, node: ast.Call, indent: int) -> str | None:
@@ -1063,12 +1171,31 @@ class _Generator:
         A plain name binds directly (``x``); a tuple/list unpacks with array
         destructuring (``[k, v]``).
         """
+        return self._target_pattern(target)
+
+    def _target_pattern(self, target: ast.expr) -> str:
+        """Return the JS destructuring pattern for a binding target.
+
+        Nested as deep as the Python target goes, because
+        ``for i, (question, answer) in enumerate(pairs)`` is how an app walks a
+        table of pairs — and JS destructures it with the same shape.
+
+        Args:
+            target: A ``Name``, or a ``Tuple``/``List`` of targets.
+
+        Returns:
+            The JS pattern (``x`` or ``[i, [question, answer]]``).
+
+        Raises:
+            TranspileError: If a leaf is not a plain name.
+        """
         if isinstance(target, ast.Name):
             return target.id
         if isinstance(target, (ast.Tuple, ast.List)):
-            return f"[{', '.join(self._target_names(target))}]"
+            inner = ", ".join(self._target_pattern(elt) for elt in target.elts)
+            return f"[{inner}]"
         raise TranspileError(
-            "loop target must be a name or a tuple of names",
+            "a binding target must be a name, or a tuple/list of them",
             target,
             self.filename,
         )
@@ -1327,13 +1454,17 @@ class _Generator:
         """
         names: list[str] = []
         for elt in target.elts:  # type: ignore[attr-defined]
-            if not isinstance(elt, ast.Name):
+            if isinstance(elt, ast.Name):
+                names.append(elt.id)
+            elif isinstance(elt, (ast.Tuple, ast.List)):
+                names.extend(self._target_names(elt))
+            else:
                 raise TranspileError(
-                    "only flat `a, b = ...` unpacking of plain names is supported",
+                    "unpacking binds plain names, nested as deep as you like, "
+                    f"but not a {type(elt).__name__}",
                     target,
                     self.filename,
                 )
-            names.append(elt.id)
         return names
 
     def _assign(self, node: ast.Assign, indent: int) -> list[str]:
@@ -1365,7 +1496,7 @@ class _Generator:
             return [f"{pad}{self.expr(target, indent)} = {value};"]
         if isinstance(target, (ast.Tuple, ast.List)):
             names = self._target_names(target)
-            pattern = f"[{', '.join(names)}]"
+            pattern = self._target_pattern(target)
             hoisted = self._scopes and all(n in self._scopes[-1] for n in names)
             if hoisted:
                 # Destructuring assignment (no declaration) must be parenthesized.
@@ -1545,6 +1676,8 @@ class _Generator:
                 bodies.append(self._class(node))
                 self.referenced.add(self.state_base)
             elif isinstance(node, ast.Assign | ast.AnnAssign):
+                if self._is_type_alias(node):
+                    continue
                 bodies.append(self._module_const(node))
             else:
                 assert isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -1578,6 +1711,40 @@ class _Generator:
                 self.filename,
             )
         return f"const {target.id} = {self.expr(value, 0)};"
+
+    def _is_type_alias(self, node: ast.Assign | ast.AnnAssign) -> bool:
+        """Whether a module-level assignment is a type alias, and record it.
+
+        A module that annotates handlers writes aliases like
+        ``Fetcher = Callable[[], Awaitable[list[str]]]``. That is an assignment of
+        runtime syntax built out of type-only names and builtin generics, so
+        emitting it would reference identifiers nothing imports. The target joins
+        :attr:`type_only`, which keeps it usable in the annotations the emitter
+        drops and refused in a value position.
+
+        A name that is neither type-only nor a builtin means the value carries a
+        real runtime term, so the assignment is a constant and not an alias —
+        ``LIMIT = MAX_ROWS`` stays an emitted ``const``.
+
+        Args:
+            node: The module-level assignment.
+
+        Returns:
+            Whether the assignment is a type alias (and was recorded as one).
+        """
+        value = node.value
+        if value is None:
+            return False
+        names = {n.id for n in ast.walk(value) if isinstance(n, ast.Name)}
+        if not names & self.type_only:
+            return False
+        if names - self.type_only - _BUILTIN_NAMES:
+            return False
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+        for target in targets:
+            if isinstance(target, ast.Name):
+                self.type_only.add(target.id)
+        return True
 
     def _collect_imports(
         self, node: ast.Import | ast.ImportFrom, importable: set[str]
@@ -1614,10 +1781,16 @@ class _Generator:
                         self.filename,
                     )
             return
-        if not module.startswith("tempest_core"):
+        # Annotation-only sources: record the names and emit nothing for them.
+        if module in _TYPE_ONLY_MODULES:
+            for alias in node.names:
+                self.type_only.add(alias.asname or alias.name)
+            return
+        if not (module.startswith("tempest_core") or module == _COMPONENT_MODULE):
             raise TranspileError(
                 f"import from {module!r} is not supported "
-                "(only tempest_core and `tempestweb.native`)",
+                "(only tempest_core, `tempestweb.components` "
+                "and `tempestweb.native`)",
                 node,
                 self.filename,
             )
@@ -1752,19 +1925,53 @@ class _Generator:
             for kw in value.keywords:
                 if kw.arg == "default":
                     return self.expr(kw.value, 2)
-                if (
-                    kw.arg == "default_factory"
-                    and isinstance(kw.value, ast.Name)
-                    and kw.value.id in factories
-                ):
-                    return factories[kw.value.id]
+                if kw.arg == "default_factory":
+                    if isinstance(kw.value, ast.Name) and kw.value.id in factories:
+                        return factories[kw.value.id]
+                    # Parenthesized: an arrow (`lambda: …`) is not callable
+                    # without it, and `() => x()` would store the function.
+                    return f"({self.expr(kw.value, 2)})()"
+            for kw in value.keywords:
+                if kw.arg not in _IGNORED_FIELD_OPTIONS:
+                    raise TranspileError(
+                        f"dataclass field(...) option {kw.arg!r} is not supported "
+                        "(use default= or default_factory=)",
+                        value,
+                        self.filename,
+                    )
+            return "undefined"
+        return self.expr(value, 2)
+
+    def _check_dataclass_options(self, decorator: ast.Call) -> None:
+        """Refuse a ``@dataclass(...)`` option that would change the emitted class.
+
+        ``frozen``/``slots``/``eq`` and friends describe Python-side behaviour the
+        generated JS class does not have, so they are accepted and ignored — a
+        module written ``@dataclass(frozen=True)`` (three examples in this repo)
+        transpiles to the same class as a bare ``@dataclass``. Anything else is
+        refused by name, because silently dropping an option the author *did*
+        mean is how a subtle divergence between modes starts.
+
+        Args:
+            decorator: The decorator call node.
+
+        Raises:
+            TranspileError: For an option outside
+                :data:`_IGNORED_DATACLASS_OPTIONS`, or a positional argument.
+        """
+        if decorator.args:
             raise TranspileError(
-                "unsupported dataclass field(...) — use default= or "
-                "default_factory=list/dict",
-                value,
+                "@dataclass takes only keyword options",
+                decorator,
                 self.filename,
             )
-        return self.expr(value, 2)
+        for kw in decorator.keywords:
+            if kw.arg not in _IGNORED_DATACLASS_OPTIONS:
+                raise TranspileError(
+                    f"@dataclass option {kw.arg!r} is not supported in Mode C",
+                    decorator,
+                    self.filename,
+                )
 
     def _class(self, node: ast.ClassDef) -> str:
         """Emit a `@dataclass` as `export class X extends <base> { … }`.
@@ -1778,7 +1985,15 @@ class _Generator:
         defaults are assigned — overriding an inherited default when they clash).
         """
         for decorator in node.decorator_list:
-            name = decorator.id if isinstance(decorator, ast.Name) else None
+            if isinstance(decorator, ast.Name):
+                name: str | None = decorator.id
+            elif isinstance(decorator, ast.Call) and isinstance(
+                decorator.func, ast.Name
+            ):
+                name = decorator.func.id
+                self._check_dataclass_options(decorator)
+            else:
+                name = None
             if name != "dataclass":
                 raise TranspileError(
                     "only the @dataclass decorator is supported on a class",
@@ -1806,13 +2021,12 @@ class _Generator:
         methods: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
         for stmt in node.body:
             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
-                if stmt.value is None:
-                    raise TranspileError(
-                        "dataclass fields must have a default in the subset",
-                        stmt,
-                        self.filename,
-                    )
-                fields.append((stmt.target.id, self._field_default(stmt.value)))
+                default = (
+                    "undefined"
+                    if stmt.value is None
+                    else self._field_default(stmt.value)
+                )
+                fields.append((stmt.target.id, default))
             elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 methods.append(stmt)
             elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):

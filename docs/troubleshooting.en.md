@@ -157,12 +157,23 @@ function decorators are not supported
 And the one you meet most when porting an existing app:
 
 ```text
-is not supported (only tempest_core and `tempestweb.native`)
+is not supported (only tempest_core, `tempestweb.components` and `tempestweb.native`)
 ```
 
-Mode C only sees `tempest_core` and `tempestweb.native`. That includes
-`tempestweb.presets` and `tempestweb.components` — screens built from presets
-run in Modes A and B, not in C.
+Mode C sees `tempest_core`, `tempestweb.components` and `tempestweb.native`.
+Annotation-only stdlib imports (`collections.abc`, `typing`) pass too: the name
+exists for the type checker and costs no JS import — but using one as a **value**
+is an error (`'Any' is a type-only name`), because nothing would import it.
+
+Outside that list, `tempestweb.presets` and `tempestweb.observability` are out of
+reach: screens built from presets run in Modes A and B, not in C.
+
+A legal name in a legal module can still be missing from the client — then the
+error names the **name**, not the module:
+
+```text
+is not available in Mode C (the transpile client exports no such name)
+```
 
 Reference: [Mode C — transpile](advanced/transpile.md).
 

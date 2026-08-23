@@ -25,6 +25,12 @@ import {
   Text,
 } from "../../client/transpile/widgets.js";
 import { mountApp, State } from "../../client/transpile/runtime.js";
+import { formValidate } from "../../client/transpile/widget-support.js";
+import {
+  validate_cpf,
+  validate_email,
+  validate_phone,
+} from "../../client/transpile/validators.js";
 import * as widgets from "../../client/transpile/widgets.gen.js";
 import {
   Accordion,
@@ -910,6 +916,51 @@ test("an invalid field paints its border and text in the error role", () => {
     color: red,
   });
   assert.notDeepEqual(cases.field_outline_valid.props.style.color, red);
+});
+
+test("Form.validate runs the field validators the way the core does", () => {
+  const samples = fixture("transpile_form_samples.json");
+  const required = (v) => (String(v).trim() ? null : "obrigatório");
+  const tooShort = (v) => (String(v).length < 8 ? "mínimo 8 caracteres" : null);
+  const email = widgets.FormField({ name: "email", validators: [required, validate_email] });
+  const password = widgets.FormField({ name: "password", validators: [required, tooShort] });
+  const cpf = widgets.FormField({ name: "cpf", validators: [validate_cpf] });
+  const phone = widgets.FormField({ name: "phone", validators: [validate_phone] });
+  const free = widgets.FormField({
+    name: "notes",
+    child: Input({ value: "", key: "notes-input" }),
+  });
+  const form = (...fields) => widgets.Form({ fields, key: "signup" });
+  const cases = {
+    form_all_valid: form(email, password),
+    form_one_failure: form(email, password),
+    form_every_field_fails: form(email, password),
+    form_second_validator_fails: form(password),
+    form_missing_value_is_empty_string: form(email),
+    form_field_without_validators: form(free),
+    form_no_fields: form(),
+    form_br_validators: form(cpf, phone),
+    form_br_validators_invalid: form(cpf, phone),
+  };
+  assert.equal(Object.keys(cases).length, Object.keys(samples).length);
+  for (const [name, node] of Object.entries(cases)) {
+    const want = samples[name];
+    assert.deepEqual(
+      formValidate(node, want.values),
+      { errors: want.result.errors, valid: want.result.valid },
+      `${name} diverged from core`,
+    );
+  }
+});
+
+test("a receiver that is not a Form keeps its own validate", () => {
+  // The helper stands in for a *widget* method; an app object that happens to
+  // have `validate` must still be the one that runs.
+  const own = { validate: (values) => ({ errors: { seen: values.x }, valid: false }) };
+  assert.deepEqual(formValidate(own, { x: "mine" }), {
+    errors: { seen: "mine" },
+    valid: false,
+  });
 });
 
 test("Color.from_hex parses the three shapes the core accepts, and refuses the rest", () => {

@@ -4,6 +4,46 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.93.0] — 2026-08-23
+
+### Added
+
+- **`Form.validate(values)` roda em Modo C** — o primeiro (e, por ora, único)
+  **método** de widget portado. O cliente carrega o *builder* de cada widget e
+  nenhum dos métodos Python da classe; `validate` cabe porque o insumo sobrevive:
+  `validators` nunca atravessa fio em Modo C, então as funções vivas estão no nó
+  quando a validação roda. Fixado por
+  `tests/fixtures/transpile_form_samples.json` (9 cenários do `Form` real —
+  válido, uma falha, todas as falhas, segundo validador falhando, valor ausente,
+  campo sem validador, form vazio, validadores BR).
+
+  O padrão geral que a [#128](https://github.com/mauriciobenjamin700/tempestweb/issues/128)
+  pedia para decidir: **tabela de exceção** (`_WIDGET_METHODS`). Método fora dela
+  continua recusado no build — a porta é uma entrada, não uma abertura.
+- **Predicados de caixa `isupper`/`islower`**, com a semântica do Python: exigem
+  ao menos um caractere com caixa, então `"1".isupper()` é `False`.
+
+### Fixed
+
+- **`form.validate` escapava da recusa quando o compilador não via a ligação.**
+  A recusa dependia de um local que o módulo tivesse ligado a `Form(...)`, então
+  um form montado em outro escopo passava batido e compilava para
+  `form1.validate is not a function` — medido no `examples/signup-wizard`, que
+  passava no build e lançava três vezes por clique. A rota nova não depende da
+  ligação.
+- **`dict(outro)` explodia num mapeamento.** Compilava para
+  `Object.fromEntries`, que exige iterável de pares. `dict(pares)` também é
+  legítimo e o compilador não sabe qual é qual, então a decisão passou a ser em
+  runtime.
+- **`d.pop(chave, default)`** caía no `pop` de array, que num objeto não existe.
+- **Atribuição anotada não registrava ligação.** Só `x = re.compile(...)` era
+  rastreado, nunca `x: re.Pattern[str] = re.compile(...)` — a forma que as regras
+  de estilo deste repo pedem. O `.match` saía cru num `RegExp`, que não tem esse
+  método, e morria dentro de um validador. Vale igual para `form: Form = Form(…)`.
+
+Corpus do Modo C: **44 dos 57 exemplos** (era 42). Desbloqueados: `form` e
+`login-form`; o `signup-wizard` já compilava e agora **funciona**.
+
 ## [0.92.0] — 2026-08-23
 
 ### Added

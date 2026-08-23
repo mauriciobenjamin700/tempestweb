@@ -1,0 +1,97 @@
+{
+  "form_all_valid": {
+    "result": {
+      "errors": {},
+      "valid": true
+    },
+    "values": {
+      "email": "a@b.co",
+      "password": "hunter2!!"
+    }
+  },
+  "form_br_validators": {
+    "result": {
+      "errors": {},
+      "valid": true
+    },
+    "values": {
+      "cpf": "529.982.247-25",
+      "phone": "(11) 99999-1234"
+    }
+  },
+  "form_br_validators_invalid": {
+    "result": {
+      "errors": {
+        "cpf": "CPF inválido",
+        "phone": "Telefone inválido"
+      },
+      "valid": false
+    },
+    "values": {
+      "cpf": "111.111.111-11",
+      "phone": "123"
+    }
+  },
+  "form_every_field_fails": {
+    "result": {
+      "errors": {
+        "email": "obrigatório",
+        "password": "obrigatório"
+      },
+      "valid": false
+    },
+    "values": {}
+  },
+  "form_field_without_validators": {
+    "result": {
+      "errors": {},
+      "valid": true
+    },
+    "values": {
+      "notes": ""
+    }
+  },
+  "form_missing_value_is_empty_string": {
+    "result": {
+      "errors": {
+        "email": "obrigatório"
+      },
+      "valid": false
+    },
+    "values": {
+      "password": "hunter2!!"
+    }
+  },
+  "form_no_fields": {
+    "result": {
+      "errors": {},
+      "valid": true
+    },
+    "values": {
+      "email": "whatever"
+    }
+  },
+  "form_one_failure": {
+    "result": {
+      "errors": {
+        "email": "E-mail inválido"
+      },
+      "valid": false
+    },
+    "values": {
+      "email": "nope",
+      "password": "hunter2!!"
+    }
+  },
+  "form_second_validator_fails": {
+    "result": {
+      "errors": {
+        "password": "mínimo 8 caracteres"
+      },
+      "valid": false
+    },
+    "values": {
+      "password": "short"
+    }
+  }
+}

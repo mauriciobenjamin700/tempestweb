@@ -676,6 +676,17 @@ spirit of `mypy --strict`.
     - **`{**old, k: v}`**, the "new dict without mutating" idiom (sibling of
       `[a, *rest]`), and **`xs[:] = [...]`**, the in-place replace — which
       becomes a `splice`, not an assignment to a copy.
+    - **a dict as a dict:** `dict(other)` copies and `dict(pairs)` builds — the
+      same call in Python, different operations in JS, told apart at runtime. And
+      `d.pop(key, default)` really removes, instead of falling through to the
+      array `pop`.
+    - **case predicates:** `c.isupper()` / `c.islower()` require at least one
+      cased character, as Python does — `"1".isupper()` is `False`. The classes
+      are ASCII, like the other predicates'.
+    - **`Form.validate(values)`** — the one widget *method* Mode C ports. It fits
+      because its input survives: `validators` never crosses a wire in Mode C, so
+      the live functions are on the node when validation runs. Every other method
+      stays refused.
     - **`f"{x:+.1f}"`**: `+` forces the sign on a positive, the way Python does.
       The value is formatted **first** and the prefix decided from the result,
       or a negative would come out `+-3.0`. It composes with `,`, `%` and `d`;
@@ -702,7 +713,7 @@ spirit of `mypy --strict`.
       window in the runtime, the way the server does in Mode B, and it survives
       the `view` re-running.
 
-    Measured on the corpus: **42 of 57 examples** transpile, up from 14.
+    Measured on the corpus: **44 of 57 examples** transpile, up from 14.
 
 !!! tip "Always give a component an explicit `key`"
     A component's default key is its own name (`card`, `alert`, `navbar`), so two

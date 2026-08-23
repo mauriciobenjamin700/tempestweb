@@ -25,6 +25,10 @@ import { diff } from "./diff.js";
 import { NavStack, Route, pathToRoutes, routeToPath } from "./nav.js";
 import { MediaQueryData, Theme } from "./theme.js";
 import { setSlidWindows } from "./widget-support.js";
+// `Form.validate` is the one widget *method* Mode C ports, and the emitted code
+// reaches every helper through this module — so it is re-exported here rather
+// than given a second import site.
+export { formValidate } from "./widget-support.js";
 
 /**
  * @typedef {import("../transport.js").Node} Node
@@ -578,6 +582,50 @@ export function reSub(pattern, replacement, text) {
  */
 export function reFindall(pattern, text) {
   return [...String(text).matchAll(pythonRegExp(pattern, "", "g"))].map((m) => m[0]);
+}
+
+/**
+ * Copy a mapping or build one from pairs, the way Python's `dict()` does.
+ *
+ * A dict is a plain object in Mode C and a list of pairs is an array, and the
+ * compiler cannot tell which one it holds — so `dict(x)` emitted
+ * `Object.fromEntries(x)` unconditionally, which throws `object is not iterable`
+ * on a mapping. Measured in `examples/form`, whose submit died on
+ * `dict(result.errors)`.
+ *
+ * @param {Object|Iterable} value  A mapping to copy, or an iterable of pairs.
+ * @returns {Object<string, *>}  A new plain object.
+ */
+export function toDict(value) {
+  if (value == null) {
+    return {};
+  }
+  if (typeof value[Symbol.iterator] === "function") {
+    return Object.fromEntries(value);
+  }
+  return { ...value };
+}
+
+/**
+ * Remove a key from a mapping and return its value, as `dict.pop` does.
+ *
+ * A dict is a plain object, which has no `pop`: the emitted `errors.pop(k, null)`
+ * resolved to nothing at all and threw. Python raises `KeyError` for a missing
+ * key with no default; only the two-argument form is emitted, and this mirrors
+ * it.
+ *
+ * @param {Object<string, *>} mapping  The mapping to remove from (mutated).
+ * @param {string} key  The key to remove.
+ * @param {*} fallback  Returned when the key is absent.
+ * @returns {*}  The removed value, or `fallback`.
+ */
+export function dictPop(mapping, key, fallback) {
+  if (mapping == null || !Object.hasOwn(mapping, key)) {
+    return fallback;
+  }
+  const value = mapping[key];
+  delete mapping[key];
+  return value;
 }
 
 /**

@@ -674,6 +674,17 @@ no espírito do `mypy --strict`.
     - **`{**old, k: v}`**, o idioma de "novo dict sem mutar" (irmão do
       `[a, *rest]`), e **`xs[:] = [...]`**, a substituição no lugar — que vira
       `splice`, não uma atribuição a uma cópia.
+    - **dict como dict:** `dict(outro)` copia e `dict(pares)` constrói — a mesma
+      chamada em Python, operações diferentes em JS, resolvidas em runtime. E
+      `d.pop(chave, default)` remove de verdade, em vez de cair no `pop` de
+      array.
+    - **predicados de caso:** `c.isupper()` / `c.islower()` exigem ao menos um
+      caractere com caixa, como o Python — `"1".isupper()` é `False`. As
+      classes são ASCII, como as dos outros predicados.
+    - **`Form.validate(values)`** — o único **método** de widget que o Modo C
+      porta. Ele cabe porque o insumo sobrevive: `validators` nunca atravessa fio
+      em Modo C, então as funções vivas estão no nó quando a validação roda.
+      Qualquer outro método continua recusado.
     - **`f"{x:+.1f}"`**: o `+` força o sinal no positivo, como o Python. O valor
       é formatado **primeiro** e o prefixo decidido do resultado, senão um
       negativo viraria `+-3.0`. Combina com `,`, `%` e `d`; com `0Nd` é recusado,
@@ -700,7 +711,7 @@ no espírito do `mypy --strict`.
       desliza a janela no runtime, como o servidor faz no Modo B, e ela
       sobrevive ao `view` re-rodando.
 
-    Medido no corpus: **42 dos 57 exemplos** transpilam (eram 14).
+    Medido no corpus: **44 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),

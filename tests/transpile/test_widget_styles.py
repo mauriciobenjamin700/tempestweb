@@ -25,13 +25,16 @@ def test_widget_styles_module_matches_core() -> None:
 
 
 def test_table_covers_button_combinations() -> None:
-    """The table carries a resolved style for every Button variant/size/scheme."""
+    """The table carries a resolved style for every Button variant/size/scheme.
+
+    A ``solid``/``md``/``primary`` button resolves a filled background — the
+    canonical case — in each mode, and the two modes differ. That difference is the
+    point of the mode axis: a table baked from one theme made every Mode C widget
+    render light whatever the app asked (tempestweb#106).
+    """
     table = build_table()
     button = table["Button"]
     assert set(button) == {"solid", "outline", "ghost", "link"}
-    # A solid/md/primary button resolves a filled background (the canonical case),
-    # in each mode — and the two differ, which is the point of the mode axis: a
-    # table baked from one theme made every Mode C widget render light (#106).
     solid = button["solid"]["md"]["primary"]
     assert set(solid) == {"light", "dark"}
     for mode in ("light", "dark"):

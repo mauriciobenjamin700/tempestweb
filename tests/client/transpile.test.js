@@ -360,6 +360,11 @@ test("a scroll wire event slides the window, and no handler is asked for it", ()
   assert.deepEqual(scrolls, []);
 });
 
+// The matrix runs every case twice: once light, once dark. That second half is
+// the whole guard for #106 — the tables were baked from the default theme, so a
+// component rendered light whatever the app asked, and a light-only matrix could
+// not see it because light was what it compared against. A port that forgets to
+// pass the theme down to a child fails here, on that child's colour.
 test("every ported component matches the core build (order-agnostic)", () => {
   const samples = fixture("transpile_component_samples.json");
   // Descendant keys are compared, the root's is not: the fixture nulls the
@@ -793,11 +798,6 @@ test("every ported component matches the core build (order-agnostic)", () => {
     tabs_second_lg: Tabs({ tabs: ["a", "b", "c"], active: 1, onSelect: noop, size: "lg", key: "k9" }),
     text_field_default: TextField({ onChange: noop, key: "k9" }),
   };
-  // Every case again in dark mode. This is the whole guard for #106: the tables
-  // were baked from the default theme, so a component rendered light whatever the
-  // app asked — and a light-only matrix could not see it, since light was what it
-  // compared against. A port that forgets to pass the theme down to a child fails
-  // here, on that child's colour.
   const cases = { ...casesFor(undefined) };
   for (const [name, built] of Object.entries(casesFor(new Theme({ mode: ThemeMode.DARK })))) {
     cases[`${name}__dark`] = built;

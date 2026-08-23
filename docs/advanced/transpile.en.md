@@ -606,6 +606,29 @@ spirit of `mypy --strict`.
 
     `examples/mode-c-components` exercises the whole batch in one app.
 
+!!! check "The forms a real app writes"
+    The subset takes what a real app writes, not just the counter's minimum:
+
+    - **annotation-only imports:** `from collections.abc import Callable` and
+      `from typing import Any` pass and cost **no JS import** — but using the name
+      as a *value* is an error (`'Any' is a type-only name`). A module-level type
+      alias (`Fetcher = Callable[[], None]`) is dropped too.
+    - **`from tempestweb.components import …`:** the import the
+      [components tutorial](../tutorial/components.md) teaches, routed to the same
+      served names. A name the client lacks is refused **by name**, not by module.
+    - **`[a, *rest]`** (the "new list without mutating" idiom), **destructured
+      targets** (`for i, (q, a) in enumerate(pairs)`), **`is` / `is not`**
+      (against `None` it emits `== null`, the right answer for a field never
+      assigned) and **`f"{n:02d}"`** (clock and scoreboard zero-padding, with the
+      sign kept outside the padding the way Python does it).
+    - **dataclasses as written:** a field with no default (`undefined` until
+      `make_state` fills it), `@dataclass(frozen=True)`, and
+      `field(default_factory=…)` with your own callable.
+    - **container conversions:** `list(xs)`, `tuple(xs)`, `set(xs)`,
+      `dict(pairs)`.
+
+    Measured on the corpus: **25 of 57 examples** transpile, up from 14.
+
 !!! tip "Always give a component an explicit `key`"
     A component's default key is its own name (`card`, `alert`, `navbar`), so two
     `Card`s under the same parent both answer to `card` and a patch addresses the
@@ -628,9 +651,9 @@ spirit of `mypy --strict`.
     structural ones above
     ([#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107) tracks
     what is left). Also out:
-    multi-loop or destructured comprehensions (`for k, v in …`), and f-string
-    format specs beyond the supported set (e.g. alignment `{x:>5}`, sign
-    `{x:+.2f}`, hex/bin `{x:x}`, dynamic `{x:.{n}f}`, the `!a` conversion).
+    comprehensions with **more than one** `for`, and f-string format specs beyond
+    the supported set (e.g. alignment `{x:>5}`, sign `{x:+.2f}`, hex/bin `{x:x}`,
+    dynamic `{x:.{n}f}`, the `!a` conversion).
 
     Using one of those names is now a **compile error** with `file:line`:
 

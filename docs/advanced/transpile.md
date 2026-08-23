@@ -604,6 +604,30 @@ no espírito do `mypy --strict`.
 
     `examples/mode-c-components` exercita o lote inteiro num app só.
 
+!!! check "As formas que o app real escreve"
+    O subset aceita o que um app de verdade escreve, não só o mínimo do counter:
+
+    - **import só de anotação:** `from collections.abc import Callable` e
+      `from typing import Any` passam e **não custam import nenhum** no JS — mas
+      usar o nome como *valor* é erro (`'Any' is a type-only name`). Alias de tipo
+      em nível de módulo (`Fetcher = Callable[[], None]`) também é descartado.
+    - **`from tempestweb.components import …`:** é o import que o
+      [tutorial de componentes](../tutorial/components.md) ensina, e roteia para
+      os mesmos nomes servidos. Nome que o cliente não tem é recusado **pelo
+      nome**, não pelo módulo.
+    - **`[a, *rest]`** (o idioma de "nova lista sem mutar"), **alvo destructurado**
+      (`for i, (q, a) in enumerate(pairs)`), **`is` / `is not`** (contra `None`
+      vira `== null`, que responde certo para campo nunca atribuído) e
+      **`f"{n:02d}"`** (zero-pad de relógio e placar — com o sinal fora do
+      preenchimento, como o Python faz).
+    - **dataclass do jeito real:** campo sem default (fica `undefined` até o
+      `make_state` preencher), `@dataclass(frozen=True)`, e
+      `field(default_factory=…)` com callable próprio.
+    - **conversão de container:** `list(xs)`, `tuple(xs)`, `set(xs)`,
+      `dict(pairs)`.
+
+    Medido no corpus: **25 dos 57 exemplos** transpilam (eram 14).
+
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),
     então dois `Card` sob o mesmo pai respondem os dois por `card` e o patch
@@ -626,9 +650,9 @@ no espírito do `mypy --strict`.
     diferente dos estruturais acima
     ([#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107)
     acompanha o que falta). Também
-    fora: comprehensions multi-loop ou com alvo desestruturado (`for k, v in …`),
-    e format-specs de f-string além dos suportados (ex.: alinhamento `{x:>5}`,
-    sinal `{x:+.2f}`, hex/bin `{x:x}`, dinâmico `{x:.{n}f}`, conversão `!a`).
+    fora: comprehension com **mais de um** `for`, e format-specs de f-string além
+    dos suportados (ex.: alinhamento `{x:>5}`, sinal `{x:+.2f}`, hex/bin `{x:x}`,
+    dinâmico `{x:.{n}f}`, conversão `!a`).
 
     Usar um desses nomes agora é **erro de compilação** com `arquivo:linha`:
 

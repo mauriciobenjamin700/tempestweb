@@ -159,6 +159,11 @@ def _view(rows: int) -> Any:  # noqa: ANN401 — returns the app's view callable
 async def _run_session(rows: int, events: int) -> tuple[CountingTransport, float]:
     """Drive one session through ``events`` interactions.
 
+    Each dispatch is followed by two bare ``sleep(0)`` yields, so the coalesced
+    rebuild and its send actually run — the way the server's loop does between two
+    client messages. Without them the loop would measure dispatch alone and report
+    a throughput no client can observe.
+
     Args:
         rows: Rows on the screen.
         events: How many click events to dispatch.
@@ -182,8 +187,6 @@ async def _run_session(rows: int, events: int) -> tuple[CountingTransport, float
         await session.dispatch(
             {"type": "click", "key": f"btn-{index % rows}", "payload": {}}
         )
-        # Let the coalesced rebuild and its send actually run, the way the server's
-        # loop does between two client messages.
         await asyncio.sleep(0)
         await asyncio.sleep(0)
     elapsed = time.perf_counter() - start

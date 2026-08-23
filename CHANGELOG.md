@@ -38,6 +38,22 @@ versioning.
   retipar, mudar semântica de patch → bump da versão + nota de migração).
   Regenerar fixture com valores novos **não** mexe no digest, que é o ponto.
 
+### Fixed
+
+- **O gate novo pegou duas violações críticas na primeira execução** — as duas
+  entraram na 0.98.0 e são exatamente a classe de coisa que ele existe para achar:
+
+  - **`aria-expanded` num `div` sem role é ARIA inválido** (`aria-allowed-attr`).
+    O `RouteDrawer` o escrevia; "expandido" descreve o **controle** que abre a
+    gaveta (o botão da app), não o painel. Fechado, o painel agora diz o que
+    é verdade sobre ele: `aria-hidden="true"`.
+  - **Controle embrulhado ficava sem nome acessível** (`label`). Um `<label>`
+    nomeia o input pelo **texto**; quando a app nomeia por `semantics`, o
+    `aria-label` cai no wrapper e não nomeia o controle dentro dele. O nome passa
+    a ser copiado para dentro — e só quando não há legenda visível, porque dois
+    nomes num controle é pior que um. `examples/settings-panel` ganhou o nome nos
+    seis controles que tinham só um `Text` ao lado.
+
 ### Changed
 
 - `docs/stability.md` (PT + EN) descreve o que o gate pega e o que fica para a

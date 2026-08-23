@@ -522,10 +522,12 @@ def test_route_drawer_says_whether_it_is_open() -> None:
     opened = render_to_html(
         RouteDrawer(child=Text(content="main"), drawer=Text(content="side"), open=True)
     )
-    assert 'aria-expanded="false"' in closed
+    # Closed: hidden from the accessibility tree, not `aria-expanded` — that
+    # attribute is invalid on a role-less div (axe: aria-allowed-attr).
+    assert 'aria-hidden="true"' in closed
     assert "data-tw-open" not in closed
-    assert 'aria-expanded="true"' in opened
     assert 'data-tw-open=""' in opened
+    assert "aria-hidden" not in opened
 
 
 def test_ssr_tag_table_matches_the_dom_renderer() -> None:

@@ -288,9 +288,14 @@ def _control_attributes(node: Node) -> list[str]:
             attributes.append(f'aria-label="{escape_attr(tabs[active])}"')
     elif node.type == "RouteDrawer":
         open_ = bool(props.get("open"))
-        attributes.append(f'aria-expanded="{"true" if open_ else "false"}"')
         if open_:
             attributes.append('data-tw-open=""')
+        else:
+            # `aria-expanded` is not allowed on a role-less div (axe:
+            # aria-allowed-attr). "Expanded" describes the control that toggles the
+            # drawer — the app's button. What this element can say is that it is
+            # hidden.
+            attributes.append('aria-hidden="true"')
     elif node.type == "Input":
         attributes.append(f'type="{"password" if props.get("secure") else "text"}"')
         if "value" in props:

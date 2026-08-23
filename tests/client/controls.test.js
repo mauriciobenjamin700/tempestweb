@@ -402,12 +402,16 @@ test("RouteDrawer reflects open, so the prop is visible to sheet and reader", ()
   });
 
   assert.equal(el.hasAttribute("data-tw-open"), false);
-  assert.equal(el.getAttribute("aria-expanded"), "false");
+  // Closed: hidden from the accessibility tree. Not `aria-expanded` — that is only
+  // allowed on a handful of roles, and this is a plain div, so axe flagged it as
+  // invalid ARIA (critical). "Expanded" describes the control that toggles the
+  // drawer, which is the app's own button.
+  assert.equal(el.getAttribute("aria-hidden"), "true");
 
   applyPatches(el, [{ path: [], set_props: { open: true } }]);
 
   assert.equal(el.hasAttribute("data-tw-open"), true);
-  assert.equal(el.getAttribute("aria-expanded"), "true");
+  assert.equal(el.hasAttribute("aria-hidden"), false);
   assert.equal(el.children.length, 2, "both IR children keep their indices");
 });
 
@@ -510,4 +514,35 @@ test("TabView keeps an aria-label the app set through semantics", () => {
   applyPatches(el, [{ path: [], set_props: { active: 1 } }]);
 
   assert.equal(el.getAttribute("aria-label"), "Profile sections");
+});
+
+
+test("a wrapped control takes the name the app gave the widget", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Switch",
+    key: "notify",
+    props: { checked: false, semantics: { label: "Enable notifications" } },
+    children: [],
+  });
+
+  // A <label> names its input through its text; an aria-label on the wrapper
+  // names the label, not the control inside it — so the control came out nameless
+  // (axe: `label`, critical). The name is copied inward.
+  assert.equal(el.querySelector("input").getAttribute("aria-label"), "Enable notifications");
+});
+
+test("a visible caption wins over the semantics name, and is not duplicated", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Switch",
+    key: "notify",
+    props: { checked: false, label: "Notifications", semantics: { label: "Other" } },
+    children: [],
+  });
+
+  // Two names on one control is worse than one, and the visible caption is the
+  // better name: it is what the reader sees.
+  assert.equal(el.querySelector("input").hasAttribute("aria-label"), false);
+  assert.equal(el.textContent.trim(), "Notifications");
 });

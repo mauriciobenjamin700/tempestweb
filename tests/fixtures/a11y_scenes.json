@@ -11485,7 +11485,11 @@
                                   "focusable": null,
                                   "label": "",
                                   "on_change": null,
-                                  "semantics": null,
+                                  "semantics": {
+                                    "hint": null,
+                                    "label": "Enable notifications",
+                                    "role": null
+                                  },
                                   "size": "md",
                                   "style": {
                                     "align": null,
@@ -11605,7 +11609,11 @@
                               "focusable": null,
                               "label": "Send e-mail alerts",
                               "on_change": null,
-                              "semantics": null,
+                              "semantics": {
+                                "hint": null,
+                                "label": "Send e-mail alerts",
+                                "role": null
+                              },
                               "size": "md",
                               "style": {
                                 "align": null,
@@ -11676,7 +11684,11 @@
                               "focusable": null,
                               "label": "Play sounds",
                               "on_change": null,
-                              "semantics": null,
+                              "semantics": {
+                                "hint": null,
+                                "label": "Play sounds",
+                                "role": null
+                              },
                               "size": "md",
                               "style": {
                                 "align": null,
@@ -12439,7 +12451,11 @@
                               "max_value": 30.0,
                               "min_value": 10.0,
                               "on_change": null,
-                              "semantics": null,
+                              "semantics": {
+                                "hint": null,
+                                "label": "Font size",
+                                "role": null
+                              },
                               "size": "md",
                               "step": 1.0,
                               "style": {
@@ -13277,7 +13293,11 @@
                               "max_value": 100.0,
                               "min_value": 0.0,
                               "on_change": null,
-                              "semantics": null,
+                              "semantics": {
+                                "hint": null,
+                                "label": "Playback volume",
+                                "role": null
+                              },
                               "size": "md",
                               "step": 1.0,
                               "style": {
@@ -13403,7 +13423,11 @@
                                   "focusable": null,
                                   "label": "",
                                   "on_change": null,
-                                  "semantics": null,
+                                  "semantics": {
+                                    "hint": null,
+                                    "label": "Auto-save drafts",
+                                    "role": null
+                                  },
                                   "size": "md",
                                   "style": {
                                     "align": null,

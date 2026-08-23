@@ -4,6 +4,50 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.102.0] — 2026-08-23
+
+### Added
+
+- **Gate de performance no CI**
+  ([#120](https://github.com/mauriciobenjamin700/tempestweb/issues/120)).
+  `benchmarks/bench_reconcile.py` existia e ninguém rodava: uma mudança que
+  dobrasse o custo de `diff` passava por todo o gate atual, porque ruff, mypy,
+  pytest e jsdom são de correção — nenhum de tempo.
+
+  `benchmarks/perf_gate.py` roda no CI e falha o job. O difícil num gate de perf
+  não é medir, é **não ser flake**: runner compartilhado varia mais do que as
+  regressões que valem pegar. Então ele afirma só o que sobrevive a máquina lenta:
+  **escala** (dobrar as linhas custa no máximo ~2,6× — `O(n²)` aparece perto de
+  4×, e a razão é imune à velocidade da máquina), **patch mínimo** (1 mudança → 2
+  patches; o jeito mais barato de fazer um diff parecer rápido é parar de estar
+  certo), **custo calibrado** (dividido por um laço medido no mesmo processo, com
+  tolerância de 1,8×) e **escala de sessões**.
+
+- **Throughput do Modo B** (`benchmarks/bench_ws_throughput.py`): mede o loop em
+  que o app vive — evento, handler, diff, lote no transporte — com uma sessão e
+  com N concorrentes. Medido: **o total fica praticamente constante** (~1.000
+  eventos/s nesta máquina) e a fatia por sessão divide. Ou seja, Modo B satura em
+  CPU no rebuild, dentro de um único event loop: escalar é mais processo, não mais
+  thread. O gate fixa essa forma — queda no total é contenção, não carga.
+
+- **Cold-start do Modo A** (`benchmarks/bench_cold_start.mjs` + workflow
+  `perf-cold-start.yml`): mede **cold** (sem SW/cache: Pyodide e core pela rede) e
+  **warm** (precache do SW) até a primeira árvore na tela. Roda em **schedule**, e
+  não em PR, porque um download de ~6 MB no caminho crítico de cada PR compra um
+  número que ninguém lê naquele momento.
+
+### Changed
+
+- `docs/advanced/observability.md` (PT + EN) documenta as três medidas e o porquê
+  de cada limite. `docs/roadmap.md`: S9 fecha.
+- `benchmarks/baseline.json` guarda o baseline calibrado, versionado; mudança
+  deliberada de custo usa `--update-baseline` e se justifica no PR.
+
+Gate verificado que morde, com teste por regra
+(`tests/unit/test_perf_gate.py`): `diff` escalando 4,1× reprova citando `O(n^2)`;
+1 patch em vez de 2 reprova; custo calibrado 2× reprova; ruído de 30% **passa**
+(era o requisito para o gate não ser desligado na primeira semana); e throughput
+total caindo a 0,30× reprova falando de contenção.
 ## [0.98.0] — 2026-08-23
 
 ### Fixed

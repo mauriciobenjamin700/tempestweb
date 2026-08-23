@@ -212,6 +212,21 @@ O mesmo `native` tipado dos Modos A/B funciona no Modo C — chamadas `async`
 transcritas para chamadas JS em processo à glue de browser compartilhada
 (`fetch`, IndexedDB/localStorage, `document.cookie`). Zero Python, zero rede.
 
+As três formas de import que o Python escreve chegam no mesmo lugar:
+
+```python
+from tempestweb import native                          # o namespace
+from tempestweb.native import storage, get_position    # grupo e função
+from tempestweb.native.geolocation import get_position  # o grupo como módulo
+```
+
+!!! warning "Capacidade que o Modo C não tem, dita na hora do build"
+    `camera` não tem fachada em processo — `camera.capture` precisa do Modo A
+    (Pyodide) ou B (servidor). Importá-la em Modo C é erro de compilação com
+    `arquivo:linha` dizendo isso, e não uma página que carrega e quebra ao
+    clicar. A lista viva do que a fachada serve é gerada do próprio
+    `client/transpile/native.js`.
+
 ```python
 from tempestweb import native
 
@@ -636,7 +651,14 @@ no espírito do `mypy --strict`.
     - **generator expression** (`any(x for x in xs)`), `any`/`all`, `dict.get`
       com default, e os predicados de `str` (`c.isdigit()`).
 
-    Medido no corpus: **26 dos 57 exemplos** transpilam (eram 14).
+    - **capacidade nativa, nas três formas de import:**
+      `from tempestweb import native`, `from tempestweb.native import storage`
+      e `from tempestweb.native.geolocation import get_position` caem todas no
+      mesmo objeto de `./native.js`. Grupo que a fachada não carrega (`camera`)
+      é recusado dizendo **qual modo o tem**, e membro desconhecido é recusado
+      **pelo nome** (`geolocation.triangulate`).
+
+    Medido no corpus: **31 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),

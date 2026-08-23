@@ -164,13 +164,25 @@ E o que mais aparece ao portar um app já pronto:
 is not supported (only tempest_core, `tempestweb.components` and `tempestweb.native`)
 ```
 
-O Modo C enxerga `tempest_core`, `tempestweb.components` e `tempestweb.native`.
+O Modo C enxerga `tempest_core`, `tempestweb.components` e `tempestweb.native`
+— este último nas três formas: `from tempestweb import native`,
+`from tempestweb.native import storage` e
+`from tempestweb.native.geolocation import get_position`. Já `import
+tempestweb.native` não: a mensagem diz qual forma escrever no lugar.
 Import de stdlib **só de anotação** (`collections.abc`, `typing`) também passa: o
 nome existe para o type-checker e não custa import nenhum no JS — mas usá-lo como
 **valor** é erro (`'Any' is a type-only name`), porque nada o importaria.
 
 Fora dessa lista, `tempestweb.presets` e `tempestweb.observability` não são
 alcançáveis: telas montadas com presets rodam nos Modos A e B, não em C.
+
+Capacidade nativa que o Modo C não tem em processo (`camera`) é recusada
+dizendo **qual modo a tem**:
+
+```text
+`camera` is not served in Mode C: the facade in `native.js` has no `camera`,
+so the capability needs Mode A (Pyodide) or Mode B (server)
+```
 
 Nome legal em módulo legal ainda pode faltar no cliente — aí o erro cita o
 **nome**, não o módulo:

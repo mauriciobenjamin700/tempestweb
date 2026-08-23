@@ -430,8 +430,12 @@ def test_runtime_methods_pass_through_unmapped() -> None:
     """Runtime/facade methods are emitted unchanged (no false mapping)."""
     # `app.replace` is the nav method, NOT string.replace.
     assert "app.replace(" in gen("def view(app):\n    app.replace(r)\n")
-    # `native.storage.get` is the storage capability, NOT dict.get.
-    js = gen("def f():\n    return native.storage.get('k')\n")
+    # `native.storage.get` is the storage capability, NOT dict.get — and the
+    # facade is recognized by what the module imported, not by the bare name.
+    js = gen(
+        "from tempestweb import native\n\n"
+        "def f():\n    return native.storage.get('k')\n"
+    )
     assert "native.storage.get(" in js
 
 

@@ -178,3 +178,90 @@ test("pointer gestures on a non-GestureDetector element are ignored", () => {
   incButton.dispatchEvent(new dom.window.MouseEvent("pointerup", { bubbles: true, clientX: 0, clientY: 0 }));
   assert.equal(transport.events.length, 0);
 });
+
+test("typing in a MaskedInput formats as you go, and reports the masked value", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const field = buildElement({
+    type: "MaskedInput",
+    key: "cpf",
+    props: { value: "", mask: "999.999.999-99", keyboard: "number" },
+    children: [],
+  });
+  dom.root.appendChild(field);
+  const transport = mockTransport();
+  bindEvents(dom.root, transport);
+
+  // The reader types four digits; the mask has to have put the dot in before the
+  // app is told what the field holds, or state and screen disagree.
+  field.value = "1234";
+  field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+  assert.equal(field.value, "123.4");
+  assert.deepEqual(transport.events.at(-1), {
+    type: "input",
+    key: "cpf",
+    payload: { value: "123.4" },
+  });
+});
+
+test("a masked value the app writes back is left alone", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const field = buildElement({
+    type: "MaskedInput",
+    key: "cpf",
+    props: { value: "529.982.247-25", mask: "999.999.999-99" },
+    children: [],
+  });
+  dom.root.appendChild(field);
+  bindEvents(dom.root, mockTransport());
+
+  // Re-masking an already-masked value must be a no-op, or every round trip
+  // through the app's state would chew the literals.
+  field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  assert.equal(field.value, "529.982.247-25");
+});
+
+test("an unmasked field is untouched by the masking pass", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const field = buildElement({
+    type: "Input",
+    key: "free",
+    props: { value: "" },
+    children: [],
+  });
+  dom.root.appendChild(field);
+  const transport = mockTransport();
+  bindEvents(dom.root, transport);
+
+  field.value = "1234";
+  field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+  assert.equal(field.value, "1234");
+  assert.deepEqual(transport.events.at(-1).payload, { value: "1234" });
+});
+
+test("typing in a TextArea reports its value like any other field", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const area = buildElement({
+    type: "TextArea",
+    key: "body",
+    props: { value: "", rows: 4 },
+    children: [],
+  });
+  dom.root.appendChild(area);
+  const transport = mockTransport();
+  bindEvents(dom.root, transport);
+
+  area.value = "a note";
+  area.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+  assert.deepEqual(transport.events.at(-1), {
+    type: "input",
+    key: "body",
+    payload: { value: "a note" },
+  });
+});

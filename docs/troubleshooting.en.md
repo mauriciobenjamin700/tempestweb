@@ -193,6 +193,46 @@ is not available in Mode C (the transpile client exports no such name)
 
 Reference: [Mode C — transpile](advanced/transpile.md).
 
+### The field will not take typing, or the grid renders one column
+
+Three declared widgets the renderer drew as an anonymous `div` — in **all three
+modes**, since `client/dom.js` is shared:
+
+- **`TextArea`** became a `div` shaped like a field (the base sheet styles by
+  `[data-tw-type]`) with nothing to focus. Fixed in 0.94.0: it is a `<textarea>`,
+  with `rows` and `maxlength`.
+- **`MaskedInput`** became a dead rectangle — CPF, phone and postcode did not
+  exist. It is an `<input>` now, formatted as you type (`9` digit, `A` letter,
+  everything else a literal), with the caret left where the reader put it.
+- **`LazyGrid.columns`** was declared and never read: a three-column gallery
+  rendered one item per row. It is `display: grid` +
+  `grid-template-columns: repeat(N, minmax(0, 1fr))` now, and the virtualizer
+  reserves space by **row** instead of by item.
+
+With them came the reason a masked field still swallowed everything after
+becoming an `<input>`: the Mode C builder mapped those widgets' `on_change` to
+**`click`**. The list of "real form controls" was hand-written next to the
+generator and drifts silently; it is derived from the renderer's tag table now.
+That also fixes `PinInput`, which had the same defect.
+
+If you see this, update:
+
+```bash
+uv add "tempestweb>=0.94.0"
+```
+
+---
+
+### `setattr is not defined` (Mode C)
+
+`setattr(obj, name, value)` was only ported in the
+`lambda s: setattr(s, "field", v)` shape with a **constant** name. With a computed
+name — inside a `def mutate(...)` — it emitted a call to a `setattr` that does not
+exist. Measured in `examples/br-cadastro`, whose whole address block was inert.
+Fixed in 0.94.0, along with `getattr`.
+
+---
+
 ### `object is not iterable` or `X.pop is not a function` (Mode C)
 
 A click dies in the console and the screen does not change. It is a **dict**

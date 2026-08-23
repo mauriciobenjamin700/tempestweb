@@ -90,6 +90,49 @@ test("refresh writes proportional spacer rules for the full item_count", () => {
   assert.match(sheet.textContent, /::after\{content:"";display:block;flex:0 0 auto;height:18600px\}/);
 });
 
+test("a grid reserves space by row, and its spacers span the row", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  const children = [];
+  for (let i = 0; i < 12; i++) {
+    children.push({ type: "Text", key: String(i), props: { content: String(i) }, children: [] });
+  }
+  const el = buildElement({
+    type: "LazyGrid",
+    key: "G",
+    props: { item_count: 90, window_size: 12, columns: 3, window: [0, 12] },
+    children,
+  });
+  dom.root.appendChild(el);
+  for (const child of el.children) {
+    Object.defineProperty(child, "offsetHeight", { value: 40, configurable: true });
+  }
+  const v = installVirtualization(dom.root, transportNoop());
+  v.refresh();
+
+  // 78 items off-window over 3 columns is 26 rows, not 78: reserving per item
+  // would make the scrollbar describe a list three times too long.
+  const sheet = dom.document.getElementById("tw-virt-styles").textContent;
+  assert.match(sheet, /::after\{[^}]*height:1040px\}/);
+  // A pseudo-element takes a grid *cell* unless it is told to span the row.
+  assert.match(sheet, /::after\{[^}]*grid-column:1\/-1;/);
+  assert.match(sheet, /::before\{[^}]*grid-column:1\/-1;/);
+});
+
+test("a single-column list keeps the arithmetic it always had", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  globalThis.CSS = dom.window.CSS;
+  lazyViewport(dom, { count: 100, windowSize: 10, start: 10, rendered: 10, h: 20 });
+  const v = installVirtualization(dom.root, transportNoop());
+  v.refresh();
+  const sheet = dom.document.getElementById("tw-virt-styles").textContent;
+  assert.match(sheet, /::before\{[^}]*height:200px\}/);
+  assert.match(sheet, /::after\{[^}]*height:1600px\}/);
+  assert.ok(!sheet.includes("grid-column"), "no grid rule for a plain list");
+});
+
 test("the spacers refuse to shrink, or the scrollbar describes only the window", () => {
   const dom = freshDom();
   globalThis.document = dom.document;

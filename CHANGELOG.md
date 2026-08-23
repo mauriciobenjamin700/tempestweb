@@ -4,6 +4,53 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.94.0] — 2026-08-23
+
+Três widgets declarados que o renderizador desenhava como `div` anônimo. Vale nos
+**três modos** — `client/dom.js` é o renderizador compartilhado —, e é a mesma
+classe do `IconButton` (#109): o nó existe com a chave certa, então nenhum teste
+via, e a caixa parecia certa numa captura.
+
+### Fixed
+
+- **`TextArea` renderiza um `<textarea>`**
+  ([#130](https://github.com/mauriciobenjamin700/tempestweb/issues/130)), com
+  `value`, `placeholder`, `rows` e `maxlength`. Era um `div` com cara de campo e
+  nada para focar: `FORM_CONTROL_TAGS` e `payloadFor` já estavam prontos para o
+  `<textarea>` que nunca era criado.
+- **`MaskedInput` renderiza um `<input>` e aplica a máscara**
+  ([#136](https://github.com/mauriciobenjamin700/tempestweb/issues/136)). A
+  notação é a do core (`9` dígito, `A` letra, o resto literal); a formatação roda
+  antes de o valor ser lido, para estado e tela concordarem, e o cursor é
+  recolocado contando os caracteres **preenchíveis** que o precedem — senão
+  digitar o sexto dígito de um CPF jogaria o cursor três casas atrás. Re-mascarar
+  um valor já mascarado é no-op, senão cada ida e volta pelo estado comeria os
+  literais.
+- **`LazyGrid.columns` é aplicado**
+  ([#132](https://github.com/mauriciobenjamin700/tempestweb/issues/132)):
+  `display: grid` + `grid-template-columns: repeat(N, minmax(0, 1fr))`. A reserva
+  de espaço da virtualização passou a contar **linhas** (`ceil(itens/colunas)`) e
+  os spacers, que são pseudo-elementos, ganharam `grid-column: 1 / -1` — sem isso
+  ocupariam uma célula e a barra de rolagem descreveria uma lista N vezes maior.
+- **O `on_change` de um controle de formulário ia para `click` no Modo C.** A
+  lista de "controle de verdade" era escrita à mão ao lado do gerador, então
+  driftou assim que o renderizador aprendeu um controle novo — e o drift é mudo:
+  o campo renderiza, aceita digitação e nunca avisa a app. Agora é derivada da
+  tabela de tags do renderizador. Conserta `MaskedInput`, `TextArea` e também
+  `PinInput`, que já estava assim.
+- **`setattr(obj, nome, valor)` com nome computado** só era portado na forma
+  `lambda s: setattr(s, "campo", v)` com nome constante; fora dela emitia uma
+  chamada a um `setattr` inexistente. Medido no `examples/br-cadastro`, cujo
+  bloco de endereço inteiro era inerte. `getattr` ganhou o mesmo tratamento.
+
+### Auditoria
+
+O `TAG_BY_TYPE` foi auditado contra os widgets de IR interativos do core, como a
+#130 pedia. **Treze** têm o mesmo defeito latente; três saem aqui, e os dez
+restantes ficam registrados: `Autocomplete`, `DatePicker`, `Dropdown`,
+`FilePicker`, `RangeSlider`, `RouteDrawer`, `Slider`, `Switch`, `TabBar`,
+`TabView`. Nenhum tem regra na folha base nem ramo em `events.js`.
+
 ## [0.93.0] — 2026-08-23
 
 ### Added

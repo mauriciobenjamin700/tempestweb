@@ -324,6 +324,42 @@ def test_form_samples_fixture_matches_core() -> None:
     )
 
 
+def test_a_form_control_binds_its_change_to_input_not_click() -> None:
+    """Every widget the renderer draws as a form control reports its edits.
+
+    The list of "real form controls" used to be hand-written next to the
+    generator, so it drifted the moment the renderer learned a new one — and the
+    drift is silent: the builder maps ``on_change`` to ``click``, so the field
+    renders, accepts typing, and never tells the app. Measured on the CEP field
+    of ``examples/br-cadastro``, which swallowed every keystroke.
+
+    It is derived from ``client/dom.js``'s tag table now, which is why
+    ``MaskedInput``, ``TextArea`` and ``PinInput`` are in it.
+    """
+    module = widgets_gen.WIDGETS_MODULE.read_text(encoding="utf-8")
+    for name in ("Input", "MaskedInput", "TextArea", "PinInput"):
+        builder = module[module.index(f"export function {name}(") :]
+        handlers = builder[builder.index("__handlers:") : builder.index("\n}")]
+        assert '"input": onChange' in handlers, f"{name} does not report typing"
+        assert '"click": onChange' not in handlers, f"{name} still reports a click"
+
+
+def test_the_native_input_list_tracks_the_renderer() -> None:
+    """The list is derived, so a new form control cannot be forgotten."""
+    dom = (widgets_gen.WIDGETS_MODULE.parent / "..").resolve() / "dom.js"
+    table = dom.read_text(encoding="utf-8")
+    start = table.index("const TAG_BY_TYPE = Object.freeze({")
+    tagged = dict(
+        re.findall(
+            r'^\s*(\w+): "(\w+)"', table[start : table.index("});", start)], re.M
+        )
+    )
+    controls = {
+        n for n, tag in tagged.items() if tag in {"input", "textarea", "select"}
+    }
+    assert controls <= widgets_gen._NATIVE_INPUT_TYPES
+
+
 def test_the_lazy_scrollers_are_served() -> None:
     """A virtualized list is a widget the compiler must accept by name."""
     for name in ("LazyColumn", "LazyRow", "LazyGrid"):

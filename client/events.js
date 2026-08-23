@@ -24,6 +24,7 @@ import {
   ITEM_ATTR,
   ITEM_VALUE_ATTR,
   KEY_ATTR,
+  MASK_ATTR,
   PIN_LENGTH_ATTR,
   REORDER_ATTR,
   TYPE_ATTR,
@@ -374,6 +375,88 @@ function keyedAncestor(target, root) {
  * @param {EventTarget|null} target  The event target.
  * @returns {{value?: string}}  The TWEvent `payload` ({ value } for input/change, else {}).
  */
+/**
+ * Format `raw` against a `MaskedInput`'s mask.
+ *
+ * The core's notation: `9` is a required digit, `A` a required letter, and every
+ * other character is a fixed literal (`"999.999.999-99"`). Input characters that
+ * cannot fill the next slot are dropped, and a trailing literal is only emitted
+ * while there is more input to place — so a half-typed CPF reads `123.4`, not
+ * `123.4..-`.
+ *
+ * @param {string} mask  The mask pattern.
+ * @param {string} raw   What the field currently holds.
+ * @returns {string}     The masked text.
+ */
+export function applyMask(mask, raw) {
+  if (!mask) {
+    return String(raw ?? "");
+  }
+  const chars = [...String(raw ?? "")];
+  let out = "";
+  let index = 0;
+  for (const slot of mask) {
+    if (index >= chars.length) {
+      break;
+    }
+    if (slot === "9" || slot === "A") {
+      const wanted = slot === "9" ? /[0-9]/ : /[A-Za-z]/;
+      while (index < chars.length && !wanted.test(chars[index])) {
+        index += 1;
+      }
+      if (index >= chars.length) {
+        break;
+      }
+      out += chars[index];
+      index += 1;
+    } else {
+      out += slot;
+      if (chars[index] === slot) {
+        index += 1;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Rewrite a masked field in place, keeping the caret where the reader left it.
+ *
+ * The caret is re-placed by counting how many *fillable* characters precede it,
+ * because the mask inserts literals: typing the sixth digit of a CPF must leave
+ * the caret after `123.456`, not three characters back where the raw offset would
+ * put it. A caret at the end stays at the end.
+ *
+ * @param {HTMLInputElement} target  The field being edited.
+ * @returns {void}
+ */
+function reformatMasked(target) {
+  const mask = target.getAttribute?.(MASK_ATTR);
+  if (!mask) {
+    return;
+  }
+  const before = String(target.value ?? "");
+  const caret = target.selectionStart ?? before.length;
+  const fillable = [...before.slice(0, caret)].filter((c) => /[0-9A-Za-z]/.test(c)).length;
+  const masked = applyMask(mask, before);
+  if (masked === before) {
+    return;
+  }
+  target.value = masked;
+  let seen = 0;
+  let position = masked.length;
+  for (let i = 0; i < masked.length; i += 1) {
+    if (/[0-9A-Za-z]/.test(masked[i])) {
+      seen += 1;
+      if (seen === fillable) {
+        position = i + 1;
+        break;
+      }
+    }
+  }
+  target.setSelectionRange?.(position, position);
+}
+
 function payloadFor(domType, target) {
   if (domType === "input" || domType === "change") {
     const value = target && "value" in target ? target.value : undefined;
@@ -417,6 +500,11 @@ export function bindEvents(root, transport) {
       const key = keyedAncestor(event.target, root);
       if (key == null) {
         return;
+      }
+      if (domType === "input") {
+        // The mask is applied before the value is read, so the app's state and
+        // the field agree on what the reader sees.
+        reformatMasked(event.target);
       }
       transport.sendEvent({
         type: EVENT_TYPES[domType],

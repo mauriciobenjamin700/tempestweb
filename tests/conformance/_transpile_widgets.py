@@ -17,6 +17,7 @@ regenerable-golden guarantee as the wire fixtures — never hand-typed.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -31,10 +32,40 @@ WIDGETS_MODULE: Path = CLIENT_DIR / "widgets.gen.js"
 
 _NONE = "_"
 
+
 # IR types the shared renderer (client/dom.js TAG_BY_TYPE) renders as a native
 # form control that fires DOM `input`/`change`. Every other widget is a div/span
 # whose interaction is a `click`, so a change/toggle handler on it binds to click.
-_NATIVE_INPUT_TYPES: frozenset[str] = frozenset({"Input", "Checkbox"})
+def _native_input_types() -> frozenset[str]:
+    """Widgets the DOM renderer draws as a real form control.
+
+    Derived from ``client/dom.js``'s tag table rather than hand-listed, because a
+    hand-list drifts the moment the renderer learns a new control — and the drift
+    is silent: the builder maps ``on_change`` to ``click``, so the widget renders,
+    accepts typing, and never tells the app. Measured on ``MaskedInput``, whose
+    CEP field in ``examples/br-cadastro`` swallowed every keystroke.
+
+    ``Checkbox`` is included explicitly: it renders as a ``<label>`` wrapping a
+    real checkbox input, so the tag alone does not say it.
+
+    Returns:
+        The IR type names whose ``on_change`` binds to ``input``/``change``.
+    """
+    dom = (Path(__file__).resolve().parents[2] / "client" / "dom.js").read_text(
+        encoding="utf-8"
+    )
+    start = dom.index("const TAG_BY_TYPE = Object.freeze({")
+    table = dom[start : dom.index("});", start)]
+    controls = {"input", "textarea", "select"}
+    names = {
+        name
+        for name, tag in re.findall(r'^\s*(\w+): "(\w+)"', table, re.M)
+        if tag in controls
+    }
+    return frozenset(names | {"Checkbox"})
+
+
+_NATIVE_INPUT_TYPES: frozenset[str] = _native_input_types()
 
 # Handler props whose DOM event is fixed regardless of the widget's rendered tag.
 _FIXED_HANDLER_EVENTS: dict[str, list[str]] = {

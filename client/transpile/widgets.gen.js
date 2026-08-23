@@ -976,7 +976,7 @@ export function MaskedInput({ key = null, colorScheme = "primary", fieldVariant 
       value: value,
     },
     children: [],
-    __handlers: { "click": onChange },
+    __handlers: { "input": onChange, "change": onChange },
   };
 }
 
@@ -1124,7 +1124,7 @@ export function PinInput({ key = null, colorScheme = "primary", fieldVariant = "
       value: value,
     },
     children: [],
-    __handlers: { "click": onChange, "complete": onComplete },
+    __handlers: { "input": onChange, "change": onChange, "complete": onComplete },
   };
 }
 
@@ -1734,7 +1734,7 @@ export function TextArea({ key = null, colorScheme = "primary", fieldVariant = "
       value: value,
     },
     children: [],
-    __handlers: { "click": onChange },
+    __handlers: { "input": onChange, "change": onChange },
   };
 }
 

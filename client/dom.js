@@ -42,6 +42,15 @@ const TAG_BY_TYPE = Object.freeze({
   // leaf, so no patch path descends into it.
   IconButton: "button",
   Input: "input",
+  // A TextArea is a multi-line field. It rendered as an anonymous <div>: the base
+  // sheet styles by [data-tw-type], so it *looked* like a field at the right size
+  // and had nothing to focus and no input event to fire. `FORM_CONTROL_TAGS` and
+  // `payloadFor` were already ready for the <textarea> that was never created.
+  TextArea: "textarea",
+  // A MaskedInput is an <input> the renderer formats as the reader types; the
+  // mask travels as a data attribute so events.js can apply it. Rendering it as a
+  // div left CPF, phone and CEP as dead rectangles in every mode.
+  MaskedInput: "input",
   // A PinInput is a one-time-code field: a single <input> with the browser's own
   // autofill hint and a length cap, spaced out by the base sheet so it reads as a
   // code box. It rendered as an anonymous div before — declared, and invisible.
@@ -481,6 +490,9 @@ export const CAMERA_ATTR = "data-tw-camera";
 /** Attribute holding a `PinInput`'s expected code length. */
 export const PIN_LENGTH_ATTR = "data-tw-length";
 
+/** Attribute holding a `MaskedInput`'s mask, which events.js applies as you type. */
+export const MASK_ATTR = "data-tw-mask";
+
 /** Attribute holding a `FormField`'s field name, reported with its validation. */
 export const FIELD_ATTR = "data-tw-field";
 
@@ -851,6 +863,16 @@ function applyLazyProps(el, type, props) {
   }
   if ("window_size" in props) {
     setOrRemove(el, "data-tw-window-size", props.window_size);
+  }
+  if (type === "LazyGrid" && "columns" in props) {
+    // `columns` was declared and never read: a three-column gallery rendered one
+    // item per row. The spacers virtualize.js reserves are ::before/::after, so
+    // they take a grid cell — `grid-column: 1 / -1` in the base sheet keeps them
+    // spanning the row, and the reserved extent stays proportional.
+    const columns = Math.max(1, Math.trunc(Number(props.columns) || 1));
+    el.style.display = "grid";
+    el.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+    el.setAttribute("data-tw-columns", String(columns));
   }
   const start = Array.isArray(props.window) ? props.window[0] : 0;
   el.setAttribute("data-tw-window-start", String(start ?? 0));
@@ -1283,6 +1305,30 @@ function applyControlProps(el, type, props) {
     }
     if ("max_length" in props) {
       setOrRemove(el, "maxlength", props.max_length);
+    }
+  } else if (type === "TextArea") {
+    if ("value" in props) {
+      el.value = props.value == null ? "" : String(props.value);
+    }
+    if ("placeholder" in props) {
+      setOrRemove(el, "placeholder", props.placeholder);
+    }
+    if ("rows" in props) {
+      setOrRemove(el, "rows", props.rows);
+    }
+    if ("max_length" in props) {
+      setOrRemove(el, "maxlength", props.max_length);
+    }
+  } else if (type === "MaskedInput") {
+    applyInputType(el, props);
+    if ("mask" in props) {
+      setOrRemove(el, MASK_ATTR, props.mask);
+    }
+    if ("value" in props) {
+      el.value = props.value == null ? "" : String(props.value);
+    }
+    if ("placeholder" in props) {
+      setOrRemove(el, "placeholder", props.placeholder);
     }
   } else if (type === "PinInput") {
     applyPinProps(el, props);

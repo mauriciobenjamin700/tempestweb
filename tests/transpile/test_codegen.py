@@ -985,6 +985,28 @@ def test_the_repos_own_field_layer_is_served() -> None:
     assert 'import { EmailField, LoginForm } from "./widgets.js";' in js
 
 
+def test_setattr_with_a_computed_name_becomes_an_indexed_write() -> None:
+    """`setattr(obj, name, value)` outside a lambda emitted a call to nothing.
+
+    Only the `lambda s: setattr(s, "field", v)` shape with a *constant* name was
+    handled, so a dynamic name inside a `def mutate(...)` compiled into a call to
+    an undefined `setattr` and threw `setattr is not defined` on the first edit.
+    Measured in `examples/br-cadastro`, whose whole address block was inert.
+    """
+    js = gen(
+        "def f(state, field_name, value):\n"
+        "    setattr(state.address, field_name, value)\n"
+    )
+    assert "state.address[field_name] = value;" in js
+    assert "setattr(" not in js
+
+
+def test_getattr_with_a_default_reads_through_the_same_indexing() -> None:
+    """`getattr(obj, name, default)` is the read side of the same hole."""
+    js = gen('def f(obj, name):\n    return getattr(obj, name, "")\n')
+    assert 'obj[name] ?? ""' in js
+
+
 def test_a_dataclass_default_factory_of_a_dataclass_is_constructed() -> None:
     """`field(default_factory=Nested)` builds the nested state with `new`.
 

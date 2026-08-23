@@ -308,6 +308,36 @@ Fixed in 0.98.0 — each becomes the equivalent native control (see
 uv add "tempestweb>=0.98.0"
 ```
 
+### Dark mode changes nothing in Mode C
+
+The app calls `app.set_theme(Theme(mode=ThemeMode.DARK))`, Mode B goes dark, and
+the same transpiled artifact stays light. Two causes, both fixed in 0.99.0:
+
+- **The generated style tables had no mode axis.** Mode C has no Python, so each
+  widget's resolved style travels as a generated table — and it was generated
+  with the default theme. Since an inline style beats the stylesheet, the half
+  with precedence was the half rendering light.
+- **The builder refused the `theme` kwarg.** There was no way to even *ask* for
+  dark: `Button(theme=app.theme)` compiled to a builder that did not name
+  `theme`, so Mode C dropped it while Modes A/B resolved correctly — the same
+  `view`, two results.
+
+```bash
+uv add "tempestweb>=0.99.0"
+```
+
+!!! note "Pass the theme to the widget"
+    The theme is a **field on the widget**, not ambient: `Button(label="x",
+    theme=app.theme)`. Without it the widget resolves the light palette in all
+    three modes — that is the core's rule, not a Mode C detail. See
+    [Theming](tutorial/theming.md#dark-mode-pass-the-theme-to-the-widget).
+
+!!! warning "The base sheet is still light"
+    An `Input`'s background, the page background and the hover/focus states come
+    from the `--tw-*` tokens, which have no mode axis — in a dark app the field
+    shows up white. Tracked in
+    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+
 ---
 
 ### `setattr is not defined` (Mode C)

@@ -336,6 +336,69 @@ The two ends the host covers:
     If runtime switching is the heart of your app, declare `THEME` with the
     palette it opens on.
 
+## Dark mode: pass the theme to the widget
+
+A **styled** widget resolves its own colours from the theme it carries — from its
+`theme` field, not from an ambient theme. Which is why the idiom is one line:
+
+```python
+Button(label="Save", theme=app.theme, on_click=save)
+```
+
+Pass `app.theme` and the whole tree follows `app.set_theme(...)`; leave it out and
+the widget resolves the **light** palette, even with the app in dark mode. The
+same in all three modes.
+
+```python
+from tempest_core import App, Card, Column, Text, Theme, ThemeMode, Widget
+
+
+def view(app: App[State]) -> Widget:
+    """Draw a card that follows the app's theme."""
+    theme: Theme = app.theme
+    return Column(
+        key="body",
+        children=[
+            Card(
+                key="card",
+                theme=theme,
+                children=[Text(content="Follows the theme", key="label")],
+            ),
+        ],
+    )
+
+
+def go_dark(app: App[State]) -> None:
+    """Swap the app's theme, which re-resolves every widget that got it."""
+    app.set_theme(Theme(mode=ThemeMode.DARK))
+```
+
+!!! note "A layout widget has no `theme`"
+    `Row`, `Column` and `Text` carry no colour of their own, so the core gives
+    them no such field — passing `theme=` raises `ValidationError` naming it. The
+    colour they show is the one they inherit from the styled box around them.
+
+!!! tip "A component propagates the way the core propagates"
+    An `EmailInput` **is** the field: it hands its theme to the `Input` it builds.
+    A `SearchBar` or a `TextField` **composes** one and layers the style it
+    resolved on top, so the inner field keeps the default palette — and Mode C
+    reproduces that distinction component by component, pinned by a parity matrix
+    in both modes.
+
+!!! info "Mode C: the generated tables carry a mode axis since 0.99.0"
+    Mode C has no Python, so each widget's resolved style travels as a generated
+    table. Up to 0.98.0 those tables were baked from the default theme: every
+    transpiled widget and component rendered **light**, and since an inline style
+    beats the stylesheet, the half with precedence was the half that failed. The
+    table now carries both modes and the builder picks by `theme.is_dark()`.
+
+!!! warning "The base sheet is still light"
+    What the inline `Style` resolves follows the theme; what only the **base
+    sheet** paints (an `Input`'s background, the page background, hover and focus
+    states) stays on the light palette, because the `--tw-*` tokens have no mode
+    axis. In a dark app that shows up as a white field inside a dark card. Tracked
+    in [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+
 ## Progress indicators
 
 `ProgressBar` and `Spinner` have no intrinsic size: with no stylesheet both

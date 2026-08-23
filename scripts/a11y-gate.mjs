@@ -32,16 +32,24 @@ const BLOCKING = new Set(["serious", "critical"]);
  * Violations accepted for a stated reason, keyed by axe rule id.
  *
  * An exception is a decision with an owner, not a mute button: each one says why
- * the rule cannot apply to a scene built this way, and a rule that stops being
- * violated is removed from here (the gate reports an exception that no longer
- * fires, so the list cannot rot).
+ * the rule cannot apply to a scene built this way. The blocking pass disables
+ * them — a disabled rule produces no result at all — so `staleExceptions` runs a
+ * second pass with only these enabled and reports the ones that no longer fire
+ * anywhere. Without that pass the list could not rot loudly, only silently.
  */
 const KNOWN_EXCEPTIONS = {
-  "landmark-one-main": "a scene is one screen's tree, not a whole document",
-  "page-has-heading-one": "the same: a screen fragment carries no document outline",
-  region: "every node lands in the mount root, which is not a landmark by itself",
   "color-contrast": "needs real layout; the Lighthouse layer owns contrast",
 };
+
+/**
+ * Exceptions the staleness pass cannot judge, and why.
+ *
+ * `color-contrast` needs a laid-out box to sample colours from, which jsdom does
+ * not produce: axe returns it as incomplete rather than as a violation, so its
+ * silence here says nothing about whether the rule still applies. Reporting it as
+ * stale would teach the reader to ignore the report.
+ */
+const NOT_EVALUABLE = new Set(["color-contrast"]);
 
 /**
  * Load the generated scenes.
@@ -109,6 +117,77 @@ export async function auditScene(name, node) {
 }
 
 /**
+ * The excepted rules the staleness pass can actually judge.
+ *
+ * @returns {Array<string>}  The rule ids to re-enable in the second pass.
+ */
+function evaluableExceptions() {
+  return Object.keys(KNOWN_EXCEPTIONS).filter((rule) => !NOT_EVALUABLE.has(rule));
+}
+
+/**
+ * Run one scene with only the excepted rules enabled.
+ *
+ * @param {Object} node  The serialized IR node.
+ * @returns {Promise<Set<string>>}  The excepted rule ids that fired on it.
+ */
+async function firedExceptions(node) {
+  const { window, root } = mountScene(node);
+  const previousWindow = globalThis.window;
+  globalThis.window = window;
+  globalThis.document = window.document;
+  try {
+    const results = await axe.run(root, {
+      resultTypes: ["violations"],
+      runOnly: { type: "rule", values: evaluableExceptions() },
+    });
+    return new Set(results.violations.map((violation) => violation.id));
+  } finally {
+    globalThis.window = previousWindow;
+  }
+}
+
+/**
+ * Report every exception that no longer fires on any scene.
+ *
+ * This is what keeps `KNOWN_EXCEPTIONS` from rotting: an entry that stopped being
+ * violated is a decision nobody needs any more, and a mute button nobody notices.
+ * It reports rather than fails — a stale exception is untidy, not broken.
+ *
+ * @param {Object<string, Object>} scenes  Scene name -> serialized IR.
+ * @returns {Promise<Array<string>>}  The stale rule ids, in listed order.
+ */
+export async function staleExceptions(scenes) {
+  const candidates = evaluableExceptions();
+  if (candidates.length === 0) {
+    return [];
+  }
+  const fired = new Set();
+  for (const node of Object.values(scenes)) {
+    for (const rule of await firedExceptions(node)) {
+      fired.add(rule);
+    }
+  }
+  return candidates.filter((rule) => !fired.has(rule));
+}
+
+/**
+ * Print the staleness report, when there is one.
+ *
+ * @param {Object<string, Object>} scenes  Scene name -> serialized IR.
+ * @returns {Promise<void>}
+ */
+async function reportStaleExceptions(scenes) {
+  const stale = await staleExceptions(scenes);
+  if (stale.length === 0) {
+    return;
+  }
+  console.log(
+    `\nKNOWN_EXCEPTIONS no longer violated by any scene — drop them: ${stale.join(", ")}`,
+  );
+}
+
+/**
  * Audit every scene and report.
  * @returns {Promise<number>}  The process exit code.
  */
@@ -122,6 +201,8 @@ export async function runGate() {
     console.log(`  ${name}: ${mark}`);
     blocking.push(...violations);
   }
+
+  await reportStaleExceptions(scenes);
 
   if (blocking.length === 0) {
     console.log(`\naxe-core: no serious or critical violation in ${Object.keys(scenes).length} scenes.`);

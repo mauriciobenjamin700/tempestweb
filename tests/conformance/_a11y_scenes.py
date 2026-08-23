@@ -15,6 +15,13 @@ The scenes are chosen for markup diversity, not for count: the component gallery
 (every ported component on one page), the control panel (switch/slider/checkbox/
 radio), a list with a text field, a form, a nav shell with a drawer, and a media
 screen. A regression in any of those is a regression a person would hit.
+
+Diversity is measured by **widget type**, not by screen count, and the first six
+scenes missed seven of the controls that had just learned to speak — the range
+slider, the dropdown, the autocomplete, both pickers, the file picker and the tab
+bar. Adding the three screens that carry them found two more critical violations
+immediately, so a control that reports an event belongs in a scene: that is what
+makes the gate's silence mean something.
 """
 
 from __future__ import annotations
@@ -41,6 +48,9 @@ SCENES: dict[str, str] = {
     "login-form": "a form with labelled fields and a submit",
     "router-drawer": "a nav shell: app bar, drawer, breadcrumb",
     "image-gallery": "images, which is where alt text is either there or not",
+    "booking-form": "the pickers, the dropdown, the range slider, the file picker",
+    "search-autocomplete": "a text field backed by a datalist",
+    "tabs-profile": "a tab bar and the panel it switches",
 }
 
 

@@ -155,6 +155,32 @@ test("RangeSlider draws two thumbs and reports the pair, normalized", () => {
   });
 });
 
+// The RangeSlider wrapper is a role-less <div>, so its aria-label names nothing a
+// reader can reach. axe flagged both thumbs as critical (rule `label`) even with
+// semantics.label set on the widget, because the name stopped at the wrapper.
+test("RangeSlider names both thumbs, so neither is an unnamed control", () => {
+  const named = mountWidget("RangeSlider", "fare", {
+    low: 1,
+    high: 9,
+    min_value: 0,
+    max_value: 10,
+    semantics: { label: "Fare window" },
+  });
+  const namedThumbs = named.el.querySelectorAll("input[type=range]");
+  assert.equal(namedThumbs[0].getAttribute("aria-label"), "Fare window (minimum)");
+  assert.equal(namedThumbs[1].getAttribute("aria-label"), "Fare window (maximum)");
+
+  const bare = mountWidget("RangeSlider", "span", {
+    low: 1,
+    high: 9,
+    min_value: 0,
+    max_value: 10,
+  });
+  const bareThumbs = bare.el.querySelectorAll("input[type=range]");
+  assert.equal(bareThumbs[0].getAttribute("aria-label"), "Minimum");
+  assert.equal(bareThumbs[1].getAttribute("aria-label"), "Maximum");
+});
+
 test("Dropdown renders its options, its placeholder, and reports a selection", () => {
   const { dom, el, transport } = mountWidget("Dropdown", "theme", {
     options: ["System", "Light", "Dark"],

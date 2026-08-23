@@ -472,6 +472,18 @@ def test_range_slider_renders_both_thumbs() -> None:
     assert html.count('type="range"') == 2
 
 
+def test_range_slider_names_both_thumbs() -> None:
+    named = render_to_html(
+        RangeSlider(low=20.0, high=80.0, semantics=Semantics(label="Fare window"))
+    )
+    assert 'aria-label="Fare window (minimum)"' in named
+    assert 'aria-label="Fare window (maximum)"' in named
+
+    bare = render_to_html(RangeSlider(low=20.0, high=80.0))
+    assert 'aria-label="Minimum"' in bare
+    assert 'aria-label="Maximum"' in bare
+
+
 def test_dropdown_is_a_select_with_its_options_and_placeholder() -> None:
     html = render_to_html(Dropdown(options=["Light", "Dark"], value="Dark"))
     assert html.startswith("<select")

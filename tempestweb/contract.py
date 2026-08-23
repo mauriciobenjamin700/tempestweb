@@ -11,9 +11,18 @@ This module closes that gap with two values and one rule:
 * :data:`WIRE_CONTRACT_VERSION` — the contract's own version, independent of the
   package version. A client can read it and know what it is talking to.
 * :data:`WIRE_SHAPE_DIGEST` — a digest of the wire's **shape** (every key and its
-  type, not its value). Regenerating a fixture with new values leaves it alone;
-  adding, renaming, removing or retyping a key changes it, and the freeze test
-  fails until the author says which kind of change it was.
+  type, not its value). Regenerating a fixture with new values of the same type
+  leaves it alone; adding, renaming, removing or retyping a key changes it, and
+  the freeze test fails until the author says which kind of change it was.
+
+  One edge is worth knowing before it surprises anyone: a field that is ``null``
+  in a fixture is recorded as the type ``null``, because a fixture is the only
+  thing this module reads. So a regeneration where a nullable field *gains* a
+  value does move the digest. That is the right answer — a client that had only
+  ever seen ``null`` there now has a type to parse — but it is a shape change
+  produced by a value, which is exactly the kind of thing a maintainer stares at
+  for ten minutes. The flip side is the real limit: while a nullable field stays
+  ``null`` in every fixture, its declared type is **not** pinned by this digest.
 
 The shape covers what a client parses: the IR node, the five patch kinds, the
 serialized ``Style``, the envelope kinds and the event types that route to a

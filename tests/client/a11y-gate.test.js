@@ -7,7 +7,7 @@
 // is a gate nobody knows works.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { auditScene, runGate } from "../../scripts/a11y-gate.mjs";
+import { auditScene, runGate, staleExceptions } from "../../scripts/a11y-gate.mjs";
 
 test("every generated scene passes axe-core with no serious or critical violation", async () => {
   assert.equal(await runGate(), 0);
@@ -65,4 +65,35 @@ test("the gate fails an invalid ARIA role the app set through semantics", async 
     violations.some((v) => v.id === "aria-roles"),
     `expected aria-roles, got ${violations.map((v) => v.id).join(", ") || "none"}`,
   );
+});
+
+// The exception list is a mute button unless something notices when an entry
+// stops being needed. The blocking pass disables those rules, so it structurally
+// cannot notice; this is the second pass that can.
+test("a nameless range slider fails the gate, which is how the thumbs got names", async () => {
+  const violations = await auditScene("probe", {
+    type: "Column",
+    key: "probe-root",
+    props: {},
+    children: [
+      {
+        type: "RangeSlider",
+        key: "fare",
+        props: { low: 1, high: 9, min_value: 0, max_value: 10 },
+        children: [],
+      },
+    ],
+  });
+
+  assert.deepEqual(violations, []);
+});
+
+test("no accepted exception has stopped being needed", async () => {
+  const scenes = JSON.parse(
+    await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("../fixtures/a11y_scenes.json", import.meta.url), "utf8"),
+    ),
+  );
+
+  assert.deepEqual(await staleExceptions(scenes), []);
 });

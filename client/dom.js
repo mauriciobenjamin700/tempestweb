@@ -1559,6 +1559,43 @@ function applyRangeBounds(el, props) {
 }
 
 /**
+ * The accessible name of one RangeSlider thumb: with the widget's own name, and
+ * standing alone when the widget has none.
+ */
+const RANGE_THUMB_NAMES = {
+  low: { suffix: "minimum", alone: "Minimum" },
+  high: { suffix: "maximum", alone: "Maximum" },
+};
+
+/**
+ * Name one of the two thumbs a RangeSlider owns.
+ *
+ * The wrapper is a role-less `<div>`, so an `aria-label` on it names nothing a
+ * reader can reach: what the reader lands on are the two `<input type="range">`
+ * children the renderer creates, and an unnamed range input is a critical axe
+ * violation (rule `label`). Measured on `examples/booking-form`: the widget
+ * carried `semantics.label` and both thumbs were still nameless, because the
+ * label stopped at the wrapper.
+ *
+ * Each thumb is named after the widget **plus the end it moves** — two controls
+ * announced "Fare window" would be indistinguishable, which is the same defect
+ * wearing a name.
+ *
+ * @param {HTMLElement} el          The RangeSlider `<div>`.
+ * @param {HTMLInputElement} thumb  The thumb to name.
+ * @param {string} part             Which end it is: `"low"` or `"high"`.
+ * @returns {void}
+ */
+function nameRangeThumb(el, thumb, part) {
+  const names = RANGE_THUMB_NAMES[part];
+  const wrapperName = el.getAttribute("aria-label");
+  thumb.setAttribute(
+    "aria-label",
+    wrapperName ? `${wrapperName} (${names.suffix})` : names.alone,
+  );
+}
+
+/**
  * Draw a `RangeSlider`: two native range inputs, one per end of the window.
  *
  * @param {HTMLElement} el   The RangeSlider `<div>`.
@@ -1568,6 +1605,8 @@ function applyRangeBounds(el, props) {
 function applyRangeSliderProps(el, props) {
   const low = ensureRangeThumb(el, "low");
   const high = ensureRangeThumb(el, "high");
+  nameRangeThumb(el, low, "low");
+  nameRangeThumb(el, high, "high");
   applyRangeBounds(low, props);
   applyRangeBounds(high, props);
   if ("low" in props) {

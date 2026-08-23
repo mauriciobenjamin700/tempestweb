@@ -36,7 +36,14 @@ versioning.
   escolha o autor deve: aditiva (chave opcional nova, `kind` novo, `type` novo →
   digest novo, versão igual, entrada no CHANGELOG) ou quebra (renomear, remover,
   retipar, mudar semântica de patch → bump da versão + nota de migração).
-  Regenerar fixture com valores novos **não** mexe no digest, que é o ponto.
+  Regenerar fixture com valores novos do **mesmo tipo** não mexe no digest.
+
+  Uma borda fica registrada em teste em vez de virar susto: campo `null` na
+  fixture é gravado com o tipo `null`, então regenerar com um valor **move** o
+  digest — resposta certa (o cliente que só via nada agora tem tipo para parsear),
+  mas produzida por um valor. O outro lado é o limite real: enquanto um campo
+  nullable continuar `null` em toda fixture, o tipo declarado dele **não** está
+  pinado por este digest.
 
 ### Fixed
 
@@ -54,7 +61,41 @@ versioning.
     nomes num controle é pior que um. `examples/settings-panel` ganhou o nome nos
     seis controles que tinham só um `Text` ao lado.
 
+- **Os dois thumbs do `RangeSlider` não tinham nome acessível** (`label`,
+  `critical`) — nos **dois** renderizadores, DOM e SSR. O wrapper é um `<div>` sem
+  role, então o `aria-label` dele não nomeia nada que o leitor alcance: o leitor
+  para nos dois `<input type="range">` que o renderizador cria. Medido em
+  `examples/booking-form`: o widget carregava `semantics.label` e os dois thumbs
+  continuavam anônimos, porque o nome parava no wrapper.
+
+  Cada thumb passa a ser nomeado pelo widget **mais a ponta que ele move**
+  (`Fare window (minimum)` / `(maximum)`; sem `semantics`, `Minimum` / `Maximum`),
+  porque dois controles anunciados igual são o mesmo defeito de terno.
+
+- **O `Dropdown` do `examples/booking-form` não tinha nome** (`select-name`,
+  `critical`): um `<select>` solto, nomeado só por um `Text` ao lado. Ganhou
+  `semantics`, como os do `settings-panel`.
+
 ### Changed
+
+- **As cenas do gate cobriam 17 tipos de widget e deixavam sete controles de fora**
+  — justamente os que a #143 acabara de fazer falar (range slider, dropdown,
+  autocomplete, os dois pickers, file picker, tab bar). Diversidade se mede por
+  **tipo de widget**, não por número de telas: `booking-form`,
+  `search-autocomplete` e `tabs-profile` entraram, e as duas violações críticas
+  acima apareceram na hora. Nove cenas.
+
+- **`KNOWN_EXCEPTIONS` agora não pode apodrecer em silêncio.** O docstring
+  prometia que o gate reportaria exceção que parou de disparar, e ele não podia:
+  a passada bloqueante desliga essas regras, e regra desligada não produz
+  resultado nenhum. Uma segunda passada reabilita só o que é julgável em jsdom e
+  reporta o que ficou obsoleto.
+
+  Ela achou algo na estreia: `landmark-one-main`, `page-has-heading-one` e
+  `region` são regras de documento e **nunca** disparam quando o contexto é o
+  elemento de mount — as três saíram da lista. Sobra `color-contrast`, marcada
+  como não-julgável aqui (precisa de layout, amostra cor por canvas), então a
+  passada de obsolescência não a acusa nem finge medi-la.
 
 - `docs/stability.md` (PT + EN) descreve o que o gate pega e o que fica para a
   camada Lighthouse (contraste e instalabilidade precisam de layout real), e a

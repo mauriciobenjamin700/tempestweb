@@ -8,19 +8,24 @@ lean on, which is one of the two things the repo listed as a 1.0 prerequisite.
 The digest closes it. Values may move freely (a fixture regenerated with a new
 count, a different colour); keys and types may not, and when they do this test
 names the choice the author owes: additive change, or version bump plus migration
-note.
+note. The one place a *value* is a shape change — a nullable field that gains one —
+is pinned below, so it reads as a decision instead of a surprise.
 """
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from tempestweb.contract import (
     WIRE_CONTRACT_VERSION,
     WIRE_SHAPE_DIGEST,
+    _shape_of,
     wire_shape,
     wire_shape_digest,
 )
+
+FIXTURES: Path = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 def test_the_wire_shape_matches_the_frozen_digest() -> None:
@@ -39,12 +44,11 @@ def test_the_wire_shape_matches_the_frozen_digest() -> None:
     )
 
 
-def test_the_shape_ignores_values_so_a_regenerated_fixture_is_free() -> None:
-    """Regenerating a fixture with different values does not move the digest.
+def test_the_shape_carries_types_and_no_values() -> None:
+    """The shape records types; no fixture value survives into it.
 
-    That is the whole point of digesting the *shape*: the fixtures are derived
-    from the live core, so their values move with it. Only keys and types are the
-    contract.
+    That is the point of digesting the *shape*: the fixtures are derived from the
+    live core, so their values move with it. Only keys and types are the contract.
     """
     shape = wire_shape()
     serialized = json.dumps(shape)
@@ -65,3 +69,25 @@ def test_every_envelope_kind_and_event_type_is_covered() -> None:
     assert "navigate" in shape["envelope_kinds"]
     assert shape["event_types"]["click"] == ["on_click"]
     assert shape["event_types"]["toggle"] == ["on_change"]
+
+
+def test_a_nullable_field_gaining_a_value_is_a_shape_change() -> None:
+    """A field that was ``null`` and now has a type moves the digest, on purpose.
+
+    This is the one case where a *value* is a shape change, and it is pinned here
+    so the next person to hit it reads a decision instead of guessing at a bug:
+    the fixture is all this module can see, so ``null`` is recorded as the type
+    ``null``. A client that had only ever seen nothing there now has something to
+    parse — worth a look, and worth saying out loud that the reverse holds too: a
+    field that stays ``null`` everywhere has its declared type unpinned.
+    """
+    node = json.loads(
+        (FIXTURES / "node_initial.json").read_text(encoding="utf-8"),
+    )
+    assert node["key"] is None, "this test needs a nullable field that is null"
+
+    with_value = {**node, "key": "root"}
+
+    assert _shape_of(node) != _shape_of(with_value)
+    assert _shape_of(node)["key"] == "null"
+    assert _shape_of(with_value)["key"] == "str"

@@ -1029,3 +1029,62 @@ def test_an_unsupported_format_spec_still_names_what_is_supported() -> None:
     with pytest.raises(TranspileError) as excinfo:
         gen('def f(n):\n    return f"{n:>5}"\n')
     assert "`0Nd`" in str(excinfo.value)
+
+
+def test_a_field_without_a_default_is_undefined_not_an_error() -> None:
+    """A required field is `undefined` until `make_state` fills it.
+
+    Four examples stopped here, and the emitted class has no notion of a
+    required field: the constructor takes overrides, so the honest translation
+    of "no default" is `undefined`.
+    """
+    js = gen("@dataclass\nclass S:\n    items: list[int]\n")
+    assert "this.items = opts.items !== undefined ? opts.items : undefined;" in js
+
+
+def test_a_parameterized_dataclass_decorator_is_accepted() -> None:
+    """`@dataclass(frozen=True)` emits the same class as a bare `@dataclass`.
+
+    `frozen`/`slots`/`eq` describe Python-side behaviour the generated JS class
+    does not have, so accepting and ignoring them is faithful; three examples in
+    this repo are written that way.
+    """
+    js = gen("@dataclass(frozen=True, slots=True)\nclass S:\n    value: int = 0\n")
+    assert "export class S extends State {" in js
+    assert "this.value = opts.value !== undefined ? opts.value : 0;" in js
+
+
+def test_an_unknown_dataclass_option_is_refused_by_name() -> None:
+    """An option that is not a known no-op is refused, not dropped in silence."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen("@dataclass(weird=True)\nclass S:\n    value: int = 0\n")
+    assert "'weird'" in str(excinfo.value)
+
+
+def test_a_custom_default_factory_is_called() -> None:
+    """`field(default_factory=fresh)` calls the factory, like the dataclass does."""
+    js = gen(
+        "@dataclass\nclass S:\n"
+        "    log: list[str] = field(default_factory=fresh)\n"
+        "    tags: list[str] = field(default_factory=list)\n"
+    )
+    assert "opts.log !== undefined ? opts.log : fresh();" in js
+    assert "opts.tags !== undefined ? opts.tags : [];" in js
+
+
+def test_a_field_option_that_shapes_python_only_is_ignored() -> None:
+    """`repr`/`compare`/`init` shape behaviour the emitted constructor lacks."""
+    js = gen(
+        "@dataclass\nclass S:\n"
+        '    note: str = field(default="", repr=False)\n'
+        "    seq: int = field(init=False)\n"
+    )
+    assert 'opts.note !== undefined ? opts.note : "";' in js
+    assert "opts.seq !== undefined ? opts.seq : undefined;" in js
+
+
+def test_an_unknown_field_option_is_refused_by_name() -> None:
+    """A `field(...)` option that could change the value is refused."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen("@dataclass\nclass S:\n    value: int = field(converter=int)\n")
+    assert "'converter'" in str(excinfo.value)

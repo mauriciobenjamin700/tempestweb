@@ -88,6 +88,19 @@ _COMPONENT_MODULE: str = "tempestweb.components"
 _BUILTIN_NAMES: frozenset[str] = frozenset(dir(builtins))
 
 
+# `@dataclass` options that change nothing about the emitted JS: the generated
+# class has no `repr`, no ordering and no equality of its own, and `frozen`/`slots`
+# have no counterpart. Refusing them was conservatism, not a limit.
+_IGNORED_DATACLASS_OPTIONS: frozenset[str] = frozenset(
+    {"frozen", "slots", "eq", "order", "repr", "init", "unsafe_hash", "kw_only"}
+)
+# `field(...)` options with the same property: they shape Python-side behaviour
+# the emitted constructor does not have.
+_IGNORED_FIELD_OPTIONS: frozenset[str] = frozenset(
+    {"init", "repr", "compare", "hash", "kw_only", "metadata"}
+)
+
+
 def _is_none(node: ast.expr) -> bool:
     """Whether an expression is the literal ``None``.
 
@@ -1900,19 +1913,51 @@ class _Generator:
             for kw in value.keywords:
                 if kw.arg == "default":
                     return self.expr(kw.value, 2)
-                if (
-                    kw.arg == "default_factory"
-                    and isinstance(kw.value, ast.Name)
-                    and kw.value.id in factories
-                ):
-                    return factories[kw.value.id]
+                if kw.arg == "default_factory":
+                    if isinstance(kw.value, ast.Name) and kw.value.id in factories:
+                        return factories[kw.value.id]
+                    return f"{self.expr(kw.value, 2)}()"
+            for kw in value.keywords:
+                if kw.arg not in _IGNORED_FIELD_OPTIONS:
+                    raise TranspileError(
+                        f"dataclass field(...) option {kw.arg!r} is not supported "
+                        "(use default= or default_factory=)",
+                        value,
+                        self.filename,
+                    )
+            return "undefined"
+        return self.expr(value, 2)
+
+    def _check_dataclass_options(self, decorator: ast.Call) -> None:
+        """Refuse a ``@dataclass(...)`` option that would change the emitted class.
+
+        ``frozen``/``slots``/``eq`` and friends describe Python-side behaviour the
+        generated JS class does not have, so they are accepted and ignored — a
+        module written ``@dataclass(frozen=True)`` (three examples in this repo)
+        transpiles to the same class as a bare ``@dataclass``. Anything else is
+        refused by name, because silently dropping an option the author *did*
+        mean is how a subtle divergence between modes starts.
+
+        Args:
+            decorator: The decorator call node.
+
+        Raises:
+            TranspileError: For an option outside
+                :data:`_IGNORED_DATACLASS_OPTIONS`, or a positional argument.
+        """
+        if decorator.args:
             raise TranspileError(
-                "unsupported dataclass field(...) — use default= or "
-                "default_factory=list/dict",
-                value,
+                "@dataclass takes only keyword options",
+                decorator,
                 self.filename,
             )
-        return self.expr(value, 2)
+        for kw in decorator.keywords:
+            if kw.arg not in _IGNORED_DATACLASS_OPTIONS:
+                raise TranspileError(
+                    f"@dataclass option {kw.arg!r} is not supported in Mode C",
+                    decorator,
+                    self.filename,
+                )
 
     def _class(self, node: ast.ClassDef) -> str:
         """Emit a `@dataclass` as `export class X extends <base> { … }`.
@@ -1926,7 +1971,15 @@ class _Generator:
         defaults are assigned — overriding an inherited default when they clash).
         """
         for decorator in node.decorator_list:
-            name = decorator.id if isinstance(decorator, ast.Name) else None
+            if isinstance(decorator, ast.Name):
+                name: str | None = decorator.id
+            elif isinstance(decorator, ast.Call) and isinstance(
+                decorator.func, ast.Name
+            ):
+                name = decorator.func.id
+                self._check_dataclass_options(decorator)
+            else:
+                name = None
             if name != "dataclass":
                 raise TranspileError(
                     "only the @dataclass decorator is supported on a class",
@@ -1954,13 +2007,12 @@ class _Generator:
         methods: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
         for stmt in node.body:
             if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name):
-                if stmt.value is None:
-                    raise TranspileError(
-                        "dataclass fields must have a default in the subset",
-                        stmt,
-                        self.filename,
-                    )
-                fields.append((stmt.target.id, self._field_default(stmt.value)))
+                default = (
+                    "undefined"
+                    if stmt.value is None
+                    else self._field_default(stmt.value)
+                )
+                fields.append((stmt.target.id, default))
             elif isinstance(stmt, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 methods.append(stmt)
             elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):

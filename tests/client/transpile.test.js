@@ -356,10 +356,20 @@ test("a scroll wire event slides the window, and no handler is asked for it", ()
 
 test("every ported component matches the core build (order-agnostic)", () => {
   const samples = fixture("transpile_component_samples.json");
+  // Descendant keys are compared, the root's is not: the fixture nulls the
+  // component's own key so the sample pins the tree the builder must reproduce,
+  // not the core's incidental keying of the root. Every key *below* it is part of
+  // the contract — it is what the event router matches on.
+  const inner = (n) => ({
+    type: n.type,
+    key: n.key,
+    props: n.props,
+    children: (n.children ?? []).map(inner),
+  });
   const drop = (n) => ({
     type: n.type,
     props: n.props,
-    children: (n.children ?? []).map(drop),
+    children: (n.children ?? []).map(inner),
   });
   const child = () => Text({ content: "a", key: "a" });
   const noop = () => {};
@@ -748,6 +758,81 @@ test("every ported component matches the core build (order-agnostic)", () => {
       onSubmit: noop,
     }),
   };
+  // The keyed twins: the same builder called with an explicit `key`. An unkeyed
+  // build hides the namespacing — `Accordion()` emits `accordion-header` whether
+  // or not the builder derives it — so only these pin that every inner key hangs
+  // off the caller's, the way `Component.child_key` does in the core.
+  const keyed = {
+    accordion_open: Accordion({
+      title: "Details",
+      open: true,
+      children: [child()],
+      onToggle: noop, key: "k9" }),
+    address_input_default: AddressInput({ onChange: noop, key: "k9" }),
+    alert_title_only: Alert({ title: "Heads up", key: "k9" }),
+    appbar_title_only: AppBar({ title: "Home", key: "k9" }),
+    avatar_default: Avatar({ initials: "MB", key: "k9" }),
+    banner_default: Banner({ message: "saved", key: "k9" }),
+    breadcrumb_navigable: Breadcrumb({ items: ["home", "docs", "ui"], onSelect: noop, key: "k9" }),
+    card_default: Card({ children: [child()], key: "k9" }),
+    cnpj_input_default: CNPJInput({ onChange: noop, key: "k9" }),
+    cpf_input_default: CPFInput({ onChange: noop, key: "k9" }),
+    email_field_keyed_error: EmailField({
+      value: "a@b.c",
+      error: "inválido",
+      key: "signup-email",
+      onChange: noop, key: "k9" }),
+    email_input_value_and_error: EmailInput({
+      value: "a@b.c",
+      error: "inválido",
+      placeholder: "seu e-mail",
+      onChange: noop, key: "k9" }),
+    emptystate_full: EmptyState({
+      title: "Nothing here",
+      subtitle: "add the first one",
+      glyph: "◍",
+      action: Button({ label: "add", onClick: noop, key: "add" }), key: "k9" }),
+    grid_three_in_two: Grid({ children: [child(), child(), child()], key: "k9" }),
+    header_title_only: Header({ title: "Reports", key: "k9" }),
+    listtile_with_subtitle: ListTile({ title: "Maria", subtitle: "admin", key: "k9" }),
+    login_form_default: LoginForm({
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onSubmit: noop, key: "k9" }),
+    metric_card_delta: MetricCard({ label: "users", value: "1.2k", delta: "+8%", key: "k9" }),
+    navbar_first_active: NavBar({ items: ["a", "b", "c"], onSelect: noop, key: "k9" }),
+    password_field_default: PasswordField({ onChange: noop, key: "k9" }),
+    password_input_flushed_sm_error: PasswordInput({
+      value: "hunter2",
+      error: "curta demais",
+      fieldVariant: "flushed",
+      size: "sm",
+      onChange: noop, key: "k9" }),
+    phone_input_default: PhoneInput({ onChange: noop, key: "k9" }),
+    progress_stepper_second: ProgressStepper({ steps: ["a", "b", "c"], current: 1, key: "k9" }),
+    radio_default: RadioGroup({ options: ["a", "b"], onSelect: noop, key: "k9" }),
+    rating_three_stars: Rating({ value: 1, maxStars: 3, colorScheme: "warning", key: "k9" }),
+    scaffold_body_only: Scaffold({ body: child(), key: "k9" }),
+    searchbar_with_value_and_clear: SearchBar({ value: "cat", onChange: noop, onClear: noop, key: "k9" }),
+    segmented_second_lg: SegmentedControl({
+      options: ["a", "b", "c"],
+      selected: 1,
+      onSelect: noop,
+      size: "lg", key: "k9" }),
+    signup_form_default: SignupForm({
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onConfirmChange: noop,
+      onSubmit: noop, key: "k9" }),
+    stat_plain: Stat({ label: "revenue", value: "R$ 1.2M", key: "k9" }),
+    stat_card_default: StatCard({ label: "users", value: "1.2k", key: "k9" }),
+    stepper_bounded: Stepper({ value: 5, step: 2, minValue: 0, maxValue: 10, onChange: noop, key: "k9" }),
+    tabs_second_lg: Tabs({ tabs: ["a", "b", "c"], active: 1, onSelect: noop, size: "lg", key: "k9" }),
+    text_field_default: TextField({ onChange: noop, key: "k9" }),
+  };
+  for (const [name, built] of Object.entries(keyed)) {
+    cases[`${name}__keyed`] = built;
+  }
   assert.equal(
     Object.keys(cases).length,
     Object.keys(samples).length,

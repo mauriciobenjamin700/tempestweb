@@ -153,10 +153,14 @@ Armadilhas já pagas neste repo:
   fidelidade é a matriz em `tests/fixtures/transpile_component_samples.json`,
   construída do core real — um caso por componente não basta: variante, esquema,
   tamanho e elevação driftam em silêncio.
-- **Chave de filho de componente colide entre instâncias.** `SegmentedControl` e
-  `RadioGroup` nomeiam filhos com chave fixa (`seg-N`, `radio-N`); duas instâncias
-  na mesma tela disputam o nome e o evento vai para a errada (Python pega a
-  primeira, Modo C a última). Defeito do `tempest-core`, vale nos três modos.
+- **Chave de filho de componente é namespaced desde `tempest-core` 0.15.0.** Todo
+  componente deriva a chave de cada filho da própria (`base_key` = `key` ou
+  `default_key`; `child_key("item-0")` → `faq-3-item-0`), então duas instâncias na
+  mesma tela não disputam mais o nome. Antes eram literais (`seg-N`, `radio-N`,
+  `accordion-header`) e o evento ia para a instância errada. **Port de Modo C tem
+  que carregar a derivação**: a matriz de paridade ganhou um par `__keyed` por
+  componente, porque o build sem `key` esconde exatamente isso — `Accordion()`
+  emite `accordion-header` derivando ou não.
 - **O Modo C só serve o que `tempestweb/transpile/_served.py` lista.** O
   manifesto é gerado do próprio JS (`python -m tests.conformance._transpile_served`)
   e o compilador recusa nome fora dele — antes emitia import morto e a página

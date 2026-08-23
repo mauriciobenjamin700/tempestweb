@@ -533,7 +533,7 @@
             },
             {
               "type": "Text",
-              "key": "appbar-title",
+              "key": "tw-shell-appbar-title",
               "props": {
                 "style": {
                   "direction": null,
@@ -802,7 +802,7 @@
                   "children": [
                     {
                       "type": "Input",
-                      "key": "search-input",
+                      "key": "tw-list-search-input",
                       "props": {
                         "style": {
                           "direction": null,

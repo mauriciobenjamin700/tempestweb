@@ -197,23 +197,26 @@ função:
 | **Gráficos** | `BarChart` · `LineChart` · `ChartSeries` | tempest-core |
 | **Visão** | `DetectionBox` · `DetectionOverlay` · `ConfidenceBadge` · `ResultView` · `confidence_scheme` | tempest-core |
 
-!!! warning "Duas instâncias do mesmo componente na mesma tela colidem"
-    Todo componente que monta filhos interativos os nomeia com chave **fixa**,
-    sem prefixo da chave do componente. Medido numa tela com duas instâncias de
-    cada: `SegmentedControl` (`seg-N`), `RadioGroup` (`radio-N`), `Rating`
-    (`star-N`), `NavBar` (`nav-N`), `Breadcrumb` (`crumb-N`/`sep-N`), `Stepper`
-    (`step-up`/`step-down`/`step-value`) e `SearchBar`
-    (`search-input`/`search-clear`) — todas as chaves duplicam. Como o evento é
-    roteado **por chave**, as duas instâncias disputam o mesmo nome: o Python
-    resolve para a **primeira** ocorrência, e o Modo C para a **última** — então
-    um clique num controle move o outro. Passar `key=` diferente para cada
-    componente **não** resolve: a chave do filho não herda a do pai.
+!!! check "Duas instâncias do mesmo componente convivem — desde tempest-core 0.15.0"
+    Todo componente agora deriva a chave de cada filho da **própria**: a base é o
+    `key` que você passou (ou o nome do componente, quando você não passa), e cada
+    filho vira `<base>-<papel>`. Dois `SegmentedControl` na mesma tela emitem
+    `filtro-item-0` e `ordem-item-0`, não `seg-0` duas vezes — e como o evento é
+    roteado **por chave**, o clique chega no controle certo.
 
-    É defeito do `tempest-core`, não do seu app, e vale nos três modos —
-    acompanhado em
-    [tempest-core#20](https://github.com/mauriciobenjamin700/tempest-core/issues/20).
-    Enquanto não for corrigido lá, mantenha um por tela ou monte o controle com
-    `Button`/`Input` dando chave própria a cada filho.
+    ```python
+    SegmentedControl(key="filtro", options=["Tudo", "Ativos"], on_select=set_filtro)
+    SegmentedControl(key="ordem", options=["A-Z", "Z-A"], on_select=set_ordem)
+    ```
+
+    Vale para `SegmentedControl`, `RadioGroup`, `Rating`, `NavBar`, `Breadcrumb`,
+    `Stepper`, `SearchBar`, `Tabs`, `Accordion`, `Card`, `Grid` e os campos — nos
+    três modos.
+
+    !!! warning "Dois **sem** `key` ainda colidem"
+        Sem `key`, a base é o nome do componente (`segmented`), então duas
+        instâncias anônimas voltam a disputar o nome. Dê `key=` a cada uma quando
+        houver mais de uma na tela — é uma linha, e é o que o namespacing usa.
 
 !!! tip "Campo vs Input"
     O par existe de propósito: o **`*Input`** (do core) é a primitiva de baixo nível;

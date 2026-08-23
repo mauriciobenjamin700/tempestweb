@@ -4,6 +4,130 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.85.0] — 2026-08-23
+
+### Added
+
+- **As três formas de import de capacidade nativa chegam na mesma fachada**
+  (#117): `from tempestweb import native`, `from tempestweb.native import
+  storage` e `from tempestweb.native.geolocation import get_position`. Só a
+  primeira compilava, e a recusa das outras duas listava `tempestweb.native`
+  entre os módulos que ela permitia — mensagem que se contradizia e ensinava
+  errado: quem lia concluía que a capacidade não existia em Modo C, quando a
+  fachada em `./native.js` a serve.
+- **Manifesto da fachada gerado das duas fontes honestas**
+  (`tempestweb/transpile/_native.py`, via `python -m
+  tests.conformance._transpile_native`): a **forma** vem do
+  `client/transpile/native.js` — é o que o browser carrega — e a **resolução de
+  nome solto** vem do pacote Python, o único que sabe que `get_position` é
+  re-export de `geolocation`.
+- **Enum nativo de string vira tabela congelada.** A fachada devolve o valor
+  cru (`"granted"`), então `perm is NotificationPermission.GRANTED` é comparação
+  de string assim que os dois lados são emitidos — os mesmos `Object.freeze` que
+  os enums do core já usam.
+- **Recusa que diz qual modo tem a capacidade:** `camera` não tem fachada em
+  processo (`camera.capture` é `mode_c=False` no contrato), e importá-la agora é
+  erro de build apontando Modo A ou B. Membro desconhecido é recusado **pelo
+  nome** (`geolocation.triangulate`, com o que o grupo serve), e `import
+  tempestweb.native` diz qual forma escrever no lugar — antes listava os módulos
+  de stdlib servidos, que não tinham nada a ver.
+
+### Fixed
+
+- **Campo de dataclass chamado `get` era lido como acesso a dict.**
+  `examples/file-storage` injeta `storage.get` no estado e abre uma nota com
+  `app.state.get(key)`; isso compilava para `app.state[key]` — JS válido que
+  devolve `undefined`, então a página carregava e nenhuma nota abria. Nome que o
+  módulo declara como campo é atributo, e ganha do mapeamento.
+- **`except X as Y` comparava com o apelido.** O Modo C despacha `except` pelo
+  **nome de classe** em string, e um import renomeado gerava `_err.name ===
+  "Failure"` enquanto o erro carrega `"NativeError"` — o handler era código
+  morto e o erro escapava. Agora compara o nome de origem.
+- **A fachada passa a ser reconhecida pelo que o módulo importou**, não pelo
+  nome solto `native`: `native.storage.get(k)` só escapa do mapeamento de
+  `dict.get` quando `native` foi de fato importado.
+- **Handler do Modo C recebia o evento do fio, e o app lê o evento plano.**
+  Nos Modos A e B o handler recebe um objeto tipado com campo raso — `e.value`
+  num `TextChangeEvent` —, e o Modo C entregava `{type, key, payload}`: todo
+  input de texto gravava `undefined` no estado. Medido no browser: digitar no
+  `file-storage` não mudava nada e o primeiro `title_draft.strip()` derrubava o
+  handler. O campo do payload agora vem raso, com `payload` ainda alcançável.
+
+### Notas
+
+- **Medido no corpus: 31 dos 57 exemplos transpilam** (eram 26). Entraram
+  `geo_demo`, `file-storage`, `weather-native`, `clipboard-share` e
+  `pwa-webpush`; `photo-capture` fica recusado — `camera` não é capacidade de
+  Modo C, e dizer isso é a resposta certa.
+- Verificado em Chrome real, service worker e caches limpos antes de medir:
+  `file-storage` salva a nota no IndexedDB (`storage.put`), lista a chave,
+  abre o conteúdo (`app.state.get`) e apaga; `geo_demo` vai de `idle` a
+  `located` com `-8.048, -34.877` com a permissão concedida, e a `error:
+  NativeError: permission_denied` com ela negada. Console limpo nos dois, sem
+  overflow horizontal a 390px e 1280px.
+- **Fora do escopo, achado na medição:** o `TextArea` renderiza um `<div>`
+  vazio, sem campo editável — o corpo da nota do `file-storage` não é digitável.
+  Vale nos três modos, porque `client/dom.js` é compartilhado (#130).
+
+## [0.84.0] — 2026-08-23
+
+### Added
+
+- **`import x` funciona, para os módulos que o browser tem** (#110): `re`, `json`,
+  `math`, `base64` e `asyncio`, nas **duas** formas de import (`import re`,
+  `from math import ceil`). Antes a recusa era pela *forma*, então nem um módulo
+  cujo conteúdo o Modo C sabia traduzir passava.
+- **Semântica de `re` do Python, que o JS não dá de graça:** `Pattern.match`
+  ancora no início (`test`/`exec` não ancoram), `fullmatch` ancora nas duas
+  pontas, e `re.sub` troca **todas** as ocorrências. Os helpers vivem em
+  `client/transpile/runtime.js` e são importados com alias `$` — ilegal em
+  identificador Python, logo um `sleep` do app não colide com o helper. Conferido
+  membro a membro contra o Python: `match`/`search`/`fullmatch`/`sub`/`findall`
+  dão o mesmo resultado nos dois lados.
+- **`enum` do app** (#112): `class Phase(StrEnum)` vira `Object.freeze({…})`, como
+  os enums do core já viajam em `values.gen.js`. Os 6 exemplos que usam `enum`
+  usam `StrEnum` com membro string.
+- **`math`** (#112) com os membros de equivalente exato (`Math.*`,
+  `Number.isNaN`/`isFinite`) e as constantes (`pi`, `e`, `tau`, `inf`, `nan`).
+- **`asyncio.sleep`**, convertendo segundos para milissegundos — medido no
+  browser: `sleep(0.4)` espera ~400 ms, não 0,4 ms.
+- **Generator expression** (`any(x for x in xs)`) toma o caminho da comprehension:
+  JS não tem gerador lazy, então o array é materializado — diferença de custo, não
+  de resultado. Junto vieram `any`/`all` (que não existiam e emitiam chamada a
+  nome inexistente), `dict.get` com default, e os predicados de `str`
+  (`c.isdigit()` → teste de padrão).
+- **Recusa que ensina** (#112): módulo fora da lista diz o que fazer no lugar —
+  `datetime` → formate no estado e passe a string; `functools` → `partial` é
+  lambda e `reduce` é `.reduce`. Vale nas duas formas de import. Membro
+  desconhecido de módulo servido é recusado **pelo nome** (`re.escape`).
+
+### Fixed
+
+- **Comprehension sobre string emitia `.map` em string.** Python itera qualquer
+  iterável (`for c in str(value)` anda pelos caracteres) e string em JS não tem
+  `.map`. O iterável passa a ser espalhado (`[...expr]`).
+- **`dict.get` não existia.** Dict é objeto simples em JS, então
+  `state.errors.get("email", "")` carregava a página e morria na primeira
+  renderização (medido em `signup-wizard`). Agora é leitura indexada com `??` — e
+  não `||`, para valor falsy guardado (`0`, `""`) não ser trocado pelo default. O
+  `.get` da fachada nativa (`native.storage.get`) é preservado.
+- **Método de widget do core compilava e morria.** `form.validate(values)`
+  transpilava limpo e levantava `form1.validate is not a function` na primeira
+  renderização, porque o cliente porta o *builder* de cada widget e não os
+  métodos Python da classe. Agora é erro de compilação com `arquivo:linha`:
+  compilar algo que morre é pior que recusar, que é justamente o que a checagem
+  de nome servido existe para evitar.
+
+### Notas
+
+- **Medido no corpus: 26 dos 57 exemplos transpilam** (eram 25 antes deste PR e
+  14 antes da 0.83.0). `async_demo` entrou; `signup-wizard` saiu do estado
+  "compila e quebra" para "recusado com motivo".
+- Verificado em Chrome real, service worker e caches limpos antes de medir:
+  `async_demo` vai de `idle` → `loading…` → `done` com o sleep de 400 ms;
+  `rating-review` troca a dica de `Tap a star to rate` para `Very good` ao clicar
+  a quarta estrela, que é o `dict.get` com default rodando. Console limpo nos dois.
+
 ## [0.83.1] — 2026-08-23
 
 ### Fixed

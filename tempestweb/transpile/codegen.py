@@ -22,6 +22,14 @@ import re
 from typing import Any
 
 import tempest_core
+from tempestweb.transpile._native import (
+    NATIVE_ENUMS,
+    NATIVE_EXPORTS,
+    NATIVE_FLAT,
+    NATIVE_GROUPS,
+    NATIVE_MEMBERS,
+    NATIVE_TYPES,
+)
 from tempestweb.transpile._served import SERVED_NAMES
 from tempestweb.transpile.errors import TranspileError
 
@@ -33,8 +41,17 @@ _RUNTIME_NAMES: frozenset[str] = frozenset({"App", "State"})
 # declares its own `State`. `$` is legal in a JS identifier but never in a
 # Python one, so this alias cannot collide with a transpiled name.
 _STATE_BASE_ALIAS: str = "State$"
-# The native-capability namespace, imported from `./native.js` in Mode C.
-_NATIVE_NAMES: frozenset[str] = frozenset({"native"})
+# What `./native.js` exports. Every form Python spells for a native
+# capability lands on this one module, so the facade is imported once.
+_NATIVE_NAMES: frozenset[str] = NATIVE_EXPORTS
+# The namespace `from tempestweb import native` binds.
+_NATIVE_NAMESPACE: str = "native"
+# The alias the facade is imported under when the module reached it through
+# a submodule import. `$` is legal in a JS identifier and never in a Python
+# one, so an app that binds its own `native` cannot collide with it.
+_NATIVE_FACADE_ALIAS: str = "native$"
+# The package whose submodules are capability groups (`tempestweb.native.http`).
+_NATIVE_MODULE: str = "tempestweb.native"
 # Navigation primitives, imported from `./nav.js` in Mode C.
 _NAV_NAMES: frozenset[str] = frozenset({"Route", "NavStack", "routes_from_path"})
 # Localization helpers, imported from `./i18n.js` in Mode C.
@@ -83,6 +100,94 @@ _TYPE_ONLY_MODULES: frozenset[str] = frozenset({"collections.abc", "typing"})
 # they route exactly like a `tempest_core` import; the rest are this repo's own
 # layer and are refused by name against the served manifest.
 _COMPONENT_MODULE: str = "tempestweb.components"
+
+# Stdlib modules Mode C can serve, with the JS each member maps to. A module is
+# reachable by either import form (`import re` / `from math import ceil`), and a
+# member outside its table is refused by name — the browser has no `re.escape`,
+# and pretending otherwise ships a page that dies on the line that calls it.
+_MODULE_CALLS: dict[str, dict[str, str]] = {
+    "json": {"dumps": "JSON.stringify", "loads": "JSON.parse"},
+    "math": {
+        "ceil": "Math.ceil",
+        "cos": "Math.cos",
+        "exp": "Math.exp",
+        "fabs": "Math.abs",
+        "floor": "Math.floor",
+        "hypot": "Math.hypot",
+        "isfinite": "Number.isFinite",
+        "isnan": "Number.isNaN",
+        "log": "Math.log",
+        "log10": "Math.log10",
+        "log2": "Math.log2",
+        "pow": "Math.pow",
+        "sin": "Math.sin",
+        "sqrt": "Math.sqrt",
+        "tan": "Math.tan",
+        "trunc": "Math.trunc",
+    },
+    "base64": {"b64encode": "btoa", "b64decode": "atob"},
+    # Runtime helpers, imported from ./runtime.js under a `$` alias.
+    "asyncio": {"sleep": "@sleep"},
+    "re": {
+        "compile": "@compile",
+        "findall": "@reFindall",
+        "fullmatch": "@reFullmatch",
+        "match": "@reMatch",
+        "search": "@reSearch",
+        "sub": "@reSub",
+    },
+}
+
+#: Module-level constants, by module and name.
+_MODULE_CONSTANTS: dict[str, dict[str, str]] = {
+    "math": {
+        "e": "Math.E",
+        "inf": "Infinity",
+        "nan": "NaN",
+        "pi": "Math.PI",
+        "tau": "(2 * Math.PI)",
+    },
+}
+
+#: Helpers the emitted code calls, imported from ``./runtime.js`` aliased with a
+#: `$` — illegal in a Python identifier, so an app's own ``sleep`` cannot collide.
+_RUNTIME_HELPERS: frozenset[str] = frozenset(
+    {"reFindall", "reFullmatch", "reMatch", "reSearch", "reSub", "sleep"}
+)
+
+#: Methods of a compiled pattern, and the helper each maps to. Only a name bound
+#: to `re.compile(...)` is treated this way — mapping every `.match(...)` in the
+#: module would catch an app's own method of the same name.
+_PATTERN_METHODS: dict[str, str] = {
+    "findall": "reFindall",
+    "fullmatch": "reFullmatch",
+    "match": "reMatch",
+    "search": "reSearch",
+    "sub": "reSub",
+}
+
+#: Bases that turn a class into a frozen JS object of its members.
+_ENUM_BASES: frozenset[str] = frozenset({"Enum", "IntEnum", "StrEnum"})
+
+#: Modules refused on purpose, with what to do instead. Listing the alternative
+#: is the difference between a diagnostic and a dead end.
+_REFUSED_MODULES: dict[str, str] = {
+    "datetime": (
+        "there is no equivalent in the browser without shipping an "
+        "implementation; format the value in your state and pass the string"
+    ),
+    "functools": (
+        "`partial` is a lambda and `reduce` is `.reduce`; write them inline "
+        "(a render-time cache like `lru_cache` has no meaning here)"
+    ),
+    "collections": "use a plain dict or list",
+    "itertools": "use a comprehension or a `for` loop",
+    "os": "an artifact has no filesystem; use `tempestweb.native` capabilities",
+    "pathlib": "an artifact has no filesystem; use `tempestweb.native` capabilities",
+    "random": "seeded randomness is not portable; compute the value in your state",
+    "time": "use `asyncio.sleep`, or keep the timestamp in your state",
+}
+
 # Builtin names a type alias may mention besides the type-only ones themselves
 # (`list[str]`, `dict[str, int]`, `tuple[int, ...]`).
 _BUILTIN_NAMES: frozenset[str] = frozenset(dir(builtins))
@@ -133,6 +238,15 @@ _INDENT: str = "  "
 # with no realistic collision with a runtime/facade method (e.g. `.replace` is
 # omitted — it clashes with `app.replace(route)`; `.get` clashes with
 # `native.storage.get(...)` — use subscript instead).
+# `str` predicates with no JS counterpart: each is a full-string pattern test.
+# Emitting `c.isdigit()` shipped a call to a method the browser does not have.
+_STRING_TESTS: dict[str, tuple[str, str]] = {
+    "isdigit": ("[0-9]+", "reFullmatch"),
+    "isalpha": ("[A-Za-z]+", "reFullmatch"),
+    "isalnum": ("[A-Za-z0-9]+", "reFullmatch"),
+    "isspace": ("\\s+", "reFullmatch"),
+}
+
 _METHOD_RENAMES: dict[str, str] = {
     "upper": "toUpperCase",
     "lower": "toLowerCase",
@@ -357,6 +471,41 @@ class _Generator:
         # or bound to a type alias built from one. Referencing them as a value is
         # refused instead of emitting an identifier nothing imports.
         self.type_only: set[str] = set()
+        # Local name → stdlib module it stands for (`import re`, `import re as r`).
+        self.module_aliases: dict[str, str] = {}
+        # Local name → the (module, member) it was imported from
+        # (`from math import ceil`).
+        self.member_aliases: dict[str, tuple[str, str]] = {}
+        # Local name → the identifier `./native.js` exports for it, so the
+        # facade import carries an `as` when the app renamed it.
+        self.native_imports: dict[str, str] = {}
+        # Every field name the module's dataclasses declare. An attribute the
+        # source declared as a field is an attribute, so it wins over the dict
+        # mapping: a state carrying an injected `get` callable read
+        # `app.state.get(key)` as `app.state[key]`, which compiles and returns
+        # undefined instead of calling it (measured in `examples/file-storage`).
+        self.field_names: set[str] = set()
+        # Local name → the native string enum it stands for. The facade speaks
+        # JSON, so the enum crosses as its value and is emitted as a frozen table
+        # next to the imports, the way the core's own enums travel.
+        self.native_enums: dict[str, str] = {}
+        # Local name → the facade path it stands for, so both submodule forms
+        # (`from tempestweb.native import get_position`,
+        # `from tempestweb.native.storage import put`) reach the same object
+        # `from tempestweb import native` reaches by attribute.
+        self.native_aliases: dict[str, str] = {}
+        # Runtime helpers the emitted code ended up calling, so the import line
+        # carries exactly what is used.
+        self.runtime_helpers: set[str] = set()
+        # Local names bound to an `enum` base, which make a class a frozen object.
+        self.enum_bases: set[str] = set()
+        # Local names bound to `re.compile(...)`, so their pattern methods route
+        # to the helpers instead of emitting `RegExp.match`, which does not exist.
+        self.regex_names: set[str] = set()
+        # Local names bound to a core widget call. Mode C ports each widget's
+        # *builder*, not its Python methods, so calling one is refused at build
+        # time rather than emitting a call that dies on the first render.
+        self.widget_names: dict[str, str] = {}
 
     # -- expressions --------------------------------------------------------
 
@@ -376,6 +525,10 @@ class _Generator:
         if isinstance(node, ast.Constant):
             return self._constant(node)
         if isinstance(node, ast.Name):
+            path = self.native_aliases.get(node.id)
+            if path is not None:
+                self.referenced.add(path.split(".", 1)[0])
+                return path
             if node.id in self.type_only:
                 raise TranspileError(
                     f"{node.id!r} is a type-only name (annotations are dropped), "
@@ -386,6 +539,9 @@ class _Generator:
             self.referenced.add(node.id)
             return _js_name(node.id)
         if isinstance(node, ast.Attribute):
+            constant = self._module_constant_js(node)
+            if constant is not None:
+                return constant
             return f"{self.expr(node.value, indent)}.{_js_name(node.attr)}"
         if isinstance(node, ast.JoinedStr):
             return self._template(node, indent)
@@ -415,12 +571,42 @@ class _Generator:
             return self._unaryop(node, indent)
         if isinstance(node, ast.IfExp):
             return self._ifexp(node, indent)
-        if isinstance(node, ast.ListComp):
+        if isinstance(node, (ast.ListComp, ast.GeneratorExp)):
             return self._listcomp(node, indent)
         if isinstance(node, ast.Subscript):
             return self._subscript(node, indent)
         raise TranspileError(
             f"expression {type(node).__name__} is not supported", node, self.filename
+        )
+
+    def _module_constant_js(self, node: ast.Attribute) -> str | None:
+        """Emit a stdlib module constant (``math.pi``), or None if not one.
+
+        Args:
+            node: The attribute expression.
+
+        Returns:
+            The JS source, or ``None`` when the attribute is not a module member.
+
+        Raises:
+            TranspileError: If the module is served but has no such member — a
+                bare ``math.gamma`` would otherwise emit an attribute read on an
+                identifier nothing imports.
+        """
+        if not isinstance(node.value, ast.Name):
+            return None
+        module = self.module_aliases.get(node.value.id)
+        if module is None:
+            return None
+        mapped = _MODULE_CONSTANTS.get(module, {}).get(node.attr)
+        if mapped is not None:
+            return mapped
+        if node.attr in _MODULE_CALLS.get(module, {}):
+            return None
+        raise TranspileError(
+            f"`{module}.{node.attr}` is not available in Mode C",
+            node,
+            self.filename,
         )
 
     def _constant(self, node: ast.Constant) -> str:
@@ -701,11 +887,15 @@ class _Generator:
         orelse = self.expr(node.orelse, indent)
         return f"({test} ? {body} : {orelse})"
 
-    def _listcomp(self, node: ast.ListComp, indent: int) -> str:
+    def _listcomp(self, node: ast.ListComp | ast.GeneratorExp, indent: int) -> str:
         """Emit a list comprehension as chained ``.filter().map()``.
 
         ``[expr for x in it if cond]`` → ``it.filter((x) => cond).map((x) => expr)``.
         Only a single ``for`` clause (with optional ``if``s) is supported.
+
+        A generator expression takes the same path. JS has no lazy generator, so
+        the array is materialized — a difference in cost, not in result, and every
+        corpus site feeds one straight into ``any()``/``all()``/``sum()``.
         """
         if len(node.generators) != 1:
             raise TranspileError(
@@ -713,7 +903,11 @@ class _Generator:
             )
         gen = node.generators[0]
         var = self._loop_target(gen.target)
-        iterable = self.expr(gen.iter, indent)
+        # Spread, because Python iterates anything: `for c in str(value)` walks
+        # the characters, and a JS string has no `.map`. Emitting the chain
+        # straight on the expression shipped `String(value).map(...)`, which the
+        # page only discovers when the line runs.
+        iterable = f"[...{self.expr(gen.iter, indent)}]"
         result = iterable
         for cond in gen.ifs:
             result = f"{result}.filter(({var}) => {self.expr(cond, indent)})"
@@ -829,6 +1023,12 @@ class _Generator:
         ``native.http.request("GET", url, json=body)``) → the positional args
         followed by a trailing options object holding the keywords.
         """
+        pattern = self._pattern_method(node, indent)
+        if pattern is not None:
+            return pattern
+        stdlib = self._stdlib_call(node, indent)
+        if stdlib is not None:
+            return stdlib
         builtin = self._builtin_call(node, indent)
         if builtin is not None:
             return builtin
@@ -889,6 +1089,10 @@ class _Generator:
             return f"Number(({args[0]}).toFixed({args[1]}))"
         if name == "sum" and count == 1:
             return f"{args[0]}.reduce((a, b) => a + b, 0)"
+        if name == "any" and count == 1:
+            return f"{args[0]}.some(Boolean)"
+        if name == "all" and count == 1:
+            return f"{args[0]}.every(Boolean)"
         if name == "enumerate" and count == 1:
             # Python yields (index, value); pair as [index, value] so
             # `for i, v in enumerate(xs)` destructures correctly.
@@ -925,6 +1129,212 @@ class _Generator:
             return empty[name]
         return None
 
+    def _note_regex_binding(self, target: ast.expr, value: ast.expr | None) -> None:
+        """Remember a name bound to ``re.compile(...)``.
+
+        A compiled pattern is emitted as a `RegExp`, and `RegExp` has no
+        `.match`/`.sub`. Knowing which names hold one is what lets the pattern
+        methods route to the helpers without hijacking an unrelated `.match()`.
+
+        Args:
+            target: The assignment target.
+            value: The assigned expression, if any.
+        """
+        if not isinstance(target, ast.Name) or not isinstance(value, ast.Call):
+            return
+        resolved = self._stdlib_target(value.func)
+        if resolved == ("re", "compile"):
+            self.regex_names.add(target.id)
+            return
+        if isinstance(value.func, ast.Name):
+            origin = self.core_imports.get(value.func.id)
+            if origin is not None and getattr(tempest_core, origin, None) is not None:
+                self.widget_names[target.id] = origin
+
+    def _pattern_method(self, node: ast.Call, indent: int) -> str | None:
+        """Emit a compiled pattern's method call, or None when it is not one.
+
+        Args:
+            node: The call node.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS source, or ``None`` to fall through.
+
+        Raises:
+            TranspileError: If the method is not one Mode C maps.
+        """
+        func = node.func
+        if not isinstance(func, ast.Attribute) or not isinstance(func.value, ast.Name):
+            return None
+        if func.value.id not in self.regex_names:
+            return None
+        helper = _PATTERN_METHODS.get(func.attr)
+        if helper is None:
+            raise TranspileError(
+                f"`Pattern.{func.attr}` is not available in Mode C "
+                f"(mapped: {', '.join(sorted(_PATTERN_METHODS))})",
+                node,
+                self.filename,
+            )
+        self.runtime_helpers.add(helper)
+        args = [func.value.id, *(self.expr(a, indent) for a in node.args)]
+        return f"{helper}$({', '.join(args)})"
+
+    def _stdlib_target(self, func: ast.expr) -> tuple[str, str] | None:
+        """Resolve a call target to a ``(module, member)`` pair, or None.
+
+        Covers both import forms: ``re.sub(...)`` through :attr:`module_aliases`
+        and ``ceil(...)`` through :attr:`member_aliases`.
+
+        Args:
+            func: The callee expression.
+
+        Returns:
+            The pair, or ``None`` when this is not a stdlib call.
+        """
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+            module = self.module_aliases.get(func.value.id)
+            if module is not None:
+                return (module, func.attr)
+        if isinstance(func, ast.Name):
+            return self.member_aliases.get(func.id)
+        return None
+
+    def _stdlib_call(self, node: ast.Call, indent: int) -> str | None:
+        """Emit a stdlib call, or None when the callee is not one.
+
+        Args:
+            node: The call node.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS source, or ``None`` to fall through to the normal path.
+
+        Raises:
+            TranspileError: If the module has no such member in Mode C, or the
+                call uses keyword arguments the mapping cannot carry.
+        """
+        target = self._stdlib_target(node.func)
+        if target is None:
+            return None
+        module, member = target
+        mapped = _MODULE_CALLS.get(module, {}).get(member)
+        if mapped is None:
+            raise TranspileError(
+                f"`{module}.{member}` is not available in Mode C",
+                node,
+                self.filename,
+            )
+        if node.keywords:
+            raise TranspileError(
+                f"`{module}.{member}` takes no keyword arguments in Mode C",
+                node,
+                self.filename,
+            )
+        args = [self.expr(a, indent) for a in node.args]
+        if mapped == "@compile":
+            if len(args) != 1:
+                raise TranspileError(
+                    "`re.compile` takes the pattern only (flags are not translated)",
+                    node,
+                    self.filename,
+                )
+            return f"new RegExp({args[0]})"
+        if mapped.startswith("@"):
+            helper = mapped[1:]
+            self.runtime_helpers.add(helper)
+            return f"{helper}$({', '.join(args)})"
+        return f"{mapped}({', '.join(args)})"
+
+    def _refuse_widget_method(self, node: ast.Call) -> None:
+        """Refuse a method call on a core widget, which Mode C does not carry.
+
+        The client ports each widget's *builder* — a function returning the IR
+        node — and none of the Python methods the widget class also has. So
+        ``form.validate(values)`` type-checks, transpiles, and then throws
+        ``form1.validate is not a function`` on the first render: measured in
+        ``examples/signup-wizard``. Compiling something that dies is worse than
+        refusing it, which is the whole point of the served-name check.
+
+        Args:
+            node: The call node.
+
+        Raises:
+            TranspileError: When the receiver is a name bound to a core widget.
+        """
+        func = node.func
+        if not isinstance(func, ast.Attribute) or not isinstance(func.value, ast.Name):
+            return
+        widget = self.widget_names.get(func.value.id)
+        if widget is None:
+            return
+        raise TranspileError(
+            f"`{widget}.{func.attr}()` is not available in Mode C: the client "
+            "ports each widget's builder, not the widget's Python methods",
+            node,
+            self.filename,
+        )
+
+    def _facade_rooted(self, node: ast.expr) -> bool:
+        """Whether an expression is rooted at the native-capability facade.
+
+        `native.storage.get(name)` and `native.geolocation.get()` are real facade
+        calls, so the dict mapping below must not touch them.
+
+        Args:
+            node: The receiver expression.
+
+        Returns:
+            Whether its root name is the facade namespace.
+        """
+        current = node
+        while True:
+            if isinstance(current, ast.Call):
+                current = current.func
+            elif isinstance(current, (ast.Attribute, ast.Subscript)):
+                current = current.value
+            else:
+                break
+        if not isinstance(current, ast.Name):
+            return False
+        return current.id in self.native_imports or current.id in self.native_aliases
+
+    def _dict_get(self, node: ast.Call, indent: int) -> str | None:
+        """Map `d.get(key)` / `d.get(key, default)` to an indexed read.
+
+        A dict is emitted as a plain object, which has no `.get`, so
+        `state.errors.get("email", "")` shipped a page that died on the first
+        render (measured in `signup-wizard`). `??` and not `||`, because
+        Python's `.get` returns a stored falsy value — `0`, `""` — rather than
+        the default.
+
+        A `get` the module declares as a dataclass field is an attribute and not
+        a dict read: `examples/file-storage` injects `storage.get` into its state
+        and calls `app.state.get(key)`, which this mapping turned into
+        `app.state[key]` — valid JS that silently returns undefined.
+
+        Args:
+            node: The call node.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS source, or ``None`` when this is not a dict read.
+        """
+        func = node.func
+        if not isinstance(func, ast.Attribute) or func.attr != "get":
+            return None
+        if len(node.args) not in (1, 2) or self._facade_rooted(func.value):
+            return None
+        if func.attr in self.field_names:
+            return None
+        receiver = self.expr(func.value, indent)
+        key = self.expr(node.args[0], indent)
+        if len(node.args) == 1:
+            return f"{receiver}[{key}]"
+        default = self.expr(node.args[1], indent)
+        return f"({receiver}[{key}] ?? {default})"
+
     def _method_call(self, node: ast.Call, indent: int) -> str | None:
         """Map a Python stdlib method call to its JS idiom, or None to pass through.
 
@@ -938,11 +1348,19 @@ class _Generator:
         """
         if not isinstance(node.func, ast.Attribute) or node.keywords:
             return None
+        mapping = self._dict_get(node, indent)
+        if mapping is not None:
+            return mapping
+        self._refuse_widget_method(node)
         method = node.func.attr
         receiver = self.expr(node.func.value, indent)
         args = [self.expr(a, indent) for a in node.args]
         if method in _METHOD_RENAMES:
             return f"{receiver}.{_METHOD_RENAMES[method]}({', '.join(args)})"
+        if not args and method in _STRING_TESTS:
+            pattern, helper = _STRING_TESTS[method]
+            self.runtime_helpers.add(helper)
+            return f"{helper}$({pattern!r}, {receiver}) !== null".replace("'", '"')
         if not args and method in ("items", "keys", "values"):
             js = "entries" if method == "items" else method
             return f"Object.{js}({receiver})"
@@ -1335,20 +1753,38 @@ class _Generator:
             and handler.type.id in ("Exception", "BaseException")
         )
 
+    def _exc_name(self, local: str) -> str:
+        """Return the name an exception class carries at runtime.
+
+        Args:
+            local: The name the module refers to the class by.
+
+        Returns:
+            The exported name it was imported from, or the local name when the
+            module declares the class itself.
+        """
+        return self.native_imports.get(local) or self.core_imports.get(local, local)
+
     def _exc_condition(self, type_node: ast.expr, var: str) -> str:
         """Build the JS test matching an ``except`` type against a caught error.
 
         Match is by exception **class name** (``err.name === "ValueError"`` /
         ``["A","B"].includes(err.name)``) — JS has no Python exception classes,
         so a browser/JS error (whose ``name`` is e.g. ``"TypeError"``) only
-        matches when the names coincide.
+        matches when the names coincide. The name compared is the one the class
+        carries at runtime, so ``except NativeError as Failure`` still matches:
+        an aliased import tested against its local name never fired.
         """
         if isinstance(type_node, ast.Name):
-            return f'{var}.name === "{type_node.id}"'
+            return f'{var}.name === "{self._exc_name(type_node.id)}"'
         if isinstance(type_node, ast.Tuple) and all(
             isinstance(elt, ast.Name) for elt in type_node.elts
         ):
-            names = ", ".join(f'"{elt.id}"' for elt in type_node.elts)  # type: ignore[attr-defined]
+            names = ", ".join(
+                f'"{self._exc_name(elt.id)}"'
+                for elt in type_node.elts
+                if isinstance(elt, ast.Name)
+            )
             return f"[{names}].includes({var}.name)"
         raise TranspileError(
             "unsupported except type; use `except Name` or `except (A, B)`",
@@ -1479,6 +1915,7 @@ class _Generator:
         pad = _INDENT * indent
         lines: list[str] = []
         for target in node.targets:
+            self._note_regex_binding(target, node.value)
             lines.extend(self._assign_target(target, value, pad, indent))
         return lines
 
@@ -1649,6 +2086,12 @@ class _Generator:
                 self._collect_imports(node, importable)
             elif isinstance(node, ast.ClassDef):
                 self.class_names.add(node.name)
+                self.field_names.update(
+                    stmt.target.id
+                    for stmt in node.body
+                    if isinstance(stmt, ast.AnnAssign)
+                    and isinstance(stmt.target, ast.Name)
+                )
                 top_level.append(node)
             elif isinstance(
                 node,
@@ -1684,7 +2127,33 @@ class _Generator:
                 bodies.append(self._function(node))
 
         imports = self._imports(self.referenced & importable)
-        return "\n\n".join([imports, *bodies]) + "\n"
+        tables = [
+            self._native_enum(local, name)
+            for local, name in sorted(self.native_enums.items())
+            if local in self.referenced
+        ]
+        return "\n\n".join([imports, *tables, *bodies]) + "\n"
+
+    def _native_enum(self, local: str, name: str) -> str:
+        """Emit a native string enum as the frozen table Mode C compares against.
+
+        The facade returns the raw JSON value — ``"granted"``, not a Python
+        member — so ``perm is NotificationPermission.GRANTED`` is a string
+        comparison once both sides are emitted. The table is what makes the
+        member name resolvable.
+
+        Args:
+            local: The name the module bound it to.
+            name: The enum as the native package spells it.
+
+        Returns:
+            The ``const X = Object.freeze({...});`` source.
+        """
+        members = "\n".join(
+            f"{_INDENT}{member}: {json.dumps(value)},"
+            for member, value in sorted(NATIVE_ENUMS[name].items())
+        )
+        return f"const {local} = Object.freeze({{\n{members}\n}});"
 
     def _module_const(self, node: ast.Assign | ast.AnnAssign) -> str:
         """Emit a module-level constant (e.g. a translations table) as `const`.
@@ -1696,6 +2165,7 @@ class _Generator:
         value: ast.expr | None
         if isinstance(node, ast.AnnAssign):
             target, value = node.target, node.value
+            self._note_regex_binding(target, value)
         else:
             if len(node.targets) != 1:
                 raise TranspileError(
@@ -1704,6 +2174,7 @@ class _Generator:
                     self.filename,
                 )
             target, value = node.targets[0], node.value
+            self._note_regex_binding(target, value)
         if not isinstance(target, ast.Name) or value is None:
             raise TranspileError(
                 "only a single named module constant with a value is supported",
@@ -1724,7 +2195,11 @@ class _Generator:
 
         A name that is neither type-only nor a builtin means the value carries a
         real runtime term, so the assignment is a constant and not an alias —
-        ``LIMIT = MAX_ROWS`` stays an emitted ``const``.
+        ``LIMIT = MAX_ROWS`` stays an emitted ``const``. A native string enum is
+        tolerated as a leaf, because ``Callable[[], Awaitable[Permission]]`` is
+        annotation syntax whichever way its parameter is spelled; it takes a
+        type-only head for the assignment to be read as an alias at all, so a
+        real constant built from an enum member is still emitted.
 
         Args:
             node: The module-level assignment.
@@ -1738,13 +2213,51 @@ class _Generator:
         names = {n.id for n in ast.walk(value) if isinstance(n, ast.Name)}
         if not names & self.type_only:
             return False
-        if names - self.type_only - _BUILTIN_NAMES:
+        if names - self.type_only - _BUILTIN_NAMES - set(self.native_enums):
             return False
         targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
         for target in targets:
             if isinstance(target, ast.Name):
                 self.type_only.add(target.id)
         return True
+
+    def _bind_module(self, module: str, local: str, node: ast.stmt) -> None:
+        """Bind a module name for `import x` / `import x as y`.
+
+        Args:
+            module: The imported module's dotted name.
+            local: The local name it binds.
+            node: The import node, for the diagnostic's line.
+
+        Raises:
+            TranspileError: If Mode C serves no such module. A module that is
+                refused on purpose says what to do instead — a diagnostic that
+                only lists what is allowed leaves the reader stuck.
+        """
+        if module in _MODULE_CALLS or module in _MODULE_CONSTANTS:
+            self.module_aliases[local] = module
+            return
+        if module == "tempestweb" or module.startswith(f"{_NATIVE_MODULE}"):
+            raise TranspileError(
+                f"`import {module}` is not supported in Mode C: import the "
+                "capability by name — `from tempestweb import native`, or "
+                "`from tempestweb.native import get_position`",
+                node,
+                self.filename,
+            )
+        hint = _REFUSED_MODULES.get(module)
+        if hint is not None:
+            raise TranspileError(
+                f"`import {module}` is not available in Mode C: {hint}",
+                node,
+                self.filename,
+            )
+        raise TranspileError(
+            f"`import {module}` is not available in Mode C "
+            f"(served: {', '.join(sorted(_MODULE_CALLS))})",
+            node,
+            self.filename,
+        )
 
     def _collect_imports(
         self, node: ast.Import | ast.ImportFrom, importable: set[str]
@@ -1758,11 +2271,9 @@ class _Generator:
                 injected dataclass base).
         """
         if isinstance(node, ast.Import):
-            raise TranspileError(
-                "plain `import x` is not supported; use `from ... import ...`",
-                node,
-                self.filename,
-            )
+            for alias in node.names:
+                self._bind_module(alias.name, alias.asname or alias.name, node)
+            return
         module = node.module or ""
         if module in {"__future__", "dataclasses"}:
             return
@@ -1770,16 +2281,46 @@ class _Generator:
         # Mode C serves from its in-process JS facade (./native.js).
         if module == "tempestweb":
             for alias in node.names:
-                name = alias.asname or alias.name
-                if name in _NATIVE_NAMES:
-                    importable.add(name)
-                else:
+                if alias.name != _NATIVE_NAMESPACE:
                     raise TranspileError(
-                        f"`from tempestweb import {name}` is not supported "
+                        f"`from tempestweb import {alias.name}` is not supported "
                         "(only `native`)",
                         node,
                         self.filename,
                     )
+                self.native_imports[alias.asname or alias.name] = _NATIVE_NAMESPACE
+            return
+        if module == _NATIVE_MODULE:
+            self._import_native_root(node)
+            return
+        if module.startswith(f"{_NATIVE_MODULE}."):
+            self._import_native_group(module[len(_NATIVE_MODULE) + 1 :], node)
+            return
+        if module == "enum":
+            for alias in node.names:
+                name = alias.name
+                if name not in _ENUM_BASES:
+                    raise TranspileError(
+                        f"`from enum import {name}` is not supported "
+                        f"(only {', '.join(sorted(_ENUM_BASES))})",
+                        node,
+                        self.filename,
+                    )
+                self.enum_bases.add(alias.asname or name)
+            return
+        if module in _MODULE_CALLS or module in _MODULE_CONSTANTS:
+            for alias in node.names:
+                member = alias.name
+                known = member in _MODULE_CALLS.get(
+                    module, {}
+                ) or member in _MODULE_CONSTANTS.get(module, {})
+                if not known:
+                    raise TranspileError(
+                        f"`{module}.{member}` is not available in Mode C",
+                        node,
+                        self.filename,
+                    )
+                self.member_aliases[alias.asname or member] = (module, member)
             return
         # Annotation-only sources: record the names and emit nothing for them.
         if module in _TYPE_ONLY_MODULES:
@@ -1787,6 +2328,13 @@ class _Generator:
                 self.type_only.add(alias.asname or alias.name)
             return
         if not (module.startswith("tempest_core") or module == _COMPONENT_MODULE):
+            hint = _REFUSED_MODULES.get(module)
+            if hint is not None:
+                raise TranspileError(
+                    f"`from {module} import …` is not available in Mode C: {hint}",
+                    node,
+                    self.filename,
+                )
             raise TranspileError(
                 f"import from {module!r} is not supported "
                 "(only tempest_core, `tempestweb.components` "
@@ -1801,6 +2349,113 @@ class _Generator:
             self.core_imports[name] = alias.name
             self.import_nodes[name] = node
         importable.add("State")
+
+    def _bind_native(self, local: str, path: str) -> None:
+        """Bind a local name to a path on the Mode C native facade.
+
+        Args:
+            local: The name the module binds.
+            path: The path below the facade namespace (``"storage"``,
+                ``"geolocation.get_position"``).
+        """
+        self.native_imports[_NATIVE_FACADE_ALIAS] = _NATIVE_NAMESPACE
+        self.native_aliases[local] = f"{_NATIVE_FACADE_ALIAS}.{path}"
+
+    def _refuse_native_group(self, group: str, node: ast.stmt) -> None:
+        """Raise for a capability group the in-process facade does not carry.
+
+        Args:
+            group: The capability group as Python spells it.
+            node: The import node, for the diagnostic's line.
+
+        Raises:
+            TranspileError: Always, when called.
+        """
+        raise TranspileError(
+            f"`{group}` is not served in Mode C: the facade in `native.js` has "
+            f"no `{group}`, so the capability needs Mode A (Pyodide) or Mode B "
+            "(server)",
+            node,
+            self.filename,
+        )
+
+    def _import_native_root(self, node: ast.ImportFrom) -> None:
+        """Bind `from tempestweb.native import …` onto the facade.
+
+        The package re-exports both the capability groups (``storage``) and the
+        flat helpers (``get_position``), and Mode C reaches every one of them
+        through the same ``./native.js`` object — so this is the same import as
+        ``from tempestweb import native``, spelled the other way.
+
+        Args:
+            node: The import node.
+
+        Raises:
+            TranspileError: If the facade carries no such name, naming what was
+                asked for rather than the module it came from.
+        """
+        types = {name for names in NATIVE_TYPES.values() for name in names}
+        for alias in node.names:
+            name = alias.name
+            local = alias.asname or name
+            if name in NATIVE_EXPORTS:
+                self.native_imports[local] = name
+                self.import_nodes[local] = node
+            elif name in NATIVE_MEMBERS:
+                self._bind_native(local, name)
+            elif name in NATIVE_FLAT:
+                self._bind_native(local, NATIVE_FLAT[name])
+            elif name in NATIVE_GROUPS:
+                self._refuse_native_group(name, node)
+            elif name in NATIVE_ENUMS:
+                self.native_enums[local] = name
+            elif name in types:
+                self.type_only.add(local)
+            else:
+                raise TranspileError(
+                    f"`tempestweb.native.{name}` is not available in Mode C "
+                    "(the facade in `native.js` exports no such name)",
+                    node,
+                    self.filename,
+                )
+
+    def _import_native_group(self, group: str, node: ast.ImportFrom) -> None:
+        """Bind `from tempestweb.native.<group> import …` onto the facade.
+
+        Args:
+            group: The capability group the import addresses.
+            node: The import node.
+
+        Raises:
+            TranspileError: If the group is not served, or the group serves no
+                such member — named, with what it does serve.
+        """
+        members = NATIVE_MEMBERS.get(group)
+        if members is None:
+            if group in NATIVE_GROUPS:
+                self._refuse_native_group(group, node)
+            raise TranspileError(
+                f"`tempestweb.native.{group}` is not a capability group",
+                node,
+                self.filename,
+            )
+        types = NATIVE_TYPES.get(group, frozenset())
+        for alias in node.names:
+            name = alias.name
+            local = alias.asname or name
+            if name in members:
+                self._bind_native(local, f"{group}.{name}")
+            elif name in NATIVE_ENUMS and name in types:
+                self.native_enums[local] = name
+            elif name in types:
+                self.type_only.add(local)
+            else:
+                raise TranspileError(
+                    f"`{group}.{name}` is not available in Mode C "
+                    f"(served: {', '.join(sorted(members))})",
+                    node,
+                    self.filename,
+                )
 
     def _refuse_unserved(self, origin: str, node: ast.AST | None) -> None:
         """Raise when the Mode C client exports no such name.
@@ -1860,7 +2515,16 @@ class _Generator:
         runtime = sorted(used & _RUNTIME_NAMES)
         if self.state_base != "State":
             runtime.append(f"State as {self.state_base}")
-        native = sorted(used & _NATIVE_NAMES)
+        # `$` is legal in a JS identifier and never in a Python one, so an app's
+        # own `sleep` cannot collide with the helper it calls.
+        runtime.extend(
+            f"{helper} as {helper}$" for helper in sorted(self.runtime_helpers)
+        )
+        native = [
+            export if local == export else f"{export} as {local}"
+            for local, export in sorted(self.native_imports.items())
+            if local in self.referenced
+        ]
         nav = sorted(used & _NAV_NAMES)
         i18n = sorted(used & _I18N_NAMES)
         theme = sorted(used & _THEME_NAMES)
@@ -1973,6 +2637,45 @@ class _Generator:
                     self.filename,
                 )
 
+    def _enum_class(self, node: ast.ClassDef) -> str:
+        """Emit an `Enum` subclass as a frozen object of its members.
+
+        An app enum is a table of constants, which is exactly what
+        ``values.gen.js`` already ships for the core's own enums. Members keep
+        their value, so `phase == Phase.CLEAR` stays a plain comparison.
+
+        Args:
+            node: The class node.
+
+        Returns:
+            The `export const X = Object.freeze({...});` source.
+
+        Raises:
+            TranspileError: If a member has no value, or the body holds anything
+                but members and a docstring (a method on an enum would need a
+                class, and the frozen object is what makes it a constant table).
+        """
+        members: list[str] = []
+        for stmt in node.body:
+            if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Constant):
+                continue
+            target: ast.expr | None = None
+            assigned: ast.expr | None = None
+            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
+                target, assigned = stmt.targets[0], stmt.value
+            elif isinstance(stmt, ast.AnnAssign):
+                target, assigned = stmt.target, stmt.value
+            if not isinstance(target, ast.Name) or assigned is None:
+                raise TranspileError(
+                    "an enum body holds `NAME = value` members only",
+                    stmt,
+                    self.filename,
+                )
+            members.append(f"{_INDENT}{target.id}: {self.expr(assigned, 1)},")
+        body = "\n".join(members)
+        inner = f"\n{body}\n" if members else ""
+        return f"export const {node.name} = Object.freeze({{{inner}}});"
+
     def _class(self, node: ast.ClassDef) -> str:
         """Emit a `@dataclass` as `export class X extends <base> { … }`.
 
@@ -1984,6 +2687,11 @@ class _Generator:
         (``super()`` chains the parent constructor, then the subclass's own field
         defaults are assigned — overriding an inherited default when they clash).
         """
+        if any(
+            isinstance(base, ast.Name) and base.id in self.enum_bases
+            for base in node.bases
+        ):
+            return self._enum_class(node)
         for decorator in node.decorator_list:
             if isinstance(decorator, ast.Name):
                 name: str | None = decorator.id

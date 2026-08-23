@@ -526,7 +526,7 @@ test("typing in an Input drives onChange -> state -> re-render", () => {
           Input({
             value: app.state.text,
             key: "f",
-            onChange: (e) => app.setState((s) => (s.text = e.payload.value)),
+            onChange: (e) => app.setState((s) => (s.text = e.value)),
           }),
         ],
       }),
@@ -539,6 +539,51 @@ test("typing in an Input drives onChange -> state -> re-render", () => {
 
   assert.equal(handle.app.state.text, "hello");
   assert.ok(handle.patchLog.length >= 1, "the re-render emitted a patch");
+});
+
+test("a handler reads the event flat, the way Modes A and B deliver it", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  class FormState extends State {
+    constructor() {
+      super();
+      this.text = "";
+      this.seen = null;
+    }
+  }
+  const mod = {
+    makeState: () => new FormState(),
+    view: (app) =>
+      Column({
+        children: [
+          Input({
+            value: app.state.text,
+            key: "f",
+            onChange: (e) =>
+              app.setState((s) => {
+                s.text = e.value;
+                s.seen = { type: e.type, key: e.key, wire: e.payload.value };
+              }),
+          }),
+        ],
+      }),
+  };
+
+  const handle = mountApp(dom.root, mod);
+  const field = dom.root.querySelector("[data-tw-key=\"f\"]");
+  field.value = "typed";
+  field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+  // The transpiler emits `e.value` — a Python handler annotated with
+  // `TextChangeEvent` reads a flat field, and Mode C used to hand it the wire
+  // event, so every text input wrote `undefined` into the state.
+  assert.equal(handle.app.state.text, "typed");
+  assert.deepEqual(handle.app.state.seen, {
+    type: "input",
+    key: "f",
+    wire: "typed",
+  });
 });
 
 // ---- 3. runtime drives a real generated module ----------------------------
@@ -776,4 +821,29 @@ test("registering a controller drives the frame loop until it settles", () => {
   } finally {
     delete globalThis.requestAnimationFrame;
   }
+});
+
+test("the re helpers reproduce Python's semantics, which JS does not give free", async () => {
+  const { reMatch, reSearch, reFullmatch, reSub, reFindall } = await import(
+    "../../client/transpile/runtime.js"
+  );
+  // `Pattern.match` anchors at the START — `test`/`exec` do not.
+  assert.ok(reMatch("[^@\\s]+@[^@\\s]+", "a@b.c"));
+  assert.equal(reMatch("b", "ab"), null, "match is anchored at the start");
+  assert.ok(reSearch("b", "ab"), "search is not anchored");
+  // `fullmatch` anchors both ends.
+  assert.ok(reFullmatch("a+", "aaa"));
+  assert.equal(reFullmatch("a+", "aaab"), null);
+  // `re.sub` replaces EVERY occurrence; a JS string `replace` replaces one.
+  assert.equal(reSub("\\D", "", "R$ 1.234,50"), "123450");
+  assert.deepEqual(reFindall("\\d+", "a1b22c333"), ["1", "22", "333"]);
+  // A compiled pattern works the same as its source.
+  assert.ok(reMatch(new RegExp("^[a-z]+$"), "abc"));
+});
+
+test("the sleep helper counts seconds, the way asyncio.sleep does", async () => {
+  const { sleep } = await import("../../client/transpile/runtime.js");
+  const started = Date.now();
+  await sleep(0.05);
+  assert.ok(Date.now() - started >= 45, "0.05 s is 50 ms, not 0.05 ms");
 });

@@ -212,6 +212,21 @@ O mesmo `native` tipado dos Modos A/B funciona no Modo C — chamadas `async`
 transcritas para chamadas JS em processo à glue de browser compartilhada
 (`fetch`, IndexedDB/localStorage, `document.cookie`). Zero Python, zero rede.
 
+As três formas de import que o Python escreve chegam no mesmo lugar:
+
+```python
+from tempestweb import native                          # o namespace
+from tempestweb.native import storage, get_position    # grupo e função
+from tempestweb.native.geolocation import get_position  # o grupo como módulo
+```
+
+!!! warning "Capacidade que o Modo C não tem, dita na hora do build"
+    `camera` não tem fachada em processo — `camera.capture` precisa do Modo A
+    (Pyodide) ou B (servidor). Importá-la em Modo C é erro de compilação com
+    `arquivo:linha` dizendo isso, e não uma página que carrega e quebra ao
+    clicar. A lista viva do que a fachada serve é gerada do próprio
+    `client/transpile/native.js`.
+
 ```python
 from tempestweb import native
 
@@ -625,8 +640,25 @@ no espírito do `mypy --strict`.
       `field(default_factory=…)` com callable próprio.
     - **conversão de container:** `list(xs)`, `tuple(xs)`, `set(xs)`,
       `dict(pairs)`.
+    - **módulos da stdlib que o browser tem:** `re`, `json`, `math`, `base64` e
+      `asyncio`, nas duas formas de import (`import re` / `from math import
+      ceil`). `Pattern.match` ancora no início como no Python, `re.sub` troca
+      todas, e `asyncio.sleep(0.4)` espera 400 ms. Membro fora da tabela é
+      recusado **pelo nome** (`re.escape`), e módulo fora da lista diz **o que
+      fazer no lugar**.
+    - **`enum` do app:** `class Phase(StrEnum)` vira objeto congelado, como os
+      enums do core já viajam em `values.gen.js`.
+    - **generator expression** (`any(x for x in xs)`), `any`/`all`, `dict.get`
+      com default, e os predicados de `str` (`c.isdigit()`).
 
-    Medido no corpus: **25 dos 57 exemplos** transpilam (eram 14).
+    - **capacidade nativa, nas três formas de import:**
+      `from tempestweb import native`, `from tempestweb.native import storage`
+      e `from tempestweb.native.geolocation import get_position` caem todas no
+      mesmo objeto de `./native.js`. Grupo que a fachada não carrega (`camera`)
+      é recusado dizendo **qual modo o tem**, e membro desconhecido é recusado
+      **pelo nome** (`geolocation.triangulate`).
+
+    Medido no corpus: **31 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),
@@ -642,6 +674,11 @@ no espírito do `mypy --strict`.
     (`widget-support.js`).
 
 !!! warning "Ainda fora do subset — e agora falha no build"
+    **Método de widget do core** (`form.validate(values)`, e qualquer outro): o
+    cliente porta o *builder* de cada widget, não os métodos Python da classe.
+    Chamar um é erro de compilação com `arquivo:linha`, e não uma página que
+    carrega e morre na primeira renderização.
+
     Os componentes **dirigidos por dados** de `tempest_core.components`
     (`DataTable`, `Table`, `Tabs`, `Accordion`, `BarChart`/`LineChart`,
     `DetectionOverlay`, `ResultView`, `Calendar`/`Clock`, os pickers de mídia e

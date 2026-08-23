@@ -143,8 +143,12 @@ The Mode C compiler accepts a subset of typed Python, and refuses early with the
 exact line. The most frequent ones:
 
 ```text
-plain `import x` is not supported; use `from ... import ...`
+is not available in Mode C
 ```
+
+`import x` works for the modules Mode C serves (`re`, `json`, `math`, `base64`,
+`asyncio`) and nothing else — and a refused module's message **says what to do
+instead** (`datetime` → format it in your state and pass the string).
 
 ```text
 variadic parameters (*args / **kwargs) are not supported
@@ -160,13 +164,25 @@ And the one you meet most when porting an existing app:
 is not supported (only tempest_core, `tempestweb.components` and `tempestweb.native`)
 ```
 
-Mode C sees `tempest_core`, `tempestweb.components` and `tempestweb.native`.
+Mode C sees `tempest_core`, `tempestweb.components` and `tempestweb.native`
+— the last one in all three forms: `from tempestweb import native`,
+`from tempestweb.native import storage` and
+`from tempestweb.native.geolocation import get_position`. Plain `import
+tempestweb.native` is not one of them: the message says which form to write.
 Annotation-only stdlib imports (`collections.abc`, `typing`) pass too: the name
 exists for the type checker and costs no JS import — but using one as a **value**
 is an error (`'Any' is a type-only name`), because nothing would import it.
 
 Outside that list, `tempestweb.presets` and `tempestweb.observability` are out of
 reach: screens built from presets run in Modes A and B, not in C.
+
+A native capability Mode C does not have in-process (`camera`) is refused
+saying **which mode has it**:
+
+```text
+`camera` is not served in Mode C: the facade in `native.js` has no `camera`,
+so the capability needs Mode A (Pyodide) or Mode B (server)
+```
 
 A legal name in a legal module can still be missing from the client — then the
 error names the **name**, not the module:

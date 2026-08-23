@@ -292,6 +292,26 @@ function collectHandlers(node) {
  * @param {TranspileModule} mod  The generated module (`makeState` + `view`).
  * @returns {TranspileMountHandle}  A handle to inspect and tear down the app.
  */
+/**
+ * Shape a wire event the way an app handler reads it.
+ *
+ * A handler in Modes A and B receives a typed event object whose fields are
+ * flat — `e.value` for a text change, `e.x`/`e.y` for a tap — built by Python
+ * from the wire payload. Mode C used to hand the handler the wire event itself
+ * (`{type, key, payload}`), so `e.value` was `undefined` and a text input wrote
+ * undefined into the state: the page rendered, typing did nothing, and the
+ * first read of the draft threw. The payload's own fields win, because they are
+ * exactly what the typed event exposes; `payload` stays reachable for a handler
+ * written against the wire shape.
+ *
+ * @param {TWEvent} event  The wire event.
+ * @returns {Object}  The event the handler sees.
+ */
+function appEvent(event) {
+  const payload = event.payload ?? {};
+  return { type: event.type, key: event.key, payload, ...payload };
+}
+
 export function mountApp(root, { makeState, view }) {
   const app = new App(makeState());
 
@@ -338,7 +358,7 @@ export function mountApp(root, { makeState, view }) {
       if (typeof handler !== "function") {
         return;
       }
-      const result = handler(event);
+      const result = handler(appEvent(event));
       if (result != null && typeof result.then === "function") {
         result.then(undefined, (err) => {
           if (typeof console !== "undefined") {
@@ -413,4 +433,100 @@ export function mountApp(root, { makeState, view }) {
       handle.unmount();
     },
   };
+}
+
+/**
+ * Python's `re` semantics, which JS does not give for free.
+ *
+ * Three differences the emitted code would otherwise get wrong:
+ * `Pattern.match` anchors at the **start** of the string (JS `test`/`exec` do
+ * not), `Pattern.fullmatch` anchors at both ends, and `re.sub` replaces **every**
+ * occurrence (a JS `replace` with a string pattern replaces one). Each helper
+ * takes either a compiled `RegExp` or a raw pattern string, so `re.sub(r"\D", …)`
+ * and a module-level `re.compile(...)` both work.
+ *
+ * The pattern source travels unchanged: the shared syntax (`\d`, `\s`, classes,
+ * quantifiers, groups) means the common case is identical, while Python-only
+ * syntax (`(?P<name>…)`, inline `(?i)`) is not translated and would throw in the
+ * browser the same way an invalid pattern does.
+ *
+ * @param {RegExp|string} pattern  A compiled pattern or its source.
+ * @param {string} [anchor]        `"^"`, `"^$"`, or `""` for a free search.
+ * @param {string} [extraFlags]    Flags to add (e.g. `"g"`).
+ * @returns {RegExp}  The equivalent JS pattern.
+ */
+function pythonRegExp(pattern, anchor = "", extraFlags = "") {
+  const compiled = pattern instanceof RegExp;
+  const source = compiled ? pattern.source : String(pattern);
+  const base = compiled ? pattern.flags.replace(/g/g, "") : "";
+  const flags = [...new Set(`${base}${extraFlags}`.split(""))].join("");
+  const head = anchor.startsWith("^") ? "^" : "";
+  const tail = anchor.endsWith("$") ? "$" : "";
+  return new RegExp(`${head}(?:${source})${tail}`, flags);
+}
+
+/**
+ * `Pattern.match(text)` / `re.match(pattern, text)` — anchored at the start.
+ *
+ * @param {RegExp|string} pattern  The pattern.
+ * @param {string} text            The subject.
+ * @returns {?RegExpExecArray}  The match, or null — truthy exactly as in Python.
+ */
+export function reMatch(pattern, text) {
+  return pythonRegExp(pattern, "^").exec(String(text));
+}
+
+/**
+ * `Pattern.search(text)` / `re.search(pattern, text)` — anywhere in the string.
+ *
+ * @param {RegExp|string} pattern  The pattern.
+ * @param {string} text            The subject.
+ * @returns {?RegExpExecArray}  The match, or null.
+ */
+export function reSearch(pattern, text) {
+  return pythonRegExp(pattern).exec(String(text));
+}
+
+/**
+ * `Pattern.fullmatch(text)` — the whole string must match.
+ *
+ * @param {RegExp|string} pattern  The pattern.
+ * @param {string} text            The subject.
+ * @returns {?RegExpExecArray}  The match, or null.
+ */
+export function reFullmatch(pattern, text) {
+  return pythonRegExp(pattern, "^$").exec(String(text));
+}
+
+/**
+ * `re.sub(pattern, replacement, text)` — replaces every occurrence.
+ *
+ * @param {RegExp|string} pattern      The pattern.
+ * @param {string} replacement         The replacement text.
+ * @param {string} text                The subject.
+ * @returns {string}  The substituted string.
+ */
+export function reSub(pattern, replacement, text) {
+  return String(text).replace(pythonRegExp(pattern, "", "g"), replacement);
+}
+
+/**
+ * `re.findall(pattern, text)` — every non-overlapping match, as strings.
+ *
+ * @param {RegExp|string} pattern  The pattern.
+ * @param {string} text            The subject.
+ * @returns {string[]}  The matched substrings.
+ */
+export function reFindall(pattern, text) {
+  return [...String(text).matchAll(pythonRegExp(pattern, "", "g"))].map((m) => m[0]);
+}
+
+/**
+ * `asyncio.sleep(seconds)` — Python counts seconds, `setTimeout` milliseconds.
+ *
+ * @param {number} seconds  How long to wait.
+ * @returns {Promise<void>}  Resolves after the delay.
+ */
+export function sleep(seconds) {
+  return new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 }

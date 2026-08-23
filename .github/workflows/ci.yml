@@ -36,6 +36,33 @@ jobs:
       - name: JS client tests (jsdom)
         run: node --test "tests/client/**/*.test.js"
 
+  a11y:
+    name: Accessibility gate (axe-core)
+    runs-on: ubuntu-latest
+    # Blocking on purpose (Track S — S10). docs/stability.md declares an
+    # accessibility baseline; before this job nothing measured one, and an
+    # IconButton shipped as an unfocusable div with no accessible name (#109).
+    # The Lighthouse job in pwa.yml stays a soft signal — it owns contrast and
+    # installability, which need a real browser.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: npm install
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install
+        run: uv sync --all-extras
+      - name: The scenes are generated from the example apps, not hand-written
+        run: |
+          uv run python -m tests.conformance._a11y_scenes
+          git diff --exit-code tests/fixtures/a11y_scenes.json
+      - name: axe-core over the DOM the renderer builds
+        run: node scripts/a11y-gate.mjs
+
   audit:
     runs-on: ubuntu-latest
     steps:

@@ -4,6 +4,46 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.101.0] — 2026-08-23
+
+### Added
+
+- **Gate de acessibilidade que trava de verdade**
+  ([#121](https://github.com/mauriciobenjamin700/tempestweb/issues/121)).
+  `docs/stability.md` declarava baseline de a11y e nada media: o job Lighthouse
+  roda com `|| echo soft-fail`, ou seja, não bloqueia nada — e um `IconButton`
+  chegou a produção como `div` sem foco e sem nome acessível sem nenhum job
+  reclamar (#109).
+
+  O job `a11y` do CI roda **axe-core** sobre o DOM que o renderizador de verdade
+  constrói e falha em violação `serious`/`critical`. As cenas são **geradas dos
+  apps que o repo entrega** (`tests/conformance/_a11y_scenes.py`): galeria de
+  componentes do Modo C, painel de controles, lista com campo, formulário, casca
+  de navegação e tela de imagens — auditar markup escrito à mão provaria que o
+  snippet do teste é acessível, não que o renderizador é.
+
+  Verificado que morde: imagem sem `alt` reprova como `critical` (`image-alt`),
+  botão sem nome reprova (`button-name`, a forma exata da #109) e `role` inválido
+  vindo de `semantics` reprova (`aria-roles`).
+
+- **O wire-contract é congelado** — `tempestweb.contract` expõe
+  `WIRE_CONTRACT_VERSION` (versão própria, independente da versão do pacote) e
+  `WIRE_SHAPE_DIGEST`, o hash da **forma** do fio (cada chave e seu tipo, nunca o
+  valor). As golden fixtures travavam drift acidental mas são regeneráveis do
+  core, então não distinguiam "regenerei" de "mudei o contrato".
+
+  `tests/unit/test_wire_contract_freeze.py` reprova mudança de forma e diz qual
+  escolha o autor deve: aditiva (chave opcional nova, `kind` novo, `type` novo →
+  digest novo, versão igual, entrada no CHANGELOG) ou quebra (renomear, remover,
+  retipar, mudar semântica de patch → bump da versão + nota de migração).
+  Regenerar fixture com valores novos **não** mexe no digest, que é o ponto.
+
+### Changed
+
+- `docs/stability.md` (PT + EN) descreve o que o gate pega e o que fica para a
+  camada Lighthouse (contraste e instalabilidade precisam de layout real), e a
+  tabela de compatibilidade do wire. `docs/roadmap.md`: S10 fecha.
+- `axe-core` entra como `devDependency` e `npm run a11y` roda o gate local.
 ## [0.98.0] — 2026-08-23
 
 ### Fixed

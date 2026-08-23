@@ -415,6 +415,10 @@ test("TabView names its panel after the active tab and stays a container", () =>
   assert.equal(el.children[0].getAttribute(TYPE_ATTR), "Text");
 });
 
+// Closed, the drawer is hidden from the accessibility tree — not `aria-expanded`,
+// which is only allowed on a handful of roles. This is a plain div, so axe flagged
+// that attribute as invalid ARIA (critical), and "expanded" describes the control
+// that toggles the drawer: the app's own button.
 test("RouteDrawer reflects open, so the prop is visible to sheet and reader", () => {
   withDocument();
   const el = buildElement({
@@ -428,10 +432,6 @@ test("RouteDrawer reflects open, so the prop is visible to sheet and reader", ()
   });
 
   assert.equal(el.hasAttribute("data-tw-open"), false);
-  // Closed: hidden from the accessibility tree. Not `aria-expanded` — that is only
-  // allowed on a handful of roles, and this is a plain div, so axe flagged it as
-  // invalid ARIA (critical). "Expanded" describes the control that toggles the
-  // drawer, which is the app's own button.
   assert.equal(el.getAttribute("aria-hidden"), "true");
 
   applyPatches(el, [{ path: [], set_props: { open: true } }]);
@@ -543,6 +543,9 @@ test("TabView keeps an aria-label the app set through semantics", () => {
 });
 
 
+// A <label> names its input through its text; an aria-label on the wrapper names
+// the label, not the control inside it — so the control came out nameless (axe:
+// `label`, critical). The name is copied inward.
 test("a wrapped control takes the name the app gave the widget", () => {
   withDocument();
   const el = buildElement({
@@ -552,12 +555,11 @@ test("a wrapped control takes the name the app gave the widget", () => {
     children: [],
   });
 
-  // A <label> names its input through its text; an aria-label on the wrapper
-  // names the label, not the control inside it — so the control came out nameless
-  // (axe: `label`, critical). The name is copied inward.
   assert.equal(el.querySelector("input").getAttribute("aria-label"), "Enable notifications");
 });
 
+// Two names on one control is worse than one, and the visible caption is the
+// better name: it is what the reader sees.
 test("a visible caption wins over the semantics name, and is not duplicated", () => {
   withDocument();
   const el = buildElement({
@@ -567,8 +569,6 @@ test("a visible caption wins over the semantics name, and is not duplicated", ()
     children: [],
   });
 
-  // Two names on one control is worse than one, and the visible caption is the
-  // better name: it is what the reader sees.
   assert.equal(el.querySelector("input").hasAttribute("aria-label"), false);
   assert.equal(el.textContent.trim(), "Notifications");
 });

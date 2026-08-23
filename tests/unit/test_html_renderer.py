@@ -528,14 +528,18 @@ def test_tab_view_is_a_panel_named_after_its_active_tab() -> None:
 
 
 def test_route_drawer_says_whether_it_is_open() -> None:
+    """A closed drawer is hidden from the accessibility tree.
+
+    Not ``aria-expanded``: that attribute is invalid on a role-less div (axe:
+    ``aria-allowed-attr``), and "expanded" describes the control that toggles the
+    drawer, not the panel.
+    """
     closed = render_to_html(
         RouteDrawer(child=Text(content="main"), drawer=Text(content="side"), open=False)
     )
     opened = render_to_html(
         RouteDrawer(child=Text(content="main"), drawer=Text(content="side"), open=True)
     )
-    # Closed: hidden from the accessibility tree, not `aria-expanded` — that
-    # attribute is invalid on a role-less div (axe: aria-allowed-attr).
     assert 'aria-hidden="true"' in closed
     assert "data-tw-open" not in closed
     assert 'data-tw-open=""' in opened

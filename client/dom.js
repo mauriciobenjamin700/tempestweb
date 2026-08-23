@@ -1787,6 +1787,12 @@ function nameActivePanel(el) {
  * IR child, so the renderer *can* draw its tabs (see applyTabBarProps) — wired to
  * the same handler.
  *
+ * A closed drawer says `aria-hidden`, not `aria-expanded`: that attribute is only
+ * allowed on a handful of roles, and a RouteDrawer is a plain div, so axe flags it
+ * as invalid ARIA — and it is right. What "expanded" describes is the *control*,
+ * which is the app's own button. What this element can say truthfully is whether
+ * it is hidden.
+ *
  * @param {HTMLElement} el   The TabView / RouteDrawer element.
  * @param {string} type      The widget type.
  * @param {Object} props     The props being applied.
@@ -1809,10 +1815,6 @@ function applyPanelProps(el, type, props) {
   if ("open" in props) {
     const open = Boolean(props.open);
     setOrRemove(el, OPEN_ATTR, open ? "" : null);
-    // Not `aria-expanded`: that attribute is only allowed on a handful of roles,
-    // and a RouteDrawer is a plain div — axe flags it as invalid ARIA, and it is
-    // right. What "expanded" describes is the *control*, which is the app's own
-    // button. What this element can say truthfully is whether it is hidden.
     setOrRemove(el, "aria-hidden", open ? null : "true");
   }
 }

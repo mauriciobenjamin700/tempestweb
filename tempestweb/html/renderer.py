@@ -237,6 +237,11 @@ def _control_attributes(node: Node) -> list[str]:
     ``src``/``alt``. Checkbox state is handled by :func:`_inner_html` (the nested
     input), and other types add nothing here.
 
+    A closed ``RouteDrawer`` says ``aria-hidden``, not ``aria-expanded``: that
+    attribute is invalid on a role-less div (axe: ``aria-allowed-attr``), and
+    "expanded" describes the control that toggles the drawer — the app's button.
+    What this element can say is that it is hidden.
+
     Args:
         node: The IR node whose control props to map.
 
@@ -291,10 +296,6 @@ def _control_attributes(node: Node) -> list[str]:
         if open_:
             attributes.append('data-tw-open=""')
         else:
-            # `aria-expanded` is not allowed on a role-less div (axe:
-            # aria-allowed-attr). "Expanded" describes the control that toggles the
-            # drawer — the app's button. What this element can say is that it is
-            # hidden.
             attributes.append('aria-hidden="true"')
     elif node.type == "Input":
         attributes.append(f'type="{"password" if props.get("secure") else "text"}"')

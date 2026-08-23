@@ -30,6 +30,8 @@ test("the gate fails an image with no alt text", async () => {
   assert.equal(violations[0].impact, "critical");
 });
 
+// The #109 shape: a control that renders, takes a click, and tells a screen
+// reader nothing.
 test("the gate fails a button with no accessible name", async () => {
   const violations = await auditScene("probe", {
     type: "Column",
@@ -38,8 +40,6 @@ test("the gate fails a button with no accessible name", async () => {
     children: [{ type: "Button", key: "nameless", props: {}, children: [] }],
   });
 
-  // This is the #109 shape: a control that renders, takes a click, and tells a
-  // screen reader nothing.
   assert.deepEqual(
     violations.map((v) => v.id),
     ["button-name"],

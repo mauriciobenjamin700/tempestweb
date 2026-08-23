@@ -49,15 +49,16 @@ def test_the_shape_carries_types_and_no_values() -> None:
 
     That is the point of digesting the *shape*: the fixtures are derived from the
     live core, so their values move with it. Only keys and types are the contract.
+
+    The first half asserts nothing leaks — not the counter's label, not its
+    colours, not its numbers. The second asserts what is left is type names. No
+    fixture carries a boolean today, which is why ``"bool"`` is not among them:
+    the shape reports what the wire has.
     """
     shape = wire_shape()
     serialized = json.dumps(shape)
-    # No fixture value leaks into the shape: the counter label, its colours and
-    # its numbers are all absent.
     assert "Count: 0" not in serialized
     assert "#6750a4" not in serialized
-    # What is left is type names. (No fixture carries a boolean today, which is
-    # why "bool" is not asserted: the shape reports what the wire has.)
     for leaf in ("str", "int", "float", "null"):
         assert leaf in serialized
 

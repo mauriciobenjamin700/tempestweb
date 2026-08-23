@@ -4,6 +4,65 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.84.0] — 2026-08-23
+
+### Added
+
+- **`import x` funciona, para os módulos que o browser tem** (#110): `re`, `json`,
+  `math`, `base64` e `asyncio`, nas **duas** formas de import (`import re`,
+  `from math import ceil`). Antes a recusa era pela *forma*, então nem um módulo
+  cujo conteúdo o Modo C sabia traduzir passava.
+- **Semântica de `re` do Python, que o JS não dá de graça:** `Pattern.match`
+  ancora no início (`test`/`exec` não ancoram), `fullmatch` ancora nas duas
+  pontas, e `re.sub` troca **todas** as ocorrências. Os helpers vivem em
+  `client/transpile/runtime.js` e são importados com alias `$` — ilegal em
+  identificador Python, logo um `sleep` do app não colide com o helper. Conferido
+  membro a membro contra o Python: `match`/`search`/`fullmatch`/`sub`/`findall`
+  dão o mesmo resultado nos dois lados.
+- **`enum` do app** (#112): `class Phase(StrEnum)` vira `Object.freeze({…})`, como
+  os enums do core já viajam em `values.gen.js`. Os 6 exemplos que usam `enum`
+  usam `StrEnum` com membro string.
+- **`math`** (#112) com os membros de equivalente exato (`Math.*`,
+  `Number.isNaN`/`isFinite`) e as constantes (`pi`, `e`, `tau`, `inf`, `nan`).
+- **`asyncio.sleep`**, convertendo segundos para milissegundos — medido no
+  browser: `sleep(0.4)` espera ~400 ms, não 0,4 ms.
+- **Generator expression** (`any(x for x in xs)`) toma o caminho da comprehension:
+  JS não tem gerador lazy, então o array é materializado — diferença de custo, não
+  de resultado. Junto vieram `any`/`all` (que não existiam e emitiam chamada a
+  nome inexistente), `dict.get` com default, e os predicados de `str`
+  (`c.isdigit()` → teste de padrão).
+- **Recusa que ensina** (#112): módulo fora da lista diz o que fazer no lugar —
+  `datetime` → formate no estado e passe a string; `functools` → `partial` é
+  lambda e `reduce` é `.reduce`. Vale nas duas formas de import. Membro
+  desconhecido de módulo servido é recusado **pelo nome** (`re.escape`).
+
+### Fixed
+
+- **Comprehension sobre string emitia `.map` em string.** Python itera qualquer
+  iterável (`for c in str(value)` anda pelos caracteres) e string em JS não tem
+  `.map`. O iterável passa a ser espalhado (`[...expr]`).
+- **`dict.get` não existia.** Dict é objeto simples em JS, então
+  `state.errors.get("email", "")` carregava a página e morria na primeira
+  renderização (medido em `signup-wizard`). Agora é leitura indexada com `??` — e
+  não `||`, para valor falsy guardado (`0`, `""`) não ser trocado pelo default. O
+  `.get` da fachada nativa (`native.storage.get`) é preservado.
+- **Método de widget do core compilava e morria.** `form.validate(values)`
+  transpilava limpo e levantava `form1.validate is not a function` na primeira
+  renderização, porque o cliente porta o *builder* de cada widget e não os
+  métodos Python da classe. Agora é erro de compilação com `arquivo:linha`:
+  compilar algo que morre é pior que recusar, que é justamente o que a checagem
+  de nome servido existe para evitar.
+
+### Notas
+
+- **Medido no corpus: 26 dos 57 exemplos transpilam** (eram 25 antes deste PR e
+  14 antes da 0.83.0). `async_demo` entrou; `signup-wizard` saiu do estado
+  "compila e quebra" para "recusado com motivo".
+- Verificado em Chrome real, service worker e caches limpos antes de medir:
+  `async_demo` vai de `idle` → `loading…` → `done` com o sleep de 400 ms;
+  `rating-review` troca a dica de `Tap a star to rate` para `Very good` ao clicar
+  a quarta estrela, que é o `dict.get` com default rodando. Console limpo nos dois.
+
 ## [0.83.1] — 2026-08-23
 
 ### Fixed

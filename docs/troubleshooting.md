@@ -143,8 +143,12 @@ O compilador do Modo C aceita um subconjunto de Python tipado, e recusa cedo com
 a linha exata. Os mais frequentes:
 
 ```text
-plain `import x` is not supported; use `from ... import ...`
+is not available in Mode C
 ```
+
+`import x` funciona para os módulos que o Modo C serve (`re`, `json`, `math`,
+`base64`, `asyncio`) e para nada além disso — a mensagem de um módulo recusado
+**diz o que fazer no lugar** (`datetime` → formate no estado e passe a string).
 
 ```text
 variadic parameters (*args / **kwargs) are not supported

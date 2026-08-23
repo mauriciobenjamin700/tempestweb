@@ -143,8 +143,12 @@ The Mode C compiler accepts a subset of typed Python, and refuses early with the
 exact line. The most frequent ones:
 
 ```text
-plain `import x` is not supported; use `from ... import ...`
+is not available in Mode C
 ```
+
+`import x` works for the modules Mode C serves (`re`, `json`, `math`, `base64`,
+`asyncio`) and nothing else — and a refused module's message **says what to do
+instead** (`datetime` → format it in your state and pass the string).
 
 ```text
 variadic parameters (*args / **kwargs) are not supported

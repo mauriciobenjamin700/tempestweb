@@ -94,7 +94,7 @@ def test_ternary_conditional_expression() -> None:
 def test_list_comprehension_becomes_map() -> None:
     """A list comprehension becomes a chained `.filter().map()`."""
     js = gen("def f(xs):\n    return [Text(content=x) for x in xs if x]\n")
-    assert "xs.filter((x) => x).map((x) => Text({ content: x }))" in js
+    assert "[...xs].filter((x) => x).map((x) => Text({ content: x }))" in js
 
 
 def test_membership_uses_includes() -> None:
@@ -1124,3 +1124,168 @@ def test_container_builtins_convert_instead_of_calling_a_missing_name() -> None:
     assert "const c = new Set(xs);" in js
     assert "const d = Object.fromEntries(pairs);" in js
     assert "const e = [];" in js
+
+
+def test_a_served_module_is_reachable_by_either_import_form() -> None:
+    """`import json` and `from math import ceil` both resolve."""
+    js = gen(
+        "import json\nfrom math import ceil\n\n\n"
+        "def f(payload, total):\n"
+        "    return json.dumps({'pages': ceil(total / 10)})\n"
+    )
+    assert "JSON.stringify(" in js
+    assert "Math.ceil(" in js
+    # Neither module leaves an import behind: both map to a JS global.
+    assert "json" not in js
+    assert "ceil(" not in js.replace("Math.ceil(", "")
+
+
+def test_a_module_constant_reads_as_a_value() -> None:
+    """`math.pi` is a constant, not a call."""
+    js = gen("import math\n\n\ndef f(r):\n    return math.pi * r * r\n")
+    assert "Math.PI" in js
+
+
+def test_asyncio_sleep_converts_seconds_to_milliseconds() -> None:
+    """Python counts seconds and `setTimeout` counts milliseconds."""
+    js = gen("import asyncio\n\n\nasync def f():\n    await asyncio.sleep(0.5)\n")
+    assert "sleep$(0.5)" in js
+    assert 'import { sleep as sleep$ } from "./runtime.js";' in js
+
+
+def test_a_helper_import_cannot_collide_with_an_app_name() -> None:
+    """The `$` alias is illegal in Python, so an app's own `sleep` is safe."""
+    js = gen(
+        "import asyncio\n\n\n"
+        "def sleep(seconds):\n"
+        "    return seconds\n\n\n"
+        "async def f():\n"
+        "    await asyncio.sleep(1)\n"
+        "    return sleep(2)\n"
+    )
+    assert "sleep as sleep$" in js
+    assert "export function sleep(seconds)" in js
+    assert "await sleep$(1)" in js
+    assert "return sleep(2)" in js
+
+
+def test_a_compiled_pattern_keeps_python_re_semantics() -> None:
+    """`Pattern.match` anchors at the start; `RegExp` has no `.match` at all.
+
+    Emitting `_RE.match(s)` straight through shipped a call to a method the
+    browser does not have — the page loads and dies on the line that runs it.
+    """
+    js = gen(
+        'import re\n\n_RE = re.compile(r"[a-z]+")\n\n\n'
+        "def f(value):\n"
+        "    return [_RE.match(value), _RE.search(value), _RE.sub('x', value)]\n"
+    )
+    assert "new RegExp(" in js
+    assert "reMatch$(_RE, value)" in js
+    assert "reSearch$(_RE, value)" in js
+    assert 'reSub$(_RE, "x", value)' in js
+
+
+def test_re_sub_replaces_every_occurrence() -> None:
+    """Python's `re.sub` is global; a JS `replace` with a string is not."""
+    js = gen('import re\n\n\ndef f(text):\n    return re.sub(r"\\D", "", text)\n')
+    assert 'reSub$("\\\\D", "", text)' in js
+
+
+def test_a_str_enum_becomes_a_frozen_object() -> None:
+    """An app enum is a constant table, which is what the core's enums ship as."""
+    js = gen(
+        "from enum import StrEnum\n\n\n"
+        "class Phase(StrEnum):\n"
+        '    """Phase."""\n\n'
+        '    INBOX = "inbox"\n'
+        '    CLEAR = "clear"\n'
+    )
+    assert "export const Phase = Object.freeze({" in js
+    assert 'INBOX: "inbox",' in js
+    assert 'CLEAR: "clear",' in js
+
+
+def test_a_generator_expression_takes_the_comprehension_path() -> None:
+    """`any(x for x in xs)` is a comprehension without the brackets."""
+    js = gen("def f(rows):\n    return any(len(r) > 0 for r in rows)\n")
+    assert "[...rows].map((r) => r.length > 0).some(Boolean)" in js
+
+
+def test_a_comprehension_over_a_string_iterates_characters() -> None:
+    """Python iterates a string; a JS string has no `.map`.
+
+    `String(value).map(...)` parsed, passed the golden, and threw in the browser.
+    """
+    js = gen("def f(value):\n    return [c for c in str(value)]\n")
+    assert "[...String(value)]" in js
+
+
+def test_a_string_predicate_becomes_a_pattern_test() -> None:
+    """`c.isdigit()` has no JS counterpart, so it routes to a full match."""
+    js = gen("def f(c):\n    return c.isdigit()\n")
+    assert 'reFullmatch$("[0-9]+", c) !== null' in js
+
+
+def test_a_refused_module_says_what_to_do_instead() -> None:
+    """A diagnostic that only lists what is allowed leaves the reader stuck."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen("import datetime\n")
+    message = str(excinfo.value)
+    assert "format the value in your state" in message
+    with pytest.raises(TranspileError) as from_form:
+        gen("from functools import partial\n")
+    assert "write them inline" in str(from_form.value)
+
+
+def test_an_unknown_module_member_is_refused_by_name() -> None:
+    """`re.escape` does not exist in the browser, and silence would ship a bug."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen("import re\n\n\ndef f(s):\n    return re.escape(s)\n")
+    assert "`re.escape`" in str(excinfo.value)
+
+
+def test_a_dict_get_reads_the_key_with_its_default() -> None:
+    """A dict is a plain object, which has no `.get`.
+
+    `state.errors.get("email", "")` shipped a page that died on the first
+    render. `??` and not `||`, so a stored `0`/`""` is not replaced.
+    """
+    js = gen(
+        "def view(app):\n"
+        '    a = app.state.errors.get("email", "")\n'
+        '    b = app.state.answers.get("q1")\n'
+        "    return [a, b]\n"
+    )
+    assert 'const a = (app.state.errors["email"] ?? "");' in js
+    assert 'const b = app.state.answers["q1"];' in js
+
+
+def test_the_native_facade_keeps_its_own_get() -> None:
+    """`native.storage.get(name)` is a real facade call, not a dict read."""
+    js = gen(
+        "from tempestweb import native\n\n\n"
+        "async def load():\n"
+        '    return await native.storage.get("key")\n'
+    )
+    assert 'await native.storage.get("key")' in js
+
+
+def test_a_core_widget_method_is_refused_at_build_time() -> None:
+    """Mode C ports a widget's builder, not the widget's Python methods.
+
+    `form.validate(values)` transpiled cleanly and then threw
+    `form1.validate is not a function` on the first render — measured in
+    `examples/signup-wizard`. Compiling something that dies is worse than
+    refusing it.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from tempest_core import Form, Text\n\n"
+            "form1 = Form(fields=[])\n\n\n"
+            "def view(app):\n"
+            "    return Text(content=str(form1.validate({})))\n"
+        )
+    message = str(excinfo.value)
+    assert "`Form.validate()`" in message
+    assert "not the widget's Python methods" in message

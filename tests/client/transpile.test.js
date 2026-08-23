@@ -777,3 +777,28 @@ test("registering a controller drives the frame loop until it settles", () => {
     delete globalThis.requestAnimationFrame;
   }
 });
+
+test("the re helpers reproduce Python's semantics, which JS does not give free", async () => {
+  const { reMatch, reSearch, reFullmatch, reSub, reFindall } = await import(
+    "../../client/transpile/runtime.js"
+  );
+  // `Pattern.match` anchors at the START — `test`/`exec` do not.
+  assert.ok(reMatch("[^@\\s]+@[^@\\s]+", "a@b.c"));
+  assert.equal(reMatch("b", "ab"), null, "match is anchored at the start");
+  assert.ok(reSearch("b", "ab"), "search is not anchored");
+  // `fullmatch` anchors both ends.
+  assert.ok(reFullmatch("a+", "aaa"));
+  assert.equal(reFullmatch("a+", "aaab"), null);
+  // `re.sub` replaces EVERY occurrence; a JS string `replace` replaces one.
+  assert.equal(reSub("\\D", "", "R$ 1.234,50"), "123450");
+  assert.deepEqual(reFindall("\\d+", "a1b22c333"), ["1", "22", "333"]);
+  // A compiled pattern works the same as its source.
+  assert.ok(reMatch(new RegExp("^[a-z]+$"), "abc"));
+});
+
+test("the sleep helper counts seconds, the way asyncio.sleep does", async () => {
+  const { sleep } = await import("../../client/transpile/runtime.js");
+  const started = Date.now();
+  await sleep(0.05);
+  assert.ok(Date.now() - started >= 45, "0.05 s is 50 ms, not 0.05 ms");
+});

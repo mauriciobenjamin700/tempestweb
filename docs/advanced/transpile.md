@@ -625,8 +625,18 @@ no espírito do `mypy --strict`.
       `field(default_factory=…)` com callable próprio.
     - **conversão de container:** `list(xs)`, `tuple(xs)`, `set(xs)`,
       `dict(pairs)`.
+    - **módulos da stdlib que o browser tem:** `re`, `json`, `math`, `base64` e
+      `asyncio`, nas duas formas de import (`import re` / `from math import
+      ceil`). `Pattern.match` ancora no início como no Python, `re.sub` troca
+      todas, e `asyncio.sleep(0.4)` espera 400 ms. Membro fora da tabela é
+      recusado **pelo nome** (`re.escape`), e módulo fora da lista diz **o que
+      fazer no lugar**.
+    - **`enum` do app:** `class Phase(StrEnum)` vira objeto congelado, como os
+      enums do core já viajam em `values.gen.js`.
+    - **generator expression** (`any(x for x in xs)`), `any`/`all`, `dict.get`
+      com default, e os predicados de `str` (`c.isdigit()`).
 
-    Medido no corpus: **25 dos 57 exemplos** transpilam (eram 14).
+    Medido no corpus: **26 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),
@@ -642,6 +652,11 @@ no espírito do `mypy --strict`.
     (`widget-support.js`).
 
 !!! warning "Ainda fora do subset — e agora falha no build"
+    **Método de widget do core** (`form.validate(values)`, e qualquer outro): o
+    cliente porta o *builder* de cada widget, não os métodos Python da classe.
+    Chamar um é erro de compilação com `arquivo:linha`, e não uma página que
+    carrega e morre na primeira renderização.
+
     Os componentes **dirigidos por dados** de `tempest_core.components`
     (`DataTable`, `Table`, `Tabs`, `Accordion`, `BarChart`/`LineChart`,
     `DetectionOverlay`, `ResultView`, `Calendar`/`Clock`, os pickers de mídia e

@@ -16,6 +16,7 @@ attribute/name/number/string/BinOp expressions, keyword-only widget calls, and
 from __future__ import annotations
 
 import ast
+import builtins
 import json
 import re
 from typing import Any
@@ -72,6 +73,19 @@ _VALIDATOR_NAMES: frozenset[str] = frozenset(
 )
 # Type-only imports that carry no runtime value and are dropped from the output.
 _TYPE_ONLY_NAMES: frozenset[str] = frozenset({"Widget"})
+# Modules whose names exist only in annotations, which the emitter drops. The
+# import carries no runtime value, so nothing is emitted for it — but a name from
+# here used as a *value* is refused, because a bare identifier with no import is
+# a `ReferenceError` the browser raises only when the line runs.
+_TYPE_ONLY_MODULES: frozenset[str] = frozenset({"collections.abc", "typing"})
+# The component facade this package re-exports the core's components through. Of
+# the 77 names it exports, 63 are the core object itself (identity-equal), so
+# they route exactly like a `tempest_core` import; the rest are this repo's own
+# layer and are refused by name against the served manifest.
+_COMPONENT_MODULE: str = "tempestweb.components"
+# Builtin names a type alias may mention besides the type-only ones themselves
+# (`list[str]`, `dict[str, int]`, `tuple[int, ...]`).
+_BUILTIN_NAMES: frozenset[str] = frozenset(dir(builtins))
 # API identifiers renamed from Python's snake_case to the JS client's camelCase.
 _NAME_MAP: dict[str, str] = {
     "make_state": "makeState",
@@ -312,6 +326,10 @@ class _Generator:
         # Local name → the import statement that introduced it, so refusing a
         # name the client cannot serve can point at a line.
         self.import_nodes: dict[str, ast.ImportFrom] = {}
+        # Names that exist only in annotations: imported from a type-only module,
+        # or bound to a type alias built from one. Referencing them as a value is
+        # refused instead of emitting an identifier nothing imports.
+        self.type_only: set[str] = set()
 
     # -- expressions --------------------------------------------------------
 
@@ -331,6 +349,13 @@ class _Generator:
         if isinstance(node, ast.Constant):
             return self._constant(node)
         if isinstance(node, ast.Name):
+            if node.id in self.type_only:
+                raise TranspileError(
+                    f"{node.id!r} is a type-only name (annotations are dropped), "
+                    "so it cannot be used as a value",
+                    node,
+                    self.filename,
+                )
             self.referenced.add(node.id)
             return _js_name(node.id)
         if isinstance(node, ast.Attribute):
@@ -1545,6 +1570,8 @@ class _Generator:
                 bodies.append(self._class(node))
                 self.referenced.add(self.state_base)
             elif isinstance(node, ast.Assign | ast.AnnAssign):
+                if self._is_type_alias(node):
+                    continue
                 bodies.append(self._module_const(node))
             else:
                 assert isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -1578,6 +1605,40 @@ class _Generator:
                 self.filename,
             )
         return f"const {target.id} = {self.expr(value, 0)};"
+
+    def _is_type_alias(self, node: ast.Assign | ast.AnnAssign) -> bool:
+        """Whether a module-level assignment is a type alias, and record it.
+
+        A module that annotates handlers writes aliases like
+        ``Fetcher = Callable[[], Awaitable[list[str]]]``. That is an assignment of
+        runtime syntax built out of type-only names and builtin generics, so
+        emitting it would reference identifiers nothing imports. The target joins
+        :attr:`type_only`, which keeps it usable in the annotations the emitter
+        drops and refused in a value position.
+
+        A name that is neither type-only nor a builtin means the value carries a
+        real runtime term, so the assignment is a constant and not an alias —
+        ``LIMIT = MAX_ROWS`` stays an emitted ``const``.
+
+        Args:
+            node: The module-level assignment.
+
+        Returns:
+            Whether the assignment is a type alias (and was recorded as one).
+        """
+        value = node.value
+        if value is None:
+            return False
+        names = {n.id for n in ast.walk(value) if isinstance(n, ast.Name)}
+        if not names & self.type_only:
+            return False
+        if names - self.type_only - _BUILTIN_NAMES:
+            return False
+        targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+        for target in targets:
+            if isinstance(target, ast.Name):
+                self.type_only.add(target.id)
+        return True
 
     def _collect_imports(
         self, node: ast.Import | ast.ImportFrom, importable: set[str]
@@ -1614,10 +1675,16 @@ class _Generator:
                         self.filename,
                     )
             return
-        if not module.startswith("tempest_core"):
+        # Annotation-only sources: record the names and emit nothing for them.
+        if module in _TYPE_ONLY_MODULES:
+            for alias in node.names:
+                self.type_only.add(alias.asname or alias.name)
+            return
+        if not (module.startswith("tempest_core") or module == _COMPONENT_MODULE):
             raise TranspileError(
                 f"import from {module!r} is not supported "
-                "(only tempest_core and `tempestweb.native`)",
+                "(only tempest_core, `tempestweb.components` "
+                "and `tempestweb.native`)",
                 node,
                 self.filename,
             )

@@ -157,12 +157,23 @@ function decorators are not supported
 E o que mais aparece ao portar um app já pronto:
 
 ```text
-is not supported (only tempest_core and `tempestweb.native`)
+is not supported (only tempest_core, `tempestweb.components` and `tempestweb.native`)
 ```
 
-O Modo C só enxerga `tempest_core` e `tempestweb.native`. Isso inclui
-`tempestweb.presets` e `tempestweb.components` — telas montadas com presets
-rodam nos Modos A e B, não em C.
+O Modo C enxerga `tempest_core`, `tempestweb.components` e `tempestweb.native`.
+Import de stdlib **só de anotação** (`collections.abc`, `typing`) também passa: o
+nome existe para o type-checker e não custa import nenhum no JS — mas usá-lo como
+**valor** é erro (`'Any' is a type-only name`), porque nada o importaria.
+
+Fora dessa lista, `tempestweb.presets` e `tempestweb.observability` não são
+alcançáveis: telas montadas com presets rodam nos Modos A e B, não em C.
+
+Nome legal em módulo legal ainda pode faltar no cliente — aí o erro cita o
+**nome**, não o módulo:
+
+```text
+is not available in Mode C (the transpile client exports no such name)
+```
 
 Referência: [Modo C — transpile](advanced/transpile.md).
 

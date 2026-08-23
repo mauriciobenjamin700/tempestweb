@@ -867,3 +867,101 @@ def test_a_type_only_import_is_never_emitted() -> None:
     )
     assert "DragEvent" not in js
     assert 'import { Text } from "./widgets.js";' in js
+
+
+def test_a_stdlib_annotation_source_costs_no_import() -> None:
+    """`collections.abc`/`typing` names annotate handlers and emit nothing.
+
+    Eleven example apps stopped at this import while the name they wanted was
+    only ever written in an annotation — which the emitter drops.
+    """
+    js = gen(
+        "from collections.abc import Awaitable, Callable\n"
+        "from typing import Any\n"
+        "from tempest_core import Text\n\n\n"
+        "def handle(fetch: Callable[[], Awaitable[str]], extra: Any) -> Text:\n"
+        '    return Text(content="x")\n'
+    )
+    assert "Callable" not in js
+    assert "Awaitable" not in js
+    assert "Any" not in js
+    assert "collections" not in js
+    assert 'import { Text } from "./widgets.js";' in js
+
+
+def test_a_module_level_type_alias_is_dropped() -> None:
+    """`Fetcher = Callable[...]` is an alias, not a constant, so nothing is emitted.
+
+    It reads as an assignment, so emitting it would declare a `const` whose value
+    references identifiers nothing imports — a `ReferenceError` at load.
+    """
+    js = gen(
+        "from collections.abc import Awaitable, Callable\n"
+        "from tempest_core import Text\n\n"
+        "Fetcher = Callable[[], Awaitable[list[str]]]\n"
+        "LIMIT = 3\n\n\n"
+        "def handle(fetch: Fetcher) -> Text:\n"
+        "    return Text(content=str(LIMIT))\n"
+    )
+    assert "Fetcher" not in js
+    assert "const LIMIT = 3;" in js
+
+
+def test_a_type_only_name_used_as_a_value_is_refused() -> None:
+    """Using an annotation-only name as a value is an error, not a dead identifier.
+
+    Without the guard the emitter wrote a bare `Any` with no import, so the module
+    loaded and died on the line that ran it. A module-level `X = Any` is not this
+    case: that reads as a type alias in Python too, so it is dropped.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from typing import Any\nfrom tempest_core import Text\n\n\n"
+            "def describe() -> str:\n"
+            "    return str(Any)\n"
+        )
+    assert "type-only name" in str(excinfo.value)
+
+
+def test_a_constant_built_from_a_runtime_name_is_still_emitted() -> None:
+    """A `const` whose value carries a real term is not mistaken for an alias."""
+    js = gen(
+        "from typing import Any\n\n"
+        "BASE = 10\n"
+        "LIMIT = BASE\n\n\n"
+        "def read(x: Any) -> int:\n"
+        "    return LIMIT\n"
+    )
+    assert "const LIMIT = BASE;" in js
+
+
+def test_the_component_facade_routes_like_the_core() -> None:
+    """`from tempestweb.components import Card` reaches the same served builder.
+
+    Of the 77 names the facade exports, 63 are the core object itself, and it is
+    the import the tutorial teaches — while Mode C used to refuse the module
+    outright.
+    """
+    js = gen(
+        "from tempestweb.components import Card, Text\n\n\n"
+        "def view(app):\n"
+        '    return Card(children=[Text(content="x", key="t")], key="c")\n'
+    )
+    assert 'import { Card, Text } from "./widgets.js";' in js
+
+
+def test_a_facade_name_the_client_cannot_serve_is_refused_by_name() -> None:
+    """This repo's own `*Field` layer is refused by name, not by module.
+
+    The distinction matters: the module is legal, the name is what is missing, so
+    the diagnostic points at the component instead of the import path.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from tempestweb.components import EmailField\n\n\n"
+            "def view(app):\n"
+            '    return EmailField(key="e")\n'
+        )
+    message = str(excinfo.value)
+    assert "EmailField" in message
+    assert "is not available in Mode C" in message

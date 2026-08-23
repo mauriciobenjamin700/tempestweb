@@ -78,6 +78,53 @@ function styleSheet() {
  * @param {import("./transport.js").Transport} transport  The event sink.
  * @returns {{refresh: () => void, dispose: () => void}}
  */
+/**
+ * Ask for the last page when the tracked window sits past the end of the list.
+ *
+ * A window slid deep into a list that then **shrinks** resolves to nothing: the
+ * core clamps the start to the item count, so `[45, 75)` against 25 items becomes
+ * `[25, 25)`. With no rows there is no scroll, and with no scroll there is no
+ * event that could ever put it back — the list is stuck empty with its data
+ * loaded. Measured in `examples/list_demo`: `25 of 200 items` over an empty box,
+ * in every mode.
+ *
+ * This runs after each patch batch, which is when a shrink lands, and asks for
+ * the **last page** rather than the top, so a reader who was at the end stays at
+ * the end. It is a recovery, not the resolution rule: where the window lands is
+ * still the core's answer.
+ *
+ * @param {HTMLElement} viewport  The lazy viewport.
+ * @param {string} key  Its widget key.
+ * @param {number} count  The list's current item count.
+ * @param {number} start  The window start the app is tracking.
+ * @param {number} rendered  How many children are materialized.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @param {Map<string, number>} requested  The last window asked for, by key.
+ * @returns {void}
+ */
+function recoverWindow(viewport, key, count, start, rendered, transport, requested) {
+  const windowSize = intAttr(viewport, "data-tw-window-size", rendered);
+  if (windowSize <= 0) {
+    return;
+  }
+  const maxStart = Math.max(0, count - windowSize);
+  // Two signals, because only one of them survives every mode. The tracked start
+  // is on the element when the app declares `window`; when it is slid at runtime
+  // the element still reads 0, and what gives the stuck state away is that a list
+  // *with* items materialized none — there is no legitimate state where that
+  // happens, and it is exactly what the clamp produces.
+  const stranded = count > 0 && rendered === 0;
+  if ((start <= maxStart && !stranded) || requested.get(key) === maxStart) {
+    return;
+  }
+  requested.set(key, maxStart);
+  transport.sendEvent({
+    type: "scroll",
+    key,
+    payload: { start: maxStart, end: Math.min(count, maxStart + windowSize) },
+  });
+}
+
 export function installVirtualization(root, transport) {
   const requested = new Map();
 
@@ -97,6 +144,7 @@ export function installVirtualization(root, transport) {
       const count = intAttr(viewport, LAZY_ATTR, 0);
       const start = intAttr(viewport, "data-tw-window-start", 0);
       const rendered = viewport.childElementCount;
+      recoverWindow(viewport, key, count, start, rendered, transport, requested);
       const extent = itemExtent(viewport);
       if (extent <= 0 || count <= rendered) {
         continue;

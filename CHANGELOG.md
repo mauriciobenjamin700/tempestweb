@@ -4,6 +4,31 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.97.0] — 2026-08-23
+
+### Fixed
+
+- **Lista virtualizada travava vazia depois de encurtar**
+  ([#133](https://github.com/mauriciobenjamin700/tempestweb/issues/133)). Uma
+  janela deslizada fundo contra uma lista que encurta resolve para vazio — o
+  `_resolve_window` do core prende o `start` na contagem, e `[45, 75)` contra 25
+  itens vira `[25, 25)`. Sem linha não há scroll, e sem scroll não há evento que
+  a recupere.
+
+  O controlador de virtualização passa a se recuperar depois de cada lote de
+  patches: uma lista **com** itens que não materializou nenhum, ou cuja janela
+  começa além da última página, pede a última página. Os dois sinais são
+  necessários porque só um sobrevive em cada modo — quando a app declara
+  `window`, o `start` está no elemento; quando ele é deslizado em runtime, o
+  elemento ainda lê 0, e o que entrega o estado travado é a lista com itens sem
+  nenhuma linha.
+
+  É rede de segurança, não a correção da regra: onde a janela **resolve**
+  continua sendo resposta do core.
+
+Medido no `examples/list_demo`, nos dois modos: deslizar fundo, pull-to-refresh,
+e a lista volta com itens e volta a rolar.
+
 ## [0.96.0] — 2026-08-23
 
 ### Fixed

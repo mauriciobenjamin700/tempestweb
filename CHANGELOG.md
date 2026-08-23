@@ -65,9 +65,9 @@ versioning.
   `located` com `-8.048, -34.877` com a permissão concedida, e a `error:
   NativeError: permission_denied` com ela negada. Console limpo nos dois, sem
   overflow horizontal a 390px e 1280px.
-- **Fora do escopo, achado na medição:** o `TextArea` do Modo C renderiza um
-  `<div>` vazio, sem campo editável — o corpo da nota do `file-storage` não é
-  digitável. Fica registrado como issue própria.
+- **Fora do escopo, achado na medição:** o `TextArea` renderiza um `<div>`
+  vazio, sem campo editável — o corpo da nota do `file-storage` não é digitável.
+  Vale nos três modos, porque `client/dom.js` é compartilhado (#130).
 
 ## [0.84.0] — 2026-08-23
 

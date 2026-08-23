@@ -86,6 +86,20 @@ _COMPONENT_MODULE: str = "tempestweb.components"
 # Builtin names a type alias may mention besides the type-only ones themselves
 # (`list[str]`, `dict[str, int]`, `tuple[int, ...]`).
 _BUILTIN_NAMES: frozenset[str] = frozenset(dir(builtins))
+
+
+def _is_none(node: ast.expr) -> bool:
+    """Whether an expression is the literal ``None``.
+
+    Args:
+        node: The expression to inspect.
+
+    Returns:
+        Whether it is ``None``.
+    """
+    return isinstance(node, ast.Constant) and node.value is None
+
+
 # API identifiers renamed from Python's snake_case to the JS client's camelCase.
 _NAME_MAP: dict[str, str] = {
     "make_state": "makeState",
@@ -480,6 +494,12 @@ class _Generator:
         - ``,`` → ``(x).toLocaleString("en-US")`` — grouped thousands.
         - ``.N%`` → ``((x) * 100).toFixed(N) + "%"`` — percent (``N`` defaults 0).
         - ``d`` / ``,d`` → truncated integer, optionally grouped.
+        - ``0Nd`` → zero-padded integer, the spec every clock, counter and
+          scoreboard needs. A bare ``padStart`` is **wrong** for a negative
+          value: Python pads after the sign (``f"{-42:05d}"`` is ``"-0042"``)
+          while ``String(-42).padStart(5, "0")`` gives ``"00-42"``. The emitted
+          arrow keeps the sign outside the padding, and takes its argument once
+          so an interpolated call is not evaluated twice.
 
         Args:
             expr: The already-emitted JS for the interpolated value.
@@ -493,6 +513,13 @@ class _Generator:
             TranspileError: For any spec outside the supported subset (e.g.
                 alignment/fill, sign, binary/hex, exponent).
         """
+        zero_pad = re.fullmatch(r"0(\d+)d", text)
+        if zero_pad:
+            width = int(zero_pad.group(1))
+            return (
+                f'((v) => v < 0 ? "-" + String(-v).padStart({max(width - 1, 0)}, "0")'
+                f' : String(v).padStart({width}, "0"))({expr})'
+            )
         match = re.fullmatch(r"(,)?(?:\.(\d+))?([fF%d])?", text)
         grouped = bool(match and match.group(1))
         precision = match.group(2) if match else None
@@ -500,7 +527,7 @@ class _Generator:
         if match is None or not (grouped or precision is not None or kind):
             raise TranspileError(
                 f"f-string format spec {text!r} is not supported "
-                "(supported: `.Nf`, `,`, `,.Nf`, `.N%`, `d`, `,d`)",
+                "(supported: `.Nf`, `,`, `,.Nf`, `.N%`, `d`, `,d`, `0Nd`)",
                 node,
                 self.filename,
             )
@@ -589,6 +616,12 @@ class _Generator:
         """Emit a comparison. Chained comparisons are joined with ``&&``.
 
         ``in`` / ``not in`` become ``.includes(...)`` membership tests.
+
+        ``is`` / ``is not`` against ``None`` use the loose ``== null`` /
+        ``!= null``, which is the one place loose equality is the *correct*
+        translation: it answers "no value" for both `null` and `undefined`, and a
+        field a JS object never assigned is `undefined`. Against any other
+        operand, identity is `===` / `!==`.
         """
         ops: dict[type[ast.cmpop], str] = {
             ast.Eq: "===",
@@ -607,15 +640,22 @@ class _Generator:
                 parts.append(f"{right_js}.includes({left_js})")
             elif isinstance(op, ast.NotIn):
                 parts.append(f"!{right_js}.includes({left_js})")
+            elif isinstance(op, (ast.Is, ast.IsNot)):
+                against_none = _is_none(left) or _is_none(right)
+                if against_none:
+                    symbol = "==" if isinstance(op, ast.Is) else "!="
+                else:
+                    symbol = "===" if isinstance(op, ast.Is) else "!=="
+                parts.append(f"{left_js} {symbol} {right_js}")
             else:
-                symbol = ops.get(type(op))
-                if symbol is None:
+                mapped = ops.get(type(op))
+                if mapped is None:
                     raise TranspileError(
                         f"comparison {type(op).__name__} is not supported",
                         node,
                         self.filename,
                     )
-                parts.append(f"{left_js} {symbol} {right_js}")
+                parts.append(f"{left_js} {mapped} {right_js}")
             left = right
         return parts[0] if len(parts) == 1 else "(" + " && ".join(parts) + ")"
 
@@ -704,8 +744,26 @@ class _Generator:
             return "[]"
         inner = indent + 1
         pad = _INDENT * inner
-        items = ",\n".join(f"{pad}{self.expr(el, inner)}" for el in elts)
+        items = ",\n".join(f"{pad}{self._element(el, inner)}" for el in elts)
         return "[\n" + items + ",\n" + _INDENT * indent + "]"
+
+    def _element(self, node: ast.expr, indent: int) -> str:
+        """Emit one element of a literal, spreading a starred one.
+
+        ``[a, *rest]`` is the idiom for "new list without mutating", so it shows
+        up in any app that keeps immutable state; JS spreads with the same
+        syntax, which is why the element is the only place that has to know.
+
+        Args:
+            node: The element expression.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS source for the element.
+        """
+        if isinstance(node, ast.Starred):
+            return f"...{self.expr(node.value, indent)}"
+        return self.expr(node, indent)
 
     def _dict(self, node: ast.Dict, indent: int) -> str:
         """Emit a dict literal as a JS object.
@@ -1088,12 +1146,31 @@ class _Generator:
         A plain name binds directly (``x``); a tuple/list unpacks with array
         destructuring (``[k, v]``).
         """
+        return self._target_pattern(target)
+
+    def _target_pattern(self, target: ast.expr) -> str:
+        """Return the JS destructuring pattern for a binding target.
+
+        Nested as deep as the Python target goes, because
+        ``for i, (question, answer) in enumerate(pairs)`` is how an app walks a
+        table of pairs — and JS destructures it with the same shape.
+
+        Args:
+            target: A ``Name``, or a ``Tuple``/``List`` of targets.
+
+        Returns:
+            The JS pattern (``x`` or ``[i, [question, answer]]``).
+
+        Raises:
+            TranspileError: If a leaf is not a plain name.
+        """
         if isinstance(target, ast.Name):
             return target.id
         if isinstance(target, (ast.Tuple, ast.List)):
-            return f"[{', '.join(self._target_names(target))}]"
+            inner = ", ".join(self._target_pattern(elt) for elt in target.elts)
+            return f"[{inner}]"
         raise TranspileError(
-            "loop target must be a name or a tuple of names",
+            "a binding target must be a name, or a tuple/list of them",
             target,
             self.filename,
         )
@@ -1352,13 +1429,17 @@ class _Generator:
         """
         names: list[str] = []
         for elt in target.elts:  # type: ignore[attr-defined]
-            if not isinstance(elt, ast.Name):
+            if isinstance(elt, ast.Name):
+                names.append(elt.id)
+            elif isinstance(elt, (ast.Tuple, ast.List)):
+                names.extend(self._target_names(elt))
+            else:
                 raise TranspileError(
-                    "only flat `a, b = ...` unpacking of plain names is supported",
+                    "unpacking binds plain names, nested as deep as you like, "
+                    f"but not a {type(elt).__name__}",
                     target,
                     self.filename,
                 )
-            names.append(elt.id)
         return names
 
     def _assign(self, node: ast.Assign, indent: int) -> list[str]:
@@ -1390,7 +1471,7 @@ class _Generator:
             return [f"{pad}{self.expr(target, indent)} = {value};"]
         if isinstance(target, (ast.Tuple, ast.List)):
             names = self._target_names(target)
-            pattern = f"[{', '.join(names)}]"
+            pattern = self._target_pattern(target)
             hoisted = self._scopes and all(n in self._scopes[-1] for n in names)
             if hoisted:
                 # Destructuring assignment (no declaration) must be parenthesized.

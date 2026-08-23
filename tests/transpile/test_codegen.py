@@ -965,3 +965,67 @@ def test_a_facade_name_the_client_cannot_serve_is_refused_by_name() -> None:
     message = str(excinfo.value)
     assert "EmailField" in message
     assert "is not available in Mode C" in message
+
+
+def test_a_starred_element_spreads_in_a_literal() -> None:
+    """`[a, *rest]` is the immutable-state idiom, and JS spreads the same way."""
+    js = gen("def f(state):\n    return [state.head, *state.tail]\n")
+    assert "...state.tail," in js
+
+
+def test_a_nested_loop_target_destructures() -> None:
+    """`for i, (q, a) in enumerate(pairs)` binds the nested pair."""
+    js = gen(
+        "def f(pairs):\n"
+        "    for idx, (question, answer) in enumerate(pairs):\n"
+        "        print(idx, question, answer)\n"
+    )
+    assert "for (const [idx, [question, answer]] of" in js
+
+
+def test_a_nested_assignment_target_destructures() -> None:
+    """`first, (second, third) = value` binds every leaf."""
+    js = gen("def f(value):\n    first, (second, third) = value\n    return first\n")
+    assert "const [first, [second, third]] = value;" in js
+
+
+def test_is_none_uses_loose_equality_and_identity_otherwise() -> None:
+    """`is None` answers "no value"; `is` on anything else is identity.
+
+    `== null` is the one correct use of loose equality here: a field a JS object
+    never assigned is `undefined`, and Python's `is None` has to answer True for
+    it just as it does for an explicit `None`.
+    """
+    js = gen(
+        "def f(state):\n"
+        "    a = state.dialog is not None\n"
+        "    b = state.other is None\n"
+        "    c = state.x is state.y\n"
+        "    d = state.x is not state.y\n"
+        "    return a\n"
+    )
+    assert "state.dialog != null" in js
+    assert "state.other == null" in js
+    assert "state.x === state.y" in js
+    assert "state.x !== state.y" in js
+
+
+def test_a_zero_padded_int_keeps_the_sign_outside_the_padding() -> None:
+    """`f"{n:05d}"` matches Python for negatives, which `padStart` alone does not.
+
+    `String(-42).padStart(5, "0")` is `"00-42"`; Python's is `"-0042"`. The
+    emitted arrow also takes its argument once, so an interpolated call is not
+    evaluated twice.
+    """
+    js = gen('def f(n):\n    return f"{n:05d}"\n')
+    assert 'String(-v).padStart(4, "0")' in js
+    assert 'String(v).padStart(5, "0")' in js
+    # Applied once: the value is not re-evaluated by the sign branch.
+    assert js.count(")(n)") == 1
+
+
+def test_an_unsupported_format_spec_still_names_what_is_supported() -> None:
+    """The diagnostic lists the specs that work, `0Nd` included."""
+    with pytest.raises(TranspileError) as excinfo:
+        gen('def f(n):\n    return f"{n:>5}"\n')
+    assert "`0Nd`" in str(excinfo.value)

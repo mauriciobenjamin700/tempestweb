@@ -16,6 +16,7 @@ cobrir".
 |---|---|---|
 | geolocation real (concedida, negada, recuperação) | N3 | ✅ medido — 2026-08-23 |
 | clipboard real (escrita + conteúdo lido de volta) | N3 | ✅ medido — 2026-08-23 |
+| `storage` sobre IndexedDB, sobrevivendo a reload | N3 | ⏳ falta medir (wrapper testado em jsdom, que é um shim) |
 | captura de câmera real | N4 | ⏳ falta hardware ou Chrome com fake device |
 | Background Sync com a aba fechada | P2 | ⏳ falta device + browser com a permissão |
 | WebPush com a aba fechada + `pushsubscriptionchange` | P3 | ⏳ falta push service e par VAPID de teste |
@@ -91,6 +92,21 @@ UI mudou de mensagem.
     o exemplo atual só escreve e compartilha.
 
 ## O que falta, e o que exatamente rodar
+
+### `storage` sobre IndexedDB (N3)
+
+O wrapper tem teste, mas em jsdom — e o `indexedDB` de jsdom é um shim: ele não
+prova persistência, que é a única coisa que essa camada promete. O que falta é
+medir num browser real:
+
+```bash
+uv run --frozen tempestweb run --mode server --path examples/offline-queue --port 8282
+```
+
+Procedimento: gravar chaves, **recarregar a aba**, conferir que voltam; depois
+`storage.clear()` e conferir que não voltam. Anotar os valores lidos, não
+"persistiu". Enquanto isso não existir, N3 fica 🔶 mesmo com geo e clipboard
+medidos — a linha cobre três capacidades e só duas foram à prova.
 
 ### captura de câmera real (N4)
 

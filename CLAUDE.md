@@ -33,6 +33,14 @@ duas no `nav:` e no `nav_translations:` do `mkdocs.yml`. Mudança de superfície
 pública, comportamento, install ou versão atualiza README + site no **mesmo
 commit**; `mkdocs build --strict` com zero warning.
 
+**Exemplo novo → página nova.** Todo exemplo de vitrine (`examples/<nome>/app.py`)
+tem `docs/examples/<nome>.md` + `.en.md`, nos dois blocos de `nav`. Duas classes
+ficam de fora, e só essas: **`*_demo`** é app de trilho (prova uma capacidade,
+mora na galeria como código para ler, sem página própria) e as **exceções
+nomeadas** `counter` (o app do tutorial) e `deploy` (não é app: Dockerfile +
+compose + nginx). `tests/unit/test_docs_examples.py` reprova quem sair da regra —
+foi a falta dela que deixou 15 exemplos sem página.
+
 ## Agentes e skill do projeto
 
 | Preciso de | Use |

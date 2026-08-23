@@ -61,6 +61,33 @@ const TAG_BY_TYPE = Object.freeze({
   // element; the input it wraps is renderer-internal (Checkbox is an IR leaf, so
   // no patch path ever descends into it).
   Checkbox: "label",
+  // A Switch is the same shape as a Checkbox — a <label> wrapping a real
+  // <input type="checkbox"> the reader can click, tab to and toggle with Space —
+  // with role="switch" on the input, which is how a native checkbox spells "this
+  // is on/off, not tick-the-box". As an anonymous div it was a settings row with
+  // nothing to switch: `checked` had no element to sit on and no change to fire.
+  Switch: "label",
+  // A Slider is an <input type="range">: the core's `min_value`/`max_value`/`step`
+  // ARE the native attributes, so the browser owns the drag, the arrow keys and
+  // the a11y for free. The div it used to be had no thumb to grab.
+  Slider: "input",
+  // A RangeSlider has two thumbs, which one native range input cannot express, so
+  // it stays a <div> holding two renderer-owned range inputs. Legal because
+  // RangeSlider is an IR leaf: no patch path descends into it.
+  RangeSlider: "div",
+  // A Dropdown is a <select>, its `options` renderer-owned <option>s and its
+  // `placeholder` a disabled leading one. Also an IR leaf.
+  Dropdown: "select",
+  // An Autocomplete is a <label> wrapping a text input plus a renderer-owned
+  // <datalist> of its `options`: `list=` has to point at a datalist *element*, so
+  // the input is wrapped rather than bare, and the browser draws the suggestions.
+  Autocomplete: "label",
+  // The pickers are the platform's own: <input type=date|time|file> inside the
+  // keyed <label> that carries their caption. A hand-drawn calendar would be worse
+  // than the one every browser already ships — and these drew nothing at all.
+  DatePicker: "label",
+  TimePicker: "label",
+  FilePicker: "label",
   Image: "img",
   // A Canvas renders to a real <canvas>; its draw-command list is executed onto
   // the 2D context by paintCanvas (charts, overlays, the sketch pad).
@@ -84,6 +111,50 @@ const TAG_BY_TYPE = Object.freeze({
   Popover: "div",
   Tooltip: "div",
 });
+
+/**
+ * Widget types whose interaction is a native form control.
+ *
+ * The tag table cannot answer this on its own: a Checkbox, a Switch, an
+ * Autocomplete and the three pickers render as a <label> *wrapping* the control,
+ * and a RangeSlider as a div holding two range inputs — every one of them fires
+ * `input`/`change`, none of them IS an input. Mode C's builder generator reads
+ * this set to decide whether an `on_change` binds to `input`/`change` or falls
+ * back to `click`; deriving it from tag names plus a hand-added exception is
+ * exactly what mapped `MaskedInput`'s `on_change` onto `click` (#142), so the set
+ * is declared once, here, next to the tags it qualifies.
+ */
+export const NATIVE_CONTROL_TYPES = new Set([
+  "Input",
+  "TextArea",
+  "MaskedInput",
+  "PinInput",
+  "Checkbox",
+  "Switch",
+  "Slider",
+  "RangeSlider",
+  "Dropdown",
+  "Autocomplete",
+  "DatePicker",
+  "TimePicker",
+  "FilePicker",
+]);
+
+/** The native input `type` each picker widget renders. */
+const PICKER_INPUT_TYPES = Object.freeze({
+  DatePicker: "date",
+  TimePicker: "time",
+  FilePicker: "file",
+});
+
+/** Widget types drawn as a keyed wrapper holding the control plus a caption. */
+const CAPTION_WRAPPER_TYPES = new Set([
+  "Checkbox",
+  "Switch",
+  "DatePicker",
+  "TimePicker",
+  "FilePicker",
+]);
 
 // Font stack for Canvas draw_text commands (a literal, since a 2D context cannot
 // read the --tw-font CSS variable). Mirrors the base theme's family.
@@ -180,8 +251,8 @@ function applyProps(el, props) {
     el.textContent = props.content == null ? "" : String(props.content);
   }
   if ("label" in props) {
-    if (type === "Checkbox") {
-      setCheckboxLabel(el, props.label == null ? "" : String(props.label));
+    if (type != null && CAPTION_WRAPPER_TYPES.has(type)) {
+      setWrapperCaption(el, props.label == null ? "" : String(props.label));
     } else if (type != null && LABEL_AS_TEXT_TYPES.has(type)) {
       el.textContent = props.label == null ? "" : String(props.label);
     }
@@ -499,6 +570,12 @@ export const FIELD_ATTR = "data-tw-field";
 /** Attribute holding a `FormField`'s current error message, painted by the sheet. */
 export const FIELD_ERROR_ATTR = "data-tw-error";
 
+/** Attribute holding a `TabView`'s active tab index. */
+export const ACTIVE_ATTR = "data-tw-active";
+
+/** Attribute marking a `RouteDrawer` whose drawer is open. */
+export const OPEN_ATTR = "data-tw-open";
+
 /** Attribute marking a `ReorderableList`, whose children can be dragged to sort. */
 export const REORDER_ATTR = "data-tw-reorder";
 
@@ -687,14 +764,12 @@ export function syncContainerGestures(root) {
  * unstyled, duplicate label — Times New Roman next to the themed one — and an
  * Update carrying `label` would have wiped the field's children along with it,
  * since textContent replaces everything.
+ *
+ * A wrapper type (see `CAPTION_WRAPPER_TYPES`) is not here for the same reason
+ * squared: its `label` is a caption *beside* a nested control, so writing it as
+ * textContent would delete the control the reader interacts with.
  */
-const LABEL_AS_TEXT_TYPES = new Set([
-  "Button",
-  "Switch",
-  "DatePicker",
-  "TimePicker",
-  "FilePicker",
-]);
+const LABEL_AS_TEXT_TYPES = new Set(["Button"]);
 
 /** Valid HTML attribute name — mirrors `_ATTR_KEY_RE` in the SSR renderer. */
 const ATTR_NAME_RE = /^[a-zA-Z][a-zA-Z0-9:_-]*$/;
@@ -1058,19 +1133,26 @@ function applyIndicatorProps(el, type, props) {
 }
 
 /**
- * Get (or lazily create) the real ``<input type=checkbox>`` nested inside a
- * Checkbox's ``<label>`` wrapper. The label is the keyed, path-addressed
- * element; this nested input carries the actual ``checked`` state and fires the
- * native ``change`` event (which bubbles up to the keyed label for delegation).
+ * Get (or lazily create) the real form control nested inside a keyed wrapper.
  *
- * @param {HTMLElement} el  The Checkbox ``<label>`` element.
- * @returns {HTMLInputElement}  The nested checkbox input.
+ * A Checkbox, Switch, Autocomplete or picker is drawn as a `<label>`: the label
+ * is the keyed, path-addressed element, and this nested control carries the state
+ * the reader changes and fires the native `input`/`change` that bubbles up to the
+ * label for delegation. Wrapping in a `<label>` also gives the control its
+ * accessible name from the caption natively — no `aria-label` to keep in sync.
+ *
+ * Legal because every widget drawn this way is an IR leaf: no patch path ever
+ * descends into what the renderer puts inside it.
+ *
+ * @param {HTMLElement} el         The keyed wrapper element.
+ * @param {string} inputType       The `type` attribute for the nested input.
+ * @returns {HTMLInputElement}     The nested input.
  */
-function ensureCheckboxInput(el) {
+function ensureNestedInput(el, inputType) {
   let input = /** @type {HTMLInputElement|null} */ (el.querySelector("input"));
   if (input == null) {
     input = /** @type {HTMLInputElement} */ (document.createElement("input"));
-    input.setAttribute("type", "checkbox");
+    input.setAttribute("type", inputType);
     nameFormControl(input, el.getAttribute(KEY_ATTR));
     el.insertBefore(input, el.firstChild);
   }
@@ -1078,23 +1160,108 @@ function ensureCheckboxInput(el) {
 }
 
 /**
- * Set a Checkbox's visible caption, kept as a single text node after the nested
- * input so the box and its label render side by side. Wrapping the input in the
- * ``<label>`` also gives it its accessible name natively (no ``aria-label``).
+ * Set a wrapper's visible caption, as a single trailing text node.
  *
- * @param {HTMLElement} el    The Checkbox ``<label>`` element.
+ * Only text nodes are replaced: the nested control (and an Autocomplete's
+ * `<datalist>`) are elements and survive, which is the whole reason this is not
+ * a `textContent` assignment. An empty caption clears it.
+ *
+ * @param {HTMLElement} el    The keyed wrapper element.
  * @param {string} text       The caption text (``""`` clears it).
  * @returns {void}
  */
-function setCheckboxLabel(el, text) {
-  const input = ensureCheckboxInput(el);
+function setWrapperCaption(el, text) {
   for (const node of Array.from(el.childNodes)) {
-    if (node !== input) {
+    if (node.nodeType === 3) {
       el.removeChild(node);
     }
   }
   if (text) {
     el.appendChild(document.createTextNode(text));
+  }
+}
+
+/**
+ * Get (or lazily create) one of a RangeSlider's two renderer-owned thumbs.
+ *
+ * Each thumb is a native range input tagged with the end it drives, and named
+ * `<key>-low` / `<key>-high` so a form submits both. The low thumb is inserted
+ * first, so the DOM order matches the pair the wire payload reports.
+ *
+ * @param {HTMLElement} el   The RangeSlider element.
+ * @param {string} part      Which end: `"low"` or `"high"`.
+ * @returns {HTMLInputElement}  The thumb input.
+ */
+function ensureRangeThumb(el, part) {
+  let thumb = /** @type {HTMLInputElement|null} */ (
+    el.querySelector(`input[${ITEM_ATTR}="${part}"]`)
+  );
+  if (thumb == null) {
+    thumb = /** @type {HTMLInputElement} */ (document.createElement("input"));
+    thumb.setAttribute("type", "range");
+    thumb.setAttribute(ITEM_ATTR, part);
+    const key = el.getAttribute(KEY_ATTR);
+    nameFormControl(thumb, key == null ? null : `${key}-${part}`);
+    el.appendChild(thumb);
+  }
+  return thumb;
+}
+
+/**
+ * Get (or lazily create) the `<datalist>` an Autocomplete's input reads from.
+ *
+ * The id is derived from the widget key, which is what the app addresses the
+ * widget by; a keyless Autocomplete gets a sequence number instead, so two of
+ * them on one screen never share a suggestion list.
+ *
+ * @param {HTMLElement} el              The Autocomplete `<label>`.
+ * @param {HTMLInputElement} input      Its nested text input.
+ * @returns {HTMLElement}               The datalist element.
+ */
+function ensureDataList(el, input) {
+  let list = el.querySelector("datalist");
+  if (list == null) {
+    list = document.createElement("datalist");
+    const key = el.getAttribute(KEY_ATTR);
+    _datalistSeq += 1;
+    list.setAttribute("id", `tw-list-${key ?? _datalistSeq}`);
+    el.appendChild(list);
+  }
+  input.setAttribute("list", list.getAttribute("id") ?? "");
+  return list;
+}
+
+/** Sequence for the datalist id of a keyless Autocomplete. */
+let _datalistSeq = 0;
+
+/**
+ * Rewrite a `<select>`'s or `<datalist>`'s options from an `options` list.
+ *
+ * The placeholder is a disabled leading option, tagged so `events.js` can tell a
+ * real choice from "nothing chosen yet" when it reports the selected index. A
+ * `<datalist>` takes no placeholder — it is a suggestion list, not a value.
+ *
+ * @param {HTMLElement} host        The `<select>` or `<datalist>`.
+ * @param {Array<*>} options        The option values, in order.
+ * @param {?string} placeholder     Leading disabled option, or null for none.
+ * @returns {void}
+ */
+function renderOptions(host, options, placeholder) {
+  host.textContent = "";
+  if (placeholder) {
+    const empty = document.createElement("option");
+    empty.setAttribute("value", "");
+    empty.setAttribute("disabled", "");
+    empty.setAttribute(ITEM_ATTR, "placeholder");
+    empty.textContent = placeholder;
+    host.appendChild(empty);
+  }
+  for (const option of options) {
+    const item = document.createElement("option");
+    const value = option == null ? "" : String(option);
+    item.setAttribute("value", value);
+    item.textContent = value;
+    host.appendChild(item);
   }
 }
 
@@ -1292,6 +1459,204 @@ function applyInputType(el, props) {
   }
 }
 
+/**
+ * Draw a `Switch`: the nested checkbox the reader flips, plus its state.
+ *
+ * `role="switch"` on a real checkbox is how HTML spells an on/off control: the
+ * keyboard, the focus ring and the checked state stay native, and a screen reader
+ * announces "switch, on" instead of "checkbox, checked".
+ *
+ * @param {HTMLElement} el   The Switch `<label>`.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applySwitchProps(el, props) {
+  const input = ensureNestedInput(el, "checkbox");
+  input.setAttribute("role", "switch");
+  if ("checked" in props) {
+    input.checked = Boolean(props.checked);
+  }
+}
+
+/**
+ * Draw a `Slider`: a native range input over the declared scale.
+ *
+ * The bounds are written before the value, because a range input clamps whatever
+ * it is given to the range it currently has — assigning `value` first and the
+ * bounds after left a slider parked at the wrong end (a 0..1 default clamping a
+ * value of 70 down to 1).
+ *
+ * @param {HTMLElement} el   The Slider `<input>`.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applySliderProps(el, props) {
+  el.setAttribute("type", "range");
+  applyRangeBounds(el, props);
+  if ("value" in props) {
+    /** @type {HTMLInputElement} */ (el).value =
+      props.value == null ? "" : String(props.value);
+  }
+}
+
+/**
+ * Write the shared `min`/`max`/`step` of a range input from the core's props.
+ *
+ * @param {HTMLElement} el   A range input (a Slider, or one RangeSlider thumb).
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applyRangeBounds(el, props) {
+  if ("min_value" in props) {
+    setOrRemove(el, "min", props.min_value);
+  }
+  if ("max_value" in props) {
+    setOrRemove(el, "max", props.max_value);
+  }
+  if ("step" in props) {
+    setOrRemove(el, "step", props.step);
+  }
+}
+
+/**
+ * Draw a `RangeSlider`: two native range inputs, one per end of the window.
+ *
+ * @param {HTMLElement} el   The RangeSlider `<div>`.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applyRangeSliderProps(el, props) {
+  const low = ensureRangeThumb(el, "low");
+  const high = ensureRangeThumb(el, "high");
+  applyRangeBounds(low, props);
+  applyRangeBounds(high, props);
+  if ("low" in props) {
+    low.value = props.low == null ? "" : String(props.low);
+  }
+  if ("high" in props) {
+    high.value = props.high == null ? "" : String(props.high);
+  }
+}
+
+/**
+ * Draw a `Dropdown`: its options, its placeholder and the current choice.
+ *
+ * The options are re-rendered only when the widget says so, and the current
+ * choice is restored across a re-render, so an Update that only changes the
+ * option list does not silently clear what the reader had picked. The `options`
+ * and `placeholder` last applied are kept on the element because an Update
+ * carries one prop, not the whole bag.
+ *
+ * @param {HTMLElement} el   The Dropdown `<select>`.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applyDropdownProps(el, props) {
+  const select = /** @type {HTMLSelectElement} */ (el);
+  if ("options" in props) {
+    select.__twOptions = Array.isArray(props.options) ? props.options : [];
+  }
+  if ("placeholder" in props) {
+    select.__twPlaceholder = props.placeholder == null ? "" : String(props.placeholder);
+  }
+  if ("options" in props || "placeholder" in props) {
+    const chosen = select.value;
+    renderOptions(select, select.__twOptions ?? [], select.__twPlaceholder ?? null);
+    if (!("value" in props)) {
+      select.value = chosen;
+    }
+  }
+  if ("value" in props) {
+    select.value = props.value == null ? "" : String(props.value);
+  }
+}
+
+/**
+ * Draw an `Autocomplete`: a text input plus the datalist the browser suggests from.
+ *
+ * @param {HTMLElement} el   The Autocomplete `<label>`.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applyAutocompleteProps(el, props) {
+  const input = ensureNestedInput(el, "text");
+  const list = ensureDataList(el, input);
+  if ("options" in props) {
+    renderOptions(list, Array.isArray(props.options) ? props.options : [], null);
+  }
+  if ("value" in props) {
+    input.value = props.value == null ? "" : String(props.value);
+  }
+  if ("placeholder" in props) {
+    setOrRemove(input, "placeholder", props.placeholder);
+  }
+}
+
+/**
+ * Draw a `DatePicker`, `TimePicker` or `FilePicker`: the platform's own control.
+ *
+ * A file input's `value` cannot be assigned — the browser refuses, so that no
+ * page can hand itself a path — so a FilePicker's `value` is reflected as an
+ * attribute the base sheet prints beside the button. Date and time take theirs
+ * directly, in the ISO spelling both the core and the native control use.
+ *
+ * @param {HTMLElement} el   The picker `<label>`.
+ * @param {string} type      The widget type.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applyPickerProps(el, type, props) {
+  const input = ensureNestedInput(el, PICKER_INPUT_TYPES[type]);
+  if (!("value" in props)) {
+    return;
+  }
+  const value = props.value == null ? "" : String(props.value);
+  if (type === "FilePicker") {
+    setOrRemove(el, ITEM_VALUE_ATTR, value === "" ? null : value);
+  } else {
+    input.value = value;
+  }
+}
+
+/**
+ * Reflect a `TabView`'s active tab, and a `RouteDrawer`'s open state.
+ *
+ * Neither widget can be *driven* by this renderer: both hold IR children (a
+ * TabView its panel, a RouteDrawer its content plus the drawer), so a
+ * renderer-owned tab strip would sit at a child index the patch paths address —
+ * the corruption the contract forbids. What the renderer can do is say the truth
+ * about the state, which is what a11y and the base sheet need: the panel is named
+ * after its active tab, and the drawer's `open` becomes an attribute the sheet
+ * slides on. The app draws the tab strip (a `TabBar`/`SegmentedControl`) and calls
+ * the same handler — see docs/advanced/tabview-drawer.md.
+ *
+ * @param {HTMLElement} el   The TabView / RouteDrawer element.
+ * @param {string} type      The widget type.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applyPanelProps(el, type, props) {
+  if (type === "TabView") {
+    const tabs = Array.isArray(props.tabs) ? props.tabs : null;
+    if ("active" in props) {
+      setOrRemove(el, ACTIVE_ATTR, props.active);
+    }
+    if (!el.hasAttribute("role")) {
+      el.setAttribute("role", "tabpanel");
+    }
+    const active = Number(el.getAttribute(ACTIVE_ATTR) ?? 0);
+    if (tabs != null && tabs[active] != null && !el.hasAttribute("aria-label")) {
+      el.setAttribute("aria-label", String(tabs[active]));
+    }
+    return;
+  }
+  if ("open" in props) {
+    const open = Boolean(props.open);
+    setOrRemove(el, OPEN_ATTR, open ? "" : null);
+    el.setAttribute("aria-expanded", String(open));
+  }
+}
+
 function applyControlProps(el, type, props) {
   if (type === "Canvas") {
     paintCanvas(el, props);
@@ -1333,7 +1698,7 @@ function applyControlProps(el, type, props) {
   } else if (type === "PinInput") {
     applyPinProps(el, props);
   } else if (type === "Checkbox") {
-    const input = ensureCheckboxInput(el);
+    const input = ensureNestedInput(el, "checkbox");
     if ("checked" in props) {
       input.checked = Boolean(props.checked);
     }
@@ -1349,6 +1714,20 @@ function applyControlProps(el, type, props) {
     if (!el.style.width) {
       el.style.width = "fit-content";
     }
+  } else if (type === "Switch") {
+    applySwitchProps(el, props);
+  } else if (type === "Slider") {
+    applySliderProps(el, props);
+  } else if (type === "RangeSlider") {
+    applyRangeSliderProps(el, props);
+  } else if (type === "Dropdown") {
+    applyDropdownProps(el, props);
+  } else if (type === "Autocomplete") {
+    applyAutocompleteProps(el, props);
+  } else if (type != null && type in PICKER_INPUT_TYPES) {
+    applyPickerProps(el, type, props);
+  } else if (type === "TabView" || type === "RouteDrawer") {
+    applyPanelProps(el, type, props);
   } else if (type === "Image") {
     if ("src" in props) {
       setOrRemove(el, "src", props.src);

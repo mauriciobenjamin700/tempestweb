@@ -171,6 +171,211 @@ export const BASE_THEME_CSS = `
   cursor: pointer;
 }
 
+/* ── Switch: the same <label> + real checkbox, drawn as an M3 track ──────────
+   role="switch" keeps it a native checkbox for the keyboard and the screen
+   reader; this paints the track and the knob, which is the only part the browser
+   has no look for. The knob grows when it lands on, the way M3's does. */
+[data-tw-type="Switch"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  cursor: pointer;
+  font-family: var(--tw-font);
+  font-size: 14px;
+  color: var(--tw-on-surface);
+}
+[data-tw-type="Switch"] > input {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  border: 2px solid var(--tw-outline);
+  border-radius: var(--tw-radius-full);
+  background: var(--tw-surface);
+  cursor: pointer;
+  transition: background var(--tw-motion), border-color var(--tw-motion);
+}
+[data-tw-type="Switch"] > input::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--tw-radius-full);
+  background: var(--tw-outline);
+  transform: translateY(-50%);
+  transition: left var(--tw-motion), width var(--tw-motion), height var(--tw-motion),
+    background var(--tw-motion);
+}
+[data-tw-type="Switch"] > input:checked {
+  background: var(--tw-primary);
+  border-color: var(--tw-primary);
+}
+[data-tw-type="Switch"] > input:checked::after {
+  left: 24px;
+  width: 24px;
+  height: 24px;
+  background: var(--tw-on-primary);
+}
+[data-tw-type="Switch"] > input:focus-visible {
+  outline: 2px solid var(--tw-primary);
+  outline-offset: 2px;
+}
+
+/* ── Sliders: the native range control, tinted ───────────────────────────────
+   A range input already knows how to be dragged, arrow-keyed and announced, so
+   the sheet only gives it room and the accent. A RangeSlider stacks its two
+   thumbs instead of overlapping them: overlapping reads as one broken slider
+   when both ends meet, and each thumb stays separately reachable. */
+[data-tw-type="Slider"],
+[data-tw-type="RangeSlider"] > input {
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  accent-color: var(--tw-primary);
+  cursor: pointer;
+}
+[data-tw-type="RangeSlider"] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+/* ── Dropdown: a <select> that matches the Input next to it ────────────────── */
+[data-tw-type="Dropdown"] {
+  min-height: 40px;
+  padding: 9px 12px;
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+  font-family: var(--tw-font);
+  font-size: 16px;
+  line-height: 22px;
+  cursor: pointer;
+  transition: border-color var(--tw-motion), box-shadow var(--tw-motion);
+}
+[data-tw-type="Dropdown"]:hover { border-color: var(--tw-on-surface); }
+[data-tw-type="Dropdown"]:focus,
+[data-tw-type="Dropdown"]:focus-visible {
+  outline: none;
+  border-color: var(--tw-primary);
+  box-shadow: inset 0 0 0 1px var(--tw-primary);
+}
+
+/* ── Autocomplete: the field is the wrapper, the input is transparent ────────
+   The core resolves the field's outline and radius onto the keyed <label>, so
+   the nested input drops its own chrome and just fills it — otherwise the page
+   showed a box inside a box. The focus ring follows :focus-within, since what
+   takes focus is the child. */
+[data-tw-type="Autocomplete"] {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+  font-family: var(--tw-font);
+  font-size: 16px;
+  transition: border-color var(--tw-motion), box-shadow var(--tw-motion);
+}
+[data-tw-type="Autocomplete"] > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+[data-tw-type="Autocomplete"] > input::placeholder { color: var(--tw-on-surface-variant); }
+[data-tw-type="Autocomplete"]:focus-within {
+  border-color: var(--tw-primary);
+  box-shadow: inset 0 0 0 1px var(--tw-primary);
+}
+
+/* ── Pickers: caption first, the platform's own control after ────────────────
+   dom.js appends the caption after the nested input (that is what keeps a
+   Checkbox reading "box, then label"), so the pickers put the control back on
+   the right with flex order — a field's label belongs before it. A FilePicker
+   cannot be told its value by the page, so the chosen file's name is printed
+   from the attribute the renderer reflects. */
+[data-tw-type="DatePicker"],
+[data-tw-type="TimePicker"],
+[data-tw-type="FilePicker"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  width: fit-content;
+  cursor: pointer;
+  font-family: var(--tw-font);
+  font-size: 14px;
+  color: var(--tw-on-surface);
+}
+[data-tw-type="DatePicker"] > input,
+[data-tw-type="TimePicker"] > input,
+[data-tw-type="FilePicker"] > input {
+  order: 1;
+  min-height: 40px;
+  margin: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--tw-outline);
+  border-radius: 4px;
+  background: var(--tw-surface);
+  color: var(--tw-on-surface);
+  font-family: var(--tw-font);
+  font-size: 16px;
+  cursor: pointer;
+}
+[data-tw-type="DatePicker"] > input:focus-visible,
+[data-tw-type="TimePicker"] > input:focus-visible,
+[data-tw-type="FilePicker"] > input:focus-visible {
+  outline: none;
+  border-color: var(--tw-primary);
+  box-shadow: inset 0 0 0 1px var(--tw-primary);
+}
+[data-tw-type="FilePicker"][data-tw-value]::after {
+  order: 2;
+  content: attr(data-tw-value);
+  color: var(--tw-on-surface-variant);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 18ch;
+}
+
+/* ── RouteDrawer: "open" has to be visible, or the prop is a lie ─────────────
+   The drawer is the second child (the core builds content, then drawer). It
+   slides over the content instead of sitting next to it — inline, it pushed the
+   page sideways and was on screen with open=False. */
+[data-tw-type="RouteDrawer"] {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+[data-tw-type="RouteDrawer"] > :nth-child(2) {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  width: min(320px, 80%);
+  overflow: auto;
+  background: var(--tw-surface);
+  box-shadow: var(--tw-elevation-2);
+  transform: translateX(-100%);
+  transition: transform var(--tw-motion);
+}
+[data-tw-type="RouteDrawer"][data-tw-open] > :nth-child(2) { transform: translateX(0); }
+
 /* ── Text: inherit the modern font instead of the UA serif default ─────────── */
 [data-tw-type="Text"] { font-family: var(--tw-font); }
 
@@ -563,6 +768,11 @@ export const BASE_THEME_CSS = `
   [data-tw-refresh][data-tw-refreshing="true"],
   [data-tw-type="RefreshControl"][data-tw-refreshing="true"] > [data-tw-part="spinner"] {
     animation: none;
+    transition: none;
+  }
+  [data-tw-type="RouteDrawer"] > :nth-child(2),
+  [data-tw-type="Switch"] > input,
+  [data-tw-type="Switch"] > input::after {
     transition: none;
   }
 }

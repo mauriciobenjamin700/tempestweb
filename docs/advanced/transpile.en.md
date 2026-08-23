@@ -680,6 +680,21 @@ spirit of `mypy --strict`.
       same call in Python, different operations in JS, told apart at runtime. And
       `d.pop(key, default)` really removes, instead of falling through to the
       array `pop`.
+    - **Python's truthiness, not JS's:** `""`, `0`, `None` and `False` agree
+      between the languages; an empty container does **not** — `[]` and `{}` are
+      falsy in Python and truthy in JS. A boolean position (`if`, `elif`,
+      `while`, `not`, the ternary) goes through `truthy$`, so `if s.errors:`
+      answers what Python would. A comparison, a `not`, a boolean literal and a
+      name the module only ever binds to a boolean stay unwrapped, so the test
+      stays readable. `len(d)` counts keys and `"k" in d` reads a key, instead of
+      falling through to the array `.length` and `.includes`.
+
+    !!! note "`and`/`or` in a **value** position are left alone"
+        `name or "—"` returns an **operand** in both languages, not a boolean, so
+        `||` is already the right behaviour. The difference shows only when the
+        left operand is an empty container — `[] or x` gives `x` in Python and
+        `[]` in JS. No example in the corpus writes that, and wrapping would
+        change what every `or` evaluates to for a case nobody uses.
     - **case predicates:** `c.isupper()` / `c.islower()` require at least one
       cased character, as Python does — `"1".isupper()` is `False`. The classes
       are ASCII, like the other predicates'.

@@ -4,6 +4,52 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.103.0] — 2026-08-23
+
+### Added
+
+- **Observabilidade de servidor (S8)**
+  ([#119](https://github.com/mauriciobenjamin700/tempestweb/issues/119)).
+  `metrics=True` respondia **quantas** sessões existem; não respondia se estão
+  lentas, onde o tempo é gasto, nem o que o servidor fez para o cliente que
+  reclamou.
+
+  `create_app(..., observability=ServerObservability(...))` liga três coisas
+  independentes:
+
+  - **Latência e throughput** — histograma `tempestweb_patch_seconds` +
+    `tempestweb_patches_total` no mesmo `GET /metrics`. Mede a espera que o
+    **cliente** sente: do evento chegar até os patches irem para o transporte,
+    **rebuild incluído**. Isso importa porque o rebuild é coalescido e roda depois
+    do handler retornar — cronometrar o handler dava rodadas com **zero patches**,
+    que foi como o defeito apareceu na medição.
+  - **Log estruturado** — uma linha JSON por evento de sessão (`session.open` /
+    `session.close`), com `session_id` como **campo** e `reason` sendo o nome da
+    exceção quando a sessão morre de erro. `json_log_sink` é o sink novo.
+  - **Tracing** — span por sessão, por dispatch e por lote, atrás de adapter.
+    `otel_tracer()` importa `opentelemetry` **dentro da função**, e o extra novo
+    `tempestweb[otel]` traz só a API: exporter e sampler ficam com o
+    OpenTelemetry, onde já são configuráveis.
+
+  Nada disso é dependência forçada: o default é inerte — nenhum import, nenhum
+  relógio, nenhum span. Medido: com métricas **e** log ligados, 200 cliques
+  passaram de 0,665 ms para 0,689 ms de média (**+3,6%**).
+
+### Changed
+
+- `AppSession` aceita `observability` e `session_id`. O import do tipo é
+  `TYPE_CHECKING`-only porque o bundle do Modo A carrega esse módulo e não deve
+  carregar a observabilidade de servidor com ele (o teste de fechamento do bundle
+  pega isso).
+- `docs/advanced/observability.md` (PT + EN) documenta as três partes, incluindo o
+  custo medido e por que o histograma não fica em volta do handler.
+  `docs/roadmap.md`: S8 fecha.
+
+Verificado ao vivo num app Modo B com cliente WebSocket real: 40 cliques → 40 no
+histograma, 40 patches contados; cliente mediu 0,62 ms de ida e volta e o servidor
+0,30 ms de tempo de patch (49% da espera), ou seja o número do servidor bate e é o
+menor, como tem de ser. O log da sessão saiu parseável, com o mesmo `session_id`
+nos dois eventos.
 ## [0.98.0] — 2026-08-23
 
 ### Fixed

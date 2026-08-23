@@ -271,6 +271,85 @@ expiração com folga.
     reusa `JWTUtils` do `tempest-fastapi-sdk`, e `server_decode_jwt` faz a
     verificação com segredo.
 
+## S8 — Observabilidade de servidor (Modo B)
+
+`create_app(..., metrics=True)` já respondia **quantas** sessões existem. Não
+respondia se elas estão lentas, onde o tempo é gasto, nem o que o servidor fez
+para o cliente que acabou de reclamar — e Modo B é o modo que se opera em
+produção.
+
+```python
+from tempestweb.observability import (
+    PatchMetrics,
+    ServerObservability,
+    create_logger,
+    json_log_sink,
+    otel_tracer,
+)
+from tempestweb.server import create_app
+
+app = create_app(
+    state_factory=lambda: 0,
+    view=view,
+    metrics=True,
+    observability=ServerObservability(
+        metrics=PatchMetrics(),
+        logger=create_logger(sinks=[json_log_sink], level="INFO"),
+        tracer=otel_tracer(),  # opcional: precisa de tempestweb[otel]
+    ),
+)
+```
+
+### Latência e throughput
+
+O histograma sai em `GET /metrics`, ao lado dos contadores de conexão:
+
+```text
+tempestweb_patch_seconds_bucket{le="0.005"} 40
+tempestweb_patch_seconds_sum 0.012
+tempestweb_patch_seconds_count 40
+tempestweb_patches_total 40
+```
+
+O que ele mede é a espera que o **cliente** sente: do evento chegar até os patches
+serem entregues ao transporte, **rebuild incluído**. Isso importa porque o rebuild
+é coalescido — ele roda depois do handler retornar. Cronometrar o handler daria um
+número que para antes do trabalho que o cliente está esperando (medido: rodadas com
+zero patches).
+
+!!! tip "O número bate com o do cliente"
+    Medido num app real de 40 linhas: cliente 0,62 ms de ida e volta, servidor 0,30
+    ms de tempo de patch — 49% da espera é servidor, o resto é WebSocket e
+    loopback. O valor do servidor é sempre **menor**; se ele encostar no do cliente,
+    a rede não é o problema.
+
+### Log estruturado
+
+Uma linha JSON por evento de ciclo de vida, com o `session_id` como **campo** —
+que é o ponto: junta com o span pela mesma chave.
+
+```json
+{"level": "INFO", "message": "session.open", "session_id": "s-7f60c8ba0980", "transport": "ws"}
+{"duration_s": 0.027, "level": "INFO", "message": "session.close", "reason": "closed", "session_id": "s-7f60c8ba0980", "transport": "ws"}
+```
+
+Sessão que morre de exceção fecha com `reason` sendo o nome da exceção, não
+`"closed"`.
+
+### Tracing
+
+Um span por sessão, um por dispatch e um por lote de patches, atrás de um adapter.
+`otel_tracer()` importa `opentelemetry` **dentro da função**: o default nunca
+toca a lib, e um app que não faz tracing não paga o import. Exporter e sampler
+ficam com o OpenTelemetry (env var ou setup de SDK que a app controla) —
+embrulhar isso seria uma segunda superfície de configuração, pior que a primeira.
+
+!!! note "Custo quando está desligado, medido"
+    Default (`observability=None`): o dispatch não toma relógio e não abre span.
+    Com métricas **e** log estruturado ligados, 200 cliques num app de 40 linhas
+    passaram de 0,665 ms para 0,689 ms de média — **+3,6%**. É o preço de saber o
+    que está acontecendo.
+
 ## Recap
 
 - A observabilidade usa o **padrão adapter**: troca o backend sem mudar o app.

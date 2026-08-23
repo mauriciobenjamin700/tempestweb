@@ -23,9 +23,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable, Coroutine
-from contextlib import suppress
-from typing import Any, Generic, TypeVar
+import time
+from collections.abc import Callable, Coroutine, Iterator
+from contextlib import contextmanager, suppress
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from tempest_core import App, Theme, Widget
 from tempest_core import Patch as CorePatch
@@ -64,6 +65,19 @@ _LOGGER = logging.getLogger("tempestweb.session")
 
 S = TypeVar("S")
 
+if TYPE_CHECKING:  # pragma: no cover — import only for the annotation
+    from tempestweb.observability.server import ServerObservability
+
+
+@contextmanager
+def _untraced() -> Iterator[None]:
+    """The span used when no observability is wired: nothing at all.
+
+    Yields:
+        None, so the dispatch path has one shape whether or not anything traces.
+    """
+    yield None
+
 
 class NativeCallError(RuntimeError):
     """Raised when a proxied native capability call fails on the client."""
@@ -90,6 +104,8 @@ class AppSession(Generic[S]):
         *,
         concurrent_dispatch: bool = False,
         theme: Theme | None = None,
+        observability: ServerObservability | None = None,
+        session_id: str | None = None,
     ) -> None:
         """Initialize the session.
 
@@ -106,6 +122,14 @@ class AppSession(Generic[S]):
                 the state concurrently, which an app must be written for. Prefer
                 :func:`tempestweb.runtime.spawn` inside the slow handler when only
                 one screen is affected.
+            observability: Server-side metrics, structured logs and tracing
+                (Track S — S8). ``None`` measures nothing: the dispatch path takes
+                no clock and opens no span, so an app that does not operate Mode B
+                pays nothing. The Mode A bundle carries this module, which is why
+                the type is imported for the annotation only.
+            session_id: The id metrics, logs and traces share for this connection.
+                ``None`` derives one from this object's identity — stable per
+                session, and saying nothing about the user.
             theme: The palette every component resolves its colors against.
                 ``None`` keeps the Material baseline. It belongs here rather
                 than only in CSS because components resolve their colors in
@@ -114,6 +138,19 @@ class AppSession(Generic[S]):
                 still rendered baseline-purple buttons until the session
                 handed the theme to the tree building them.
         """
+        # Typed as the seam, held as None when absent: the Mode A bundle carries
+        # this module and must not carry the server's observability with it, so the
+        # import is type-only and the default path uses the local untimed round.
+        self._observability: ServerObservability | None = observability
+        # The id that ties a metric, a log line and a span to one connection. A
+        # caller that has a better one (the SSE session id, a request id) passes
+        # it; otherwise it is this object's identity, which is stable per session
+        # and says nothing about the user.
+        self.session_id: str = session_id or f"s-{id(self):x}"
+        # When the event being served arrived. The rebuild it triggers is
+        # coalesced, so it runs after the handler returns — the latency the client
+        # experiences is measured from here to the batch actually leaving.
+        self._event_at: float | None = None
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
         self._theme: Theme | None = theme
@@ -186,7 +223,17 @@ class AppSession(Generic[S]):
         if self._closed or not patches:
             return
         wire = patches_to_wire(patches)
-        self._spawn(self.transport.send_patches(wire))
+        if self._observability is not None:
+            waited = self._event_at
+            self._event_at = None
+            if waited is not None:
+                self._observability.observe_patches(
+                    time.perf_counter() - waited, len(wire)
+                )
+            with self._observability.patch_batch(self.session_id, len(wire)):
+                self._spawn(self.transport.send_patches(wire))
+        else:
+            self._spawn(self.transport.send_patches(wire))
         self._emit_nav_if_changed()
 
     def _emit_nav_if_changed(self) -> None:
@@ -304,9 +351,19 @@ class AppSession(Generic[S]):
             return
         payload = event.get("payload", {})
         arg = coerce_event(find_node_type(scene, key), event_type, payload)
-        result = handler(arg) if handler_wants_event(handler) else handler()
-        if asyncio.iscoroutine(result):
-            await result
+        # The handler gets its own span; the latency histogram is taken where the
+        # batch leaves, because the rebuild is coalesced and runs after this
+        # returns. Timing this block instead reported rounds with zero patches.
+        self._event_at = time.perf_counter()
+        traced = (
+            _untraced()
+            if self._observability is None
+            else self._observability.dispatch(self.session_id, event_type)
+        )
+        with traced:
+            result = handler(arg) if handler_wants_event(handler) else handler()
+            if asyncio.iscoroutine(result):
+                await result
 
     async def resync(self) -> None:
         """Re-send the current scene as a full initial patch batch.

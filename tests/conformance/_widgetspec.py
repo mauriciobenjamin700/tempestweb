@@ -16,12 +16,19 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any
 
+from tempest_core import Icons, Text, build
 from tempest_core import Widget as WidgetBase
-from tempest_core import build
 from tempest_core import widgets as _widgets
 
 # Candidate arguments used to satisfy a widget's required fields when building a
 # bare instance for introspection. Keyed by parameter name.
+#
+# A missing candidate is not a no-op: the bare build raises, :func:`_spec_for`
+# returns ``None`` and the widget is dropped from Mode C without a word. That is
+# how ``IconButton``, ``AspectRatio``, ``Hero``, ``Animated``, ``Shimmer``,
+# ``Navigator``, ``RouteDrawer`` and ``TabView`` sat out of the transpiled client
+# while the shared renderer already drew them in Modes A and B. Adding a required
+# field to a core widget means adding its candidate here.
 _CANDIDATE_ARGS: dict[str, Any] = {
     "label": "x",
     "content": "x",
@@ -46,7 +53,21 @@ _CANDIDATE_ARGS: dict[str, Any] = {
     "count": 3,
     "index": 0,
     "length": 4,
+    "child": Text(content="x"),
+    "drawer": Text(content="x"),
+    "icon": Icons.MENU,
+    "ratio": 1.0,
+    "hero_tag": "x",
 }
+
+#: Widgets deliberately kept out of Mode C, by name, with the reason.
+#:
+#: A generated builder is a *passthrough*: it forwards props and child slots into
+#: the IR node. That is faithful for a leaf widget, but the lazy scrollers call
+#: ``item_builder`` at build time to materialize a window of children, so a
+#: passthrough builder would emit an empty viewport. They need a hand-authored
+#: builder that runs the item function, not a candidate argument.
+UNPORTABLE_WIDGETS: frozenset[str] = frozenset({"LazyColumn", "LazyGrid", "LazyRow"})
 
 #: Wire props that every node carries but a builder handles specially (not plain
 #: passthrough kwargs): ``style`` is resolved, ``attrs`` defaults to a fresh map.
@@ -161,9 +182,12 @@ def _spec_for(name: str, cls: type[WidgetBase]) -> WidgetSpec | None:
 def buildable_widgets() -> dict[str, WidgetSpec]:
     """Return specs for every buildable ``tempest_core`` widget, by name.
 
+    Every ``Widget`` subclass that builds with the candidate arguments is
+    covered, minus :data:`UNPORTABLE_WIDGETS` — the ones a passthrough builder
+    cannot reproduce.
+
     Returns:
-        A name-sorted mapping of widget name to :class:`WidgetSpec`, covering
-        every ``Widget`` subclass that builds with the candidate arguments.
+        A name-sorted mapping of widget name to :class:`WidgetSpec`.
     """
     specs: dict[str, WidgetSpec] = {}
     for name in sorted(dir(_widgets)):
@@ -172,7 +196,7 @@ def buildable_widgets() -> dict[str, WidgetSpec]:
         cls = getattr(_widgets, name)
         if not (inspect.isclass(cls) and issubclass(cls, WidgetBase)):
             continue
-        if cls is WidgetBase:
+        if cls is WidgetBase or name in UNPORTABLE_WIDGETS:
             continue
         spec = _spec_for(name, cls)
         if spec is not None:

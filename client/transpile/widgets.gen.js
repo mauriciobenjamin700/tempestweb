@@ -36,6 +36,30 @@ export function ActionSheet({ key = null, focusOrder = null, focusable = null, i
 }
 
 /**
+ * Build a `Animated` IR node (type `Animated`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function Animated({ key = null, controller = null, focusOrder = null, focusable = null, semantics = null, styleBegin = null, styleEnd = null, tag = null, attrs = {}, style = null, child = null } = {}) {
+  return {
+    type: "Animated",
+    key,
+    props: {
+      attrs,
+      controller: controller,
+      focus_order: focusOrder,
+      focusable: focusable,
+      semantics: semantics,
+      style: style,
+      style_begin: styleBegin,
+      style_end: styleEnd,
+      tag: tag,
+    },
+    children: (child == null ? [] : [child]),
+  };
+}
+
+/**
  * Build a `AnimatedList` IR node (type `AnimatedList`).
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
@@ -58,6 +82,28 @@ export function AnimatedList({ key = null, direction = "column", enterCurve = "e
       tag: tag,
     },
     children: children,
+  };
+}
+
+/**
+ * Build a `AspectRatio` IR node (type `AspectRatio`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function AspectRatio({ ratio, key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null } = {}) {
+  return {
+    type: "AspectRatio",
+    key,
+    props: {
+      attrs,
+      focus_order: focusOrder,
+      focusable: focusable,
+      ratio: ratio,
+      semantics: semantics,
+      style: style,
+      tag: tag,
+    },
+    children: (child == null ? [] : [child]),
   };
 }
 
@@ -610,6 +656,28 @@ export function GestureDetector({ key = null, focusOrder = null, focusable = nul
 }
 
 /**
+ * Build a `Hero` IR node (type `Hero`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function Hero({ heroTag, key = null, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null } = {}) {
+  return {
+    type: "Hero",
+    key,
+    props: {
+      attrs,
+      focus_order: focusOrder,
+      focusable: focusable,
+      hero_tag: heroTag,
+      semantics: semantics,
+      style: style,
+      tag: tag,
+    },
+    children: (child == null ? [] : [child]),
+  };
+}
+
+/**
  * Build a `Icon` IR node (type `Icon`).
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
@@ -629,6 +697,34 @@ export function Icon({ name, key = null, focusOrder = null, focusable = null, se
       tag: tag,
     },
     children: [],
+  };
+}
+
+/**
+ * Build a `IconButton` IR node (type `IconButton`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function IconButton({ icon, key = null, colorScheme = "primary", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, variant = "ghost", attrs = {}, style = null, onClick = null } = {}) {
+  return {
+    type: "IconButton",
+    key,
+    props: {
+      attrs,
+      color_scheme: colorScheme,
+      focus_order: focusOrder,
+      focusable: focusable,
+      icon: icon,
+      label: label,
+      on_click: null,
+      semantics: semantics,
+      size: size,
+      style: resolveWidgetStyle("IconButton", variant, size, colorScheme, style),
+      tag: tag,
+      variant: variant,
+    },
+    children: [],
+    __handlers: { "click": onClick },
   };
 }
 
@@ -814,6 +910,29 @@ export function Menu({ key = null, anchor = null, focusOrder = null, focusable =
     },
     children: [],
     __handlers: { "select": onSelect },
+  };
+}
+
+/**
+ * Build a `Navigator` IR node (type `Navigator`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function Navigator({ key = null, depth = 0, focusOrder = null, focusable = null, semantics = null, tag = null, transition = "slide", attrs = {}, style = null, child = null } = {}) {
+  return {
+    type: "Navigator",
+    key,
+    props: {
+      attrs,
+      depth: depth,
+      focus_order: focusOrder,
+      focusable: focusable,
+      semantics: semantics,
+      style: style,
+      tag: tag,
+      transition: transition,
+    },
+    children: (child == null ? [] : [child]),
   };
 }
 
@@ -1066,6 +1185,30 @@ export function ReorderableList({ key = null, focusOrder = null, focusable = nul
 }
 
 /**
+ * Build a `RouteDrawer` IR node (type `RouteDrawer`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function RouteDrawer({ key = null, focusOrder = null, focusable = null, open = false, semantics = null, tag = null, attrs = {}, style = null, child = null, drawer = null, onChange = null } = {}) {
+  return {
+    type: "RouteDrawer",
+    key,
+    props: {
+      attrs,
+      focus_order: focusOrder,
+      focusable: focusable,
+      on_change: null,
+      open: open,
+      semantics: semantics,
+      style: style,
+      tag: tag,
+    },
+    children: (child == null ? [] : [child]).concat((drawer == null ? [] : [drawer])),
+    __handlers: { "click": onChange },
+  };
+}
+
+/**
  * Build a `Row` IR node (type `Row`).
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
@@ -1201,6 +1344,30 @@ export function SectionList({ key = null, endReachedThreshold = 0.8, focusOrder 
     },
     children: [],
     __handlers: { "scroll": onScroll, "end_reached": onEndReached },
+  };
+}
+
+/**
+ * Build a `Shimmer` IR node (type `Shimmer`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function Shimmer({ key = null, baseColor = {"r": 224, "g": 224, "b": 224, "a": 1.0}, durationMs = 1200, focusOrder = null, focusable = null, highlightColor = {"r": 245, "g": 245, "b": 245, "a": 1.0}, semantics = null, tag = null, attrs = {}, style = null, child = null } = {}) {
+  return {
+    type: "Shimmer",
+    key,
+    props: {
+      attrs,
+      base_color: baseColor,
+      duration_ms: durationMs,
+      focus_order: focusOrder,
+      focusable: focusable,
+      highlight_color: highlightColor,
+      semantics: semantics,
+      style: style,
+      tag: tag,
+    },
+    children: (child == null ? [] : [child]),
   };
 }
 
@@ -1398,6 +1565,31 @@ export function TabBar({ tabs, key = null, active = 0, focusOrder = null, focusa
       tag: tag,
     },
     children: [],
+    __handlers: { "click": onChange },
+  };
+}
+
+/**
+ * Build a `TabView` IR node (type `TabView`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function TabView({ tabs, key = null, active = 0, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, child = null, onChange = null } = {}) {
+  return {
+    type: "TabView",
+    key,
+    props: {
+      active: active,
+      attrs,
+      focus_order: focusOrder,
+      focusable: focusable,
+      on_change: null,
+      semantics: semantics,
+      style: style,
+      tabs: tabs,
+      tag: tag,
+    },
+    children: (child == null ? [] : [child]),
     __handlers: { "click": onChange },
   };
 }

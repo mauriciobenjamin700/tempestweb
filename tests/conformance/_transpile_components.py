@@ -66,6 +66,8 @@ from tempest_core import (
     Tabs,
     Tag,
     Text,
+    Theme,
+    ThemeMode,
     VStack,
     build,
 )
@@ -546,6 +548,13 @@ def build_samples() -> dict[str, Any]:
     pins what the unkeyed build cannot: that each *inner* key is namespaced under
     the caller's, the way ``Component.child_key`` does.
 
+    **Every** case is also built a second time in dark mode, under a ``__dark``
+    name. That twin is the whole guard for tempestweb#106: the Mode C tables were
+    baked from the default theme, so a component rendered light whatever the app
+    asked — and a light-only matrix could not see it, because light is what it
+    compared against. A component whose port forgets to pass the theme down to a
+    child now fails here, on that child's colour.
+
     Returns:
         A scenario → serialized IR node map.
     """
@@ -555,11 +564,27 @@ def build_samples() -> dict[str, Any]:
         node = serialize_node(build(widget))
         node["key"] = None
         samples[name] = node
+        samples[f"{name}__dark"] = _dark_sample(widget)
     for name in KEYED_TWINS:
         twin = serialize_node(build(cases[name].model_copy(update={"key": "k9"})))
         twin["key"] = None
         samples[f"{name}__keyed"] = twin
     return samples
+
+
+def _dark_sample(widget: Any) -> dict[str, Any]:  # noqa: ANN401 — any core component
+    """Build one case again in dark mode, serialized like its light twin.
+
+    Args:
+        widget: The component instance the light sample was built from.
+
+    Returns:
+        The serialized IR node, with the root key dropped.
+    """
+    dark = widget.model_copy(update={"theme": Theme(mode=ThemeMode.DARK)})
+    node = serialize_node(build(dark))
+    node["key"] = None
+    return node
 
 
 def render_fixture_text() -> str:

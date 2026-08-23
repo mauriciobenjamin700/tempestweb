@@ -29,7 +29,27 @@ def test_table_covers_button_combinations() -> None:
     table = build_table()
     button = table["Button"]
     assert set(button) == {"solid", "outline", "ghost", "link"}
-    # A solid/md/primary button resolves a filled background (the canonical case).
+    # A solid/md/primary button resolves a filled background (the canonical case),
+    # in each mode — and the two differ, which is the point of the mode axis: a
+    # table baked from one theme made every Mode C widget render light (#106).
     solid = button["solid"]["md"]["primary"]
-    assert "background" in solid
-    assert "color" in solid
+    assert set(solid) == {"light", "dark"}
+    for mode in ("light", "dark"):
+        assert "background" in solid[mode]
+        assert "color" in solid[mode]
+    assert solid["light"]["background"] != solid["dark"]["background"]
+
+
+def test_mode_free_component_tables_really_are_mode_free() -> None:
+    """The two scale tables carry no colour, so they ship without a mode axis.
+
+    ``SHAPE_STEPS`` and ``TYPOGRAPHY`` are emitted flat on that basis. The day the
+    core makes a radius or a type step depend on the theme mode, this fails —
+    instead of Mode C quietly resolving the light one forever.
+    """
+    from tempest_core import Theme, ThemeMode
+    from tests.conformance._transpile_component_styles import shape_steps, typography
+
+    light, dark = Theme(mode=ThemeMode.LIGHT), Theme(mode=ThemeMode.DARK)
+    assert shape_steps(light) == shape_steps(dark)
+    assert typography(light) == typography(dark)

@@ -232,6 +232,12 @@ def _builder(spec: WidgetSpec) -> str:
         args.append(f"{_camel(prop)} = {_lit(spec.props[prop])}")
     args.append("attrs = {}")
     args.append("style = null")
+    # `theme` never crosses the wire (the core drops it when serializing), but it
+    # decides which mode's leaf of the style table the widget resolves from — so a
+    # styled builder has to take it. Without it Mode C could not even be *asked*
+    # for dark: the table was baked light and the kwarg was refused (#106).
+    if spec.styled:
+        args.append("theme = null")
     for name, is_list in spec.child_fields:
         args.append(f"{_camel(name)} = {'[]' if is_list else 'null'}")
     for handler in spec.handlers:
@@ -255,12 +261,12 @@ def _builder(spec: WidgetSpec) -> str:
         if _is_validated_field(spec):
             style_expr = (
                 f'resolveFieldStyle("{spec.name}", {variant_expr}, '
-                f"{size_expr}, {scheme_expr}, error, style)"
+                f"{size_expr}, {scheme_expr}, error, style, theme)"
             )
         else:
             style_expr = (
                 f'resolveWidgetStyle("{spec.name}", {variant_expr}, '
-                f"{size_expr}, {scheme_expr}, style)"
+                f"{size_expr}, {scheme_expr}, style, theme)"
             )
     else:
         style_expr = "style"

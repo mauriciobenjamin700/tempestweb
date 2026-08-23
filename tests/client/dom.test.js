@@ -193,6 +193,78 @@ test("Checkbox Update toggles checked and relabels without dropping the input", 
   assert.equal(el.textContent.trim(), "New");
 });
 
+test("TextArea builds a real <textarea> the reader can type in", () => {
+  withDocument();
+  const el = buildElement({
+    type: "TextArea",
+    key: "body",
+    props: { value: "hello", placeholder: "Write…", rows: 6, max_length: 280 },
+    children: [],
+  });
+  // It rendered as an anonymous <div> before: styled like a field by the base
+  // sheet, and not typable — no element to focus, no input event possible.
+  assert.equal(el.tagName, "TEXTAREA");
+  assert.equal(el.getAttribute(TYPE_ATTR), "TextArea");
+  assert.equal(el.value, "hello");
+  assert.equal(el.getAttribute("placeholder"), "Write…");
+  assert.equal(el.getAttribute("rows"), "6");
+  assert.equal(el.getAttribute("maxlength"), "280");
+});
+
+test("TextArea Update rewrites the value without replacing the element", () => {
+  withDocument();
+  const el = buildElement({
+    type: "TextArea",
+    key: "body",
+    props: { value: "old" },
+    children: [],
+  });
+  applyPatches(el, [{ path: [], set_props: { value: "new" } }]);
+  assert.equal(el.value, "new");
+  assert.equal(el.tagName, "TEXTAREA");
+});
+
+test("MaskedInput builds an <input> carrying its mask", () => {
+  withDocument();
+  const el = buildElement({
+    type: "MaskedInput",
+    key: "cpf",
+    props: { value: "", placeholder: "000.000.000-00", mask: "999.999.999-99", keyboard: "number" },
+    children: [],
+  });
+  // CPF, phone and CEP fields were 1192x48 dead rectangles in all three modes.
+  assert.equal(el.tagName, "INPUT");
+  assert.equal(el.getAttribute("placeholder"), "000.000.000-00");
+  assert.equal(el.getAttribute("data-tw-mask"), "999.999.999-99");
+  assert.equal(el.getAttribute("inputmode"), "numeric");
+});
+
+test("LazyGrid lays its window out in the declared number of columns", () => {
+  withDocument();
+  const el = buildElement({
+    type: "LazyGrid",
+    key: "gallery",
+    props: { item_count: 12, columns: 3, window_size: 12 },
+    children: [],
+  });
+  // `columns` was never read: a three-column gallery rendered one item per row.
+  assert.equal(el.style.display, "grid");
+  assert.equal(el.style.gridTemplateColumns, "repeat(3, minmax(0, 1fr))");
+  assert.equal(el.getAttribute("data-tw-columns"), "3");
+});
+
+test("a LazyColumn is not turned into a grid", () => {
+  withDocument();
+  const el = buildElement({
+    type: "LazyColumn",
+    key: "rows",
+    props: { item_count: 12, window_size: 6 },
+    children: [],
+  });
+  assert.notEqual(el.style.display, "grid");
+  assert.equal(el.getAttribute("data-tw-columns"), null);
+});
+
 test("Image builds an <img> with src/alt", () => {
   withDocument();
   const el = buildElement({

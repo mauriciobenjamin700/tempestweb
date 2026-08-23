@@ -193,6 +193,46 @@ is not available in Mode C (the transpile client exports no such name)
 
 Referência: [Modo C — transpile](advanced/transpile.md).
 
+### O campo não aceita digitação, ou a grade rende uma coluna
+
+Três widgets declarados que o renderizador desenhava como `div` anônimo — nos
+**três modos**, porque `client/dom.js` é compartilhado:
+
+- **`TextArea`** virava um `div` com a cara de campo (a folha base estiliza por
+  `[data-tw-type]`) e sem nada para focar. Corrigido em 0.94.0: vira
+  `<textarea>`, com `rows` e `maxlength`.
+- **`MaskedInput`** virava um retângulo morto — CPF, telefone e CEP não
+  existiam. Agora é `<input>` com a máscara aplicada enquanto se digita
+  (`9` dígito, `A` letra, o resto literal), e o cursor fica onde o leitor
+  deixou.
+- **`LazyGrid.columns`** era declarado e nunca lido: uma galeria de 3 colunas
+  rendia 1 item por linha. Agora vira `display: grid` +
+  `grid-template-columns: repeat(N, minmax(0, 1fr))`, e a reserva de espaço da
+  virtualização passou a contar **linhas**, não itens.
+
+Junto veio o motivo de o campo mascarado engolir tudo mesmo depois de virar
+`<input>`: o builder do Modo C mapeava o `on_change` desses widgets para
+**`click`**. A lista de "controle de formulário de verdade" era escrita à mão ao
+lado do gerador e drifta em silêncio; agora é derivada da tabela de tags do
+renderizador. Isso conserta também o `PinInput`, que tinha o mesmo defeito.
+
+Se você vê isso, atualize:
+
+```bash
+uv add "tempestweb>=0.94.0"
+```
+
+---
+
+### `setattr is not defined` (Modo C)
+
+`setattr(obj, nome, valor)` só era portado na forma `lambda s: setattr(s, "campo", v)`
+com nome **constante**. Com nome dinâmico — dentro de um `def mutate(...)` — saía
+uma chamada a um `setattr` que não existe. Medido no `examples/br-cadastro`, cujo
+bloco de endereço inteiro era inerte. Corrigido em 0.94.0, junto com `getattr`.
+
+---
+
 ### `object is not iterable` ou `X.pop is not a function` (Modo C)
 
 Um clique morre no console e a tela não muda. É um **dict** sendo tratado como

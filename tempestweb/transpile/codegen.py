@@ -1202,6 +1202,19 @@ class _Generator:
                 # only knowable at runtime.
                 self.runtime_helpers.add("toDict")
                 return f"toDict$({args[0]})"
+        if name == "setattr" and count == 3:
+            # Indexed, not dotted: the name can be computed. Only the
+            # `lambda s: setattr(s, "field", v)` shape with a constant name was
+            # handled, so a dynamic name compiled into a call to an undefined
+            # `setattr` and died on the first edit.
+            obj, attr, value = (self.expr(a, indent) for a in node.args)
+            return f"{obj}[{attr}] = {value}"
+        if name == "getattr" and count in (2, 3):
+            obj = self.expr(node.args[0], indent)
+            attr = self.expr(node.args[1], indent)
+            if count == 2:
+                return f"{obj}[{attr}]"
+            return f"{obj}[{attr}] ?? {self.expr(node.args[2], indent)}"
         if count == 0 and name in ("list", "tuple", "dict", "set"):
             empty = {"list": "[]", "tuple": "[]", "dict": "{}", "set": "new Set()"}
             return empty[name]

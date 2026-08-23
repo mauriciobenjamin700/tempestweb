@@ -101,15 +101,25 @@ export function installVirtualization(root, transport) {
       if (extent <= 0 || count <= rendered) {
         continue;
       }
-      const before = start * extent;
-      const after = Math.max(0, count - start - rendered) * extent;
+      // A grid packs `columns` items per row, so the space to reserve is counted
+      // in rows, not items — and the spacers are pseudo-elements, which take a
+      // grid *cell* unless they are told to span the row. With one column the
+      // arithmetic is what it always was.
+      const columns = Math.max(1, intAttr(viewport, "data-tw-columns", 1));
+      const before = Math.ceil(start / columns) * extent;
+      const after = Math.ceil(Math.max(0, count - start - rendered) / columns) * extent;
+      const span = columns > 1 ? "grid-column:1/-1;" : "";
       const escaped =
         typeof globalThis.CSS?.escape === "function"
           ? globalThis.CSS.escape(key)
           : key.replace(/["\\]/g, "\\$&");
       const sel = `[${LAZY_ATTR}][data-tw-key="${escaped}"]`;
-      rules.push(`${sel}::before{content:"";display:block;flex:0 0 auto;height:${before}px}`);
-      rules.push(`${sel}::after{content:"";display:block;flex:0 0 auto;height:${after}px}`);
+      rules.push(
+        `${sel}::before{content:"";display:block;flex:0 0 auto;${span}height:${before}px}`,
+      );
+      rules.push(
+        `${sel}::after{content:"";display:block;flex:0 0 auto;${span}height:${after}px}`,
+      );
     }
     sheet.textContent = rules.join("\n");
   };

@@ -911,6 +911,18 @@ class _Generator:
             }
             if name in simple:
                 return f"{simple[name]}({args[0]})"
+            # Container conversions. Without these, `list(xs)` emitted a call to
+            # an undefined `list`: the module parsed, the page loaded, and the
+            # first render died — a blank screen from a green build.
+            if name in ("list", "tuple"):
+                return f"[...{args[0]}]"
+            if name == "set":
+                return f"new Set({args[0]})"
+            if name == "dict":
+                return f"Object.fromEntries({args[0]})"
+        if count == 0 and name in ("list", "tuple", "dict", "set"):
+            empty = {"list": "[]", "tuple": "[]", "dict": "{}", "set": "new Set()"}
+            return empty[name]
         return None
 
     def _method_call(self, node: ast.Call, indent: int) -> str | None:
@@ -1916,7 +1928,9 @@ class _Generator:
                 if kw.arg == "default_factory":
                     if isinstance(kw.value, ast.Name) and kw.value.id in factories:
                         return factories[kw.value.id]
-                    return f"{self.expr(kw.value, 2)}()"
+                    # Parenthesized: an arrow (`lambda: …`) is not callable
+                    # without it, and `() => x()` would store the function.
+                    return f"({self.expr(kw.value, 2)})()"
             for kw in value.keywords:
                 if kw.arg not in _IGNORED_FIELD_OPTIONS:
                     raise TranspileError(

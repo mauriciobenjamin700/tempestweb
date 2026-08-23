@@ -1068,7 +1068,7 @@ def test_a_custom_default_factory_is_called() -> None:
         "    log: list[str] = field(default_factory=fresh)\n"
         "    tags: list[str] = field(default_factory=list)\n"
     )
-    assert "opts.log !== undefined ? opts.log : fresh();" in js
+    assert "opts.log !== undefined ? opts.log : (fresh)();" in js
     assert "opts.tags !== undefined ? opts.tags : [];" in js
 
 
@@ -1088,3 +1088,39 @@ def test_an_unknown_field_option_is_refused_by_name() -> None:
     with pytest.raises(TranspileError) as excinfo:
         gen("@dataclass\nclass S:\n    value: int = field(converter=int)\n")
     assert "'converter'" in str(excinfo.value)
+
+
+def test_a_lambda_default_factory_is_applied_not_stored() -> None:
+    """`field(default_factory=lambda: list(SEED))` holds the list, not the arrow.
+
+    Measured in Chrome before the parentheses: `core-app-shell` compiled, the
+    page loaded, and the first render died on `state.items.map is not a
+    function`, because the field held the function.
+    """
+    js = gen(
+        "@dataclass\nclass S:\n"
+        "    items: list[int] = field(default_factory=lambda: list(SEED))\n"
+    )
+    assert "(() => [...SEED])()" in js
+
+
+def test_container_builtins_convert_instead_of_calling_a_missing_name() -> None:
+    """`list(xs)` emitted a call to an undefined `list` — a blank page.
+
+    `node --check` parses it and the golden compares text, so nothing caught it
+    until a browser ran the line.
+    """
+    js = gen(
+        "def f(xs, pairs):\n"
+        "    a = list(xs)\n"
+        "    b = tuple(xs)\n"
+        "    c = set(xs)\n"
+        "    d = dict(pairs)\n"
+        "    e = list()\n"
+        "    return a\n"
+    )
+    assert "const a = [...xs];" in js
+    assert "const b = [...xs];" in js
+    assert "const c = new Set(xs);" in js
+    assert "const d = Object.fromEntries(pairs);" in js
+    assert "const e = [];" in js

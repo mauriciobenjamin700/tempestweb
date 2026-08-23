@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from tempest_core import (
+    Accordion,
     Alert,
     AppBar,
     Avatar,
@@ -56,6 +57,7 @@ from tempest_core import (
     Stepper,
     StyledContainer,
     Surface,
+    Tabs,
     Tag,
     Text,
     VStack,
@@ -321,6 +323,33 @@ def _cases() -> dict[str, Any]:
         "confidence_badge_custom_thresholds": ConfidenceBadge(
             confidence=0.61, high=0.6, mid=0.3
         ),
+        "accordion_closed": Accordion(title="Details", on_toggle=lambda: None),
+        "accordion_open": Accordion(
+            title="Details", open=True, children=[child], on_toggle=lambda: None
+        ),
+        "accordion_outlined_primary": Accordion(
+            title="Details",
+            variant="outlined",
+            color_scheme="primary",
+            on_toggle=lambda: None,
+        ),
+        "accordion_open_elevated_error": Accordion(
+            title="Details",
+            open=True,
+            children=[child],
+            variant="elevated",
+            color_scheme="error",
+            on_toggle=lambda: None,
+        ),
+        "tabs_default": Tabs(tabs=["a", "b"], on_select=_noop),
+        "tabs_second_lg": Tabs(
+            tabs=["a", "b", "c"], active=1, on_select=_noop, size="lg"
+        ),
+        "tabs_secondary_sm": Tabs(
+            tabs=["a"], on_select=_noop, color_scheme="secondary", size="sm"
+        ),
+        "tabs_empty": Tabs(tabs=[], on_select=_noop),
+        "tabs_active_out_of_range": Tabs(tabs=["a", "b"], active=7, on_select=_noop),
     }
     return cases
 

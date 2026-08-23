@@ -26,6 +26,7 @@ import {
 import { mountApp, State } from "../../client/transpile/runtime.js";
 import * as widgets from "../../client/transpile/widgets.gen.js";
 import {
+  Accordion,
   Alert,
   AppBar,
   Avatar,
@@ -59,6 +60,7 @@ import {
   Stepper,
   StyledContainer,
   Surface,
+  Tabs,
   Tag,
   VStack,
 } from "../../client/transpile/components.js";
@@ -592,6 +594,32 @@ test("every ported component matches the core build (order-agnostic)", () => {
     confidence_badge_low: ConfidenceBadge({ confidence: 0.2 }),
     confidence_badge_labelled: ConfidenceBadge({ confidence: 0.92, label: "cat" }),
     confidence_badge_custom_thresholds: ConfidenceBadge({ confidence: 0.61, high: 0.6, mid: 0.3 }),
+    accordion_closed: Accordion({ title: "Details", onToggle: noop }),
+    accordion_open: Accordion({
+      title: "Details",
+      open: true,
+      children: [child()],
+      onToggle: noop,
+    }),
+    accordion_outlined_primary: Accordion({
+      title: "Details",
+      variant: "outlined",
+      colorScheme: "primary",
+      onToggle: noop,
+    }),
+    accordion_open_elevated_error: Accordion({
+      title: "Details",
+      open: true,
+      children: [child()],
+      variant: "elevated",
+      colorScheme: "error",
+      onToggle: noop,
+    }),
+    tabs_default: Tabs({ tabs: ["a", "b"], onSelect: noop }),
+    tabs_second_lg: Tabs({ tabs: ["a", "b", "c"], active: 1, onSelect: noop, size: "lg" }),
+    tabs_secondary_sm: Tabs({ tabs: ["a"], onSelect: noop, colorScheme: "secondary", size: "sm" }),
+    tabs_empty: Tabs({ tabs: [], onSelect: noop }),
+    tabs_active_out_of_range: Tabs({ tabs: ["a", "b"], active: 7, onSelect: noop }),
   };
   assert.equal(
     Object.keys(cases).length,

@@ -11,10 +11,13 @@
 // built from the real core over a matrix of props: if a component's composition or
 // resolved style drifts, the JS test fails until this file follows.
 //
-// Still out of scope: the data-driven components (DataTable, Table, charts, Tabs,
-// Accordion, the date/media pickers, DetectionOverlay, ResultView) whose
-// composition depends on the data they are handed. Compose them from primitives,
-// or use Modes A/B. See docs/advanced/transpile.md.
+// Still out of scope: the components whose *tree shape* depends on the data they
+// are handed (DataTable, Table, the charts, the date/media pickers,
+// DetectionOverlay, ResultView) — one row of cells per record, one bar per
+// datum. A component that merely loops over a flat list of labels or widgets
+// (Tabs, Accordion, SegmentedControl) is a fixed composition and ports fine.
+// Compose the rest from primitives, or use Modes A/B. See
+// docs/advanced/transpile.md.
 
 import {
   Button,
@@ -28,7 +31,7 @@ import {
 } from "./widgets.gen.js";
 import { SPACING_STEPS } from "./spacing.gen.js";
 import { Color, Edge, Style, resolveWidgetStyle } from "./widget-support.js";
-import { MUTED, ON_SURFACE } from "./values.gen.js";
+import { Border, MUTED, ON_SURFACE, SideBorder } from "./values.gen.js";
 import {
   ALERT_STYLES,
   AVATAR_COLORS,
@@ -1442,4 +1445,110 @@ export function ConfidenceBadge({
     variant: "subtle",
     style,
   });
+}
+
+/**
+ * `Accordion` — a titled section whose body shows only when `open`.
+ *
+ * The header is a resolved surface button carrying the disclosure marker; the
+ * body is a padded column rendered only while open, so a closed accordion is a
+ * single child and the reconciler removes the body rather than hiding it.
+ * `open` is controlled — the app flips it from `onToggle`.
+ *
+ * @param {{title?: string, open?: boolean,
+ *          children?: import("../transport.js").Node[], onToggle?: ?Function,
+ *          variant?: string, colorScheme?: string, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Accordion({
+  title = "",
+  open = false,
+  children = [],
+  onToggle = null,
+  variant = "filled",
+  colorScheme = "neutral",
+  style = null,
+  key = null,
+} = {}) {
+  const header = Button({
+    label: `${open ? "▾" : "▸"}  ${title}`,
+    onClick: onToggle,
+    key: "accordion-header",
+    style: Style({
+      ...surfaceStyle(variant, colorScheme, null, "sm"),
+      padding: Edge.all(SPACING_STEPS.sm),
+      font_weight: 700,
+    }),
+  });
+  const body = open
+    ? [
+        Column({
+          key: "accordion-body",
+          style: Style({
+            gap: SPACING_STEPS.sm,
+            padding: Edge.all(SPACING_STEPS.md),
+          }),
+          children,
+        }),
+      ]
+    : [];
+  return Column({
+    key: key ?? "accordion",
+    style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
+    children: [header, ...body],
+  });
+}
+
+/**
+ * `Tabs` — a tab strip whose active tab carries an underline indicator.
+ *
+ * Each tab is a ghost button that grows to share the strip evenly; the active
+ * one resolves against `colorScheme` instead of neutral and takes a thin bottom
+ * `SideBorder` in the accent role — the indicator uses the existing border
+ * fields, never a new style field. The active index is app state, reported back
+ * through `onSelect`.
+ *
+ * @param {{tabs?: string[], active?: number, onSelect?: ?Function,
+ *          colorScheme?: string, size?: string, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Tabs({
+  tabs = [],
+  active = 0,
+  onSelect = null,
+  colorScheme = "primary",
+  size = "md",
+  style = null,
+  key = null,
+} = {}) {
+  const accent = COLOR_ROLES[colorScheme] ?? COLOR_ROLES.primary;
+  const children = tabs.map((label, index) => {
+    const chosen = index === active;
+    const base = resolveWidgetStyle(
+      "Button",
+      "ghost",
+      size,
+      chosen ? colorScheme : "neutral",
+      null,
+    );
+    const overrides = chosen
+      ? { grow: 1.0, border: SideBorder({ bottom: Border({ width: 2.0, color: accent }) }) }
+      : { grow: 1.0 };
+    return Button({
+      label,
+      key: `tab-${index}`,
+      onClick: onSelect == null ? null : () => onSelect(index),
+      style: mergeStyle(base, overrides),
+    });
+  });
+  const strip = {
+    ...surfaceStyle("filled", "neutral", null, "none"),
+    gap: 4.0,
+    padding: Edge.symmetric({ vertical: 0.0, horizontal: 4.0 }),
+    justify: "center",
+    align: "stretch",
+  };
+  return Row({ key: key ?? "tabs", style: mergeStyle(strip, style), children });
 }

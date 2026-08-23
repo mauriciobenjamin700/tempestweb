@@ -4,6 +4,32 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.87.0] — 2026-08-23
+
+### Added
+
+- **`Accordion` e `Tabs` rodam em Modo C.** Estavam na lista de "componentes
+  dirigidos por dados", junto de `DataTable` e dos gráficos, e a classificação
+  estava errada: a árvore do `Accordion` é header + corpo opcional, e a do
+  `Tabs` é um botão por rótulo — composição fixa, do mesmo tipo que
+  `SegmentedControl` e `RadioGroup`, que já estavam portados. O que é
+  genuinamente dirigido por dado é a *forma* da árvore mudar com o registro (uma
+  linha de células por linha de dado, uma barra por ponto), e isso continua fora.
+- **Nove casos novos na matriz de paridade** (`transpile_component_samples.json`,
+  agora 126): `Accordion` fechado, aberto, `outlined`/`primary` e
+  `elevated`/`error`; `Tabs` default, ativo com `size="lg"`, `secondary`/`sm`,
+  lista vazia e `active` fora de alcance.
+
+### Changed
+
+- **O teste que fixa o fora-de-escopo passou a dizer o critério certo.**
+  `test_a_data_driven_component_is_still_out_of_scope` agora guarda `DataTable`,
+  `Table`, os gráficos e `DetectionOverlay` — a *forma* da árvore depender do
+  dado — e um teste irmão exige que `Accordion` e `Tabs` estejam servidos.
+
+Corpus do Modo C: **38 dos 57 exemplos** (era 35). Desbloqueados:
+`core-profile-cards`, `core-tabbed-settings`, `faq-accordion`.
+
 ## [0.86.0] — 2026-08-23
 
 ### Added

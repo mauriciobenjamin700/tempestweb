@@ -597,7 +597,7 @@ no espírito do `mypy --strict`.
     as saídas.
 
 !!! check "Componentes estruturais estão portados"
-    Os 35 componentes estruturais do core rodam em Modo C:
+    Os 36 componentes estruturais do core rodam em Modo C:
 
     - **superfície e estrutura:** `Surface`, `StyledContainer`, `Card`,
       `Scaffold`, `Grid`, `Sidebar`, `Drawer`, `Divider`, mais os aliases
@@ -606,6 +606,9 @@ no espírito do `mypy --strict`.
       `Breadcrumb`, `Burger`, `SegmentedControl`;
     - **conteúdo:** `ListTile`, `Avatar`, `Chip`, `Tag`, `Rating`, `Stepper`,
       `SearchBar`, `RadioGroup`;
+    - **divulgação e seleção de painel:** `Accordion` (o corpo só existe na
+      árvore quando `open`, então fechar é *remove*, não esconder) e `Tabs` (a
+      aba ativa leva o sublinhado por `SideBorder`, sem campo de estilo novo);
     - **feedback:** `Banner`, `Alert`, `Badge`, `EmptyState`, `Stat`,
       `ProgressStepper`;
     - **composição:** `MetricCard`, `StatCard`, `ConfidenceBadge` — mais a função
@@ -615,7 +618,7 @@ no espírito do `mypy --strict`.
     resolvedores de estilo do core viaja em tabela gerada
     (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
     pelos widgets. Cada builder é fixado por uma matriz de props construída do
-    core real — 117 casos — então drift de composição ou de estilo falha no teste.
+    core real — 126 casos — então drift de composição ou de estilo falha no teste.
 
     `examples/mode-c-components` exercita o lote inteiro num app só.
 
@@ -665,7 +668,7 @@ no espírito do `mypy --strict`.
       desliza a janela no runtime, como o servidor faz no Modo B, e ela
       sobrevive ao `view` re-rodando.
 
-    Medido no corpus: **35 dos 57 exemplos** transpilam (eram 14).
+    Medido no corpus: **38 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),
@@ -687,11 +690,13 @@ no espírito do `mypy --strict`.
     carrega e morre na primeira renderização.
 
     Os componentes **dirigidos por dados** de `tempest_core.components`
-    (`DataTable`, `Table`, `Tabs`, `Accordion`, `BarChart`/`LineChart`,
-    `DetectionOverlay`, `ResultView`, `Calendar`/`Clock`, os pickers de mídia e
-    de formulário, e o `CollapsingAppBar`, que depende do scroll): a árvore deles
-    depende dos dados recebidos, então não há composição fixa para portar —
-    diferente dos estruturais acima
+    (`DataTable`, `Table`, `BarChart`/`LineChart`, `DetectionOverlay`,
+    `ResultView`, `Calendar`/`Clock`, os pickers de mídia e de formulário, e o
+    `CollapsingAppBar`, que depende do scroll): a *forma da árvore* deles depende
+    dos dados recebidos — uma linha de células por registro, uma barra por dado —
+    então não há composição fixa para portar. Percorrer uma lista plana de
+    rótulos não é isso: `Tabs` e `Accordion` são composição fixa e estão
+    servidos, como os estruturais acima
     ([#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107)
     acompanha o que falta). Também
     fora: comprehension com **mais de um** `for`, e format-specs de f-string além

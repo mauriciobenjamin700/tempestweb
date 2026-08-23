@@ -158,8 +158,8 @@ listava geo/clipboard/notifications/storage).
 | N0 | **http:** `native.http` com cliente tipado — `retry`, `generate_idempotency_key`, upload com progresso, `poll`. **Idempotency key + retry são a base do replay offline** (P2). Modo A: `fetch`/httpx-pyodide; Modo B: httpx no servidor | ✅ |
 | N1 | **audio:** `await audio.play(src, volume=...)` — chime de notificação/sucesso. Autoplay bloqueado até a 1ª interação (resolve com `None`); pareia com WebPush (P3) | ✅ |
 | N2 | **share:** `await share(title, text, url, files=...)` + `is_share_supported()`, com fallback gracioso (clipboard). Pareia com `share_target` (P5) | ✅ |
-| N3 | **geolocation / clipboard / storage:** awaitables; `storage` por cima de IndexedDB (P2). Migra o conteúdo do A5 pra cá | 🔶 (wrappers testados; geo/clipboard reais pendentes) |
-| N4 | **camera / mídia:** captura no cliente; no Modo B proxiada por WS (foto volta tipada). Herda o B3 | 🔶 (proxy testado; captura real pendente) |
+| N3 | **geolocation / clipboard / storage:** awaitables; `storage` por cima de IndexedDB (P2). Migra o conteúdo do A5 pra cá | ✅ (geo medido em Chrome real 2026-08-23: concedida → `located` na posição injetada, negada → `error: permission_denied`, e volta a localizar; clipboard medido lendo o conteúdo de volta do sistema — registro em `docs/agents/device-verification.md`) |
+| N4 | **camera / mídia:** captura no cliente; no Modo B proxiada por WS (foto volta tipada). Herda o B3 | 🔶 (proxy testado; captura real pendente — o harness não tem câmera nem fake device; procedimento em `docs/agents/device-verification.md`) |
 
 ## Trilho O — observabilidade / produção (compartilhado)
 

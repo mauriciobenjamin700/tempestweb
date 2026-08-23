@@ -365,6 +365,10 @@ class TempestWebServer(Generic[S]):
             The auth gate + origin allowlist (Track S) run on the upgrade before
             a session is created; a rejected connection is closed with ``1008``
             (policy violation) and never mounts.
+
+            The connection is wrapped in one observability span and two log lines,
+            carrying the same id the patch metrics carry — so "this client was
+            slow" is a query, not an archaeology project.
             """
             peer = websocket.client.host if websocket.client else None
             credentials = _credentials_from_headers(
@@ -394,9 +398,6 @@ class TempestWebServer(Generic[S]):
             )
             session = self._new_session(transport)
             try:
-                # One span and two log lines per connection, carrying the id the
-                # patch metrics also carry — so "this client was slow" is a query,
-                # not an archaeology project.
                 with self._observability.session(session.session_id, transport="ws"):
                     await session.run()
             finally:

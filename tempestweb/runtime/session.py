@@ -138,18 +138,19 @@ class AppSession(Generic[S]):
                 still rendered baseline-purple buttons until the session
                 handed the theme to the tree building them.
         """
-        # Typed as the seam, held as None when absent: the Mode A bundle carries
-        # this module and must not carry the server's observability with it, so the
-        # import is type-only and the default path uses the local untimed round.
+        #: Typed as the seam, held as ``None`` when absent: the Mode A bundle
+        #: carries this module and must not carry the server's observability with
+        #: it, so the import is type-only and the default path uses the local
+        #: untimed round.
         self._observability: ServerObservability | None = observability
-        # The id that ties a metric, a log line and a span to one connection. A
-        # caller that has a better one (the SSE session id, a request id) passes
-        # it; otherwise it is this object's identity, which is stable per session
-        # and says nothing about the user.
+        #: The id that ties a metric, a log line and a span to one connection. A
+        #: caller with a better one (the SSE session id, a request id) passes it;
+        #: otherwise it is this object's identity, which is stable per session and
+        #: says nothing about the user.
         self.session_id: str = session_id or f"s-{id(self):x}"
-        # When the event being served arrived. The rebuild it triggers is
-        # coalesced, so it runs after the handler returns — the latency the client
-        # experiences is measured from here to the batch actually leaving.
+        #: When the event being served arrived. The rebuild it triggers is
+        #: coalesced, so it runs after the handler returns — the latency the
+        #: client experiences is measured from here to the batch actually leaving.
         self._event_at: float | None = None
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
@@ -322,6 +323,12 @@ class AppSession(Generic[S]):
         re-sends the whole scene (the client asks for it when it could not apply
         a batch).
 
+        When observability is wired, the handler gets its own span, and the arrival
+        time is stamped here rather than the latency being timed around this call:
+        the rebuild is coalesced and runs *after* the handler returns, so timing
+        this block reported rounds with zero patches. The histogram is taken where
+        the batch actually leaves.
+
         Args:
             event: The JSON-able client event ``{"type", "key", "payload"}``.
         """
@@ -351,9 +358,6 @@ class AppSession(Generic[S]):
             return
         payload = event.get("payload", {})
         arg = coerce_event(find_node_type(scene, key), event_type, payload)
-        # The handler gets its own span; the latency histogram is taken where the
-        # batch leaves, because the rebuild is coalesced and runs after this
-        # returns. Timing this block instead reported rounds with zero patches.
         self._event_at = time.perf_counter()
         traced = (
             _untraced()

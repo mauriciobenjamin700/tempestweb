@@ -64,7 +64,8 @@ def test_patch_latency_and_throughput_reach_the_metrics_endpoint() -> None:
     """A real click makes the histogram and the patch counter move.
 
     The number has to arrive where an operator reads it — a histogram collected and
-    never rendered is the same as no histogram.
+    never rendered is the same as no histogram. The connection counters are checked
+    too: this adds to ``/metrics``, it does not replace what was there.
     """
     metrics = PatchMetrics()
     app = create_app(
@@ -84,7 +85,6 @@ def test_patch_latency_and_throughput_reach_the_metrics_endpoint() -> None:
     assert "tempestweb_patch_seconds_count 1" in body
     assert 'tempestweb_patch_seconds_bucket{le="+Inf"} 1' in body
     assert "tempestweb_patches_total 1" in body
-    # And the connection counters are still there: this adds, it does not replace.
     assert "tempestweb_sessions_opened_total 1" in body
 
 
@@ -93,7 +93,8 @@ def test_the_session_log_is_json_with_the_id_as_a_field() -> None:
 
     ``session_id`` has to be a *field*, because the whole point is joining a log
     line to a span by that key — a message that merely contains the id is not
-    something a log pipeline can group by.
+    something a log pipeline can group by. The last assertion is the other half:
+    the sink that ships it renders one parseable object per line.
     """
     records: list[LogRecord] = []
     logger = create_logger(sinks=[records.append], level="INFO")
@@ -109,7 +110,6 @@ def test_the_session_log_is_json_with_the_id_as_a_field() -> None:
     assert closed.fields["reason"] == "closed"
     assert closed.fields["duration_s"] >= 0.0
 
-    # And the sink that ships it renders one parseable object per line.
     payload = {
         "level": closed.level,
         "message": closed.message,

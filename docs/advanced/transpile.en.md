@@ -212,6 +212,21 @@ The same typed `native` API from Modes A/B works in Mode C — `async` calls are
 transcribed to in-process JS calls into the shared browser glue (`fetch`,
 IndexedDB/localStorage, `document.cookie`). No Python, no network.
 
+The three import forms Python writes all reach the same place:
+
+```python
+from tempestweb import native                          # the namespace
+from tempestweb.native import storage, get_position    # a group and a function
+from tempestweb.native.geolocation import get_position  # the group as a module
+```
+
+!!! warning "A capability Mode C does not have, said at build time"
+    `camera` has no in-process facade — `camera.capture` needs Mode A (Pyodide)
+    or Mode B (server). Importing it in Mode C is a compile error with
+    `file:line` saying so, rather than a page that loads and breaks on click.
+    The live list of what the facade serves is generated from
+    `client/transpile/native.js` itself.
+
 ```python
 from tempestweb import native
 
@@ -637,7 +652,14 @@ spirit of `mypy --strict`.
     - **generator expressions** (`any(x for x in xs)`), `any`/`all`, `dict.get`
       with a default, and the `str` predicates (`c.isdigit()`).
 
-    Measured on the corpus: **26 of 57 examples** transpile, up from 14.
+    - **native capabilities, in all three import forms:**
+      `from tempestweb import native`, `from tempestweb.native import storage`
+      and `from tempestweb.native.geolocation import get_position` all land on
+      the same object from `./native.js`. A group the facade does not carry
+      (`camera`) is refused saying **which mode has it**, and an unknown member
+      is refused **by name** (`geolocation.triangulate`).
+
+    Measured on the corpus: **31 of 57 examples** transpile, up from 14.
 
 !!! tip "Always give a component an explicit `key`"
     A component's default key is its own name (`card`, `alert`, `navbar`), so two

@@ -526,7 +526,7 @@ test("typing in an Input drives onChange -> state -> re-render", () => {
           Input({
             value: app.state.text,
             key: "f",
-            onChange: (e) => app.setState((s) => (s.text = e.payload.value)),
+            onChange: (e) => app.setState((s) => (s.text = e.value)),
           }),
         ],
       }),
@@ -539,6 +539,51 @@ test("typing in an Input drives onChange -> state -> re-render", () => {
 
   assert.equal(handle.app.state.text, "hello");
   assert.ok(handle.patchLog.length >= 1, "the re-render emitted a patch");
+});
+
+test("a handler reads the event flat, the way Modes A and B deliver it", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  class FormState extends State {
+    constructor() {
+      super();
+      this.text = "";
+      this.seen = null;
+    }
+  }
+  const mod = {
+    makeState: () => new FormState(),
+    view: (app) =>
+      Column({
+        children: [
+          Input({
+            value: app.state.text,
+            key: "f",
+            onChange: (e) =>
+              app.setState((s) => {
+                s.text = e.value;
+                s.seen = { type: e.type, key: e.key, wire: e.payload.value };
+              }),
+          }),
+        ],
+      }),
+  };
+
+  const handle = mountApp(dom.root, mod);
+  const field = dom.root.querySelector("[data-tw-key=\"f\"]");
+  field.value = "typed";
+  field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+  // The transpiler emits `e.value` — a Python handler annotated with
+  // `TextChangeEvent` reads a flat field, and Mode C used to hand it the wire
+  // event, so every text input wrote `undefined` into the state.
+  assert.equal(handle.app.state.text, "typed");
+  assert.deepEqual(handle.app.state.seen, {
+    type: "input",
+    key: "f",
+    wire: "typed",
+  });
 });
 
 // ---- 3. runtime drives a real generated module ----------------------------

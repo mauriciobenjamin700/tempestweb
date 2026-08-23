@@ -32,6 +32,26 @@ versioning.
   default. A matriz de paridade ganhou um par `__dark` por caso (185 → 336
   amostras), que é o que fixa cada uma dessas decisões.
 
+  **Seis componentes ficam de fora, e agora isso está escrito:** `TextField`,
+  `EmailField`, `PasswordField`, `LoginForm`, `SignupForm` e `Stepper` não
+  declaram campo `theme` — são claros por construção, como os docstrings deles já
+  diziam ("styled for the Material 3 light surface"). O par `__dark` deles é
+  byte a byte igual ao claro. O par continua valendo (fixa que o port JS ignora o
+  tema **exatamente** como o core ignora), mas não prova nada sobre escuro, e a
+  matriz lia como mais cobertura do que tem.
+
+  `LIGHT_ONLY_COMPONENTS` nomeia os seis com o motivo, e
+  `tests/transpile/test_component_dark_axis.py` fixa a divisão nas duas direções:
+  componente que **pode** ser tematizado e mostra cor tem que diferir no escuro
+  (é a asserção da #106 no nível de componente), e a lista não pode apodrecer —
+  quem ganhar tematização sai dela, quem perder entra, e o gerador reprova até
+  isso ser feito. As três direções foram provadas por mutação.
+
+  Isso importa porque `model_copy(update={"theme": ...})` **pula a validação**:
+  `TextField` recusa o kwarg (`extra_forbidden`), e o gerador injetava de qualquer
+  forma um atributo que o core ignora. O caso "escuro" saía sendo o caso claro com
+  outro nome — que é exatamente a forma do defeito que a #106 existe para pegar.
+
 ### Added
 
 - **`examples/dark-mode`** — o idioma `theme=app.theme` numa tela com `Card`,

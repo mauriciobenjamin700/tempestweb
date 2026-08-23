@@ -39,7 +39,9 @@ versioning.
   os `Slider` tinham 4px de altura (alvo de toque de 4px) e o `Checkbox` escondia
   a própria legenda. `styleToCss` e o port `style_to_css` passam a descartar a
   geometria/pintura de peça desses quatro tipos e a reemitir a cor resolvida como
-  `accent-color`.
+  `accent-color` — e também como `--tw-control-accent`, porque a folha base
+  pinta o track do `Switch` e não consegue ler `accent-color`: um app azul
+  mostrava um switch roxo.
 
 - **Pickers estouravam a tela em 390px** (um `<input type=file>` não encolhe:
   empurrava a página 101px) e o **`aria-label` do `TabView` ficava preso na

@@ -11,20 +11,41 @@
 // built from the real core over a matrix of props: if a component's composition or
 // resolved style drifts, the JS test fails until this file follows.
 //
-// Still out of scope: the data-driven components (DataTable, charts, Tabs, form
-// pickers) whose composition depends on the data they are handed. Compose them
-// from primitives, or use Modes A/B. See docs/advanced/transpile.md.
+// Still out of scope: the data-driven components (DataTable, Table, charts, Tabs,
+// Accordion, the date/media pickers, DetectionOverlay, ResultView) whose
+// composition depends on the data they are handed. Compose them from primitives,
+// or use Modes A/B. See docs/advanced/transpile.md.
 
-import { Button, Column, Container, Row, ScrollView, Text } from "./widgets.gen.js";
-import { SPACING_STEPS } from "./spacing.gen.js";
-import { Edge, Style, resolveWidgetStyle } from "./widget-support.js";
 import {
+  Button,
+  Column,
+  Container,
+  IconButton,
+  Input,
+  Row,
+  ScrollView,
+  Text,
+} from "./widgets.gen.js";
+import { SPACING_STEPS } from "./spacing.gen.js";
+import { Color, Edge, Style, resolveWidgetStyle } from "./widget-support.js";
+import { MUTED, ON_SURFACE } from "./values.gen.js";
+import {
+  ALERT_STYLES,
+  AVATAR_COLORS,
   BADGE_STYLES,
   COLOR_ROLES,
+  FIELD_STYLES,
   SELECTION_ACCENT,
   SHAPE_STEPS,
   SURFACE_STYLES,
+  TYPOGRAPHY,
 } from "./component-styles.gen.js";
+
+/**
+ * The legacy status tones `Banner`/`Badge` accept, which double as scheme names.
+ * @type {ReadonlySet<string>}
+ */
+const TONE_SCHEMES = new Set(["info", "success", "warning", "error"]);
 
 /**
  * Resolve a `gap` to logical pixels: a token name via the theme scale, or a
@@ -243,6 +264,9 @@ export function SegmentedControl({
 /**
  * `AppBar` — a top bar: leading widget, growing title, trailing actions.
  *
+ * The bar overrides only the padding step of the resolved surface; the radius
+ * keeps the resolver's own default, so a bar carries the same corner as a card.
+ *
  * @param {{title?: string, leading?: ?import("../transport.js").Node,
  *          actions?: import("../transport.js").Node[], variant?: string,
  *          colorScheme?: string, elevation?: ?number, style?: ?Object,
@@ -259,8 +283,6 @@ export function AppBar({
   style = null,
   key = null,
 } = {}) {
-  // `_bar_surface` overrides only the padding step; the radius keeps the
-  // resolver's own default, so a bar carries the same corner as a card.
   const surface = surfaceStyle(variant, colorScheme, elevation, "md");
   const content = surface.color ?? COLOR_ROLES.on_surface;
   const children = [];
@@ -360,4 +382,1064 @@ export function Scaffold({
   }
   const base = { gap: 0.0, background: COLOR_ROLES.background };
   return Column({ key: key ?? "scaffold", style: mergeStyle(base, style), children });
+}
+
+/**
+ * `Surface` — the themed, un-padded box every higher-level surface builds on.
+ *
+ * Carries the resolved surface style and nothing else: no inner padding, no gap.
+ * `Card` is exactly this plus padding and a `Column`.
+ *
+ * @param {{child?: ?import("../transport.js").Node, variant?: string,
+ *          colorScheme?: string, elevation?: ?number, radiusStep?: string,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Surface({
+  child = null,
+  variant = "elevated",
+  colorScheme = "neutral",
+  elevation = null,
+  radiusStep = "md",
+  style = null,
+  key = null,
+} = {}) {
+  return Container({
+    key: key ?? "surface",
+    style: mergeStyle(surfaceStyle(variant, colorScheme, elevation, radiusStep), style),
+    child,
+  });
+}
+
+/**
+ * `StyledContainer` — a `Container` whose padding is a spacing-token step.
+ *
+ * A raw number passes through as logical pixels; a step name (`"md"`) resolves
+ * against the theme's spacing scale.
+ *
+ * @param {{child?: ?import("../transport.js").Node, padding?: number|string,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function StyledContainer({ child = null, padding = "md", style = null, key = null } = {}) {
+  const amount = typeof padding === "string" ? SPACING_STEPS[padding] ?? 0.0 : padding;
+  return Container({
+    key: key ?? "styled-container",
+    style: mergeStyle({ padding: Edge.all(amount) }, style),
+    child,
+  });
+}
+
+/**
+ * `Grid` — children laid out in equal-width cells, `columns` per row.
+ *
+ * Each child is wrapped in a growing `Container` so the columns share the width,
+ * and a short final row is padded with empty cells to keep the alignment.
+ *
+ * @param {{children?: import("../transport.js").Node[], columns?: number,
+ *          gap?: number|string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key = null } = {}) {
+  const perRow = Math.max(1, columns);
+  const space = typeof gap === "string" ? SPACING_STEPS[gap] ?? 0.0 : gap;
+  const rows = [];
+  for (let start = 0; start < children.length; start += perRow) {
+    const chunk = children.slice(start, start + perRow);
+    const cells = chunk.map((child, offset) =>
+      Container({ key: `cell-${start + offset}`, style: Style({ grow: 1.0 }), child }),
+    );
+    for (let pad = chunk.length; pad < perRow; pad += 1) {
+      cells.push(Container({ key: `cell-pad-${start}-${pad}`, style: Style({ grow: 1.0 }) }));
+    }
+    rows.push(Row({ key: `grid-row-${start}`, style: Style({ gap: space }), children: cells }));
+  }
+  return Column({
+    key: key ?? "grid",
+    style: mergeStyle({ gap: space }, style),
+    children: rows,
+  });
+}
+
+/**
+ * A fixed-width lateral panel over a resolved surface — the `Sidebar`/`Drawer` body.
+ *
+ * @param {string} key           The node key.
+ * @param {import("../transport.js").Node[]} children  The stacked children.
+ * @param {number} width         The panel width in logical pixels.
+ * @param {string} variant       A `CardVariant` value.
+ * @param {string} colorScheme   A Material 3 scheme name.
+ * @param {?number} elevation    An explicit M3 level, or null for the default.
+ * @param {?Object} style        The caller's style override.
+ * @returns {import("../transport.js").Node}
+ */
+function lateralPanel(key, children, width, variant, colorScheme, elevation, style) {
+  const base = {
+    ...surfaceStyle(variant, colorScheme, elevation, "md"),
+    width,
+    padding: Edge.all(16.0),
+    gap: 10.0,
+  };
+  return Column({ key, style: mergeStyle(base, style), children });
+}
+
+/**
+ * `Sidebar` — a fixed-width lateral column of navigation or content widgets.
+ *
+ * @param {{children?: import("../transport.js").Node[], width?: number,
+ *          variant?: string, colorScheme?: string, elevation?: ?number,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Sidebar({
+  children = [],
+  width = 240.0,
+  variant = "elevated",
+  colorScheme = "neutral",
+  elevation = null,
+  style = null,
+  key = null,
+} = {}) {
+  return lateralPanel(key ?? "sidebar", children, width, variant, colorScheme, elevation, style);
+}
+
+/**
+ * `Drawer` — a controlled lateral panel that shows its children when `open`.
+ *
+ * Closed, it collapses to an empty `Container` — the same node the core emits, so
+ * the reconciler sees a prop change rather than a replaced subtree.
+ *
+ * @param {{open?: boolean, children?: import("../transport.js").Node[],
+ *          width?: number, variant?: string, colorScheme?: string,
+ *          elevation?: ?number, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Drawer({
+  open = false,
+  children = [],
+  width = 260.0,
+  variant = "elevated",
+  colorScheme = "neutral",
+  elevation = null,
+  style = null,
+  key = null,
+} = {}) {
+  if (!open) {
+    return Container({ key: key ?? "drawer" });
+  }
+  return lateralPanel(key ?? "drawer", children, width, variant, colorScheme, elevation, style);
+}
+
+/**
+ * `Burger` — the hamburger menu button.
+ *
+ * Lowers to an `IconButton` carrying the curated `menu` glyph in the `ghost`
+ * variant, with `"menu"` as its accessible label. The core's deprecated `glyph`
+ * prop is not surfaced: it no longer changes what is drawn.
+ *
+ * @param {{onClick?: ?Function, variant?: string, colorScheme?: string,
+ *          size?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Burger({
+  onClick = null,
+  variant = "ghost",
+  colorScheme = "neutral",
+  size = "md",
+  style = null,
+  key = null,
+} = {}) {
+  return IconButton({
+    icon: "menu",
+    label: "menu",
+    onClick,
+    variant,
+    colorScheme,
+    size,
+    key: key ?? "burger",
+    style,
+  });
+}
+
+/**
+ * `Header` — a flat page-header band: a title with an optional subtitle.
+ *
+ * A header is a band, not a surface: it fills with the `surface_variant` role and
+ * takes no `variant`/elevation. A `colorScheme` other than `"neutral"` tints the
+ * title with that role.
+ *
+ * @param {{title?: string, subtitle?: ?string, colorScheme?: ?string,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Header({ title = "", subtitle = null, colorScheme = null, style = null, key = null } = {}) {
+  const titleColor =
+    colorScheme != null && colorScheme !== "neutral"
+      ? COLOR_ROLES[colorScheme]
+      : COLOR_ROLES.on_surface;
+  const children = [
+    Text({
+      content: title,
+      key: "header-title",
+      style: Style({
+        font_size: TYPOGRAPHY.headline_small.font_size,
+        font_weight: 700,
+        color: titleColor,
+      }),
+    }),
+  ];
+  if (subtitle != null) {
+    children.push(
+      Text({
+        content: subtitle,
+        key: "header-subtitle",
+        style: Style({
+          font_size: TYPOGRAPHY.body_medium.font_size,
+          color: COLOR_ROLES.on_surface_variant,
+        }),
+      }),
+    );
+  }
+  const base = {
+    padding: Edge.all(SPACING_STEPS.lg),
+    gap: SPACING_STEPS.xs,
+    background: COLOR_ROLES.surface_variant,
+  };
+  return Column({ key: key ?? "header", style: mergeStyle(base, style), children });
+}
+
+/**
+ * `Footer` — a bottom bar holding arbitrary, centered content.
+ *
+ * Carries the same resolved surface as an `AppBar`, with the bar's own padding.
+ *
+ * @param {{children?: import("../transport.js").Node[], variant?: string,
+ *          colorScheme?: string, elevation?: ?number, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Footer({
+  children = [],
+  variant = "elevated",
+  colorScheme = "neutral",
+  elevation = null,
+  style = null,
+  key = null,
+} = {}) {
+  const base = {
+    ...surfaceStyle(variant, colorScheme, elevation, "md"),
+    padding: Edge.symmetric({ vertical: 12.0, horizontal: 16.0 }),
+    gap: 12.0,
+    align: "center",
+  };
+  return Row({ key: key ?? "footer", style: mergeStyle(base, style), children });
+}
+
+/**
+ * `NavBar` — a horizontal navigation bar with the active item as an accent pill.
+ *
+ * The active item takes the `solid` badge treatment in `colorScheme`; the others
+ * take a neutral `ghost` button treatment. Every item grows, so they share the
+ * bar's width.
+ *
+ * @param {{items?: string[], active?: number, onSelect?: ?Function,
+ *          colorScheme?: string, size?: string, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function NavBar({
+  items = [],
+  active = 0,
+  onSelect = null,
+  colorScheme = "primary",
+  size = "md",
+  style = null,
+  key = null,
+} = {}) {
+  const children = items.map((label, index) => {
+    const itemStyle =
+      index === active
+        ? BADGE_STYLES.solid?.[size]?.[colorScheme] ?? {}
+        : resolveWidgetStyle("Button", "ghost", size, "neutral", null);
+    return Button({
+      label,
+      key: `nav-${index}`,
+      onClick: onSelect == null ? null : () => onSelect(index),
+      style: mergeStyle(itemStyle, { grow: 1.0 }),
+    });
+  });
+  const base = {
+    ...surfaceStyle("filled", "neutral", null, "md"),
+    gap: 8.0,
+    padding: Edge.all(8.0),
+    justify: "center",
+  };
+  return Row({ key: key ?? "navbar", style: mergeStyle(base, style), children });
+}
+
+/**
+ * `Breadcrumb` — a path trail of crumbs joined by a separator.
+ *
+ * A crumb is a `link`-styled `Button` while `onSelect` is set, except the last
+ * one: the current crumb is never tappable, and reads bold in `on_surface`.
+ *
+ * @param {{items?: string[], separator?: string, onSelect?: ?Function,
+ *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Breadcrumb({
+  items = [],
+  separator = "/",
+  onSelect = null,
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  const children = [];
+  items.forEach((label, index) => {
+    if (index) {
+      children.push(
+        Text({
+          content: separator,
+          key: `sep-${index}`,
+          style: Style({ color: COLOR_ROLES.on_surface_variant, font_size: 14.0 }),
+        }),
+      );
+    }
+    const isLast = index === items.length - 1;
+    if (onSelect != null && !isLast) {
+      children.push(
+        Button({
+          label,
+          key: `crumb-${index}`,
+          onClick: () => onSelect(index),
+          style: resolveWidgetStyle("Button", "link", "sm", colorScheme, null),
+        }),
+      );
+      return;
+    }
+    children.push(
+      Text({
+        content: label,
+        key: `crumb-${index}`,
+        style: Style({
+          color: isLast ? COLOR_ROLES.on_surface : COLOR_ROLES.on_surface_variant,
+          font_size: 14.0,
+          font_weight: isLast ? 700 : 400,
+        }),
+      }),
+    );
+  });
+  return Row({
+    key: key ?? "breadcrumb",
+    style: mergeStyle({ gap: 6.0, align: "center" }, style),
+    children,
+  });
+}
+
+/**
+ * `ListTile` — a list row: optional leading/trailing widgets around a title block.
+ *
+ * Presentational by design: the primitive set only taps on a `Button`, so an
+ * actionable row puts one in `trailing`.
+ *
+ * @param {{title?: string, subtitle?: ?string,
+ *          leading?: ?import("../transport.js").Node,
+ *          trailing?: ?import("../transport.js").Node, colorScheme?: ?string,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function ListTile({
+  title = "",
+  subtitle = null,
+  leading = null,
+  trailing = null,
+  colorScheme = null,
+  style = null,
+  key = null,
+} = {}) {
+  const titleColor =
+    colorScheme != null && colorScheme !== "neutral"
+      ? COLOR_ROLES[colorScheme]
+      : COLOR_ROLES.on_surface;
+  const textChildren = [
+    Text({
+      content: title,
+      key: "tile-title",
+      style: Style({
+        font_size: TYPOGRAPHY.body_large.font_size,
+        font_weight: TYPOGRAPHY.body_large.font_weight,
+        color: titleColor,
+      }),
+    }),
+  ];
+  if (subtitle != null) {
+    textChildren.push(
+      Text({
+        content: subtitle,
+        key: "tile-subtitle",
+        style: Style({
+          font_size: TYPOGRAPHY.body_small.font_size,
+          color: COLOR_ROLES.on_surface_variant,
+        }),
+      }),
+    );
+  }
+  const children = [];
+  if (leading != null) {
+    children.push(leading);
+  }
+  children.push(
+    Column({
+      key: "tile-text",
+      style: Style({ grow: 1.0, gap: SPACING_STEPS.xs }),
+      children: textChildren,
+    }),
+  );
+  if (trailing != null) {
+    children.push(trailing);
+  }
+  const base = {
+    gap: SPACING_STEPS.sm,
+    align: "center",
+    padding: Edge.symmetric({ vertical: SPACING_STEPS.sm, horizontal: SPACING_STEPS.md }),
+  };
+  return Row({ key: key ?? "listtile", style: mergeStyle(base, style), children });
+}
+
+/**
+ * `Avatar` — a round badge showing short initials.
+ *
+ * The circle fills with the scheme's tonal `*_container` role and the initials
+ * take its legible `on_*_container` pair, so the contrast holds by construction.
+ *
+ * @param {{initials?: string, size?: number, colorScheme?: string,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", style = null, key = null } = {}) {
+  const pair = AVATAR_COLORS[colorScheme] ?? AVATAR_COLORS.primary;
+  const base = {
+    width: size,
+    height: size,
+    radius: size / 2.0,
+    background: pair.background,
+    align: "center",
+  };
+  return Container({
+    key: key ?? "avatar",
+    style: mergeStyle(base, style),
+    child: Text({
+      content: initials,
+      key: "avatar-text",
+      style: Style({ color: pair.color, font_weight: 700, text_align: "center" }),
+    }),
+  });
+}
+
+/**
+ * `Tag` — a read-only label: a `Chip` fixed to its static, low-emphasis form.
+ *
+ * The core models it as a `Chip` subclass whose `selected`/`on_click` fields are
+ * frozen, so it always lowers to a `subtle` badge pill. Kept as its own export
+ * because app code imports the name; it delegates rather than restating the pill.
+ *
+ * @param {{label?: string, colorScheme?: string, size?: string, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Tag({ label = "", colorScheme = "primary", size = "md", style = null, key = null } = {}) {
+  return Chip({ label, colorScheme, size, style, key });
+}
+
+/**
+ * `Rating` — a row of stars showing, and optionally setting, a 1-based rating.
+ *
+ * With `onRate` set every star is a tappable `ghost` button with an explicitly
+ * transparent fill, so the glyph reads as a bare star instead of a filled pill.
+ *
+ * @param {{value?: number, maxStars?: number, onRate?: ?Function,
+ *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Rating({
+  value = 0,
+  maxStars = 5,
+  onRate = null,
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  const color = COLOR_ROLES[colorScheme];
+  const children = [];
+  for (let index = 0; index < maxStars; index += 1) {
+    const glyph = index < value ? "★" : "☆";
+    if (onRate != null) {
+      children.push(
+        Button({
+          label: glyph,
+          key: `star-${index}`,
+          variant: "ghost",
+          onClick: () => onRate(index + 1),
+          style: Style({ font_size: 24.0, color, background: Color({ a: 0.0 }) }),
+        }),
+      );
+    } else {
+      children.push(
+        Text({ content: glyph, key: `star-${index}`, style: Style({ font_size: 24.0, color }) }),
+      );
+    }
+  }
+  return Row({
+    key: key ?? "rating",
+    style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
+    children,
+  });
+}
+
+/**
+ * `Stepper` — a numeric spinner: `-` decrement, current value, `+` increment.
+ *
+ * Each button reports the value already clamped to `minValue`/`maxValue`, so the
+ * app never has to re-check the bounds it declared.
+ *
+ * @param {{value?: number, step?: number, minValue?: ?number,
+ *          maxValue?: ?number, onChange?: ?Function, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Stepper({
+  value = 0,
+  step = 1,
+  minValue = null,
+  maxValue = null,
+  onChange = null,
+  style = null,
+  key = null,
+} = {}) {
+  const clamped = (candidate) => {
+    if (minValue != null && candidate < minValue) {
+      return minValue;
+    }
+    if (maxValue != null && candidate > maxValue) {
+      return maxValue;
+    }
+    return candidate;
+  };
+  const button = (label, delta, buttonKey) =>
+    Button({
+      label,
+      key: buttonKey,
+      onClick: onChange == null ? null : () => onChange(clamped(value + delta)),
+      style: Style({
+        padding: Edge.symmetric({ vertical: 8.0, horizontal: 16.0 }),
+        radius: 8.0,
+        background: MUTED,
+        color: ON_SURFACE,
+        font_size: 18.0,
+      }),
+    });
+  return Row({
+    key: key ?? "stepper",
+    style: mergeStyle({ gap: 10.0, align: "center" }, style),
+    children: [
+      button("-", -step, "step-down"),
+      Text({
+        content: String(value),
+        key: "step-value",
+        style: Style({ font_size: 18.0, font_weight: 700, color: ON_SURFACE }),
+      }),
+      button("+", step, "step-up"),
+    ],
+  });
+}
+
+/**
+ * `SearchBar` — a search field: a controlled `Input` in a surface pill.
+ *
+ * The clear button appears only when `onClear` is set *and* the query is
+ * non-empty, matching the core: an empty field has nothing to clear.
+ *
+ * @param {{value?: string, placeholder?: string, onChange?: ?Function,
+ *          onClear?: ?Function, fieldVariant?: string, colorScheme?: string,
+ *          size?: string, style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function SearchBar({
+  value = "",
+  placeholder = "Search",
+  onChange = null,
+  onClear = null,
+  fieldVariant = "filled",
+  colorScheme = "neutral",
+  size = "md",
+  style = null,
+  key = null,
+} = {}) {
+  const field = FIELD_STYLES[fieldVariant]?.[size]?.[colorScheme] ?? {};
+  const children = [
+    Input({
+      value,
+      placeholder,
+      onChange,
+      key: "search-input",
+      style: mergeStyle(field, { grow: 1.0 }),
+    }),
+  ];
+  if (onClear != null && value) {
+    children.push(
+      IconButton({
+        icon: "x",
+        label: "clear",
+        onClick: onClear,
+        variant: "ghost",
+        colorScheme,
+        size,
+        key: "search-clear",
+      }),
+    );
+  }
+  const base = {
+    ...surfaceStyle("filled", colorScheme, null, "lg"),
+    gap: 8.0,
+    align: "center",
+    padding: Edge.all(8.0),
+  };
+  return Row({ key: key ?? "searchbar", style: mergeStyle(base, style), children });
+}
+
+/**
+ * Map the legacy `tone` prop onto a Material 3 color scheme.
+ *
+ * `Banner`/`Badge` predate the scheme axis and still accept `tone`; an unknown
+ * tone falls back to `"info"`, as the core does.
+ *
+ * @param {string} tone  One of `"info"`/`"success"`/`"warning"`/`"error"`.
+ * @returns {string}  The matching scheme name.
+ */
+function toneScheme(tone) {
+  return TONE_SCHEMES.has(tone) ? tone : "info";
+}
+
+/**
+ * `Banner` — an inline status bar with a message and an optional trailing action.
+ *
+ * @param {{message?: string, tone?: string, colorScheme?: ?string,
+ *          variant?: string, action?: ?import("../transport.js").Node,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Banner({
+  message = "",
+  tone = "info",
+  colorScheme = null,
+  variant = "subtle",
+  action = null,
+  style = null,
+  key = null,
+} = {}) {
+  const scheme = colorScheme ?? toneScheme(tone);
+  const resolved = ALERT_STYLES[variant]?.[scheme] ?? {};
+  const children = [
+    Text({
+      content: message,
+      key: "banner-text",
+      style: Style({ grow: 1.0, color: resolved.color ?? null, font_size: 14.0 }),
+    }),
+  ];
+  if (action != null) {
+    children.push(action);
+  }
+  const base = { ...resolved, gap: 12.0, align: "center" };
+  return Row({ key: key ?? "banner", style: mergeStyle(base, style), children });
+}
+
+/**
+ * `Alert` — a block status callout: optional glyph, title, body and dismiss.
+ *
+ * The richer sibling of `Banner`, over the same resolved alert block. Use
+ * `variant: "left_accent"` for the classic accented-edge callout.
+ *
+ * @param {{title?: string, body?: ?string, glyph?: ?string,
+ *          colorScheme?: string, variant?: string,
+ *          dismiss?: ?import("../transport.js").Node, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Alert({
+  title = "",
+  body = null,
+  glyph = null,
+  colorScheme = "info",
+  variant = "subtle",
+  dismiss = null,
+  style = null,
+  key = null,
+} = {}) {
+  const resolved = ALERT_STYLES[variant]?.[colorScheme] ?? {};
+  const content = resolved.color ?? null;
+  const columnChildren = [
+    Text({
+      content: title,
+      key: "alert-title",
+      style: Style({ color: content, font_size: 15.0, font_weight: 700 }),
+    }),
+  ];
+  if (body != null) {
+    columnChildren.push(
+      Text({ content: body, key: "alert-body", style: Style({ color: content, font_size: 13.0 }) }),
+    );
+  }
+  const children = [];
+  if (glyph != null) {
+    children.push(
+      Text({ content: glyph, key: "alert-glyph", style: Style({ color: content, font_size: 20.0 }) }),
+    );
+  }
+  children.push(
+    Column({
+      key: "alert-col",
+      style: Style({ grow: 1.0, gap: SPACING_STEPS.xs }),
+      children: columnChildren,
+    }),
+  );
+  if (dismiss != null) {
+    children.push(dismiss);
+  }
+  const base = { ...resolved, gap: SPACING_STEPS.sm, align: "center" };
+  return Row({ key: key ?? "alert", style: mergeStyle(base, style), children });
+}
+
+/**
+ * `Badge` — a small inline status pill (a count or a short label).
+ *
+ * @param {{label?: string, tone?: string, colorScheme?: ?string,
+ *          variant?: string, size?: string, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Badge({
+  label = "",
+  tone = "error",
+  colorScheme = null,
+  variant = "solid",
+  size = "sm",
+  style = null,
+  key = null,
+} = {}) {
+  const scheme = colorScheme ?? toneScheme(tone);
+  const pill = BADGE_STYLES[variant]?.[size]?.[scheme] ?? {};
+  return Text({
+    content: label,
+    key: key ?? "badge",
+    style: mergeStyle({ ...pill, text_align: "center" }, style),
+  });
+}
+
+/**
+ * `EmptyState` — a centered placeholder: glyph, title, subtitle, action.
+ *
+ * @param {{title?: string, subtitle?: ?string, glyph?: string,
+ *          action?: ?import("../transport.js").Node, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function EmptyState({
+  title = "",
+  subtitle = null,
+  glyph = "○",
+  action = null,
+  style = null,
+  key = null,
+} = {}) {
+  const muted = COLOR_ROLES.on_surface_variant;
+  const children = [
+    Text({
+      content: glyph,
+      key: "empty-glyph",
+      style: Style({ font_size: 48.0, color: muted, text_align: "center" }),
+    }),
+    Text({
+      content: title,
+      key: "empty-title",
+      style: Style({
+        font_size: 18.0,
+        font_weight: 700,
+        color: COLOR_ROLES.on_surface,
+        text_align: "center",
+      }),
+    }),
+  ];
+  if (subtitle != null) {
+    children.push(
+      Text({
+        content: subtitle,
+        key: "empty-subtitle",
+        style: Style({ font_size: 14.0, color: muted, text_align: "center" }),
+      }),
+    );
+  }
+  if (action != null) {
+    children.push(action);
+  }
+  const base = {
+    gap: SPACING_STEPS.sm,
+    align: "center",
+    padding: Edge.all(SPACING_STEPS.lg),
+  };
+  return Column({ key: key ?? "emptystate", style: mergeStyle(base, style), children });
+}
+
+/**
+ * `Stat` — a labelled metric with a value and an optional trend delta.
+ *
+ * The delta is tinted by the `success`/`error` status role and prefixed with the
+ * canonical ▲/▼ cue, following `deltaUp`.
+ *
+ * @param {{label?: string, value?: string, delta?: ?string, deltaUp?: boolean,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function Stat({ label = "", value = "", delta = null, deltaUp = true, style = null, key = null } = {}) {
+  const children = [
+    Text({
+      content: label,
+      key: "stat-label",
+      style: Style({ color: COLOR_ROLES.on_surface_variant, font_size: 13.0 }),
+    }),
+    Text({
+      content: value,
+      key: "stat-value",
+      style: Style({ color: COLOR_ROLES.on_surface, font_size: 28.0, font_weight: 700 }),
+    }),
+  ];
+  if (delta != null) {
+    children.push(
+      Text({
+        content: `${deltaUp ? "▲" : "▼"} ${delta}`,
+        key: "stat-delta",
+        style: Style({
+          color: deltaUp ? COLOR_ROLES.success : COLOR_ROLES.error,
+          font_size: 13.0,
+          font_weight: 500,
+        }),
+      }),
+    );
+  }
+  return Column({
+    key: key ?? "stat",
+    style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
+    children,
+  });
+}
+
+/**
+ * One `ProgressStepper` cell: a numbered disc above its label.
+ *
+ * A done or active step paints a filled accent disc; a pending one an outlined,
+ * muted disc — which is the whole visual cue the stepper carries.
+ *
+ * @param {number} index        The zero-based step position.
+ * @param {string} label        The step's caption.
+ * @param {number} current      The active step index.
+ * @param {string} colorScheme  A Material 3 scheme name.
+ * @returns {import("../transport.js").Node}
+ */
+function stepCell(index, label, current, colorScheme) {
+  const doneOrActive = index <= current;
+  const muted = COLOR_ROLES.on_surface_variant;
+  const disc = doneOrActive
+    ? Style({
+        width: 28.0,
+        height: 28.0,
+        radius: 14.0,
+        background: COLOR_ROLES[colorScheme],
+        color: COLOR_ROLES[`on_${colorScheme}`],
+        align: "center",
+        text_align: "center",
+        font_weight: 700,
+        font_size: 13.0,
+      })
+    : Style({
+        width: 28.0,
+        height: 28.0,
+        radius: 14.0,
+        border: { width: 1.0, color: COLOR_ROLES.outline },
+        color: muted,
+        align: "center",
+        text_align: "center",
+        font_size: 13.0,
+      });
+  return Column({
+    key: `step-${index}`,
+    style: Style({ gap: SPACING_STEPS.xs, align: "center" }),
+    children: [
+      Text({ content: String(index + 1), key: `step-disc-${index}`, style: disc }),
+      Text({
+        content: label,
+        key: `step-label-${index}`,
+        style: Style({
+          color: doneOrActive ? COLOR_ROLES.on_surface : muted,
+          font_size: 12.0,
+        }),
+      }),
+    ],
+  });
+}
+
+/**
+ * `ProgressStepper` — a horizontal wizard showing labelled, numbered steps.
+ *
+ * Named for the core's own split: this is the progress trail, while `Stepper` is
+ * the numeric +/- spinner.
+ *
+ * @param {{steps?: string[], current?: number, colorScheme?: string,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function ProgressStepper({
+  steps = [],
+  current = 0,
+  colorScheme = "primary",
+  style = null,
+  key = null,
+} = {}) {
+  const children = [];
+  steps.forEach((label, index) => {
+    if (index > 0) {
+      children.push(
+        Text({
+          content: "",
+          key: `step-conn-${index}`,
+          style: Style({
+            grow: 1.0,
+            height: 2.0,
+            background:
+              index <= current ? COLOR_ROLES[colorScheme] : COLOR_ROLES.outline_variant,
+          }),
+        }),
+      );
+    }
+    children.push(stepCell(index, label, current, colorScheme));
+  });
+  return Row({
+    key: key ?? "progress-stepper",
+    style: mergeStyle({ gap: SPACING_STEPS.xs, align: "center" }, style),
+    children,
+  });
+}
+
+/**
+ * `MetricCard` — a dashboard metric inside a themed card.
+ *
+ * `Card` + `Stat`, with an optional trailing slot (a sparkline, an icon) laid
+ * beside the stat block. No new primitive is introduced.
+ *
+ * @param {{label?: string, value?: string, delta?: ?string, deltaUp?: boolean,
+ *          colorScheme?: string, variant?: string,
+ *          trailing?: ?import("../transport.js").Node, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function MetricCard({
+  label = "",
+  value = "",
+  delta = null,
+  deltaUp = true,
+  colorScheme = "neutral",
+  variant = "elevated",
+  trailing = null,
+  style = null,
+  key = null,
+} = {}) {
+  const stat = Stat({ label, value, delta, deltaUp, key: "metric-stat", style: Style({ grow: 1.0 }) });
+  const body =
+    trailing == null
+      ? stat
+      : Row({
+          key: "metric-row",
+          style: Style({ gap: SPACING_STEPS.md, align: "center" }),
+          children: [stat, trailing],
+        });
+  return Card({
+    key: key ?? "metric-card",
+    variant,
+    colorScheme,
+    style,
+    children: [body],
+  });
+}
+
+/**
+ * `StatCard` — a compact preset of `MetricCard` (a `filled` card).
+ *
+ * @param {{label?: string, value?: string, delta?: ?string, deltaUp?: boolean,
+ *          colorScheme?: string, variant?: string,
+ *          trailing?: ?import("../transport.js").Node, style?: ?Object,
+ *          key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function StatCard({
+  label = "",
+  value = "",
+  delta = null,
+  deltaUp = true,
+  colorScheme = "neutral",
+  variant = "filled",
+  trailing = null,
+  style = null,
+  key = null,
+} = {}) {
+  return MetricCard({ label, value, delta, deltaUp, colorScheme, variant, trailing, style, key });
+}
+
+/**
+ * Map a confidence score to a status color scheme.
+ *
+ * The traffic-light cue every confidence-driven component shares: at or above
+ * `high` reads `"success"`, at or above `mid` reads `"warning"`, below `mid`
+ * reads `"error"`.
+ *
+ * @param {number} conf  The confidence score, typically in `[0, 1]`.
+ * @param {{high?: number, mid?: number}} [thresholds]
+ * @returns {string}  One of `"success"`/`"warning"`/`"error"`.
+ */
+export function confidence_scheme(conf, { high = 0.8, mid = 0.5 } = {}) {
+  if (conf >= high) {
+    return "success";
+  }
+  if (conf >= mid) {
+    return "warning";
+  }
+  return "error";
+}
+
+/**
+ * `ConfidenceBadge` — a status pill showing a model's confidence.
+ *
+ * A `subtle` `Badge` whose scheme comes from {@link confidence_scheme} and whose
+ * label is the rounded percentage, optionally prefixed with a class name. The
+ * percentage is formatted the way the transpiler renders Python's `.0%` spec, so
+ * a hand-built badge and a transpiled f-string agree.
+ *
+ * @param {{confidence?: number, label?: string, high?: number, mid?: number,
+ *          style?: ?Object, key?: ?string}} [args]
+ * @returns {import("../transport.js").Node}
+ */
+export function ConfidenceBadge({
+  confidence = 0.0,
+  label = "",
+  high = 0.8,
+  mid = 0.5,
+  style = null,
+  key = null,
+} = {}) {
+  const percent = `${(confidence * 100).toFixed(0)}%`;
+  return Badge({
+    key: key ?? "confidence-badge",
+    label: label ? `${label} ${percent}`.trim() : percent,
+    colorScheme: confidence_scheme(confidence, { high, mid }),
+    variant: "subtle",
+    style,
+  });
 }

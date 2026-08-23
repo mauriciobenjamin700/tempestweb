@@ -193,6 +193,36 @@ is not available in Mode C (the transpile client exports no such name)
 
 Referência: [Modo C — transpile](advanced/transpile.md).
 
+### O handler recebe o evento no lugar do valor que capturou
+
+O idioma clássico de captura em laço — parâmetro com default, para fugir do late
+binding do Python — recebia o objeto de evento em vez do índice:
+
+```python
+for index, item in enumerate(items):
+    def toggle(i: int = index) -> None:   # o idioma
+        select(i)
+    Accordion(..., on_toggle=toggle)
+```
+
+A convenção de chamada era decidida pela **espécie** do parâmetro, nunca por ele
+ter default — e um parâmetro com default não é algo que o chamador precise
+fornecer. Resultado medido no `examples/faq-accordion`: `open_index` virava um
+`ClickEvent` e o acordeão parava de responder de vez.
+
+Corrigido em 0.96.0 nos **três** modos: o handler só recebe o evento quando
+declara um parâmetro sem default (ou `*args`). Em Modo C a pergunta é a mesma e
+sai de graça — `fn.length` conta os parâmetros antes do primeiro default.
+
+Junto, o Modo C passou a **emitir** o default: `def toggle(i=index)` saía
+`(i) => …`, então a captura sumia e o closure respondia `undefined`.
+
+```bash
+uv add "tempestweb>=0.96.0"
+```
+
+---
+
 ### O campo não aceita digitação, ou a grade rende uma coluna
 
 Três widgets declarados que o renderizador desenhava como `div` anônimo — nos

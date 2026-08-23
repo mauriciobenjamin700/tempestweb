@@ -1415,3 +1415,52 @@ test("the sleep helper counts seconds, the way asyncio.sleep does", async () => 
   await sleep(0.05);
   assert.ok(Date.now() - started >= 45, "0.05 s is 50 ms, not 0.05 ms");
 });
+
+test("a default-bound closure keeps what it captured, and is called bare", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  // The loop-capture idiom: Python writes `def toggle(i=index)`, which the
+  // transpiler emits as `(i = index) => …`. Feeding it the event overwrites the
+  // captured value with a ClickEvent — measured in examples/faq-accordion,
+  // where the accordion stopped responding for good after one click.
+  const seen = [];
+  const mod = {
+    makeState: () => new State(),
+    view: () =>
+      Column({
+        key: "root",
+        children: [0, 1, 2].map((index) =>
+          Button({
+            key: `row-${index}`,
+            label: `row ${index}`,
+            onClick: (i = index) => seen.push(i),
+          }),
+        ),
+      }),
+  };
+  mountApp(dom.root, mod);
+  dom.root
+    .querySelector('[data-tw-key="row-2"]')
+    .dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+
+  assert.deepEqual(seen, [2], "the captured index, not the event");
+});
+
+test("a handler that declares a parameter still receives the event", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  const seen = [];
+  const mod = {
+    makeState: () => new State(),
+    view: () =>
+      Input({ key: "field", value: "", onChange: (event) => seen.push(event.value) }),
+  };
+  mountApp(dom.root, mod);
+  const field = dom.root.querySelector('[data-tw-key="field"]');
+  field.value = "typed";
+  field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+  assert.deepEqual(seen, ["typed"]);
+});

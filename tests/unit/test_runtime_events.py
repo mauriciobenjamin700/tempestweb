@@ -9,7 +9,7 @@ import pkgutil
 import tempest_core
 from tempest_core import SwipeEvent, TextChangeEvent, ToggleEvent, Widget
 from tempestweb.runtime import coerce_event
-from tempestweb.runtime.events import _WIDGET_EVENT_TYPES
+from tempestweb.runtime.events import _WIDGET_EVENT_TYPES, handler_wants_event
 from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS
 
 
@@ -121,3 +121,55 @@ def test_coerce_invalid_payload_falls_back_to_raw() -> None:
     """A payload that fails validation falls back to the raw dict, not a crash."""
     payload = {"direction": "sideways"}  # not a valid SwipeDirection
     assert coerce_event("GestureDetector", "swipe", payload) is payload
+
+
+def test_a_default_bound_closure_is_called_bare() -> None:
+    """The loop-capture idiom must keep the value it captured.
+
+    ``def make_toggle(i: int = index)`` is what Python's own docs teach for
+    capturing a loop variable, and it is what ``examples/faq-accordion`` writes.
+    Deciding the calling convention on the *kind* of parameter alone reads it as
+    "accepts an event", so the click event lands in ``i`` and the app writes an
+    event object where an index belongs — measured in Chrome: ``open_index``
+    became ``<ClickEvent>`` and the accordion stopped responding for good.
+    """
+
+    def make_toggle(i: int = 3) -> None: ...
+
+    assert not handler_wants_event(make_toggle)
+
+
+def test_a_handler_that_declares_an_event_still_receives_one() -> None:
+    """A required positional parameter is the declaration that wants the event."""
+
+    def on_change(event: TextChangeEvent) -> None: ...
+
+    def on_click() -> None: ...
+
+    assert handler_wants_event(on_change)
+    assert not handler_wants_event(on_click)
+
+
+def test_a_variadic_handler_receives_the_event() -> None:
+    """``*args`` can take it, so it gets it — Python would pass it too."""
+
+    def sink(*_args: object) -> None: ...
+
+    assert handler_wants_event(sink)
+
+
+def test_a_partially_defaulted_handler_receives_the_event() -> None:
+    """One required parameter is enough, whatever follows it has a default."""
+
+    def on_change(event: TextChangeEvent, retries: int = 0) -> None: ...
+
+    assert handler_wants_event(on_change)
+
+
+def test_an_uninspectable_handler_is_called_bare() -> None:
+    """Some callables have no readable signature; calling bare is the safe answer.
+
+    ``int`` is one — ``inspect.signature`` raises ``ValueError`` on it — and a
+    handler nobody can read is not a handler that asked for anything.
+    """
+    assert not handler_wants_event(int)

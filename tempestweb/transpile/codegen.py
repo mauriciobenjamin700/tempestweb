@@ -19,6 +19,7 @@ import ast
 import builtins
 import json
 import re
+from collections.abc import Callable
 from typing import Any
 
 import tempest_core
@@ -335,19 +336,36 @@ def _camel_name(name: str) -> str:
     return head + "".join(part[:1].upper() + part[1:] for part in rest)
 
 
-def _param_names(args: ast.arguments, node: ast.AST, filename: str) -> list[str]:
-    """Return a function's positional parameter names, rejecting the rest.
+def _param_names(
+    args: ast.arguments,
+    node: ast.AST,
+    filename: str,
+    render: Callable[[ast.expr], str] | None = None,
+) -> list[str]:
+    """Return a function's positional parameters, with their defaults.
 
     Variadic (``*args``/``**kwargs``), keyword-only and positional-only params
     are outside the subset — they would be silently dropped, so raise instead.
+
+    A **default** used to be dropped just as silently, and that one is load-bearing:
+    ``def make_toggle(i: int = index)`` is what Python's docs teach for capturing a
+    loop variable, and without the default the closure captured nothing at all.
+    Measured in ``examples/faq-accordion``, where every accordion answered with an
+    undefined index.
+
+    Emitting the default also restores the arity the runtime reads: JS counts the
+    parameters *before* the first default, so a captured-index closure reports
+    zero and is called bare, exactly as Python calls it.
 
     Args:
         args: The function's ``ast.arguments``.
         node: The owning node (for the error location).
         filename: The source file name (for the diagnostic).
+        render: Renders a default expression to JS. When omitted, a parameter with
+            a default is refused rather than silently stripped.
 
     Returns:
-        The plain positional parameter names.
+        The parameter list, each entry ``name`` or ``name = default``.
 
     Raises:
         TranspileError: If the signature uses an unsupported parameter form.
@@ -364,7 +382,20 @@ def _param_names(args: ast.arguments, node: ast.AST, filename: str) -> list[str]
             node,
             filename,
         )
-    return [a.arg for a in args.args]
+    names = [a.arg for a in args.args]
+    if not args.defaults:
+        return names
+    if render is None:
+        raise TranspileError(
+            "a parameter default is not supported here",
+            node,
+            filename,
+        )
+    # `defaults` aligns to the *last* parameters.
+    first = len(names) - len(args.defaults)
+    for offset, default in enumerate(args.defaults):
+        names[first + offset] = f"{names[first + offset]} = {render(default)}"
+    return names
 
 
 def _reject_fn_decorators(
@@ -1756,7 +1787,9 @@ class _Generator:
         expression body becomes a concise expression arrow — e.g.
         ``lambda s: s.increment()`` → ``(s) => s.increment()``.
         """
-        params = ", ".join(_param_names(node.args, node, self.filename))
+        params = ", ".join(
+            _param_names(node.args, node, self.filename, lambda e: self.expr(e, indent))
+        )
         body = node.body
         if (
             isinstance(body, ast.Call)
@@ -2315,7 +2348,9 @@ class _Generator:
         An `async def` becomes an `async` arrow, so `await` inside it is valid.
         """
         _reject_fn_decorators(node, self.filename)
-        params = ", ".join(_param_names(node.args, node, self.filename))
+        params = ", ".join(
+            _param_names(node.args, node, self.filename, lambda e: self.expr(e, indent))
+        )
         pad = _INDENT * indent
         prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
         lines = [f"{pad}const {_js_name(node.name)} = {prefix}({params}) => {{"]
@@ -3098,7 +3133,7 @@ class _Generator:
     def _method(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
         """Emit a dataclass method as a JS class method (drops the `self` param)."""
         _reject_fn_decorators(node, self.filename)
-        params = _param_names(node.args, node, self.filename)
+        params = _param_names(node.args, node, self.filename, lambda e: self.expr(e, 1))
         if params and params[0] == "self":
             params = params[1:]
         pad = _INDENT
@@ -3111,7 +3146,9 @@ class _Generator:
     def _function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
         """Emit a top-level `def` as `export function name(params) {...}`."""
         _reject_fn_decorators(node, self.filename)
-        params = ", ".join(_param_names(node.args, node, self.filename))
+        params = ", ".join(
+            _param_names(node.args, node, self.filename, lambda e: self.expr(e, 0))
+        )
         prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
         lines = [f"export {prefix}function {_js_name(node.name)}({params}) {{"]
         lines.extend(self._emit_fn_body(node.body, 1))

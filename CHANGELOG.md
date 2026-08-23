@@ -4,6 +4,39 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.96.0] — 2026-08-23
+
+### Fixed
+
+- **Handler com parâmetro default-bound recebia o evento no lugar do valor
+  capturado** ([#134](https://github.com/mauriciobenjamin700/tempestweb/issues/134)),
+  nos três modos. `def toggle(i: int = index)` é o idioma que a documentação do
+  Python ensina para capturar variável de laço, e a convenção de chamada era
+  decidida pela **espécie** do parâmetro — nunca por ele ter default, que é
+  precisamente o que diz "o chamador não precisa fornecer isto". Medido no
+  `examples/faq-accordion`: `open_index` virava um `ClickEvent` e o acordeão
+  parava de responder de vez.
+
+  Agora o handler só recebe o evento quando declara um parâmetro **sem** default
+  (ou `*args`, que pode recebê-lo). A regra vive em
+  `tempestweb.runtime.events.handler_wants_event` e serve os Modos A e B — que
+  antes tinham **duas** cópias do predicado, ambas com o defeito. Em Modo C a
+  pergunta é a mesma e sai de graça: `fn.length` conta os parâmetros antes do
+  primeiro default.
+- **O Modo C descartava o default de parâmetro.** `def toggle(i: int = index)`
+  saía `(i) => …` — a captura sumia — então o closure respondia `undefined` mesmo
+  depois de ser chamado nu. O default é emitido agora, o que também dá ao runtime
+  a aridade que ele lê.
+
+Os três modos passam a concordar: no `faq-accordion`, clicar num header abre
+aquele item, clicar de novo fecha, e outro header troca — idêntico em Modo B e em
+Modo C.
+
+!!! note
+    `tempest_core.handler_accepts_event` continua respondendo a pergunta mais
+    frouxa (qualquer parâmetro posicional). Os dois deveriam convergir no core;
+    até lá o tempestweb usa o seu.
+
 ## [0.95.0] — 2026-08-23
 
 ### Fixed

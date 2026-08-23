@@ -193,6 +193,37 @@ is not available in Mode C (the transpile client exports no such name)
 
 Reference: [Mode C — transpile](advanced/transpile.md).
 
+### The handler receives the event instead of the value it captured
+
+The classic loop-capture idiom — a parameter with a default, to escape Python's
+late binding — received the event object instead of the index:
+
+```python
+for index, item in enumerate(items):
+    def toggle(i: int = index) -> None:   # the idiom
+        select(i)
+    Accordion(..., on_toggle=toggle)
+```
+
+The calling convention was decided by the parameter's **kind**, never by whether
+it had a default — and a parameter with a default is not something the caller has
+to supply. Measured in `examples/faq-accordion`: `open_index` became a
+`ClickEvent` and the accordion stopped responding for good.
+
+Fixed in 0.96.0 across all **three** modes: a handler receives the event only
+when it declares a parameter with no default (or `*args`). In Mode C the question
+is the same and comes free — `fn.length` counts the parameters before the first
+default.
+
+Along with it, Mode C started **emitting** the default: `def toggle(i=index)` came
+out as `(i) => …`, so the capture vanished and the closure answered `undefined`.
+
+```bash
+uv add "tempestweb>=0.96.0"
+```
+
+---
+
 ### The field will not take typing, or the grid renders one column
 
 Three declared widgets the renderer drew as an anonymous `div` — in **all three

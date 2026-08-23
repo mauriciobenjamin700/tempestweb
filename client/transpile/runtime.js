@@ -421,7 +421,13 @@ export function mountApp(root, { makeState, view }) {
       if (typeof handler !== "function") {
         return;
       }
-      const result = handler(appEvent(event));
+      // `fn.length` counts the parameters *before* the first default, which is
+      // exactly Python's question: a parameter with a default is not something
+      // the caller has to supply, so it does not mean "give me the event". The
+      // loop-capture idiom `(i = index) => …` has length 0 and must keep its
+      // captured index — feeding it the event made the app store a ClickEvent
+      // where an index belonged (measured in examples/faq-accordion).
+      const result = handler.length > 0 ? handler(appEvent(event)) : handler();
       if (result != null && typeof result.then === "function") {
         result.then(undefined, (err) => {
           if (typeof console !== "undefined") {

@@ -888,8 +888,11 @@ export const THEME_MODE_ATTR = "data-tw-theme";
  * The base sheet reads this attribute to pick its token block, so this is how the
  * half of dark mode that lives in CSS follows the app instead of the OS. Only
  * `"light"` and `"dark"` are written; anything else (including `"system"`, which
- * the app resolves before sending) removes the attribute and hands the page back
- * to `prefers-color-scheme`.
+ * the app resolves before sending) removes the attribute, which leaves the sheet
+ * on its own `:root` tokens — the light palette. There is no
+ * `prefers-color-scheme` fallback to hand the page back to, on purpose: the core
+ * resolves a SYSTEM theme as light for every widget, so an OS-driven flip here
+ * would darken the page under a light tree.
  *
  * @param {?string} mode  `"light"`, `"dark"`, or null/unknown to unset.
  * @returns {void}

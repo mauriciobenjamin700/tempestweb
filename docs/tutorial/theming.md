@@ -260,12 +260,17 @@ bloco vai no `<head>`, antes de a folha base ser instalada no mount; como
 ela declara os mesmos nomes com a mesma especificidade, o seu vence por vir
 depois.
 
-!!! tip "Modo escuro sai de graça, e sai honesto"
-    Tema em `SYSTEM` emite o esquema claro no `:root` e o escuro dentro de
-    `@media (prefers-color-scheme: dark)`: a página segue a configuração de
-    quem lê. Tema fixado em `LIGHT` ou `DARK` emite um esquema só e nenhuma
-    media query — um tema fixado que ainda virasse com o sistema não estaria
-    fixado.
+!!! tip "Modo escuro sai de graça, pelo mesmo interruptor da folha"
+    Tema em `SYSTEM` emite o esquema claro no `:root` e o escuro sob
+    `:root[data-tw-theme="dark"]` — **o mesmo seletor** que a folha base usa,
+    então a paleta da app e os tokens da folha viram juntos, no modo que a app
+    resolveu. Tema fixado em `DARK` emite o esquema escuro nos **dois**
+    seletores: pinta antes de qualquer atributo chegar e continua ganhando da
+    folha depois que ele chega.
+
+    Nunca sai media query. Ver "Por que não `prefers-color-scheme`" adiante:
+    um widget não vê o SO, então escurecer a página pelo SO deixava árvore
+    clara em fundo escuro — e o lado inline é o que ganha.
 
 !!! info "Só o que a folha consome"
     `theme_css` emite as variáveis que a folha base lê, não os 39 papéis.

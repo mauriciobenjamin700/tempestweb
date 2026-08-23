@@ -8,6 +8,24 @@ versioning.
 
 ### Fixed
 
+- **`theme_css` ainda escurecia a página pelo SO, contra a política que este
+  próprio release estabelece.** A folha base recusa `prefers-color-scheme` de
+  propósito — o core resolve um tema `SYSTEM` como **claro** para todo widget,
+  porque widget não vê o SO — mas `theme_css` continuava emitindo
+  `@media (prefers-color-scheme: dark)`. No Modo A, que injeta esse CSS sozinho,
+  um app com `Theme(mode=SYSTEM)` num SO escuro ficava exatamente com a árvore
+  clara sobre página escura que a política existe para evitar.
+
+  Agora o bloco escuro sai sob `:root[data-tw-theme="dark"]`, o mesmo
+  interruptor da folha: as duas metades viram juntas, no modo que a app resolveu.
+
+- **Tema fixado em `DARK` perdia a paleta da app para a folha base.** O bloco
+  escuro da folha é `:root[data-tw-theme="dark"]` (0,1,1) e o da app saía em
+  `:root` (0,1,0) — então, no instante em que a página escurecia, o rebrand
+  revertia para o roxo do baseline. A folha base é piso, não gaiola: um tema
+  fixado passa a emitir seu esquema nos dois seletores, empatando a
+  especificidade, e a app ganha por vir depois no `<head>`.
+
 - **Metade do dark mode continuava clara: a folha base não tinha eixo de modo**
   ([#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148)). O
   `Style` que o core resolve viaja inline e ganha do stylesheet, então `Card` e

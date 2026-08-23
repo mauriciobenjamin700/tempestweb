@@ -260,12 +260,17 @@ The block goes in the `<head>`, before the base sheet is installed at
 mount; since it declares the same names at the same specificity, yours wins
 by coming later.
 
-!!! tip "Dark mode comes free, and comes honestly"
-    A `SYSTEM` theme emits the light scheme on `:root` and the dark one
-    inside `@media (prefers-color-scheme: dark)`: the page follows the
-    reader's own setting. A theme pinned to `LIGHT` or `DARK` emits one
-    scheme and no media query — a pinned theme that still flipped with the
-    system would not be pinned.
+!!! tip "Dark mode comes free, through the sheet's own switch"
+    A `SYSTEM` theme emits the light scheme on `:root` and the dark one under
+    `:root[data-tw-theme="dark"]` — **the same selector** the base sheet uses,
+    so your palette and the sheet's tokens flip together, in the mode the app
+    resolved. A theme pinned to `DARK` emits its dark scheme under **both**
+    selectors: it paints before any attribute arrives and still outranks the
+    sheet once it does.
+
+    No media query is ever emitted. See "Why not `prefers-color-scheme`" below:
+    a widget never sees the OS, so darkening the page from the OS left a light
+    tree on a dark background — and the inline half is the half that wins.
 
 !!! info "Only what the sheet consumes"
     `theme_css` emits the variables the base sheet reads, not all 39 roles.

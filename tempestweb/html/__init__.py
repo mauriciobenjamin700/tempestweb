@@ -24,6 +24,7 @@ from tempestweb.html.escape import escape_text as escape_text
 from tempestweb.html.renderer import render_document as render_document
 from tempestweb.html.renderer import render_to_html as render_to_html
 from tempestweb.html.theme import ROLE_BY_VARIABLE as ROLE_BY_VARIABLE
+from tempestweb.html.theme import THEME_MODE_ATTR as THEME_MODE_ATTR
 from tempestweb.html.theme import theme_css as theme_css
 
 __all__: list[str] = [
@@ -32,6 +33,7 @@ __all__: list[str] = [
     "render_document",
     "render_to_html",
     "style_to_css",
+    "THEME_MODE_ATTR",
     "theme_css",
     "ROLE_BY_VARIABLE",
 ]

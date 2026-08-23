@@ -146,6 +146,7 @@ EXAMPLE_NAMES = [
     "core-tabbed-settings",
     "core-feedback",
     "core-profile-cards",
+    "mode-c-components",
 ]
 
 

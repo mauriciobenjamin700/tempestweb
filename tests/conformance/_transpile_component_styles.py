@@ -11,7 +11,7 @@ cannot run there — but they are deterministic, so their *output* travels as a
 table, the same trick ``widget-styles.gen.js`` already uses for the styled
 widgets.
 
-Four tables, each keyed by the axes the components actually expose:
+The tables, each keyed by the axes the components actually expose:
 
 * ``COLOR_ROLES`` — the 39 Material 3 roles of the default theme.
 * ``SHAPE_STEPS`` — the shape scale (corner radii), by step name.
@@ -23,6 +23,17 @@ Four tables, each keyed by the axes the components actually expose:
 * ``BADGE_STYLES`` — variant × size × color scheme, for the chip pill.
 * ``SELECTION_ACCENT`` — size × color scheme × checked, but only the ``color``
   field a radio row reads, because that is all the component uses.
+* ``ALERT_STYLES`` — variant × color scheme, for the ``Banner``/``Alert`` block.
+  The resolver's ``padding_step``/``radius_step`` stay at their defaults because
+  neither component exposes them.
+* ``FIELD_STYLES`` — variant × size × color scheme at the resting, valid state,
+  which is the only combination ``SearchBar`` asks for.
+* ``TYPOGRAPHY`` — the type scale, but only the ``font_size``/``font_weight``
+  pair the components read off a role; the line height and letter spacing no
+  component consumes would be dead bytes.
+* ``AVATAR_COLORS`` — color scheme → the tonal ``(background, color)`` pair the
+  ``Avatar`` circle fills with, resolved through the core's own role mapping so
+  the pairing cannot drift here.
 """
 
 from __future__ import annotations
@@ -33,14 +44,19 @@ from typing import Any
 
 from tempest_core import (
     VALID_COLOR_SCHEMES,
+    AlertVariant,
     BadgeVariant,
     CardVariant,
     ColorRole,
+    FieldVariant,
     Size,
     Theme,
 )
+from tempest_core.components.cards import _avatar_colors
 from tempest_core.variants import (
+    resolve_alert_variant,
     resolve_badge_variant,
+    resolve_field_variant,
     resolve_selection_variant,
     resolve_surface_variant,
 )
@@ -197,6 +213,94 @@ def selection_accent(theme: Theme) -> dict[str, Any]:
     return table
 
 
+def alert_styles(theme: Theme) -> dict[str, Any]:
+    """Resolved alert block styles, by variant and color scheme.
+
+    Args:
+        theme: The theme to resolve against.
+
+    Returns:
+        variant → scheme → serialized style.
+    """
+    return {
+        variant.value: {
+            scheme: _dump(
+                resolve_alert_variant(variant=variant, color_scheme=scheme, theme=theme)
+            )
+            for scheme in _schemes()
+        }
+        for variant in AlertVariant
+    }
+
+
+def field_styles(theme: Theme) -> dict[str, Any]:
+    """Resolved input-field styles, by variant, size and color scheme.
+
+    Args:
+        theme: The theme to resolve against.
+
+    Returns:
+        variant → size → scheme → serialized style, at the resting valid state.
+    """
+    return {
+        variant.value: {
+            size.value: {
+                scheme: _dump(
+                    resolve_field_variant(
+                        variant=variant,
+                        size=size,
+                        color_scheme=scheme,
+                        theme=theme,
+                    )
+                )
+                for scheme in _schemes()
+            }
+            for size in Size
+        }
+        for variant in FieldVariant
+    }
+
+
+def typography(theme: Theme) -> dict[str, Any]:
+    """The type scale, by role name, reduced to what a component reads.
+
+    Args:
+        theme: The theme whose tokens carry the scale.
+
+    Returns:
+        Role name → ``{"font_size", "font_weight"}``.
+    """
+    return {
+        role: {
+            "font_size": theme.typography(role).font_size,
+            "font_weight": theme.typography(role).font_weight,
+        }
+        for role in type(theme.tokens.typography).model_fields
+    }
+
+
+def avatar_colors(theme: Theme) -> dict[str, Any]:
+    """The tonal fill/content pair an avatar circle paints, by color scheme.
+
+    The pairing comes from the core's own role map, so an unknown scheme falls
+    back to the primary container exactly as the component does.
+
+    Args:
+        theme: The theme to resolve against.
+
+    Returns:
+        Scheme name → ``{"background", "color"}`` serialized colors.
+    """
+    table: dict[str, Any] = {}
+    for scheme in _schemes():
+        background, content = _avatar_colors(scheme, theme)
+        table[scheme] = {
+            "background": background.model_dump(mode="json"),
+            "color": content.model_dump(mode="json"),
+        }
+    return table
+
+
 def render_module_text() -> str:
     """Render the component style tables as a native JS module.
 
@@ -209,7 +313,9 @@ def render_module_text() -> str:
         "transpile (Mode C).\n"
         "// The core-resolved styles the ported components need: surface variants, "
         "badge pills,\n"
-        "// selection accents, plus the color-role and shape scales. Regenerate:\n"
+        "// selection accents, alert blocks, input fields, avatar pairs, plus the "
+        "color-role,\n"
+        "// shape and type scales. Regenerate:\n"
         "// python -m tests.conformance._transpile_component_styles. Do not edit.\n"
     )
 
@@ -237,6 +343,14 @@ def render_module_text() -> str:
         + block("BADGE_STYLES", badge_styles(theme))
         + "\n"
         + block("SELECTION_ACCENT", selection_accent(theme))
+        + "\n"
+        + block("ALERT_STYLES", alert_styles(theme))
+        + "\n"
+        + block("FIELD_STYLES", field_styles(theme))
+        + "\n"
+        + block("TYPOGRAPHY", typography(theme))
+        + "\n"
+        + block("AVATAR_COLORS", avatar_colors(theme))
     )
 
 

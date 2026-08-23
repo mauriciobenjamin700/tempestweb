@@ -23,15 +23,40 @@ from pathlib import Path
 from typing import Any
 
 from tempest_core import (
+    Alert,
     AppBar,
+    Avatar,
+    Badge,
+    Banner,
+    Breadcrumb,
+    Burger,
     Button,
     Card,
     Chip,
+    ConfidenceBadge,
     Divider,
+    Drawer,
+    EmptyState,
+    Footer,
+    Grid,
+    Header,
     HStack,
+    ListTile,
+    MetricCard,
+    NavBar,
+    ProgressStepper,
     RadioGroup,
+    Rating,
     Scaffold,
+    SearchBar,
     SegmentedControl,
+    Sidebar,
+    Stat,
+    StatCard,
+    Stepper,
+    StyledContainer,
+    Surface,
+    Tag,
     Text,
     VStack,
     build,
@@ -47,6 +72,15 @@ def _noop(_: int) -> None:
 
     Args:
         _: The selected index.
+    """
+    return None
+
+
+def _noop_event(_: Any) -> None:
+    """Absorb a value-change callback.
+
+    Args:
+        _: The change event the widget reports.
     """
     return None
 
@@ -116,6 +150,177 @@ def _cases() -> dict[str, Any]:
         ),
         "scaffold_scroll": Scaffold(body=child, scroll=True),
         "scaffold_empty": Scaffold(),
+        "surface_default": Surface(child=child),
+        "surface_filled_primary": Surface(
+            child=child, variant="filled", color_scheme="primary"
+        ),
+        "surface_outlined_error_flat": Surface(
+            child=child, variant="outlined", color_scheme="error", elevation=0
+        ),
+        "surface_radius_lg": Surface(child=child, radius_step="lg"),
+        "surface_empty": Surface(),
+        "styled_container_default": StyledContainer(child=child),
+        "styled_container_step_lg": StyledContainer(child=child, padding="lg"),
+        "styled_container_float": StyledContainer(child=child, padding=6.0),
+        "grid_three_in_two": Grid(children=[child, child, child]),
+        "grid_full_rows": Grid(children=[child, child, child, child]),
+        "grid_single_column": Grid(children=[child, child], columns=1),
+        "grid_four_in_three_token_gap": Grid(
+            children=[child, child, child, child], columns=3, gap="md"
+        ),
+        "grid_empty": Grid(),
+        "sidebar_default": Sidebar(children=[child]),
+        "sidebar_filled_primary_wide": Sidebar(
+            children=[child], width=320.0, variant="filled", color_scheme="primary"
+        ),
+        "sidebar_outlined_level_3": Sidebar(
+            children=[child], variant="outlined", elevation=3
+        ),
+        "drawer_closed": Drawer(children=[child]),
+        "drawer_open": Drawer(open=True, children=[child]),
+        "drawer_open_filled_secondary": Drawer(
+            open=True,
+            children=[child],
+            width=200.0,
+            variant="filled",
+            color_scheme="secondary",
+        ),
+        "burger_default": Burger(on_click=lambda: None),
+        "burger_solid_primary_lg": Burger(
+            on_click=lambda: None, variant="solid", color_scheme="primary", size="lg"
+        ),
+        "header_title_only": Header(title="Reports"),
+        "header_with_subtitle": Header(title="Reports", subtitle="last 30 days"),
+        "header_tinted": Header(title="Reports", color_scheme="primary"),
+        "header_neutral_scheme": Header(title="Reports", color_scheme="neutral"),
+        "footer_default": Footer(children=[child]),
+        "footer_filled_primary": Footer(
+            children=[child], variant="filled", color_scheme="primary"
+        ),
+        "footer_outlined_flat": Footer(
+            children=[child], variant="outlined", elevation=0
+        ),
+        "navbar_first_active": NavBar(items=["a", "b", "c"], on_select=_noop),
+        "navbar_second_active_lg": NavBar(
+            items=["a", "b", "c"], active=1, on_select=_noop, size="lg"
+        ),
+        "navbar_secondary_scheme": NavBar(
+            items=["a", "b"], on_select=_noop, color_scheme="secondary"
+        ),
+        "breadcrumb_presentational": Breadcrumb(items=["home", "docs", "ui"]),
+        "breadcrumb_navigable": Breadcrumb(
+            items=["home", "docs", "ui"], on_select=_noop
+        ),
+        "breadcrumb_single": Breadcrumb(items=["home"], on_select=_noop),
+        "breadcrumb_custom_separator": Breadcrumb(items=["a", "b"], separator="›"),
+        "listtile_title_only": ListTile(title="Maria"),
+        "listtile_with_subtitle": ListTile(title="Maria", subtitle="admin"),
+        "listtile_with_slots": ListTile(
+            title="Maria",
+            subtitle="admin",
+            leading=Avatar(initials="MB", key="lead"),
+            trailing=Button(label="→", on_click=lambda: None, key="go"),
+        ),
+        "listtile_tinted": ListTile(title="Maria", color_scheme="primary"),
+        "listtile_neutral_scheme": ListTile(title="Maria", color_scheme="neutral"),
+        "avatar_default": Avatar(initials="MB"),
+        "avatar_large_secondary": Avatar(
+            initials="MB", size=64.0, color_scheme="secondary"
+        ),
+        "avatar_neutral": Avatar(initials="MB", color_scheme="neutral"),
+        "avatar_unknown_scheme": Avatar(initials="MB", color_scheme="brand"),
+        "tag_default": Tag(label="python"),
+        "tag_lg_success": Tag(label="python", size="lg", color_scheme="success"),
+        "rating_presentational": Rating(value=3),
+        "rating_interactive": Rating(value=2, on_rate=_noop),
+        "rating_three_stars": Rating(value=1, max_stars=3, color_scheme="warning"),
+        "stepper_default": Stepper(on_change=_noop),
+        "stepper_bounded": Stepper(
+            value=5, step=2, min_value=0, max_value=10, on_change=_noop
+        ),
+        "searchbar_empty": SearchBar(on_change=_noop_event),
+        "searchbar_with_value_and_clear": SearchBar(
+            value="cat", on_change=_noop_event, on_clear=lambda: None
+        ),
+        "searchbar_empty_with_clear": SearchBar(
+            on_change=_noop_event, on_clear=lambda: None
+        ),
+        "searchbar_outline_sm_primary": SearchBar(
+            on_change=_noop_event,
+            field_variant="outline",
+            size="sm",
+            color_scheme="primary",
+        ),
+        "banner_default": Banner(message="saved"),
+        "banner_success_tone": Banner(message="saved", tone="success"),
+        "banner_unknown_tone": Banner(message="saved", tone="fuchsia"),
+        "banner_solid_scheme": Banner(
+            message="saved", variant="solid", color_scheme="error"
+        ),
+        "banner_left_accent_with_action": Banner(
+            message="saved",
+            variant="left_accent",
+            action=Button(label="undo", on_click=lambda: None, key="undo"),
+        ),
+        "alert_title_only": Alert(title="Heads up"),
+        "alert_body_and_glyph": Alert(title="Heads up", body="check it", glyph="!"),
+        "alert_left_accent_error": Alert(
+            title="Heads up", variant="left_accent", color_scheme="error"
+        ),
+        "alert_top_accent_with_dismiss": Alert(
+            title="Heads up",
+            variant="top_accent",
+            color_scheme="success",
+            dismiss=Button(label="x", on_click=lambda: None, key="close"),
+        ),
+        "badge_default": Badge(label="3"),
+        "badge_subtle_info_md": Badge(
+            label="3", variant="subtle", color_scheme="info", size="md"
+        ),
+        "badge_outline_warning_lg": Badge(
+            label="NEW", variant="outline", color_scheme="warning", size="lg"
+        ),
+        "badge_success_tone": Badge(label="3", tone="success"),
+        "badge_unknown_tone": Badge(label="3", tone="fuchsia"),
+        "emptystate_default": EmptyState(title="Nothing here"),
+        "emptystate_full": EmptyState(
+            title="Nothing here",
+            subtitle="add the first one",
+            glyph="◍",
+            action=Button(label="add", on_click=lambda: None, key="add"),
+        ),
+        "stat_plain": Stat(label="revenue", value="R$ 1.2M"),
+        "stat_delta_up": Stat(label="revenue", value="R$ 1.2M", delta="+12%"),
+        "stat_delta_down": Stat(
+            label="revenue", value="R$ 1.2M", delta="-3%", delta_up=False
+        ),
+        "progress_stepper_first": ProgressStepper(steps=["a", "b", "c"]),
+        "progress_stepper_second": ProgressStepper(steps=["a", "b", "c"], current=1),
+        "progress_stepper_single": ProgressStepper(steps=["a"]),
+        "progress_stepper_secondary": ProgressStepper(
+            steps=["a", "b"], current=1, color_scheme="secondary"
+        ),
+        "metric_card_plain": MetricCard(label="users", value="1.2k"),
+        "metric_card_delta": MetricCard(label="users", value="1.2k", delta="+8%"),
+        "metric_card_trailing": MetricCard(
+            label="users",
+            value="1.2k",
+            trailing=Text(content="~", key="spark"),
+        ),
+        "metric_card_filled_primary": MetricCard(
+            label="users", value="1.2k", variant="filled", color_scheme="primary"
+        ),
+        "stat_card_default": StatCard(label="users", value="1.2k"),
+        "stat_card_delta_down": StatCard(
+            label="users", value="1.2k", delta="-2%", delta_up=False
+        ),
+        "confidence_badge_high": ConfidenceBadge(confidence=0.92),
+        "confidence_badge_mid": ConfidenceBadge(confidence=0.61),
+        "confidence_badge_low": ConfidenceBadge(confidence=0.2),
+        "confidence_badge_labelled": ConfidenceBadge(confidence=0.92, label="cat"),
+        "confidence_badge_custom_thresholds": ConfidenceBadge(
+            confidence=0.61, high=0.6, mid=0.3
+        ),
     }
     return cases
 

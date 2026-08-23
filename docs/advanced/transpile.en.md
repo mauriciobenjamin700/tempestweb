@@ -584,13 +584,32 @@ spirit of `mypy --strict`.
     the options.
 
 !!! check "The structural components are ported"
-    `Card`, `AppBar`, `Scaffold`, `Divider`, `Chip`, `SegmentedControl`,
-    `RadioGroup` — plus the `HStack`/`VStack` aliases — run in Mode C. Each
-    composition was rewritten in `components.js` and the *output* of the core's
-    style resolvers travels in a generated table (`component-styles.gen.js`), the
-    same way `widget-styles.gen.js` does for the widgets. Every builder is pinned
-    by a matrix of props built from the real core, so a drift in composition or
-    resolved style fails the test.
+    All 35 structural components of the core run in Mode C:
+
+    - **surface and structure:** `Surface`, `StyledContainer`, `Card`,
+      `Scaffold`, `Grid`, `Sidebar`, `Drawer`, `Divider`, plus the
+      `HStack`/`VStack` aliases;
+    - **bars and navigation:** `AppBar`, `Header`, `Footer`, `NavBar`,
+      `Breadcrumb`, `Burger`, `SegmentedControl`;
+    - **content:** `ListTile`, `Avatar`, `Chip`, `Tag`, `Rating`, `Stepper`,
+      `SearchBar`, `RadioGroup`;
+    - **feedback:** `Banner`, `Alert`, `Badge`, `EmptyState`, `Stat`,
+      `ProgressStepper`;
+    - **composition:** `MetricCard`, `StatCard`, `ConfidenceBadge` — plus the pure
+      `confidence_scheme` function, which is how an app picks the badge's scheme.
+
+    Each composition was rewritten in `components.js` and the *output* of the
+    core's style resolvers travels in a generated table
+    (`component-styles.gen.js`), the same way `widget-styles.gen.js` does for the
+    widgets. Every builder is pinned by a matrix of props built from the real core
+    — 117 cases — so a drift in composition or resolved style fails the test.
+
+    `examples/mode-c-components` exercises the whole batch in one app.
+
+!!! tip "Always give a component an explicit `key`"
+    A component's default key is its own name (`card`, `alert`, `navbar`), so two
+    `Card`s under the same parent both answer to `card` and a patch addresses the
+    wrong one. True in all three modes; Mode C is no different.
 
 !!! check "The core's enums, value objects and tokens are served"
     `TextAlign.CENTER`, `FontWeight.BOLD`, `KeyboardType.EMAIL`,
@@ -602,9 +621,11 @@ spirit of `mypy --strict`.
 
 !!! warning "Still outside the subset — and now it fails the build"
     The **data-driven** components of `tempest_core.components` (`DataTable`,
-    `Tabs`, `Accordion`, `BarChart`/`LineChart`, the form pickers …): their tree
-    depends on the data they are handed, so there is no fixed composition to
-    port — unlike the structural ones above
+    `Table`, `Tabs`, `Accordion`, `BarChart`/`LineChart`, `DetectionOverlay`,
+    `ResultView`, `Calendar`/`Clock`, the media and form pickers, and
+    `CollapsingAppBar`, which depends on the scroll): their tree depends on the
+    data they are handed, so there is no fixed composition to port — unlike the
+    structural ones above
     ([#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107) tracks
     what is left). Also out:
     multi-loop or destructured comprehensions (`for k, v in …`), and f-string

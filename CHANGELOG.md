@@ -4,6 +4,74 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.82.0] — 2026-08-22
+
+### Added
+
+- **25 componentes estruturais do core rodam em Modo C** — de 10 exports para 35.
+  Superfície e estrutura: `Surface`, `StyledContainer`, `Grid`, `Sidebar`,
+  `Drawer`. Barras e navegação: `Header`, `Footer`, `NavBar`, `Breadcrumb`,
+  `Burger`. Conteúdo: `ListTile`, `Avatar`, `Tag`, `Rating`, `Stepper`,
+  `SearchBar`. Feedback: `Banner`, `Alert`, `Badge`, `EmptyState`, `Stat`,
+  `ProgressStepper`. Composição: `MetricCard`, `StatCard`, `ConfidenceBadge`, mais
+  a função pura `confidence_scheme` (é como a app escolhe o esquema do badge).
+  Mesmo caminho do 0.81.0: composição reescrita em
+  `client/transpile/components.js` a partir do `render()` do core, com as mesmas
+  chaves, e estilo vindo de tabela gerada.
+- **Quatro tabelas de estilo novas** em `component-styles.gen.js`: `ALERT_STYLES`
+  (variante × esquema), `FIELD_STYLES` (variante × tamanho × esquema, no estado de
+  repouso), `TYPOGRAPHY` (reduzida ao par `font_size`/`font_weight` que o
+  componente lê) e `AVATAR_COLORS` (par tonal `container`/`on_container`,
+  resolvido pelo mapa de papéis do próprio core). 164 KB → 237 KB.
+- **A matriz de paridade foi de 28 para 117 casos**
+  (`tests/fixtures/transpile_component_samples.json`), construídos do core real:
+  por componente, o eixo que muda o estilo resolvido ou a composição — variante,
+  esquema, tamanho, elevação, passo de token, tom legado, esquema desconhecido e a
+  presença de cada slot. O teste JS agora exige que **todo** caso da fixture tenha
+  builder correspondente, então componente novo não entra sem prova.
+- **Oito widgets voltaram para o Modo C:** `IconButton`, `AspectRatio`, `Hero`,
+  `Animated`, `Shimmer`, `Navigator`, `RouteDrawer` e `TabView`. Eles não estavam
+  fora por decisão: `_CANDIDATE_ARGS` não tinha candidato para `child`, `drawer`,
+  `icon`, `ratio` e `hero_tag`, então a construção nua levantava, o spec voltava
+  `None` e o widget era descartado **em silêncio** — enquanto o renderizador
+  compartilhado já os desenhava nos Modos A e B.
+- **`examples/mode-c-components`**, um app só que exercita o lote inteiro (é o que
+  foi dirigido no Chrome para validar).
+
+### Fixed
+
+- **`widgets.js` re-exportava os componentes por lista escrita à mão**, então um
+  componente presente em `components.js` mas ausente da lista era um nome que o
+  compilador aceitava (o manifesto servido é gerado por módulo) e o browser
+  depois recusava resolver: página em branco a partir de um build verde. Agora é
+  `export * from "./components.js"`, com guard em `tests/client/transpile.test.js`
+  e em `tests/transpile/test_widgets.py` fixando que as duas superfícies
+  concordam.
+
+### Notas
+
+- **Os três scrollers lazy continuam fora do Modo C, agora por decisão declarada**
+  (`UNPORTABLE_WIDGETS`): o builder gerado é passthrough, e `LazyColumn` chama
+  `item_builder` no build para materializar a janela — um passthrough emitiria
+  viewport vazio. Precisam de builder à mão.
+- **Colisão de chave de filho vale para mais componentes do que a doc dizia.**
+  Medido numa tela com duas instâncias de cada: `Rating` (`star-N`), `NavBar`
+  (`nav-N`), `Breadcrumb` (`crumb-N`/`sep-N`), `Stepper` (`step-up`/`step-down`) e
+  `SearchBar` (`search-input`/`search-clear`) duplicam chave, como
+  `SegmentedControl`/`RadioGroup` já faziam — e passar `key=` diferente no
+  componente não resolve, porque a chave do filho não herda a do pai. Defeito do
+  `tempest-core` ([tempest-core#20]), reproduzido fielmente aqui; documentado nos
+  dois idiomas.
+- **`IconButton` renderiza como `div`, não como `button`.** `TAG_BY_TYPE`
+  (`client/dom.js`) e `_TAG_BY_TYPE` (`tempestweb/html/renderer.py`) não o mapeiam,
+  então ele clica com o mouse mas não é focável nem anunciado como botão — vale
+  nos três modos e é anterior a esta versão (só ficou visível agora que o `Burger`
+  existe em Modo C). Muda o tag de um widget existente nos três renderizadores,
+  então é decisão de contrato de renderização, não refactor: fica registrado aqui
+  e não foi alterado.
+
+[tempest-core#20]: https://github.com/mauriciobenjamin700/tempest-core/issues/20
+
 ## [0.81.0] — 2026-08-22
 
 ### Added

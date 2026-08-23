@@ -94,13 +94,23 @@ def test_component_samples_fixture_matches_core() -> None:
     )
 
 
-def test_layout_components_are_available() -> None:
-    """The ergonomic layout components are re-exported for apps to import."""
-    widgets_js = (Path(widgets_gen.WIDGETS_MODULE).parent / "widgets.js").read_text(
-        encoding="utf-8"
-    )
-    assert "HStack" in widgets_js
-    assert "VStack" in widgets_js
+def test_ported_components_are_reachable_from_the_app_import() -> None:
+    """Every component the manifest serves is re-exported by ``widgets.js``.
+
+    A transpiled app imports its whole surface from ``widgets.js``, while the
+    served manifest is generated from *each* transpile module's exports. A
+    component present in ``components.js`` but absent from the app's import
+    surface is therefore a name the compiler accepts and the browser then
+    refuses to resolve — a blank page from a green build, which is what a
+    hand-kept re-export list produced.
+    """
+    client_dir = Path(widgets_gen.WIDGETS_MODULE).parent
+    widgets_js = (client_dir / "widgets.js").read_text(encoding="utf-8")
+    assert 'export * from "./components.js";' in widgets_js
+    components_js = (client_dir / "components.js").read_text(encoding="utf-8")
+    exported = set(re.findall(r"^export function (\w+)", components_js, re.M))
+    assert {"HStack", "VStack", "Card", "AppBar"} <= exported
+    assert exported <= SERVED_NAMES, sorted(exported - SERVED_NAMES)
 
 
 def test_every_builder_takes_the_core_child_slot() -> None:

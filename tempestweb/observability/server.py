@@ -160,8 +160,7 @@ def otel_tracer(service_name: str = "tempestweb") -> Tracer:
             that provides it.
     """
     try:
-        # noqa: PLC0415 — the import is lazy on purpose (see the docstring).
-        import opentelemetry.trace as trace  # type: ignore[import-not-found]  # noqa: PLC0415
+        import opentelemetry.trace as trace  # noqa: PLC0415
     except ImportError as exc:  # pragma: no cover — depends on the environment
         raise RuntimeError(
             "otel_tracer() needs opentelemetry-api: "

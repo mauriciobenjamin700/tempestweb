@@ -9,12 +9,16 @@ has an obvious way to be wrong:
 * a tracer that is "optional" and imported anyway,
 * instrumentation that costs something when it is off.
 
-One test each.
+One test each — plus the one that was missing: the shipped OpenTelemetry adapter
+is *run*, not only declared. A test double satisfies the Protocol whether or not
+the real adapter drives the real API, so proving the seam proves nothing about the
+code an app actually gets.
 """
 
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from typing import Any
 
@@ -28,6 +32,7 @@ from tempestweb.observability import (
     create_logger,
     json_log_sink,
     noop_tracer,
+    otel_tracer,
 )
 from tempestweb.observability.logger import LogRecord
 from tempestweb.server import create_app
@@ -125,14 +130,55 @@ def test_a_failed_session_logs_why() -> None:
     assert records[-1].fields["reason"] == "RuntimeError"
 
 
+def test_the_opentelemetry_adapter_is_exercised_not_just_declared() -> None:
+    """The shipped adapter runs, which the Protocol double cannot prove.
+
+    ``otel_tracer()`` is public surface and an extra in ``pyproject.toml``, so
+    "the seam works" is not the claim being made — the claim is that *this*
+    adapter drives the real OpenTelemetry API. Only running it says so; a
+    RecordingTracer would pass with the adapter broken.
+
+    Skipped rather than failed when the extra is absent, because tracing is opt-in
+    by design and a bare install must stay a passing install.
+    """
+    pytest.importorskip("opentelemetry.trace")
+
+    obs = ServerObservability(tracer=otel_tracer("tempestweb-test"))
+    with obs.session("s-otel"):
+        with obs.dispatch("s-otel", "click"):
+            pass
+        with obs.patch_batch("s-otel", 2):
+            pass
+
+
 def test_tracing_off_by_default_imports_nothing() -> None:
     """The default path does not import OpenTelemetry, which is the promise.
 
-    "Optional dependency" is only true if the default never touches it. This is
-    the assertion that keeps it true.
+    "Optional dependency" is only true if the default never touches it.
+
+    A fresh interpreter, not this one: ``sys.modules`` is process-wide, so reading
+    it here would only report whether some *other* test happened to import
+    opentelemetry first — the test above does exactly that. Asked in a subprocess,
+    the question is the one that matters and the answer does not depend on test
+    order.
     """
+    probe = (
+        "import sys;"
+        "from tempestweb.observability import ServerObservability, noop_tracer;"
+        "assert ServerObservability().tracer is noop_tracer();"
+        "print([name for name in sys.modules if name.startswith('opentelemetry')])"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.stdout.strip() == "[]", (
+        "the default observability path imported opentelemetry: "
+        f"{result.stdout.strip()}"
+    )
     assert ServerObservability().tracer is noop_tracer()
-    assert not [name for name in sys.modules if name.startswith("opentelemetry")]
 
 
 def test_the_inert_default_collects_nothing_and_costs_nothing_visible() -> None:

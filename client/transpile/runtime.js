@@ -292,6 +292,26 @@ function collectHandlers(node) {
  * @param {TranspileModule} mod  The generated module (`makeState` + `view`).
  * @returns {TranspileMountHandle}  A handle to inspect and tear down the app.
  */
+/**
+ * Shape a wire event the way an app handler reads it.
+ *
+ * A handler in Modes A and B receives a typed event object whose fields are
+ * flat — `e.value` for a text change, `e.x`/`e.y` for a tap — built by Python
+ * from the wire payload. Mode C used to hand the handler the wire event itself
+ * (`{type, key, payload}`), so `e.value` was `undefined` and a text input wrote
+ * undefined into the state: the page rendered, typing did nothing, and the
+ * first read of the draft threw. The payload's own fields win, because they are
+ * exactly what the typed event exposes; `payload` stays reachable for a handler
+ * written against the wire shape.
+ *
+ * @param {TWEvent} event  The wire event.
+ * @returns {Object}  The event the handler sees.
+ */
+function appEvent(event) {
+  const payload = event.payload ?? {};
+  return { type: event.type, key: event.key, payload, ...payload };
+}
+
 export function mountApp(root, { makeState, view }) {
   const app = new App(makeState());
 
@@ -338,7 +358,7 @@ export function mountApp(root, { makeState, view }) {
       if (typeof handler !== "function") {
         return;
       }
-      const result = handler(event);
+      const result = handler(appEvent(event));
       if (result != null && typeof result.then === "function") {
         result.then(undefined, (err) => {
           if (typeof console !== "undefined") {

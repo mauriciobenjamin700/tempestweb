@@ -46,6 +46,12 @@ versioning.
 - **A fachada passa a ser reconhecida pelo que o módulo importou**, não pelo
   nome solto `native`: `native.storage.get(k)` só escapa do mapeamento de
   `dict.get` quando `native` foi de fato importado.
+- **Handler do Modo C recebia o evento do fio, e o app lê o evento plano.**
+  Nos Modos A e B o handler recebe um objeto tipado com campo raso — `e.value`
+  num `TextChangeEvent` —, e o Modo C entregava `{type, key, payload}`: todo
+  input de texto gravava `undefined` no estado. Medido no browser: digitar no
+  `file-storage` não mudava nada e o primeiro `title_draft.strip()` derrubava o
+  handler. O campo do payload agora vem raso, com `payload` ainda alcançável.
 
 ### Notas
 
@@ -53,6 +59,15 @@ versioning.
   `geo_demo`, `file-storage`, `weather-native`, `clipboard-share` e
   `pwa-webpush`; `photo-capture` fica recusado — `camera` não é capacidade de
   Modo C, e dizer isso é a resposta certa.
+- Verificado em Chrome real, service worker e caches limpos antes de medir:
+  `file-storage` salva a nota no IndexedDB (`storage.put`), lista a chave,
+  abre o conteúdo (`app.state.get`) e apaga; `geo_demo` vai de `idle` a
+  `located` com `-8.048, -34.877` com a permissão concedida, e a `error:
+  NativeError: permission_denied` com ela negada. Console limpo nos dois, sem
+  overflow horizontal a 390px e 1280px.
+- **Fora do escopo, achado na medição:** o `TextArea` do Modo C renderiza um
+  `<div>` vazio, sem campo editável — o corpo da nota do `file-storage` não é
+  digitável. Fica registrado como issue própria.
 
 ## [0.84.0] — 2026-08-23
 

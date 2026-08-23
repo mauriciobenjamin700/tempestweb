@@ -58,16 +58,26 @@ _CANDIDATE_ARGS: dict[str, Any] = {
     "icon": Icons.MENU,
     "ratio": 1.0,
     "hero_tag": "x",
+    "item_count": 3,
+    "item_builder": lambda index: Text(content=str(index)),
 }
+
+#: Widgets whose children do not exist until something *runs*: the lazy
+#: scrollers call ``item_builder(index)`` over the resolved window instead of
+#: declaring a child slot. A plain passthrough builder would emit an empty
+#: viewport, so their generated builder materializes the window through
+#: ``lazyChildren`` (client/transpile/widget-support.js), which mirrors
+#: ``_resolve_window`` + ``_materialize_items`` in the core. Fidelity is pinned
+#: by the matrix in ``tests/fixtures/transpile_lazy_samples.json``.
+LAZY_WIDGETS: frozenset[str] = frozenset({"LazyColumn", "LazyGrid", "LazyRow"})
 
 #: Widgets deliberately kept out of Mode C, by name, with the reason.
 #:
-#: A generated builder is a *passthrough*: it forwards props and child slots into
-#: the IR node. That is faithful for a leaf widget, but the lazy scrollers call
-#: ``item_builder`` at build time to materialize a window of children, so a
-#: passthrough builder would emit an empty viewport. They need a hand-authored
-#: builder that runs the item function, not a candidate argument.
-UNPORTABLE_WIDGETS: frozenset[str] = frozenset({"LazyColumn", "LazyGrid", "LazyRow"})
+#: Empty today: the lazy scrollers used to sit here, because a passthrough
+#: builder cannot materialize a window. They are generated now (see
+#: :data:`LAZY_WIDGETS`). A widget lands here when a builder cannot reproduce it
+#: at all — not merely when it needs a body.
+UNPORTABLE_WIDGETS: frozenset[str] = frozenset()
 
 #: Wire props that every node carries but a builder handles specially (not plain
 #: passthrough kwargs): ``style`` is resolved, ``attrs`` defaults to a fresh map.
@@ -88,6 +98,10 @@ class WidgetSpec:
         required: Wire prop names that map to a required widget field, so the
             builder must not fabricate a default (the caller passes them).
         handlers: The ``on_*`` prop names the widget declares.
+        callable_props: Prop names whose value is a live Python callable
+            (``item_builder``). Like a handler, one never crosses the boundary:
+            the serializer replaces it with ``None``, so the builder writes
+            ``null`` on the wire and uses the argument for its own work.
         styled: Whether a bare build resolves a non-null ``style``.
         child_fields: The widget's child slots, in declaration order, each
             paired with whether it holds a list. The IR node always carries a
@@ -104,6 +118,7 @@ class WidgetSpec:
     props: dict[str, Any]
     required: tuple[str, ...]
     handlers: tuple[str, ...]
+    callable_props: tuple[str, ...]
     styled: bool
     child_fields: tuple[tuple[str, bool], ...]
     build_args: dict[str, Any] = field(default_factory=dict)
@@ -155,7 +170,18 @@ def _spec_for(name: str, cls: type[WidgetBase]) -> WidgetSpec | None:
         node = build(instance)
     except Exception:  # noqa: BLE001 - unbuildable widgets are simply skipped
         return None
-    wire = node.model_dump(mode="json")["props"]
+    # A live callable cannot be dumped, and never crosses the boundary anyway:
+    # replace it the way the serializer does, and remember which prop it was.
+    callable_props = tuple(sorted(k for k, v in node.props.items() if callable(v)))
+    dumpable = node.model_copy(
+        update={
+            "props": {
+                key: (None if callable(value) else value)
+                for key, value in node.props.items()
+            }
+        }
+    )
+    wire = dumpable.model_dump(mode="json")["props"]
     handlers = tuple(k for k in wire if k.startswith("on_"))
     style = wire.get("style")
     styled = style is not None and any(v is not None for v in style.values())
@@ -173,6 +199,7 @@ def _spec_for(name: str, cls: type[WidgetBase]) -> WidgetSpec | None:
         props=props,
         required=required,
         handlers=handlers,
+        callable_props=callable_props,
         styled=styled,
         child_fields=_child_fields(cls, instance),
         build_args=build_args,

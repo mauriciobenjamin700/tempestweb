@@ -141,3 +141,47 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override)
   }
   return Style(merged);
 }
+
+/**
+ * Materialize a lazy scroller's visible window into keyed item nodes.
+ *
+ * A generated builder is a passthrough, and the lazy scrollers are the one place
+ * where a widget's children do not exist until something runs: the core calls
+ * `item_builder(index)` for each index in the resolved window and re-keys each
+ * item by its **absolute index**, so the reconciler turns a window slide into a
+ * minimal remove/reorder/insert instead of rebuilding the list. This mirrors
+ * `_resolve_window` + `_materialize_items` in `tempest_core.widgets.lists`.
+ *
+ * The window is clamped to `itemCount`: an app slides `window` on a scroll event
+ * and a stale pair must not address items that no longer exist. With no window
+ * set, the initial `[0, min(windowSize, itemCount))` materializes, which is what
+ * gives the first mount content.
+ *
+ * @param {?function(number): import("../transport.js").Node} itemBuilder
+ *   The factory building the item at an index; `null` yields no children.
+ * @param {number} itemCount   The total number of items.
+ * @param {?number[]} window   The explicit `[start, end)` override, or null.
+ * @param {number} windowSize  The initial window size when no override is set.
+ * @returns {import("../transport.js").Node[]}  The materialized window.
+ */
+export function lazyChildren(itemBuilder, itemCount, window, windowSize) {
+  if (typeof itemBuilder !== "function") {
+    return [];
+  }
+  const count = Math.max(0, itemCount ?? 0);
+  let start;
+  let end;
+  if (window == null) {
+    start = 0;
+    end = Math.min(windowSize ?? 0, count);
+  } else {
+    [start, end] = window;
+  }
+  start = Math.max(0, Math.min(start, count));
+  end = Math.max(start, Math.min(end, count));
+  const items = [];
+  for (let index = start; index < end; index += 1) {
+    items.push({ ...itemBuilder(index), key: String(index) });
+  }
+  return items;
+}

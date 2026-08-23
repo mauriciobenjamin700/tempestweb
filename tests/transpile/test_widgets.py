@@ -18,6 +18,7 @@ from tempestweb.transpile._served import SERVED_NAMES
 from tempestweb.transpile.codegen import _camel_name
 from tests.conformance import _transpile_component_styles as component_styles_gen
 from tests.conformance import _transpile_components as components_gen
+from tests.conformance import _transpile_lazy as lazy_gen
 from tests.conformance import _transpile_served as served_gen
 from tests.conformance import _transpile_spacing as spacing_gen
 from tests.conformance import _transpile_values as values_gen
@@ -272,6 +273,25 @@ def test_the_ported_components_are_served() -> None:
         "HStack",
         "VStack",
     ):
+        assert name in SERVED_NAMES, f"{name} is ported but not served"
+
+
+def test_lazy_samples_fixture_matches_core() -> None:
+    """The committed lazy-parity fixture byte-matches a fresh build.
+
+    The JS builder resolves the window itself, so a stale fixture would compare
+    the reimplementation against an old core and pass while the two disagree.
+    """
+    on_disk = lazy_gen.LAZY_FIXTURE.read_text(encoding="utf-8")
+    assert on_disk == lazy_gen.render_fixture_text(), (
+        "tests/fixtures/transpile_lazy_samples.json is stale — regenerate with "
+        "`python -m tests.conformance._transpile_lazy`"
+    )
+
+
+def test_the_lazy_scrollers_are_served() -> None:
+    """A virtualized list is a widget the compiler must accept by name."""
+    for name in ("LazyColumn", "LazyRow", "LazyGrid"):
         assert name in SERVED_NAMES, f"{name} is ported but not served"
 
 

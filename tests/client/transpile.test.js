@@ -16,6 +16,9 @@ import {
   Container,
   Edge,
   Input,
+  LazyColumn,
+  LazyGrid,
+  LazyRow,
   Row,
   Style,
   Text,
@@ -143,6 +146,96 @@ test("widgets.js re-exports every ported component", async () => {
     "a component the served manifest accepts but widgets.js does not re-export " +
       "compiles cleanly and then fails to resolve in the browser",
   );
+});
+
+test("a lazy scroller materializes the same window the core does", () => {
+  const samples = fixture("transpile_lazy_samples.json");
+  const item = (index) => Text({ content: `row ${index}`, key: `mine-${index}` });
+  const drop = (n) => ({
+    type: n.type,
+    key: n.key,
+    props: n.props,
+    children: (n.children ?? []).map(drop),
+  });
+  const cases = {
+    column_default_window: LazyColumn({ itemCount: 5, itemBuilder: item }),
+    column_window_size_below_count: LazyColumn({
+      itemCount: 100,
+      itemBuilder: item,
+      windowSize: 3,
+    }),
+    column_count_below_window_size: LazyColumn({
+      itemCount: 2,
+      itemBuilder: item,
+      windowSize: 20,
+    }),
+    column_explicit_window: LazyColumn({
+      itemCount: 100,
+      itemBuilder: item,
+      window: [30, 34],
+    }),
+    column_window_past_the_end: LazyColumn({
+      itemCount: 5,
+      itemBuilder: item,
+      window: [3, 99],
+    }),
+    column_window_out_of_range: LazyColumn({
+      itemCount: 5,
+      itemBuilder: item,
+      window: [50, 60],
+    }),
+    column_window_negative_start: LazyColumn({
+      itemCount: 5,
+      itemBuilder: item,
+      window: [-3, 2],
+    }),
+    column_window_inverted: LazyColumn({
+      itemCount: 10,
+      itemBuilder: item,
+      window: [6, 2],
+    }),
+    column_empty: LazyColumn({ itemCount: 0, itemBuilder: item }),
+    column_refreshing_and_threshold: LazyColumn({
+      itemCount: 8,
+      itemBuilder: item,
+      windowSize: 4,
+      refreshing: true,
+      endReachedThreshold: 0.5,
+    }),
+    column_styled: LazyColumn({
+      itemCount: 3,
+      itemBuilder: item,
+      style: Style({ height: 300.0 }),
+    }),
+    row_default_window: LazyRow({ itemCount: 4, itemBuilder: item }),
+    row_explicit_window: LazyRow({
+      itemCount: 50,
+      itemBuilder: item,
+      window: [10, 13],
+    }),
+    grid_default_window: LazyGrid({ itemCount: 7, itemBuilder: item, columns: 3 }),
+    grid_window_size_below_count: LazyGrid({
+      itemCount: 40,
+      itemBuilder: item,
+      columns: 4,
+      windowSize: 6,
+    }),
+    grid_explicit_window: LazyGrid({
+      itemCount: 40,
+      itemBuilder: item,
+      columns: 2,
+      window: [12, 15],
+    }),
+  };
+
+  assert.deepEqual(
+    Object.keys(cases).sort(),
+    Object.keys(samples).sort(),
+    "the JS matrix and the core-built fixture must cover the same scenarios",
+  );
+  for (const [name, node] of Object.entries(cases)) {
+    assert.deepEqual(drop(node), samples[name], `${name} drifted from the core`);
+  }
 });
 
 test("every ported component matches the core build (order-agnostic)", () => {

@@ -253,6 +253,7 @@ SERVED_NAMES: frozenset[str] = frozenset(
         "routeToPath",
         "routesFromPath",
         "routes_from_path",
+        "setSlidWindows",
         "sleep",
         "t",
         "translate",

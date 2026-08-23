@@ -24,6 +24,7 @@ import { mount } from "../tempestweb.js";
 import { diff } from "./diff.js";
 import { NavStack, Route, pathToRoutes, routeToPath } from "./nav.js";
 import { MediaQueryData, Theme } from "./theme.js";
+import { setSlidWindows } from "./widget-support.js";
 
 /**
  * @typedef {import("../transport.js").Node} Node
@@ -68,6 +69,13 @@ export class App {
     this._animations = new Set();
     /** @type {?() => void} — hook the runtime installs to start the frame loop. */
     this._onAnimate = null;
+    /**
+     * Visible-window overrides for virtualized lists, keyed by the list's `key`
+     * (mirrors the core App._windows). Published to the builders for the
+     * duration of each build, so a slid window survives the view re-running.
+     * @type {Map<string, number[]>}
+     */
+    this._windows = new Map();
   }
 
   /**
@@ -182,6 +190,24 @@ export class App {
     if (this._onSetState !== null) {
       this._onSetState();
     }
+  }
+
+  /**
+   * Set a virtualized list's visible window and re-render (mirrors the core
+   * App.slide_window).
+   *
+   * The client reports a list's `[start, end)` as it scrolls; recording it by
+   * key is what makes the next build materialize the slid items, which the
+   * keyed diff turns into a minimal remove/reorder/insert.
+   *
+   * @param {string} key   The list widget's key.
+   * @param {number} start The first visible index (inclusive).
+   * @param {number} end   The one-past-last visible index (exclusive).
+   * @returns {void}
+   */
+  slide_window(key, start, end) {
+    this._windows.set(key, [start, end]);
+    this._rerender();
   }
 
   /**
@@ -307,6 +333,27 @@ function collectHandlers(node) {
  * @param {TWEvent} event  The wire event.
  * @returns {Object}  The event the handler sees.
  */
+/**
+ * Run the app's view with its tracked list windows published to the builders.
+ *
+ * The core injects a slid window into the widget tree before children are
+ * materialized; a Mode C builder materializes as it runs, so the map is ambient
+ * for exactly the duration of the build and cleared right after — a build that
+ * threw must not leave a stale window visible to the next one.
+ *
+ * @param {function(App): import("../transport.js").Node} view  The app's view.
+ * @param {App} app  The application handle.
+ * @returns {import("../transport.js").Node}  The freshly built tree.
+ */
+function buildView(view, app) {
+  setSlidWindows(app._windows);
+  try {
+    return view(app);
+  } finally {
+    setSlidWindows(null);
+  }
+}
+
 function appEvent(event) {
   const payload = event.payload ?? {};
   return { type: event.type, key: event.key, payload, ...payload };
@@ -316,7 +363,7 @@ export function mountApp(root, { makeState, view }) {
   const app = new App(makeState());
 
   /** @type {Node} */
-  let node = view(app);
+  let node = buildView(view, app);
   /** @type {Map<string, Function>} */
   let handlers = collectHandlers(node);
   /** @type {Patch[][]} */
@@ -351,6 +398,18 @@ export function mountApp(root, { makeState, view }) {
         app._setMedia(new MediaQueryData(event.payload ?? {}));
         return;
       }
+      if (event.type === "scroll") {
+        const { start, end } = event.payload ?? {};
+        if (
+          event.key != null &&
+          Number.isInteger(start) &&
+          Number.isInteger(end) &&
+          end >= start
+        ) {
+          app.slide_window(event.key, start, end);
+        }
+        return;
+      }
       if (event.key == null) {
         return;
       }
@@ -371,7 +430,7 @@ export function mountApp(root, { makeState, view }) {
   };
 
   app._onSetState = () => {
-    const next = view(app);
+    const next = buildView(view, app);
     const patches = diff(node, next);
     node = next;
     handlers = collectHandlers(next);

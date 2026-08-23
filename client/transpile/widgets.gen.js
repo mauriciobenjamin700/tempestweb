@@ -859,7 +859,7 @@ export function LazyColumn({ itemBuilder, itemCount, key = null, endReachedThres
       window: window,
       window_size: windowSize,
     },
-    children: lazyChildren(itemBuilder, itemCount, window, windowSize),
+    children: lazyChildren(key, itemBuilder, itemCount, window, windowSize),
     __handlers: { "scroll": onScroll, "refresh": onRefresh, "end_reached": onEndReached },
   };
 }
@@ -889,7 +889,7 @@ export function LazyGrid({ itemBuilder, itemCount, key = null, columns = 2, endR
       window: window,
       window_size: windowSize,
     },
-    children: lazyChildren(itemBuilder, itemCount, window, windowSize),
+    children: lazyChildren(key, itemBuilder, itemCount, window, windowSize),
     __handlers: { "scroll": onScroll, "end_reached": onEndReached },
   };
 }
@@ -920,7 +920,7 @@ export function LazyRow({ itemBuilder, itemCount, key = null, endReachedThreshol
       window: window,
       window_size: windowSize,
     },
-    children: lazyChildren(itemBuilder, itemCount, window, windowSize),
+    children: lazyChildren(key, itemBuilder, itemCount, window, windowSize),
     __handlers: { "scroll": onScroll, "refresh": onRefresh, "end_reached": onEndReached },
   };
 }

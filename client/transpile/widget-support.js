@@ -91,27 +91,41 @@ export function Color({ r = 0, g = 0, b = 0, a = 1.0 } = {}) {
 }
 
 /**
- * Edge helpers — a box's four side offsets in px (`{ top, right, bottom, left }`).
+ * A box's four side offsets in px (`{ top, right, bottom, left }`).
+ *
+ * Callable like the core's `Edge`, which is a model with four fields defaulting
+ * to `0.0`: `Edge(top=20.0, left=20.0)` is how an app names two sides and leaves
+ * the others at zero. Mode C exposed only the `all`/`symmetric` helpers, so that
+ * spelling compiled into `Edge({...})` against a frozen object and the page died
+ * on `Edge is not a function` — measured in `examples/image-gallery`, which
+ * rendered nothing at all.
+ *
+ * @param {{top?: number, right?: number, bottom?: number, left?: number}} [args]
+ * @returns {{top: number, right: number, bottom: number, left: number}}
  */
-export const Edge = Object.freeze({
-  /**
-   * A uniform edge with the same value on all four sides.
-   * @param {number} n  The px value for every side.
-   * @returns {{top: number, right: number, bottom: number, left: number}}
-   */
-  all(n) {
-    return { top: n, right: n, bottom: n, left: n };
-  },
+export function Edge({ top = 0.0, right = 0.0, bottom = 0.0, left = 0.0 } = {}) {
+  return { top, right, bottom, left };
+}
 
-  /**
-   * An edge with one value top/bottom and another left/right.
-   * @param {{vertical?: number, horizontal?: number}} [args]
-   * @returns {{top: number, right: number, bottom: number, left: number}}
-   */
-  symmetric({ vertical = 0.0, horizontal = 0.0 } = {}) {
-    return { top: vertical, right: horizontal, bottom: vertical, left: horizontal };
-  },
-});
+/**
+ * A uniform edge with the same value on all four sides.
+ * @param {number} n  The px value for every side.
+ * @returns {{top: number, right: number, bottom: number, left: number}}
+ */
+Edge.all = function all(n) {
+  return { top: n, right: n, bottom: n, left: n };
+};
+
+/**
+ * An edge with one value top/bottom and another left/right.
+ * @param {{vertical?: number, horizontal?: number}} [args]
+ * @returns {{top: number, right: number, bottom: number, left: number}}
+ */
+Edge.symmetric = function symmetric({ vertical = 0.0, horizontal = 0.0 } = {}) {
+  return { top: vertical, right: horizontal, bottom: vertical, left: horizontal };
+};
+
+Object.freeze(Edge);
 
 /**
  * Resolve a widget's baked Material 3 style from the introspected defaults table.
@@ -143,6 +157,27 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override)
 }
 
 /**
+ * The window each virtualized list is currently slid to, by widget key.
+ *
+ * The core injects a tracked window into the widget tree *before* the children
+ * are materialized (`App._inject_windows`). A Mode C builder has no app to ask
+ * and materializes as it runs, so the runtime publishes the map here for the
+ * duration of `view(app)` — the same ambient shape `use_theme` has in the core.
+ * @type {?Map<string, number[]>}
+ */
+let SLID_WINDOWS = null;
+
+/**
+ * Publish the app's tracked list windows for the duration of a build.
+ *
+ * @param {?Map<string, number[]>} windows  The window map, or null to clear it.
+ * @returns {void}
+ */
+export function setSlidWindows(windows) {
+  SLID_WINDOWS = windows;
+}
+
+/**
  * Materialize a lazy scroller's visible window into keyed item nodes.
  *
  * A generated builder is a passthrough, and the lazy scrollers are the one place
@@ -157,6 +192,12 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override)
  * set, the initial `[0, min(windowSize, itemCount))` materializes, which is what
  * gives the first mount content.
  *
+ * A window the app slid (a `scroll` event the runtime applied) wins over the
+ * one the view declared, exactly as the core's injection overwrites it: the
+ * view re-runs on every rebuild and would otherwise snap the list back to its
+ * declared window on the next state change.
+ *
+ * @param {?string} key        The list's widget key, used to find a slid window.
  * @param {?function(number): import("../transport.js").Node} itemBuilder
  *   The factory building the item at an index; `null` yields no children.
  * @param {number} itemCount   The total number of items.
@@ -164,18 +205,20 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override)
  * @param {number} windowSize  The initial window size when no override is set.
  * @returns {import("../transport.js").Node[]}  The materialized window.
  */
-export function lazyChildren(itemBuilder, itemCount, window, windowSize) {
+export function lazyChildren(key, itemBuilder, itemCount, window, windowSize) {
   if (typeof itemBuilder !== "function") {
     return [];
   }
+  const slid = key != null && SLID_WINDOWS != null ? SLID_WINDOWS.get(key) : undefined;
+  const effective = slid ?? window;
   const count = Math.max(0, itemCount ?? 0);
   let start;
   let end;
-  if (window == null) {
+  if (effective == null) {
     start = 0;
     end = Math.min(windowSize ?? 0, count);
   } else {
-    [start, end] = window;
+    [start, end] = effective;
   }
   start = Math.max(0, Math.min(start, count));
   end = Math.max(start, Math.min(end, count));

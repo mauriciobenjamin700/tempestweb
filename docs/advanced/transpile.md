@@ -658,7 +658,14 @@ no espírito do `mypy --strict`.
       é recusado dizendo **qual modo o tem**, e membro desconhecido é recusado
       **pelo nome** (`geolocation.triangulate`).
 
-    Medido no corpus: **31 dos 57 exemplos** transpilam (eram 14).
+    - **listas virtualizadas:** `LazyColumn`, `LazyRow` e `LazyGrid` materializam
+      a janela visível chamando `item_builder(índice)`, com o item re-chaveado
+      pelo índice absoluto — o que faz a janela deslizar virar
+      remove/reorder/insert mínimo em vez de rebuild. O evento de `scroll`
+      desliza a janela no runtime, como o servidor faz no Modo B, e ela
+      sobrevive ao `view` re-rodando.
+
+    Medido no corpus: **35 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),

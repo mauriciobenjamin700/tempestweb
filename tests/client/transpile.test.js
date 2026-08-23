@@ -238,6 +238,108 @@ test("a lazy scroller materializes the same window the core does", () => {
   }
 });
 
+test("Edge is callable, the way the core's model is", () => {
+  // The core's Edge is a model with four fields defaulting to 0.0, so naming two
+  // sides is a normal spelling. Mode C shipped only the helpers, so this
+  // compiled into a call on a frozen object and the page died at mount with
+  // `Edge is not a function` — measured in examples/image-gallery, blank.
+  assert.deepEqual(Edge({ top: 20.0, left: 20.0, bottom: 4.0 }), {
+    top: 20.0,
+    right: 0.0,
+    bottom: 4.0,
+    left: 20.0,
+  });
+  assert.deepEqual(Edge(), { top: 0.0, right: 0.0, bottom: 0.0, left: 0.0 });
+  assert.deepEqual(Edge.all(16.0), {
+    top: 16.0,
+    right: 16.0,
+    bottom: 16.0,
+    left: 16.0,
+  });
+  assert.deepEqual(Edge.symmetric({ vertical: 6.0, horizontal: 8.0 }), {
+    top: 6.0,
+    right: 8.0,
+    bottom: 6.0,
+    left: 8.0,
+  });
+});
+
+test("a slid window survives the view re-running, and beats the declared one", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  class ListState extends State {
+    constructor() {
+      super();
+      this.reloads = 0;
+    }
+  }
+  const item = (index) => Text({ content: `row ${index}`, key: `mine-${index}` });
+  const mod = {
+    makeState: () => new ListState(),
+    view: (app) =>
+      Column({
+        children: [
+          Text({ content: `reloads ${app.state.reloads}`, key: "status" }),
+          LazyColumn({ key: "rows", itemCount: 100, itemBuilder: item, windowSize: 4 }),
+        ],
+      }),
+  };
+
+  const handle = mountApp(dom.root, mod);
+  const keys = () =>
+    handle.node.children[1].children.map((child) => child.key);
+  assert.deepEqual(keys(), ["0", "1", "2", "3"], "the initial window materializes");
+
+  handle.app.slide_window("rows", 40, 44);
+  assert.deepEqual(keys(), ["40", "41", "42", "43"], "the slid window materializes");
+
+  // The view re-runs on every state change and declares no window at all, so
+  // without the tracked map the list snapped back to [0, windowSize) — the list
+  // scrolled, the app changed something unrelated, and the rows jumped home.
+  handle.app.setState((s) => {
+    s.reloads += 1;
+  });
+  assert.deepEqual(keys(), ["40", "41", "42", "43"], "and it survives a rebuild");
+});
+
+test("a scroll wire event slides the window, and no handler is asked for it", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  const item = (index) => Text({ content: `row ${index}`, key: `mine-${index}` });
+  const scrolls = [];
+  const mod = {
+    makeState: () => new State(),
+    view: (app) =>
+      LazyColumn({
+        key: "rows",
+        itemCount: 60,
+        itemBuilder: item,
+        windowSize: 6,
+        onScroll: (e) => scrolls.push(e),
+      }),
+  };
+
+  const handle = mountApp(dom.root, mod);
+  const viewport = dom.root.querySelector("[data-tw-key=\"rows\"]");
+  // jsdom lays nothing out, so the item extent the virtualizer divides by has to
+  // be stated; everything else it reads is a real rendered attribute.
+  Object.defineProperty(viewport.firstElementChild, "offsetHeight", { value: 20 });
+  viewport.scrollTop = 400;
+  viewport.dispatchEvent(new dom.window.Event("scroll", { bubbles: false }));
+
+  // 400px / 20px per item = item 20, minus a third of the window as lead.
+  assert.deepEqual(handle.app._windows.get("rows"), [18, 24]);
+  assert.deepEqual(
+    handle.node.children.map((child) => child.key),
+    ["18", "19", "20", "21", "22", "23"],
+  );
+  // The runtime applies the scroll itself and returns, exactly as the server
+  // session does — an `on_scroll` handler is not the window's driver.
+  assert.deepEqual(scrolls, []);
+});
+
 test("every ported component matches the core build (order-agnostic)", () => {
   const samples = fixture("transpile_component_samples.json");
   const drop = (n) => ({

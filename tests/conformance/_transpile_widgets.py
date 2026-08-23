@@ -117,7 +117,7 @@ def _children_expr(spec: WidgetSpec) -> str:
         A JS expression evaluating to the node's ``children`` array.
     """
     if spec.name in LAZY_WIDGETS:
-        return "lazyChildren(itemBuilder, itemCount, window, windowSize)"
+        return "lazyChildren(key, itemBuilder, itemCount, window, windowSize)"
     parts = [
         _camel(name) if is_list else f"({_camel(name)} == null ? [] : [{_camel(name)}])"
         for name, is_list in spec.child_fields

@@ -4,6 +4,34 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.95.0] — 2026-08-23
+
+### Fixed
+
+- **O Modo C tratava `dict` como lista**
+  ([#137](https://github.com/mauriciobenjamin700/tempestweb/issues/137)), nas três
+  operações que a issue mediu:
+  - **truthiness** — `""`, `0`, `None` e `False` as duas linguagens concordam;
+    container vazio **não**: `[]` e `{}` são falsy em Python e truthy em JS. Então
+    `if s.errors:` entrava no ramo com estado recém-criado. Posição booleana
+    (`if`, `elif`, `while`, `not`, o ternário) passa por `truthy$`; comparação,
+    `not`, literal booleano e nome que o módulo só liga a booleano ficam sem
+    embrulho, para o teste continuar legível;
+  - **`len(d)`** emitia `d.length` e respondia `undefined` — o banner do
+    `br-cadastro` dizia literalmente `undefined campo(s) com erro`. Agora conta
+    chaves (e `size`, num `Set`/`Map`);
+  - **`"k" in d`** emitia `d.includes("k")`, método de `Array` que um objeto não
+    tem. Agora lê chave em mapeamento, membro em lista/string e `has` em
+    `Set`/`Map`.
+
+  `and`/`or` em posição de **valor** ficam como estão de propósito: devolvem um
+  operando nas duas linguagens, então `||` já é o comportamento certo. A
+  diferença só aparece com container vazio à esquerda, que nenhum exemplo do
+  corpus escreve — está registrado nas docs em vez de embrulhado em silêncio.
+
+Com isso o `examples/br-cadastro` funciona inteiro em Modo C: máscara, endereço,
+validação e contagem de erros.
+
 ## [0.94.0] — 2026-08-23
 
 Três widgets declarados que o renderizador desenhava como `div` anônimo. Vale nos

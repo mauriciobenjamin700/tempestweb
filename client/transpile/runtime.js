@@ -585,6 +585,83 @@ export function reFindall(pattern, text) {
 }
 
 /**
+ * Python's truthiness, which JS only half shares.
+ *
+ * `""`, `0`, `None` and `False` agree; the containers do not. An empty list, dict
+ * or set is **falsy** in Python and **truthy** in JS, so `if s.errors:` entered
+ * its branch on a fresh state and rendered an error banner nobody had earned —
+ * measured in `examples/br-cadastro`, which read `undefined campo(s) com erro`
+ * before a single submit.
+ *
+ * A dataclass instance is a Python object with no `__len__`, so it is always
+ * truthy however few fields it carries; a plain object stands for a dict and is
+ * judged by its keys.
+ *
+ * @param {*} value  Any value in a boolean position.
+ * @returns {boolean}  What Python's `bool()` would answer.
+ */
+export function truthy(value) {
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (value instanceof Set || value instanceof Map) {
+    return value.size > 0;
+  }
+  if (value !== null && typeof value === "object") {
+    return value instanceof State ? true : Object.keys(value).length > 0;
+  }
+  return Boolean(value);
+}
+
+/**
+ * Python's `len()`, which is not `.length` for a mapping or a set.
+ *
+ * `len(d)` on a dict emitted `d.length` and answered `undefined`, so a count of
+ * failing fields rendered as `undefined campo(s) com erro`.
+ *
+ * @param {*} value  A sized value.
+ * @returns {number}  Its length.
+ */
+export function pyLen(value) {
+  if (value == null) {
+    return 0;
+  }
+  if (value instanceof Set || value instanceof Map) {
+    return value.size;
+  }
+  if (typeof value.length === "number") {
+    return value.length;
+  }
+  return Object.keys(value).length;
+}
+
+/**
+ * Python's `in`, which reads keys on a mapping and members everywhere else.
+ *
+ * `"k" in d` emitted `d.includes("k")` — an `Array` method a plain object does
+ * not have — so a membership test on a dict threw instead of answering.
+ *
+ * @param {*} haystack  The container being searched.
+ * @param {*} needle    What to look for (a key, for a mapping).
+ * @returns {boolean}
+ */
+export function contains(haystack, needle) {
+  if (haystack == null) {
+    return false;
+  }
+  if (typeof haystack === "string" || Array.isArray(haystack)) {
+    return haystack.includes(needle);
+  }
+  if (haystack instanceof Set || haystack instanceof Map) {
+    return haystack.has(needle);
+  }
+  if (typeof haystack === "object") {
+    return Object.hasOwn(haystack, needle);
+  }
+  return false;
+}
+
+/**
  * Copy a mapping or build one from pairs, the way Python's `dict()` does.
  *
  * A dict is a plain object in Mode C and a list of pairs is an array, and the

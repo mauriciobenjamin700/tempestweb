@@ -82,13 +82,13 @@ def test_arithmetic_operators() -> None:
 def test_comparison_and_boolean_and_unary() -> None:
     """Comparisons, boolean and unary operators map to JS forms."""
     js = gen("def f(a, b):\n    return a >= b and not a\n")
-    assert "(a >= b && !a)" in js
+    assert "(a >= b && !truthy$(a))" in js
 
 
 def test_ternary_conditional_expression() -> None:
     """`a if c else b` becomes a JS conditional expression."""
     js = gen('def f(x):\n    return "hi" if x else "bye"\n')
-    assert '(x ? "hi" : "bye")' in js
+    assert '(truthy$(x) ? "hi" : "bye")' in js
 
 
 def test_list_comprehension_becomes_map() -> None:
@@ -100,7 +100,7 @@ def test_list_comprehension_becomes_map() -> None:
 def test_membership_uses_includes() -> None:
     """`x in xs` becomes `xs.includes(x)`."""
     js = gen("def f(x, xs):\n    return x in xs\n")
-    assert "xs.includes(x)" in js
+    assert "contains$(xs, x)" in js
 
 
 def test_if_elif_else_statement() -> None:
@@ -232,7 +232,7 @@ def test_navigation_imports_map_to_nav_module() -> None:
 
 def test_builtins_map_to_js_idioms() -> None:
     """`len`/`str`/`abs` map to JS idioms."""
-    assert "x.length" in gen("def f(x):\n    return len(x)\n")
+    assert "pyLen$(x)" in gen("def f(x):\n    return len(x)\n")
     assert "String(x)" in gen("def f(x):\n    return str(x)\n")
     assert "Math.abs(x)" in gen("def f(x):\n    return abs(x)\n")
 
@@ -985,6 +985,72 @@ def test_the_repos_own_field_layer_is_served() -> None:
     assert 'import { EmailField, LoginForm } from "./widgets.js";' in js
 
 
+def test_an_empty_container_is_falsy_the_way_python_says() -> None:
+    """`if s.errors:` entered its branch on a fresh state.
+
+    `""`, `0`, `None` and `False` agree between the languages; the containers do
+    not — an empty list, dict or set is falsy in Python and truthy in JS. Measured
+    in `examples/br-cadastro`, which rendered `undefined campo(s) com erro` before
+    a single submit.
+    """
+    js = gen("def f(s):\n    if s.errors:\n        return 1\n    return 0\n")
+    assert "if (truthy$(s.errors))" in js
+
+
+def test_a_comparison_is_not_wrapped_because_it_is_already_boolean() -> None:
+    """Only what Python would run `bool()` over is wrapped; a test that already
+    produces a boolean stays readable."""
+    js = gen(
+        "def f(s):\n"
+        "    if s.count > 0:\n"
+        "        return 1\n"
+        "    if s.mode is None:\n"
+        "        return 2\n"
+        "    return 0\n"
+    )
+    assert "if (s.count > 0)" in js
+    assert "if (s.mode == null)" in js
+    assert "truthy$" not in js
+
+
+def test_not_and_the_ternary_get_the_same_truthiness() -> None:
+    """`not xs` and `a if xs else b` are boolean contexts too."""
+    js = gen(
+        "def f(xs, a, b):\n"
+        "    first = not xs\n"
+        "    second = a if xs else b\n"
+        "    return [first, second]\n"
+    )
+    assert "!truthy$(xs)" in js
+    assert "(truthy$(xs) ? a : b)" in js
+
+
+def test_a_boolean_operator_in_a_test_wraps_each_operand() -> None:
+    """`if a and b:` runs `bool()` over both, so both need the same treatment."""
+    js = gen("def f(a, b):\n    if a and b:\n        return 1\n    return 0\n")
+    assert "if (truthy$(a) && truthy$(b))" in js
+
+
+def test_len_of_a_mapping_counts_its_keys() -> None:
+    """`len(d)` emitted `d.length` and answered `undefined`."""
+    js = gen("def f(errors):\n    return len(errors)\n")
+    assert "pyLen$(errors)" in js
+    assert "errors.length" not in js
+
+
+def test_in_on_a_mapping_reads_a_key_instead_of_calling_includes() -> None:
+    """`"k" in d` emitted `d.includes("k")` — an Array method a dict lacks."""
+    js = gen(
+        "def f(errors):\n"
+        '    a = "email" in errors\n'
+        '    b = "email" not in errors\n'
+        "    return [a, b]\n"
+    )
+    assert 'contains$(errors, "email")' in js
+    assert '!contains$(errors, "email")' in js
+    assert ".includes(" not in js
+
+
 def test_setattr_with_a_computed_name_becomes_an_indexed_write() -> None:
     """`setattr(obj, name, value)` outside a lambda emitted a call to nothing.
 
@@ -1550,7 +1616,7 @@ def test_a_str_enum_becomes_a_frozen_object() -> None:
 def test_a_generator_expression_takes_the_comprehension_path() -> None:
     """`any(x for x in xs)` is a comprehension without the brackets."""
     js = gen("def f(rows):\n    return any(len(r) > 0 for r in rows)\n")
-    assert "[...rows].map((r) => r.length > 0).some(Boolean)" in js
+    assert "[...rows].map((r) => pyLen$(r) > 0).some(Boolean)" in js
 
 
 def test_a_comprehension_over_a_string_iterates_characters() -> None:

@@ -155,15 +155,18 @@ _MODULE_CONSTANTS: dict[str, dict[str, str]] = {
 #: `$` — illegal in a Python identifier, so an app's own ``sleep`` cannot collide.
 _RUNTIME_HELPERS: frozenset[str] = frozenset(
     {
+        "contains",
         "dictPop",
         "formValidate",
         "reFindall",
         "reFullmatch",
         "reMatch",
         "reSearch",
+        "pyLen",
         "reSub",
         "sleep",
         "toDict",
+        "truthy",
     }
 )
 
@@ -555,6 +558,9 @@ class _Generator:
         # *builder*, not its Python methods, so calling one is refused at build
         # time rather than emitting a call that dies on the first render.
         self.widget_names: dict[str, str] = {}
+        #: Names the module only ever assigns a boolean expression, so a test
+        #: on one needs no truthiness wrapper.
+        self.boolean_names: set[str] = set()
 
     # -- expressions --------------------------------------------------------
 
@@ -907,10 +913,12 @@ class _Generator:
         for op, right in zip(node.ops, node.comparators, strict=True):
             left_js = self.expr(left, indent)
             right_js = self.expr(right, indent)
-            if isinstance(op, ast.In):
-                parts.append(f"{right_js}.includes({left_js})")
-            elif isinstance(op, ast.NotIn):
-                parts.append(f"!{right_js}.includes({left_js})")
+            if isinstance(op, (ast.In, ast.NotIn)):
+                # `.includes` is an Array (and String) method: on a dict, where
+                # Python reads a *key*, it threw instead of answering.
+                self.runtime_helpers.add("contains")
+                call = f"contains$({right_js}, {left_js})"
+                parts.append(call if isinstance(op, ast.In) else f"!{call}")
             elif isinstance(op, (ast.Is, ast.IsNot)):
                 against_none = _is_none(left) or _is_none(right)
                 if against_none:
@@ -930,8 +938,101 @@ class _Generator:
             left = right
         return parts[0] if len(parts) == 1 else "(" + " && ".join(parts) + ")"
 
+    def _is_boolean(self, node: ast.expr) -> bool:
+        """Whether the expression already produces a JS boolean.
+
+        Used to keep a readable test readable: only what Python would run
+        ``bool()`` over needs wrapping, and a comparison, a ``not``, a literal
+        ``True``/``False`` or a boolean builtin is already there.
+
+        Args:
+            node: The expression in a boolean position.
+
+        Returns:
+            True when no truthiness wrapper is needed.
+        """
+        if isinstance(node, ast.Compare):
+            return True
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+            return True
+        if isinstance(node, ast.Constant) and isinstance(node.value, bool):
+            return True
+        if isinstance(node, ast.BoolOp):
+            return all(self._is_boolean(value) for value in node.values)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            return node.func.id in {"any", "all", "bool", "isinstance"}
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            return node.func.attr in _STRING_TESTS
+        if isinstance(node, ast.Name):
+            return node.id in self.boolean_names
+        return False
+
+    def _collect_boolean_names(self, tree: ast.Module) -> None:
+        """Remember names the module only ever assigns a boolean expression.
+
+        `wide = app.media.width >= 700` then `"row" if wide else "column"` is the
+        readable spelling of a responsive branch, and wrapping `wide` in a
+        truthiness check would be noise around something already boolean. A name
+        counts only when **every** assignment to it in the module is boolean, so a
+        later rebind to a list cannot smuggle the wrong answer through.
+
+        Args:
+            tree: The parsed module.
+        """
+        assigned: dict[str, list[ast.expr]] = {}
+        for node in ast.walk(tree):
+            targets: list[ast.expr] = []
+            value: ast.expr | None = None
+            if isinstance(node, ast.Assign):
+                targets, value = list(node.targets), node.value
+            elif isinstance(node, ast.AnnAssign):
+                targets, value = [node.target], node.value
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    assigned.setdefault(target.id, []).append(value)  # type: ignore[arg-type]
+        for name, values in assigned.items():
+            if values and all(v is not None and self._is_boolean(v) for v in values):
+                self.boolean_names.add(name)
+
+    def _test(self, node: ast.expr, indent: int) -> str:
+        """Emit an expression in a boolean position, with Python's truthiness.
+
+        `""`, `0`, `None` and `False` agree between the languages; the containers
+        do not — an empty list, dict or set is falsy in Python and truthy in JS.
+        So `if s.errors:` entered its branch on a fresh state, measured in
+        ``examples/br-cadastro``.
+
+        Only a *value* position keeps the plain operators: `a or ""` returns an
+        operand rather than a boolean in both languages, and wrapping it would
+        change what it evaluates to.
+
+        Args:
+            node: The test expression.
+            indent: The current indentation depth.
+
+        Returns:
+            The JS for the test.
+        """
+        if isinstance(node, ast.BoolOp):
+            op = "&&" if isinstance(node.op, ast.And) else "||"
+            parts = [self._test(value, indent) for value in node.values]
+            return f" {op} ".join(parts)
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+            return f"!{self._test(node.operand, indent)}"
+        emitted = self.expr(node, indent)
+        if self._is_boolean(node):
+            return emitted
+        self.runtime_helpers.add("truthy")
+        return f"truthy$({emitted})"
+
     def _boolop(self, node: ast.BoolOp, indent: int) -> str:
-        """Emit a boolean operation (``and`` → ``&&``, ``or`` → ``||``)."""
+        """Emit a boolean operation in a *value* position (``and``/``or``).
+
+        Kept as ``&&``/``||`` because both languages return an **operand**, not a
+        boolean: ``name or "—"`` yields the same thing either way. A boolean
+        position goes through :meth:`_test`, which is where Python's truthiness
+        has to be restored.
+        """
         op = "&&" if isinstance(node.op, ast.And) else "||"
         joined = f" {op} ".join(self.expr(value, indent) for value in node.values)
         return f"({joined})"
@@ -950,11 +1051,13 @@ class _Generator:
                 node,
                 self.filename,
             )
+        if isinstance(node.op, ast.Not):
+            return f"!{self._test(node.operand, indent)}"
         return f"{op}{self.expr(node.operand, indent)}"
 
     def _ifexp(self, node: ast.IfExp, indent: int) -> str:
         """Emit a conditional expression (``a if c else b`` → ``c ? a : b``)."""
-        test = self.expr(node.test, indent)
+        test = self._test(node.test, indent)
         body = self.expr(node.body, indent)
         orelse = self.expr(node.orelse, indent)
         return f"({test} ? {body} : {orelse})"
@@ -1156,7 +1259,10 @@ class _Generator:
         if name == "range" and count in (1, 2, 3):
             return self._range(args)
         if name == "len" and count == 1:
-            return f"{args[0]}.length"
+            # Not `.length`: a dict is a plain object and a set is a Set, and
+            # `len(d)` answered `undefined` on both.
+            self.runtime_helpers.add("pyLen")
+            return f"pyLen$({args[0]})"
         if name == "round" and count == 1:
             return f"Math.round({args[0]})"
         if name == "round" and count == 2:
@@ -1722,13 +1828,13 @@ class _Generator:
     def _if(self, node: ast.If, indent: int) -> list[str]:
         """Emit an ``if`` / ``elif`` / ``else`` chain as JS if / else-if / else."""
         pad = _INDENT * indent
-        lines = [f"{pad}if ({self.expr(node.test, indent)}) {{"]
+        lines = [f"{pad}if ({self._test(node.test, indent)}) {{"]
         lines.extend(self._body(node.body, indent + 1))
         orelse = node.orelse
         # A single nested If in orelse is an ``elif`` — chain it as ``else if``.
         while len(orelse) == 1 and isinstance(orelse[0], ast.If):
             elif_node = orelse[0]
-            lines.append(f"{pad}}} else if ({self.expr(elif_node.test, indent)}) {{")
+            lines.append(f"{pad}}} else if ({self._test(elif_node.test, indent)}) {{")
             lines.extend(self._body(elif_node.body, indent + 1))
             orelse = elif_node.orelse
         if orelse:
@@ -1850,7 +1956,7 @@ class _Generator:
         if node.orelse:
             raise TranspileError("while/else is not supported", node, self.filename)
         pad = _INDENT * indent
-        lines = [f"{pad}while ({self.expr(node.test, indent)}) {{"]
+        lines = [f"{pad}while ({self._test(node.test, indent)}) {{"]
         lines.extend(self._body(node.body, indent + 1))
         lines.append(f"{pad}}}")
         return lines
@@ -2285,6 +2391,7 @@ class _Generator:
         # `State` is the injected base of every emitted dataclass — always
         # importable regardless of what the source module imported.
         importable: set[str] = {"State"}
+        self._collect_boolean_names(tree)
         top_level: list[ast.stmt] = []
         for node in tree.body:
             if isinstance(node, (ast.Import, ast.ImportFrom)):

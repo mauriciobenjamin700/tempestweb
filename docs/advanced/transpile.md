@@ -678,6 +678,22 @@ no espírito do `mypy --strict`.
       chamada em Python, operações diferentes em JS, resolvidas em runtime. E
       `d.pop(chave, default)` remove de verdade, em vez de cair no `pop` de
       array.
+    - **a verdade do Python, não a do JS:** `""`, `0`, `None` e `False` as duas
+      linguagens concordam; container vazio **não** — `[]` e `{}` são falsy em
+      Python e truthy em JS. Posição booleana (`if`, `elif`, `while`, `not`, o
+      ternário) passa por `truthy$`, então `if s.errors:` responde o que o Python
+      responderia. Comparação, `not`, literal booleano e nome que o módulo só
+      liga a booleano ficam sem embrulho, para o teste continuar legível.
+      `len(d)` conta as chaves e `"k" in d` lê chave, em vez de cair no `.length`
+      e no `.includes` de array.
+
+    !!! note "`and`/`or` em posição de **valor** ficam como estão"
+        `nome or "—"` devolve um **operando** nas duas linguagens, não um
+        booleano, então `||` já é o comportamento certo. A diferença aparece só
+        quando o operando da esquerda é container vazio — `[] or x` devolve `x`
+        em Python e `[]` em JS. Nenhum exemplo do corpus escreve isso, e
+        embrulhar mudaria o valor de todo `or` para ganhar um caso que ninguém
+        usa.
     - **predicados de caso:** `c.isupper()` / `c.islower()` exigem ao menos um
       caractere com caixa, como o Python — `"1".isupper()` é `False`. As
       classes são ASCII, como as dos outros predicados.

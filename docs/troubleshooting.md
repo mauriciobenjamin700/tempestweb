@@ -193,6 +193,28 @@ is not available in Mode C (the transpile client exports no such name)
 
 Referência: [Modo C — transpile](advanced/transpile.md).
 
+### O campo com mensagem de erro não fica vermelho (Modo C)
+
+O `Input` mostra a mensagem embaixo, mas a borda e o texto continuam na cor
+normal — em Modo A ou B, o mesmo código pinta os dois de vermelho.
+
+Um campo com `error` preenchido está **inválido**, e o core repinta a borda e o
+texto no papel `error` **na hora de construir**. Essa regra mora no estilo
+construído, não na folha de estilo, então o builder do Modo C, que é
+passthrough, a perdia em silêncio: o campo compilava, montava e mentia.
+
+Corrigido em 0.88.0 — `Input` resolve por `resolveFieldStyle`, que aplica a
+regra do core (borda de 1px no papel `error`, `SideBorder` só embaixo quando o
+`field_variant` é `flushed`, e o `style` do chamador ainda ganha por último).
+
+Se você vê isso, atualize o pacote:
+
+```bash
+uv add "tempestweb>=0.88.0"
+```
+
+---
+
 ### O app carrega com a versão **antiga** do código
 
 Nenhum erro, nenhum aviso: você reconstruiu, recarregou, e a correção não está

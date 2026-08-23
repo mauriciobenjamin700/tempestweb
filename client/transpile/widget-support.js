@@ -8,6 +8,8 @@
 // See docs/contract.md (wire format) and docs/modo-c-transpile.md (Mode C).
 
 import { WIDGET_STYLES } from "./widget-styles.gen.js";
+import { COLOR_ROLES } from "./component-styles.gen.js";
+import { Border, SideBorder } from "./values.gen.js";
 
 /**
  * The complete set of `Style` field names in the core's serialized shape
@@ -154,6 +156,44 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override)
     }
   }
   return Style(merged);
+}
+
+/**
+ * The resolved style for a field widget, honoring the invalid (error) state.
+ *
+ * The generated table carries the **resting** style per variant/size/scheme,
+ * which is the whole story for every widget but a field: the core repaints an
+ * invalid field's border and text in the `error` role at build time, so the rule
+ * lives in the built style and not in the stylesheet. Without it a Mode C field
+ * carrying a validation message rendered as if it were fine. A flushed field
+ * keeps its single bottom edge, and the caller's own `style` still wins last —
+ * both mirroring `_apply_field_state` in `tempest_core.variants`.
+ *
+ * @param {string} widget       The core widget name (a `WIDGET_STYLES` key).
+ * @param {string} fieldVariant The field treatment (outline/filled/flushed).
+ * @param {string} size         The density size.
+ * @param {string} colorScheme  The Material 3 scheme name.
+ * @param {string} error        The validation message; empty means valid.
+ * @param {?Object} override    The caller's style, or null.
+ * @returns {Object}            The complete Style object.
+ */
+export function resolveFieldStyle(widget, fieldVariant, size, colorScheme, error, override) {
+  if (!error) {
+    return resolveWidgetStyle(widget, fieldVariant, size, colorScheme, override);
+  }
+  const edge = Border({ width: 1.0, color: COLOR_ROLES.error });
+  const layered = {
+    border: fieldVariant === "flushed" ? SideBorder({ bottom: edge }) : edge,
+    color: COLOR_ROLES.error,
+  };
+  if (override != null) {
+    for (const [field, value] of Object.entries(override)) {
+      if (value !== null && value !== undefined) {
+        layered[field] = value;
+      }
+    }
+  }
+  return resolveWidgetStyle(widget, fieldVariant, size, colorScheme, layered);
 }
 
 /**

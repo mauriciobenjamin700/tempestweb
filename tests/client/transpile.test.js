@@ -27,6 +27,7 @@ import { mountApp, State } from "../../client/transpile/runtime.js";
 import * as widgets from "../../client/transpile/widgets.gen.js";
 import {
   Accordion,
+  AddressInput,
   Alert,
   AppBar,
   Avatar,
@@ -36,10 +37,13 @@ import {
   Burger,
   Card,
   Chip,
+  CNPJInput,
+  CPFInput,
   ConfidenceBadge,
   confidence_scheme,
   Divider,
   Drawer,
+  EmailInput,
   EmptyState,
   Footer,
   Grid,
@@ -48,6 +52,8 @@ import {
   ListTile,
   MetricCard,
   NavBar,
+  PasswordInput,
+  PhoneInput,
   ProgressStepper,
   RadioGroup,
   Rating,
@@ -620,6 +626,61 @@ test("every ported component matches the core build (order-agnostic)", () => {
     tabs_secondary_sm: Tabs({ tabs: ["a"], onSelect: noop, colorScheme: "secondary", size: "sm" }),
     tabs_empty: Tabs({ tabs: [], onSelect: noop }),
     tabs_active_out_of_range: Tabs({ tabs: ["a", "b"], active: 7, onSelect: noop }),
+    email_input_default: EmailInput({ onChange: noop }),
+    email_input_value_and_error: EmailInput({
+      value: "a@b.c",
+      error: "inválido",
+      placeholder: "seu e-mail",
+      onChange: noop,
+    }),
+    email_input_filled_lg_unlabelled: EmailInput({
+      label: "",
+      fieldVariant: "filled",
+      size: "lg",
+      colorScheme: "secondary",
+      onChange: noop,
+    }),
+    password_input_default: PasswordInput({ onChange: noop }),
+    password_input_flushed_sm_error: PasswordInput({
+      value: "hunter2",
+      error: "curta demais",
+      fieldVariant: "flushed",
+      size: "sm",
+      onChange: noop,
+    }),
+    phone_input_default: PhoneInput({ onChange: noop }),
+    phone_input_value_filled: PhoneInput({
+      value: "(11) 99999-1234",
+      fieldVariant: "filled",
+      onChange: noop,
+    }),
+    cpf_input_default: CPFInput({ onChange: noop }),
+    cpf_input_error_lg: CPFInput({
+      value: "529.982.247-25",
+      error: "CPF inválido",
+      size: "lg",
+      onChange: noop,
+    }),
+    cnpj_input_default: CNPJInput({ onChange: noop }),
+    cnpj_input_outline_error_scheme: CNPJInput({
+      value: "11.222.333/0001-81",
+      error: "CNPJ inválido",
+      colorScheme: "error",
+      onChange: noop,
+    }),
+    address_input_default: AddressInput({ onChange: noop }),
+    address_input_filled_values: AddressInput({
+      cep: "01001-000",
+      street: "Praça da Sé",
+      number: "1",
+      complement: "lado ímpar",
+      neighborhood: "Sé",
+      city: "São Paulo",
+      state: "SP",
+      fieldVariant: "filled",
+      onChange: noop,
+    }),
+    address_input_unlabelled_sm: AddressInput({ label: "", size: "sm", onChange: noop }),
   };
   assert.equal(
     Object.keys(cases).length,
@@ -630,6 +691,74 @@ test("every ported component matches the core build (order-agnostic)", () => {
     // diff() ignores prop key order, so an empty diff means the trees are equal.
     assert.deepEqual(diff(drop(samples[name]), drop(built)), [], `${name} diverged from core`);
   }
+});
+
+test("an invalid field paints its border and text in the error role", () => {
+  const samples = fixture("transpile_field_samples.json");
+  const drop = (n) => ({
+    type: n.type,
+    key: n.key,
+    props: n.props,
+    children: (n.children ?? []).map(drop),
+  });
+  const red = { r: 165, g: 46, b: 39, a: 1.0 };
+  const cases = {
+    field_outline_valid: widgets.Input({ value: "a", key: "f" }),
+    field_outline_invalid: widgets.Input({ value: "a", error: "obrigatório", key: "f" }),
+    field_filled_valid: widgets.Input({ value: "a", fieldVariant: "filled", key: "f" }),
+    field_filled_invalid: widgets.Input({
+      value: "a",
+      fieldVariant: "filled",
+      error: "obrigatório",
+      key: "f",
+    }),
+    field_flushed_valid: widgets.Input({ value: "a", fieldVariant: "flushed", key: "f" }),
+    field_flushed_invalid: widgets.Input({
+      value: "a",
+      fieldVariant: "flushed",
+      error: "obrigatório",
+      key: "f",
+    }),
+    field_invalid_lg_secondary: widgets.Input({
+      value: "a",
+      size: "lg",
+      colorScheme: "secondary",
+      error: "x",
+      key: "f",
+    }),
+    field_invalid_sm_error_scheme: widgets.Input({
+      value: "a",
+      size: "sm",
+      colorScheme: "error",
+      error: "x",
+      key: "f",
+    }),
+    field_invalid_keeps_caller_style: widgets.Input({
+      value: "a",
+      error: "x",
+      style: { background: { r: 1, g: 2, b: 3, a: 1.0 }, radius: 3.0 },
+      key: "f",
+    }),
+    field_invalid_caller_border_wins: widgets.Input({
+      value: "a",
+      error: "x",
+      style: { color: { r: 9, g: 9, b: 9, a: 1.0 } },
+      key: "f",
+    }),
+  };
+  assert.equal(Object.keys(cases).length, Object.keys(samples).length);
+  for (const [name, built] of Object.entries(cases)) {
+    assert.deepEqual(diff(drop(samples[name]), drop(built)), [], `${name} diverged from core`);
+  }
+  // The rule the fixture encodes, stated once in the open: a message repaints the
+  // field, a flushed one keeps its single bottom edge, and a valid one is untouched.
+  assert.deepEqual(cases.field_outline_invalid.props.style.border, { width: 1.0, color: red });
+  assert.deepEqual(cases.field_outline_invalid.props.style.color, red);
+  assert.deepEqual(cases.field_flushed_invalid.props.style.border.bottom, {
+    width: 1.0,
+    color: red,
+  });
+  assert.notDeepEqual(cases.field_outline_valid.props.style.color, red);
 });
 
 test("Container is a layout box with the semantic-tag escape hatch", () => {

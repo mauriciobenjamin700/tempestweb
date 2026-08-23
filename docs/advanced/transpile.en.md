@@ -599,7 +599,7 @@ spirit of `mypy --strict`.
     the options.
 
 !!! check "The structural components are ported"
-    All 36 structural components of the core run in Mode C:
+    All 42 structural components of the core run in Mode C:
 
     - **surface and structure:** `Surface`, `StyledContainer`, `Card`,
       `Scaffold`, `Grid`, `Sidebar`, `Drawer`, `Divider`, plus the
@@ -614,6 +614,10 @@ spirit of `mypy --strict`.
       field);
     - **feedback:** `Banner`, `Alert`, `Badge`, `EmptyState`, `Stat`,
       `ProgressStepper`;
+    - **Brazilian fields:** `EmailInput`, `PasswordInput`, `PhoneInput`,
+      `CPFInput`, `CNPJInput` and `AddressInput` — each is the muted label, the
+      `Input`/`MaskedInput` with the right mask and the error line, and
+      `on_change` receives the new **string**, not the event;
     - **composition:** `MetricCard`, `StatCard`, `ConfidenceBadge` — plus the pure
       `confidence_scheme` function, which is how an app picks the badge's scheme.
 
@@ -621,7 +625,7 @@ spirit of `mypy --strict`.
     core's style resolvers travels in a generated table
     (`component-styles.gen.js`), the same way `widget-styles.gen.js` does for the
     widgets. Every builder is pinned by a matrix of props built from the real core
-    — 126 cases — so a drift in composition or resolved style fails the test.
+    — 140 cases — so a drift in composition or resolved style fails the test.
 
     `examples/mode-c-components` exercises the whole batch in one app.
 
@@ -670,7 +674,7 @@ spirit of `mypy --strict`.
       window in the runtime, the way the server does in Mode B, and it survives
       the `view` re-running.
 
-    Measured on the corpus: **38 of 57 examples** transpile, up from 14.
+    Measured on the corpus: **39 of 57 examples** transpile, up from 14.
 
 !!! tip "Always give a component an explicit `key`"
     A component's default key is its own name (`card`, `alert`, `navbar`), so two

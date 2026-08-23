@@ -193,6 +193,28 @@ is not available in Mode C (the transpile client exports no such name)
 
 Reference: [Mode C — transpile](advanced/transpile.md).
 
+### The field with an error message is not red (Mode C)
+
+The `Input` shows the message underneath, but its border and text stay the
+normal color — in Mode A or B the same code paints both red.
+
+A field with `error` set is **invalid**, and the core repaints its border and
+text in the `error` role **while building it**. That rule lives in the built
+style, not in the stylesheet, so the Mode C builder — a passthrough — dropped it
+silently: the field compiled, mounted and lied.
+
+Fixed in 0.88.0 — `Input` resolves through `resolveFieldStyle`, which applies the
+core's rule (a 1px border in the `error` role, a bottom-only `SideBorder` when
+`field_variant` is `flushed`, and the caller's `style` still winning last).
+
+If you see this, update the package:
+
+```bash
+uv add "tempestweb>=0.88.0"
+```
+
+---
+
 ### The app loads with the **old** version of the code
 
 No error, no warning: you rebuilt, you reloaded, and the fix is not there. It is

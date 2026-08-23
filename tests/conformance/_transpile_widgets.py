@@ -95,6 +95,25 @@ def _variant_axis(spec: WidgetSpec) -> str | None:
     return None
 
 
+def _is_validated_field(spec: WidgetSpec) -> bool:
+    """Return whether the widget resolves its style against an invalid state.
+
+    A field carrying an ``error`` message is *invalid*, and the core repaints its
+    border and text in the ``error`` role while building it — a rule that lives
+    in the built style, not in the stylesheet, so a passthrough builder drops it
+    silently. Only a widget with both a field variant and an ``error`` prop has
+    that state (``Input`` today).
+
+    Args:
+        spec: The introspected widget.
+
+    Returns:
+        True when the builder must resolve through ``resolveFieldStyle``.
+    """
+    keys = set(spec.props) | set(spec.required)
+    return _variant_axis(spec) == "field_variant" and "error" in keys
+
+
 def _children_expr(spec: WidgetSpec) -> str:
     """Emit the expression that folds the widget's child slots into the IR array.
 
@@ -162,10 +181,16 @@ def _builder(spec: WidgetSpec) -> str:
         variant_expr = _camel(variant_key) if variant_key else f'"{_NONE}"'
         size_expr = "size" if "size" in keys else f'"{_NONE}"'
         scheme_expr = "colorScheme" if "color_scheme" in keys else f'"{_NONE}"'
-        style_expr = (
-            f'resolveWidgetStyle("{spec.name}", {variant_expr}, '
-            f"{size_expr}, {scheme_expr}, style)"
-        )
+        if _is_validated_field(spec):
+            style_expr = (
+                f'resolveFieldStyle("{spec.name}", {variant_expr}, '
+                f"{size_expr}, {scheme_expr}, error, style)"
+            )
+        else:
+            style_expr = (
+                f'resolveWidgetStyle("{spec.name}", {variant_expr}, '
+                f"{size_expr}, {scheme_expr}, style)"
+            )
     else:
         style_expr = "style"
     lines.append(f"      style: {style_expr},")
@@ -212,7 +237,7 @@ def render_module_text() -> str:
         "dispatches from it.\n"
         "// Regenerate: python -m tests.conformance._transpile_widgets. Do not "
         "edit.\n\n"
-        "import { lazyChildren, resolveWidgetStyle, Style } "
+        "import { lazyChildren, resolveFieldStyle, resolveWidgetStyle, Style } "
         'from "./widget-support.js";\n'
         'export { Color, Edge, Style } from "./widget-support.js";\n\n'
         "// `Style` is re-exported for apps; reference it so linters see the "

@@ -4,6 +4,36 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.88.0] — 2026-08-23
+
+### Added
+
+- **Os seis campos brasileiros do core rodam em Modo C**: `EmailInput`,
+  `PasswordInput`, `PhoneInput`, `CPFInput`, `CNPJInput` e `AddressInput`. Cada
+  um é o rótulo mudo acima, o `Input`/`MaskedInput` com a máscara e o teclado
+  certos, e a linha de erro abaixo — presentes na árvore só quando têm conteúdo,
+  para o reconciliador inserir e remover em vez de renderizar em branco. O
+  `on_change` recebe a **string** nova (o `AddressInput` recebe `(campo, valor)`),
+  como no core: o app nunca toca no objeto de evento.
+- **14 casos novos na matriz de paridade** (`transpile_component_samples.json`,
+  agora 140), cobrindo rótulo ausente, erro presente, os três tratamentos de
+  campo, tamanho, esquema e o bloco de endereço preenchido.
+
+### Fixed
+
+- **Campo inválido não ficava vermelho no Modo C.** Um `Input` com `error`
+  preenchido está inválido, e o core repinta a borda e o texto no papel `error`
+  **ao construir** — regra que mora no estilo construído, não na folha, então o
+  builder gerado (passthrough) a perdia em silêncio. O campo compilava, montava
+  e mentia: a mensagem aparecia embaixo e o campo continuava com cara de válido.
+  Agora `Input` resolve por `resolveFieldStyle`, que aplica a regra do core:
+  borda de 1px no papel `error`, `SideBorder` só embaixo quando o `field_variant`
+  é `flushed`, e o `style` do chamador ainda ganha por último. Fixado por
+  `tests/fixtures/transpile_field_samples.json` (10 cenários construídos do core
+  real) — o teste falha sem a correção.
+
+Corpus do Modo C: **39 dos 57 exemplos** (era 38). Desbloqueado: `br-cadastro`.
+
 ## [0.87.0] — 2026-08-23
 
 ### Added

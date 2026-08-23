@@ -18,6 +18,7 @@ from tempestweb.transpile._served import SERVED_NAMES
 from tempestweb.transpile.codegen import _camel_name
 from tests.conformance import _transpile_component_styles as component_styles_gen
 from tests.conformance import _transpile_components as components_gen
+from tests.conformance import _transpile_fields as fields_gen
 from tests.conformance import _transpile_lazy as lazy_gen
 from tests.conformance import _transpile_served as served_gen
 from tests.conformance import _transpile_spacing as spacing_gen
@@ -286,6 +287,20 @@ def test_lazy_samples_fixture_matches_core() -> None:
     assert on_disk == lazy_gen.render_fixture_text(), (
         "tests/fixtures/transpile_lazy_samples.json is stale — regenerate with "
         "`python -m tests.conformance._transpile_lazy`"
+    )
+
+
+def test_field_samples_fixture_matches_core() -> None:
+    """The committed invalid-field fixture byte-matches a fresh build.
+
+    The Mode C builder reimplements the core's invalid-field rule, so a stale
+    fixture would compare the reimplementation against an old core and pass while
+    the two disagree.
+    """
+    on_disk = fields_gen.FIELDS_FIXTURE.read_text(encoding="utf-8")
+    assert on_disk == fields_gen.render_fixture_text(), (
+        "tests/fixtures/transpile_field_samples.json is stale — regenerate with "
+        "`python -m tests.conformance._transpile_fields`"
     )
 
 

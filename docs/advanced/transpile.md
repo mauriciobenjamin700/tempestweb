@@ -597,7 +597,7 @@ no espírito do `mypy --strict`.
     as saídas.
 
 !!! check "Componentes estruturais estão portados"
-    Os 36 componentes estruturais do core rodam em Modo C:
+    Os 42 componentes estruturais do core rodam em Modo C:
 
     - **superfície e estrutura:** `Surface`, `StyledContainer`, `Card`,
       `Scaffold`, `Grid`, `Sidebar`, `Drawer`, `Divider`, mais os aliases
@@ -611,6 +611,10 @@ no espírito do `mypy --strict`.
       aba ativa leva o sublinhado por `SideBorder`, sem campo de estilo novo);
     - **feedback:** `Banner`, `Alert`, `Badge`, `EmptyState`, `Stat`,
       `ProgressStepper`;
+    - **campos brasileiros:** `EmailInput`, `PasswordInput`, `PhoneInput`,
+      `CPFInput`, `CNPJInput` e `AddressInput` — cada um é o rótulo mudo, o
+      `Input`/`MaskedInput` com a máscara certa e a linha de erro, e o
+      `on_change` recebe a **string** nova, não o evento;
     - **composição:** `MetricCard`, `StatCard`, `ConfidenceBadge` — mais a função
       pura `confidence_scheme`, que é como a app escolhe o esquema do badge.
 
@@ -618,7 +622,7 @@ no espírito do `mypy --strict`.
     resolvedores de estilo do core viaja em tabela gerada
     (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
     pelos widgets. Cada builder é fixado por uma matriz de props construída do
-    core real — 126 casos — então drift de composição ou de estilo falha no teste.
+    core real — 140 casos — então drift de composição ou de estilo falha no teste.
 
     `examples/mode-c-components` exercita o lote inteiro num app só.
 
@@ -668,7 +672,7 @@ no espírito do `mypy --strict`.
       desliza a janela no runtime, como o servidor faz no Modo B, e ela
       sobrevive ao `view` re-rodando.
 
-    Medido no corpus: **38 dos 57 exemplos** transpilam (eram 14).
+    Medido no corpus: **39 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),

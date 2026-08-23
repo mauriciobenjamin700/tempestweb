@@ -24,6 +24,7 @@ from typing import Any
 
 from tempest_core import (
     Accordion,
+    AddressInput,
     Alert,
     AppBar,
     Avatar,
@@ -34,9 +35,12 @@ from tempest_core import (
     Button,
     Card,
     Chip,
+    CNPJInput,
     ConfidenceBadge,
+    CPFInput,
     Divider,
     Drawer,
+    EmailInput,
     EmptyState,
     Footer,
     Grid,
@@ -45,6 +49,8 @@ from tempest_core import (
     ListTile,
     MetricCard,
     NavBar,
+    PasswordInput,
+    PhoneInput,
     ProgressStepper,
     RadioGroup,
     Rating,
@@ -83,6 +89,16 @@ def _noop_event(_: Any) -> None:
 
     Args:
         _: The change event the widget reports.
+    """
+    return None
+
+
+def _noop_pair(_field: str, _value: str) -> None:
+    """Absorb an address-block change callback.
+
+    Args:
+        _field: The address field that changed.
+        _value: The field's new value.
     """
     return None
 
@@ -350,6 +366,61 @@ def _cases() -> dict[str, Any]:
         ),
         "tabs_empty": Tabs(tabs=[], on_select=_noop),
         "tabs_active_out_of_range": Tabs(tabs=["a", "b"], active=7, on_select=_noop),
+        "email_input_default": EmailInput(on_change=_noop_event),
+        "email_input_value_and_error": EmailInput(
+            value="a@b.c",
+            error="inválido",
+            placeholder="seu e-mail",
+            on_change=_noop_event,
+        ),
+        "email_input_filled_lg_unlabelled": EmailInput(
+            label="",
+            field_variant="filled",
+            size="lg",
+            color_scheme="secondary",
+            on_change=_noop_event,
+        ),
+        "password_input_default": PasswordInput(on_change=_noop_event),
+        "password_input_flushed_sm_error": PasswordInput(
+            value="hunter2",
+            error="curta demais",
+            field_variant="flushed",
+            size="sm",
+            on_change=_noop_event,
+        ),
+        "phone_input_default": PhoneInput(on_change=_noop_event),
+        "phone_input_value_filled": PhoneInput(
+            value="(11) 99999-1234", field_variant="filled", on_change=_noop_event
+        ),
+        "cpf_input_default": CPFInput(on_change=_noop_event),
+        "cpf_input_error_lg": CPFInput(
+            value="529.982.247-25",
+            error="CPF inválido",
+            size="lg",
+            on_change=_noop_event,
+        ),
+        "cnpj_input_default": CNPJInput(on_change=_noop_event),
+        "cnpj_input_outline_error_scheme": CNPJInput(
+            value="11.222.333/0001-81",
+            error="CNPJ inválido",
+            color_scheme="error",
+            on_change=_noop_event,
+        ),
+        "address_input_default": AddressInput(on_change=_noop_pair),
+        "address_input_filled_values": AddressInput(
+            cep="01001-000",
+            street="Praça da Sé",
+            number="1",
+            complement="lado ímpar",
+            neighborhood="Sé",
+            city="São Paulo",
+            state="SP",
+            field_variant="filled",
+            on_change=_noop_pair,
+        ),
+        "address_input_unlabelled_sm": AddressInput(
+            label="", size="sm", on_change=_noop_pair
+        ),
     }
     return cases
 

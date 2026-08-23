@@ -7,9 +7,13 @@ hatch), HTML-injection safety, component expansion, and the document wrapper.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
 from tempest_core import (
+    Autocomplete,
     Burger,
     Button,
     Canvas,
@@ -18,23 +22,37 @@ from tempest_core import (
     Column,
     Component,
     Container,
+    DatePicker,
+    Dropdown,
     Edge,
+    FilePicker,
     Icon,
     IconButton,
     Icons,
     Image,
     Input,
+    MaskedInput,
+    PinInput,
     ProgressBar,
+    RangeSlider,
+    RouteDrawer,
     Row,
     Semantics,
+    Slider,
     Spinner,
     Stack,
     Style,
+    Switch,
+    TabBar,
+    TabView,
     Text,
+    TextArea,
+    TimePicker,
     Widget,
     build,
 )
 from tempestweb.html import render_document, render_to_html
+from tempestweb.html.renderer import _TAG_BY_TYPE
 
 # ---------------------------------------------------------------------------
 # Unit — primitive type -> tag
@@ -404,3 +422,137 @@ def test_a_burger_component_lowers_to_the_named_button() -> None:
     html = render_to_html(Burger(on_click=lambda: None, key="burger"))
     assert '<button data-tw-type="IconButton"' in html
     assert 'aria-label="menu"' in html
+
+
+# ---------------------------------------------------------------------------
+# Unit — the controls of #142/#143, which this renderer had never learned
+# ---------------------------------------------------------------------------
+
+
+def test_textarea_is_a_real_textarea_holding_its_value() -> None:
+    html = render_to_html(TextArea(value="a note", rows=4, placeholder="Write…"))
+    assert html.startswith("<textarea")
+    assert 'rows="4"' in html
+    assert 'placeholder="Write…"' in html
+    assert html.endswith("a note</textarea>")
+
+
+def test_masked_input_carries_its_mask() -> None:
+    html = render_to_html(MaskedInput(value="", mask="999.999.999-99"))
+    assert html.startswith("<input")
+    assert 'data-tw-mask="999.999.999-99"' in html
+
+
+def test_pin_input_asks_for_the_one_time_code() -> None:
+    html = render_to_html(PinInput(value="", length=6))
+    assert 'inputmode="numeric"' in html
+    assert 'autocomplete="one-time-code"' in html
+    assert 'maxlength="6"' in html
+
+
+def test_switch_is_a_label_wrapping_a_switch_role_checkbox() -> None:
+    html = render_to_html(Switch(label="Notifications", checked=True))
+    assert html.startswith("<label")
+    assert '<input type="checkbox" role="switch" checked>' in html
+    assert html.endswith("Notifications</label>")
+
+
+def test_slider_is_a_range_over_its_scale() -> None:
+    html = render_to_html(Slider(value=70.0, min_value=10.0, max_value=90.0, step=5.0))
+    assert 'type="range"' in html
+    assert 'min="10.0"' in html
+    assert 'max="90.0"' in html
+    assert 'value="70.0"' in html
+
+
+def test_range_slider_renders_both_thumbs() -> None:
+    html = render_to_html(RangeSlider(low=20.0, high=80.0))
+    assert 'data-tw-part="low"' in html
+    assert 'data-tw-part="high"' in html
+    assert html.count('type="range"') == 2
+
+
+def test_dropdown_is_a_select_with_its_options_and_placeholder() -> None:
+    html = render_to_html(Dropdown(options=["Light", "Dark"], value="Dark"))
+    assert html.startswith("<select")
+    assert '<option value="Light">Light</option>' in html
+    assert 'disabled data-tw-part="placeholder"' in html
+
+
+def test_autocomplete_ships_the_datalist_its_input_points_at() -> None:
+    html = render_to_html(Autocomplete(key="q", options=["ana", "bia"], value="an"))
+    assert 'list="tw-list-q"' in html
+    assert '<datalist id="tw-list-q">' in html
+    assert '<option value="bia">bia</option>' in html
+
+
+def test_date_and_time_pickers_use_the_native_controls() -> None:
+    date_html = render_to_html(DatePicker(value="2026-08-23", label="Departure"))
+    time_html = render_to_html(TimePicker(value="10:30", label="Boarding"))
+    assert '<input type="date" value="2026-08-23">Departure</label>' in date_html
+    assert '<input type="time" value="10:30">Boarding</label>' in time_html
+
+
+def test_file_picker_reflects_the_value_it_cannot_assign() -> None:
+    html = render_to_html(FilePicker(label="Attach", value="cv.pdf"))
+    assert 'data-tw-value="cv.pdf"' in html
+    assert '<input type="file">Attach</label>' in html
+
+
+def test_tab_bar_renders_a_tablist_with_the_active_tab_selected() -> None:
+    html = render_to_html(TabBar(tabs=["Posts", "About"], active=1))
+    assert 'role="tablist"' in html
+    assert html.count('role="tab"') == 2
+    assert 'data-tw-value="1" aria-selected="true"' in html
+    assert 'data-tw-value="0" aria-selected="false"' in html
+
+
+def test_tab_view_is_a_panel_named_after_its_active_tab() -> None:
+    html = render_to_html(
+        TabView(tabs=["Posts", "About"], active=1, child=Text(content="x"))
+    )
+    assert 'role="tabpanel"' in html
+    assert 'aria-label="About"' in html
+
+
+def test_route_drawer_says_whether_it_is_open() -> None:
+    closed = render_to_html(
+        RouteDrawer(child=Text(content="main"), drawer=Text(content="side"), open=False)
+    )
+    opened = render_to_html(
+        RouteDrawer(child=Text(content="main"), drawer=Text(content="side"), open=True)
+    )
+    assert 'aria-expanded="false"' in closed
+    assert "data-tw-open" not in closed
+    assert 'aria-expanded="true"' in opened
+    assert 'data-tw-open=""' in opened
+
+
+def test_ssr_tag_table_matches_the_dom_renderer() -> None:
+    """Both renderers agree on every tag that is not the div fallback.
+
+    Two hand-kept tables of the same mapping is the drift this issue is about:
+    this renderer was five widgets behind the client (#142's fields never
+    arrived), so the same tree was a typable field in the browser and a dead box
+    in a static page. Only non-``div`` entries are compared, since ``div`` is what
+    an absent entry falls back to anyway.
+    """
+    dom = (Path(__file__).resolve().parents[2] / "client" / "dom.js").read_text(
+        encoding="utf-8"
+    )
+    start = dom.index("const TAG_BY_TYPE = Object.freeze({")
+    table = dom[start : dom.index("});", start)]
+    client_tags = {
+        name: tag
+        for name, tag in re.findall(r'^\s*(\w+): "(\w+)"', table, re.M)
+        if tag != "div"
+    }
+    drift = {
+        name: (tag, _TAG_BY_TYPE.get(name, "div"))
+        for name, tag in client_tags.items()
+        if _TAG_BY_TYPE.get(name, "div") != tag
+    }
+    assert not drift, (
+        "the SSR renderer disagrees with client/dom.js on "
+        f"{sorted(drift)} (client, ssr): {drift}"
+    )

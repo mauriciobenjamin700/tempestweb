@@ -36,6 +36,17 @@ que faz *parse* sem executar.
 
 Cada um tem teste que falha sem a correção.
 
+Quatro achados de paridade ficaram **fora** deste ciclo por serem do core ou do
+renderizador compartilhado — medidos em Modo B e Modo C antes de atribuir:
+[#134](https://github.com/mauriciobenjamin700/tempestweb/issues/134) (handler
+com parâmetro default-bound recebe o evento no lugar do valor capturado),
+[#135](https://github.com/mauriciobenjamin700/tempestweb/issues/135) (a chave
+literal `accordion-header` colide entre instâncias),
+[#136](https://github.com/mauriciobenjamin700/tempestweb/issues/136)
+(`MaskedInput` renderiza um `div` vazio nos três modos) e
+[#137](https://github.com/mauriciobenjamin700/tempestweb/issues/137) (o Modo C
+trata `dict` como lista em `if`, `len` e `in`).
+
 ## [0.89.0] — 2026-08-23
 
 ### Added

@@ -193,6 +193,40 @@ is not available in Mode C (the transpile client exports no such name)
 
 Referência: [Modo C — transpile](advanced/transpile.md).
 
+### `Theme.from_seed is not a function` (Modo C)
+
+Página em branco, um erro só no console, e o build tinha passado.
+
+`_served.py` responde "o cliente exporta esse nome?" — não responde "esse nome
+tem esse método?". `Theme` **é** servido (o do Modo C carrega o modo), mas a
+paleta Material 3 semeada não é portada: quem pinta os tokens é a folha de
+estilo base.
+
+Desde 0.92.0 isso é **erro de compilação** com `arquivo:linha`:
+
+```text
+the client's own object carries no such member
+```
+
+O manifesto de membros (`tempestweb/transpile/_members.py`) é gerado
+introspectando o cliente no Node, que é a única fonte honesta — o JS é o que o
+browser carrega. `Color.from_hex`, `Edge.all` e `Edge.symmetric` continuam
+passando, porque esses o cliente carrega de verdade.
+
+---
+
+### `Invalid left-hand side in assignment` (Modo C)
+
+Um clique não faz nada e o console mostra isso. É `xs[:] = [...]`.
+
+Uma fatia **lê** como `.slice(...)`, então a atribuição saía
+`xs.slice(0) = [...]` — que *parseia*, e por isso o `node --check` do build
+passava. Corrigido em 0.92.0: vira `xs.splice(0, xs.length, ...novo)`, que é a
+substituição no lugar que o Python faz. Fatia parcial (`xs[1:3] = …`) é recusada
+no build, porque ela pode crescer ou encolher a lista.
+
+---
+
 ### O `on_change` do componente não dispara (Modo C)
 
 O componente aparece, o texto que você digita fica na caixa, e o handler nunca

@@ -671,6 +671,20 @@ no espírito do `mypy --strict`.
       enums do core já viajam em `values.gen.js`.
     - **generator expression** (`any(x for x in xs)`), `any`/`all`, `dict.get`
       com default, e os predicados de `str` (`c.isdigit()`).
+    - **`{**old, k: v}`**, o idioma de "novo dict sem mutar" (irmão do
+      `[a, *rest]`), e **`xs[:] = [...]`**, a substituição no lugar — que vira
+      `splice`, não uma atribuição a uma cópia.
+    - **`f"{x:+.1f}"`**: o `+` força o sinal no positivo, como o Python. O valor
+      é formatado **primeiro** e o prefixo decidido do resultado, senão um
+      negativo viraria `+-3.0`. Combina com `,`, `%` e `d`; com `0Nd` é recusado,
+      porque o Python conta o sinal dentro da largura.
+    - **`if __name__ == "__main__":` é pulado**, não recusado: o bloco é guarda
+      de script e nunca roda quando o arquivo é importado como módulo — que é
+      exatamente como o Modo C o compila. Um `else` nele ainda é recusado, porque
+      esse *roda*.
+    - **construtor de evento do core**: `ThemeChangeEvent(mode=ThemeMode.DARK)` e
+      os outros 32 eventos são gerados para `values.gen.js`. A app constrói um
+      quando simula um evento do host.
 
     - **capacidade nativa, nas três formas de import:**
       `from tempestweb import native`, `from tempestweb.native import storage`
@@ -686,7 +700,7 @@ no espírito do `mypy --strict`.
       desliza a janela no runtime, como o servidor faz no Modo B, e ela
       sobrevive ao `view` re-rodando.
 
-    Medido no corpus: **40 dos 57 exemplos** transpilam (eram 14).
+    Medido no corpus: **42 dos 57 exemplos** transpilam (eram 14).
 
 !!! tip "Componente sempre com `key` explícita"
     A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),

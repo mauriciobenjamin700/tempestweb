@@ -88,9 +88,13 @@ def _hand_written_names() -> set[str]:
 def _runtime_only_names() -> set[str]:
     """Core models a view never constructs, so Mode C does not need a builder.
 
-    Events arrive *from* the client (the JS runtime builds them itself) and the
-    IR node/patch types are the wire format the reconciler speaks — emitting
-    constructors for either would be dead bytes in every artifact.
+    The IR node/patch types are the wire format the reconciler speaks; emitting
+    constructors for them would be dead bytes in every artifact.
+
+    Event classes are **not** skipped, though they mostly arrive *from* the
+    client: an app builds one when it simulates a host event, which is what
+    ``examples/theme-switcher`` does with ``ThemeChangeEvent(mode=…)``. Excluding
+    them barred that view from Mode C for the size of one object literal each.
 
     Returns:
         The names to skip, derived from the core rather than hand-listed.
@@ -233,7 +237,6 @@ def collect() -> dict[str, str]:
         A name-sorted mapping of core name to its JS source.
     """
     taken = _hand_written_names() | _runtime_only_names()
-    event_base = getattr(tempest_core, "Event", None)
     out: dict[str, str] = {}
     for name in sorted(getattr(tempest_core, "__all__", [])):
         if name in taken:
@@ -245,11 +248,6 @@ def collect() -> dict[str, str]:
             isinstance(value, type)
             and issubclass(value, BaseModel)
             and not issubclass(value, WidgetBase)
-            and not (
-                event_base is not None
-                and isinstance(event_base, type)
-                and issubclass(value, event_base)
-            )
         ):
             source = _model_source(name, value)
             if source:

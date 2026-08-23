@@ -4,6 +4,49 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.92.0] — 2026-08-23
+
+### Added
+
+- **`f"{x:+.1f}"`** — o `+` que força o sinal no positivo, que é como um delta se
+  lê. O valor é formatado **primeiro** e o prefixo decidido do resultado, senão
+  um negativo sairia `+-3.0`; zero negativo mantém o sinal, que o `toFixed`
+  sozinho perde. Compõe com `,`, `%` e `d`. Com `0Nd` é recusado, porque o Python
+  conta o sinal dentro da largura e sobrepor daria um caractere a mais.
+- **`{**old, k: v}`** — o idioma de "novo dict sem mutar", irmão do `[a, *rest]`
+  que já passava. Vira spread de objeto, com a posição preservada porque nas duas
+  linguagens a última chave ganha.
+- **`if __name__ == "__main__":` é pulado**, não recusado. É guarda de script e
+  nunca roda quando o arquivo é importado como módulo — que é exatamente como o
+  Modo C o compila, então pular é a leitura fiel. Um `else` nele continua recusado,
+  porque esse *roda* na importação.
+- **Construtor de evento do core no Modo C.** Os 33 eventos (`ThemeChangeEvent`,
+  `TextChangeEvent`, …) eram excluídos de `values.gen.js` sob a premissa de que
+  evento só vem *do* cliente. Uma app constrói um quando simula evento do host —
+  é o que o `examples/theme-switcher` faz — e a exclusão barrava a view inteira
+  pelo tamanho de um literal de objeto cada.
+
+### Fixed
+
+- **`xs[:] = [...]` compilava para uma atribuição inválida.** Fatia *lê* como
+  `.slice(...)`, então a atribuição saía `xs.slice(0) = [...]`, que **parseia** —
+  e por isso o `node --check` do build passava — e lançava
+  `Invalid left-hand side in assignment` no primeiro clique. Medido no
+  `examples/router-drawer`: a navegação pelo drawer não fazia nada. Agora emite
+  `splice`, a substituição no lugar que o Python faz; fatia parcial
+  (`xs[1:3] = …`) é recusada, porque pode crescer ou encolher a lista.
+- **Membro não portado de valor do core agora falha no build.** `_served.py`
+  responde "o cliente exporta esse nome?" e não "esse nome tem esse método?" — o
+  mesmo defeito com outra forma. `Theme.from_seed(...)` compilava, carregava e
+  morria na montagem (`examples/theme-switcher`, página em branco). O manifesto
+  novo `tempestweb/transpile/_members.py` é gerado introspectando o cliente no
+  Node, e o compilador recusa com `arquivo:linha`. `Color.from_hex`, `Edge.all` e
+  `Edge.symmetric` seguem passando: esses o cliente carrega.
+
+Corpus do Modo C: **42 dos 57 exemplos** (era 40). Desbloqueados: `quiz-app` e
+`router-drawer`. O `theme-switcher` continua fora, mas agora com erro de
+compilação em vez de página em branco.
+
 ## [0.91.0] — 2026-08-23
 
 ### Changed

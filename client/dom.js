@@ -35,6 +35,12 @@ const TAG_BY_TYPE = Object.freeze({
   Stack: "div",
   Text: "span",
   Button: "button",
+  // An IconButton is a button: the core declares `on_click` on it, so rendering
+  // it as a div left it unreachable by keyboard and unnamed to a screen reader,
+  // while a mouse click still worked — the failure mode nobody notices. Its glyph
+  // is a renderer-owned <svg> (see applyIconButtonProps); IconButton is an IR
+  // leaf, so no patch path descends into it.
+  IconButton: "button",
   Input: "input",
   // A PinInput is a one-time-code field: a single <input> with the browser's own
   // autofill hint and a length cap, spaced out by the base sheet so it reads as a
@@ -181,6 +187,7 @@ function applyProps(el, props) {
   // ProgressBar with aria-valuemin and no role at all, and a Toast that
   // announced nothing.
   applyA11yProps(el, props);
+  applyIconButtonProps(el, type, props);
   applyIndicatorProps(el, type, props);
   applyControlProps(el, type, props);
   applyDragProps(el, type, props);
@@ -190,6 +197,56 @@ function applyProps(el, props) {
   applyListEventProps(el, type, props);
   applySortAndPageProps(el, type, props);
   applyCameraProps(el, type, props);
+}
+
+/**
+ * Draw an `IconButton`: its glyph, its accessible name, and the button type.
+ *
+ * The `icon` prop names a curated glyph the `Icon` widget already knows how to
+ * draw, but `renderIcon` only ever ran for an `Icon` node — so an IconButton
+ * showed its `label` as text (a `Burger` read "menu" instead of ☰) and, in the
+ * SSR renderer, nothing at all. The glyph is a renderer-owned `<svg>`, which is
+ * legal because IconButton is an IR leaf: no patch path descends into it.
+ *
+ * `label` becomes the accessible name rather than visible text — that is what a
+ * label means on an icon-only control. This runs *after* {@link applyA11yProps}
+ * on purpose: a widget with no semantics sends `semantics: null`, which clears
+ * `aria-label`, so naming the button before that pass left it nameless again
+ * (measured in Chrome: `aria-label` was null on a `Burger`). Running after also
+ * makes the app's own `semantics.label` win, because it is already on the
+ * element and this only fills a gap.
+ *
+ * @param {Element} el     The button element.
+ * @param {?string} type   The node's IR type.
+ * @param {Object} props   The node's props (may be a partial Update).
+ * @returns {void}
+ */
+function applyIconButtonProps(el, type, props) {
+  if (type !== "IconButton") {
+    return;
+  }
+  if (!el.hasAttribute("type")) {
+    el.setAttribute("type", "button");
+  }
+  if ("icon" in props) {
+    let svg = el.querySelector(`[${ITEM_ATTR}="glyph"]`);
+    if (svg == null) {
+      svg = createIconSvg();
+      svg.setAttribute(ITEM_ATTR, "glyph");
+      el.appendChild(svg);
+    }
+    renderIcon(/** @type {any} */ (svg), {
+      name: props.icon == null ? "" : String(props.icon),
+    });
+  }
+  const named = el.getAttribute("aria-label");
+  if (
+    (named == null || named === "") &&
+    props.label != null &&
+    String(props.label) !== ""
+  ) {
+    el.setAttribute("aria-label", String(props.label));
+  }
 }
 
 /** Attribute holding a `Dialog`'s title, painted by the base sheet. */
@@ -621,7 +678,6 @@ export function syncContainerGestures(root) {
  */
 const LABEL_AS_TEXT_TYPES = new Set([
   "Button",
-  "IconButton",
   "Switch",
   "DatePicker",
   "TimePicker",

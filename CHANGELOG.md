@@ -4,6 +4,39 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.83.1] — 2026-08-23
+
+### Fixed
+
+- **`IconButton` passa a ser desenhado — nos dois renderizadores.** Nem
+  `TAG_BY_TYPE` (`client/dom.js`) nem `_TAG_BY_TYPE`
+  (`tempestweb/html/renderer.py`) o mapeavam, e `renderIcon` só rodava para um nó
+  `Icon`, então o widget tinha três sintomas com uma raiz só: caía no fallback
+  `div` (não focável, não anunciado, sem o state layer da folha base), **nunca
+  desenhava o glifo** — o `Burger` escrevia a palavra "menu" onde deveria ir `☰`,
+  e o botão de limpar do `SearchBar` escrevia "clear" em vez de `×` — e no HTML
+  estático saía um `<div>` de 48×48 **vazio**. Agora é `<button type="button">`
+  com o glifo num `<svg>` do renderizador (legal porque `IconButton` é folha da
+  IR) e o `label` em `aria-label`; `semantics.label` explícito continua ganhando.
+  A folha base passou a cobrir `[data-tw-type="IconButton"]` nas mesmas regras do
+  `Button`, então o reset de UA e o state layer de hover/foco/press valem para o
+  controle só-de-ícone. Anterior a esta versão e válido nos três modos; ficou
+  visível quando o `Burger` chegou ao Modo C na 0.82.0.
+
+  Medido em Chrome real, antes e depois: a árvore de acessibilidade dizia
+  `generic "menu"` e agora diz `button "menu"`; `Tab` alcança o `Burger` em um
+  salto e `Enter` abre o `Drawer` (0 → 1 nó); o glifo é o path Lucide do menu, e o
+  do `search-clear` é o do `×`. Modo B mede idêntico ao Modo C em tag,
+  `aria-label`, glifo, caixa de 48×48 e comportamento do teclado.
+
+### Notas
+
+- **O HTML estático continua sem glifo, agora por limitação declarada:** o
+  renderizador SSR não carrega dado de path de ícone nenhum (um `Icon` também sai
+  como `<span>` vazio lá), então um `IconButton` estático é um botão **nomeado e
+  focável** cujo glifo aparece quando o cliente hidrata. Ícone no SSR é lacuna
+  própria, anterior a esta mudança.
+
 ## [0.83.0] — 2026-08-23
 
 ### Added
@@ -62,7 +95,6 @@ versioning.
   100 ticks, `00:10.0`; `core-app-shell` renderiza 28 nós com `AppBar`, `Sidebar`
   de 260px e três `ListTile`, e clicar `nav-1` move a pílula ativa. **Modo B mede
   idêntico** nos dois. Console limpo.
-
 ## [0.82.0] — 2026-08-22
 
 ### Added

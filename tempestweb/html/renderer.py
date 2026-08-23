@@ -48,6 +48,9 @@ _TAG_BY_TYPE: dict[str, str] = {
     "Stack": "div",
     "Text": "span",
     "Button": "button",
+    # An IconButton is a button — the core declares ``on_click`` on it — so the
+    # ``div`` fallback made the static page carry an unfocusable, unnamed box.
+    "IconButton": "button",
     "Input": "input",
     "Checkbox": "label",
     "Image": "img",
@@ -319,6 +322,30 @@ def _escape_hatch_attributes(node: Node) -> list[str]:
     return attributes
 
 
+def _icon_button_name(node: Node) -> list[str]:
+    """Name an ``IconButton`` from its ``label`` when semantics does not.
+
+    On an icon-only control the ``label`` *is* the accessible name — the DOM
+    renderer applies it the same way. An explicit ``semantics.label`` is emitted
+    earlier and wins, so this only fills the gap.
+
+    Args:
+        node: The IR node to name.
+
+    Returns:
+        The ``aria-label`` attribute, or an empty list.
+    """
+    if node.type != "IconButton":
+        return []
+    semantics = _dump(node.props.get("semantics"))
+    if isinstance(semantics, dict) and semantics.get("label") is not None:
+        return []
+    label = node.props.get("label")
+    if label is None or str(label) == "":
+        return []
+    return [f'aria-label="{escape_attr(label)}"']
+
+
 def _attributes(node: Node) -> str:
     """Assemble the full attribute string for a node's opening tag.
 
@@ -334,8 +361,12 @@ def _attributes(node: Node) -> str:
     parts: list[str] = []
     if node.type == "Icon":
         parts.append('data-tw-type="Icon"')
+    if node.type == "IconButton":
+        parts.append('data-tw-type="IconButton"')
+        parts.append('type="button"')
     parts.extend(_style_attribute(node))
     parts.extend(_a11y_attributes(node))
+    parts.extend(_icon_button_name(node))
     parts.extend(_control_attributes(node))
     parts.extend(_escape_hatch_attributes(node))
     return (" " + " ".join(parts)) if parts else ""
@@ -364,7 +395,10 @@ def _inner_html(node: Node) -> str:
         checked = " checked" if node.props.get("checked") else ""
         caption = escape_text(node.props.get("label"))
         return f'<input type="checkbox"{checked}>{caption}'
-    if node.type in ("Icon", "Canvas", "Spinner"):
+    if node.type in ("Icon", "Canvas", "Spinner", "IconButton"):
+        # The static renderer carries no icon path data (an ``Icon`` is an empty
+        # ``<span>`` here too), so an IconButton is an empty, *named* button —
+        # focusable and announced, with the glyph drawn once the client hydrates.
         return ""
     if node.type == "ProgressBar":
         fill = (

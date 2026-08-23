@@ -107,6 +107,13 @@ accept `leading_icon` and `trailing_icon`; `IconButton` and `MenuItem` accept
 `icon`. The name goes in **raw** — unprefixed it resolves to **Lucide**, for
 compatibility with the core's `Icon`:
 
+!!! info "An `IconButton`'s `label` is its accessible name"
+    An `IconButton` renders as a real `<button>`, with the `icon`'s glyph inside
+    and the `label` on `aria-label` — not as visible text. So
+    `IconButton(icon=Icons.MENU, label="menu", …)` draws `☰` and is announced as
+    "menu" instead of spelling the word out. An explicit `semantics.label` wins
+    over `label`. True in all three modes and in the static HTML.
+
 ```python hl_lines="7 8"
 from tempest_core import Input
 

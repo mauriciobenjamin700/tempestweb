@@ -582,13 +582,32 @@ no espírito do `mypy --strict`.
     as saídas.
 
 !!! check "Componentes estruturais estão portados"
-    `Card`, `AppBar`, `Scaffold`, `Divider`, `Chip`, `SegmentedControl`,
-    `RadioGroup` — mais os aliases `HStack`/`VStack` — rodam em Modo C. A
-    composição de cada um foi reescrita em `components.js` e o *resultado* dos
+    Os 35 componentes estruturais do core rodam em Modo C:
+
+    - **superfície e estrutura:** `Surface`, `StyledContainer`, `Card`,
+      `Scaffold`, `Grid`, `Sidebar`, `Drawer`, `Divider`, mais os aliases
+      `HStack`/`VStack`;
+    - **barras e navegação:** `AppBar`, `Header`, `Footer`, `NavBar`,
+      `Breadcrumb`, `Burger`, `SegmentedControl`;
+    - **conteúdo:** `ListTile`, `Avatar`, `Chip`, `Tag`, `Rating`, `Stepper`,
+      `SearchBar`, `RadioGroup`;
+    - **feedback:** `Banner`, `Alert`, `Badge`, `EmptyState`, `Stat`,
+      `ProgressStepper`;
+    - **composição:** `MetricCard`, `StatCard`, `ConfidenceBadge` — mais a função
+      pura `confidence_scheme`, que é como a app escolhe o esquema do badge.
+
+    A composição de cada um foi reescrita em `components.js` e o *resultado* dos
     resolvedores de estilo do core viaja em tabela gerada
     (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
     pelos widgets. Cada builder é fixado por uma matriz de props construída do
-    core real, então drift de composição ou de estilo falha no teste.
+    core real — 117 casos — então drift de composição ou de estilo falha no teste.
+
+    `examples/mode-c-components` exercita o lote inteiro num app só.
+
+!!! tip "Componente sempre com `key` explícita"
+    A chave default de um componente é o nome dele (`card`, `alert`, `navbar`),
+    então dois `Card` sob o mesmo pai respondem os dois por `card` e o patch
+    endereça o errado. Vale nos três modos; em Modo C você percebe igual.
 
 !!! check "Enums, objetos de valor e tokens do core estão servidos"
     `TextAlign.CENTER`, `FontWeight.BOLD`, `KeyboardType.EMAIL`,
@@ -600,9 +619,11 @@ no espírito do `mypy --strict`.
 
 !!! warning "Ainda fora do subset — e agora falha no build"
     Os componentes **dirigidos por dados** de `tempest_core.components`
-    (`DataTable`, `Tabs`, `Accordion`, `BarChart`/`LineChart`, os pickers de
-    formulário …): a árvore deles depende dos dados recebidos, então não há
-    composição fixa para portar — diferente dos estruturais acima
+    (`DataTable`, `Table`, `Tabs`, `Accordion`, `BarChart`/`LineChart`,
+    `DetectionOverlay`, `ResultView`, `Calendar`/`Clock`, os pickers de mídia e
+    de formulário, e o `CollapsingAppBar`, que depende do scroll): a árvore deles
+    depende dos dados recebidos, então não há composição fixa para portar —
+    diferente dos estruturais acima
     ([#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107)
     acompanha o que falta). Também
     fora: comprehensions multi-loop ou com alvo desestruturado (`for k, v in …`),

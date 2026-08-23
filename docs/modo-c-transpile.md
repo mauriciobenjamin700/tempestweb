@@ -192,14 +192,25 @@ pelo base theme).
   `Input`/`Checkbox`→input/change, `Switch` div→click). Golden tests travam ambos
   os módulos gerados contra o core; galeria multi-widget verificada no Playwright.
   **Falta:** eventos exóticos que o cliente ainda não emite.
-- **Componentes de layout (`HStack`/`VStack`). ✅** Único subset portável de
-  `tempest_core.components`: expandem em `Row`/`Column` com `gap` (token via
-  `spacing.gen.js` ou px) + `align`/`justify`. Hand-authored em `components.js`,
-  travados por fixture derivada do core (`transpile_component_samples.json`,
-  comparação order-agnostic via `diff`). **O resto dos componentes fica fora:**
-  são composição Python que expande no `build()` (muitos data/loop-driven, ex.:
-  Card/DataTable/Tabs/charts) — não auto-portáveis para um runtime sem Python sem
-  compilar o source de composição do core (projeto separado maior).
+- **Componentes estruturais do core. ✅** Os 35 componentes cuja árvore **não**
+  depende dos dados recebidos rodam em Modo C: os aliases `HStack`/`VStack`, as
+  superfícies (`Surface`, `StyledContainer`, `Card`, `Scaffold`, `Grid`,
+  `Sidebar`, `Drawer`, `Divider`), as barras (`AppBar`, `Header`, `Footer`,
+  `NavBar`, `Breadcrumb`, `Burger`, `SegmentedControl`), o conteúdo (`ListTile`,
+  `Avatar`, `Chip`, `Tag`, `Rating`, `Stepper`, `SearchBar`, `RadioGroup`), o
+  feedback (`Banner`, `Alert`, `Badge`, `EmptyState`, `Stat`, `ProgressStepper`) e
+  as composições (`MetricCard`, `StatCard`, `ConfidenceBadge`). Cada composição é
+  hand-authored em `components.js` (reescrita do `render()` do core, com as mesmas
+  chaves) e o estilo vem de tabela gerada dos resolvedores puros
+  (`component-styles.gen.js`), como `widget-styles.gen.js` faz pelos widgets.
+  Travados por matriz derivada do core (`transpile_component_samples.json`, 117
+  casos, comparação order-agnostic via `diff`) e exercitados em
+  `examples/mode-c-components`. **O que fica fora é o dirigido por dados**
+  (`DataTable`/`Table`, `Tabs`, `Accordion`, charts, `DetectionOverlay`,
+  `ResultView`, `Calendar`/`Clock`, pickers, `CollapsingAppBar`): a árvore
+  depende dos dados, então não há composição fixa para portar sem compilar o
+  `render()` do core (projeto separado maior) — acompanhado em
+  [#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107).
 - **C2 — cobertura do subset. 🚧 em progresso.** Expressões: operadores
   aritméticos (`* / %`), comparação (`== != < <= > >=`), booleanos (`and`/`or`),
   unários (`not`/`-`), ternário (`a if c else b`), comprehensions

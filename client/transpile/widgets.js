@@ -26,14 +26,10 @@ export * from "./values.gen.js";
 // the compositional components whose tree does not depend on the data they are
 // handed. Each one is parity-pinned against the real core (see
 // tests/fixtures/transpile_component_samples.json).
-export {
-  AppBar,
-  Card,
-  Chip,
-  Divider,
-  HStack,
-  RadioGroup,
-  Scaffold,
-  SegmentedControl,
-  VStack,
-} from "./components.js";
+//
+// A star re-export, not a hand-kept list: the served manifest is generated from
+// every transpile module's exports, so a component present in components.js but
+// missing from this list was a name the compiler accepted and the browser then
+// refused to resolve — a blank page from a green build. tests/client/
+// transpile.test.js pins that the two agree.
+export * from "./components.js";

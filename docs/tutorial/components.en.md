@@ -200,16 +200,22 @@ function:
 | **Vision** | `DetectionBox` · `DetectionOverlay` · `ConfidenceBadge` · `ResultView` · `confidence_scheme` | tempest-core |
 
 !!! warning "Two instances of the same component on one screen collide"
-    `SegmentedControl` and `RadioGroup` key their own children with a fixed name
-    (`seg-0`, `radio-0`, …), unscoped by the component's key. Since an event is
-    routed **by key**, two instances on one screen fight over the same name:
-    Python resolves the **first** match and Mode C the **last** — so a click on
-    one control moves the other. This is a `tempest-core` defect
-    (`SegmentedControl.render`), not your app's, and it holds in all three
+    Every component that builds interactive children keys them with a **fixed**
+    name, unscoped by the component's own key. Measured on a screen holding two
+    of each: `SegmentedControl` (`seg-N`), `RadioGroup` (`radio-N`), `Rating`
+    (`star-N`), `NavBar` (`nav-N`), `Breadcrumb` (`crumb-N`/`sep-N`), `Stepper`
+    (`step-up`/`step-down`/`step-value`) and `SearchBar`
+    (`search-input`/`search-clear`) — every key duplicates. Since an event is
+    routed **by key**, the two instances fight over the same name: Python
+    resolves the **first** match and Mode C the **last**, so a click on one
+    control moves the other. Passing a distinct `key=` per component does **not**
+    help: a child's key does not inherit the parent's.
+
+    This is a `tempest-core` defect, not your app's, and it holds in all three
     modes — tracked in
     [tempest-core#20](https://github.com/mauriciobenjamin700/tempest-core/issues/20).
     Until it is fixed there, keep one per screen or build the control from
-    `Button`s with a key of your own per segment.
+    `Button`s/`Input`s with a key of your own per child.
 
 !!! tip "Field vs Input"
     The pair exists on purpose: the **`*Input`** (from the core) is the low-level

@@ -133,6 +133,18 @@ test("every generated builder returns a well-formed IR node", () => {
   }
 });
 
+test("widgets.js re-exports every ported component", async () => {
+  const surface = await import("../../client/transpile/widgets.js");
+  const components = await import("../../client/transpile/components.js");
+  const missing = Object.keys(components).filter((name) => !(name in surface));
+  assert.deepEqual(
+    missing,
+    [],
+    "a component the served manifest accepts but widgets.js does not re-export " +
+      "compiles cleanly and then fails to resolve in the browser",
+  );
+});
+
 test("every ported component matches the core build (order-agnostic)", () => {
   const samples = fixture("transpile_component_samples.json");
   const drop = (n) => ({

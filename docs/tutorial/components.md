@@ -198,16 +198,22 @@ função:
 | **Visão** | `DetectionBox` · `DetectionOverlay` · `ConfidenceBadge` · `ResultView` · `confidence_scheme` | tempest-core |
 
 !!! warning "Duas instâncias do mesmo componente na mesma tela colidem"
-    `SegmentedControl` e `RadioGroup` nomeiam os próprios filhos com chave fixa
-    (`seg-0`, `radio-0`, …), sem prefixo da chave do componente. Como o evento é
-    roteado **por chave**, duas instâncias na mesma tela disputam o mesmo nome: o
-    Python resolve para a **primeira** ocorrência, e o Modo C para a **última** —
-    então um clique num controle move o outro. É defeito do `tempest-core`
-    (`SegmentedControl.render`), não do seu app, e vale nos três modos —
+    Todo componente que monta filhos interativos os nomeia com chave **fixa**,
+    sem prefixo da chave do componente. Medido numa tela com duas instâncias de
+    cada: `SegmentedControl` (`seg-N`), `RadioGroup` (`radio-N`), `Rating`
+    (`star-N`), `NavBar` (`nav-N`), `Breadcrumb` (`crumb-N`/`sep-N`), `Stepper`
+    (`step-up`/`step-down`/`step-value`) e `SearchBar`
+    (`search-input`/`search-clear`) — todas as chaves duplicam. Como o evento é
+    roteado **por chave**, as duas instâncias disputam o mesmo nome: o Python
+    resolve para a **primeira** ocorrência, e o Modo C para a **última** — então
+    um clique num controle move o outro. Passar `key=` diferente para cada
+    componente **não** resolve: a chave do filho não herda a do pai.
+
+    É defeito do `tempest-core`, não do seu app, e vale nos três modos —
     acompanhado em
     [tempest-core#20](https://github.com/mauriciobenjamin700/tempest-core/issues/20).
     Enquanto não for corrigido lá, mantenha um por tela ou monte o controle com
-    `Button` dando chave própria a cada segmento.
+    `Button`/`Input` dando chave própria a cada filho.
 
 !!! tip "Campo vs Input"
     O par existe de propósito: o **`*Input`** (do core) é a primitiva de baixo nível;

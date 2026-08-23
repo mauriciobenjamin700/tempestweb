@@ -838,6 +838,12 @@ def _bootstrap_js(name: str, pyodide_base: str, packages: tuple[str, ...] = ()) 
     onto ``#app`` through ``transport-wasm.js`` — Python runs in the same tab, so
     the transport is an in-process bridge with no network.
 
+    The emitted module also wires ``onTheme``, which marks the document with the
+    app's resolved theme mode. That is the theme's other half: the colours ride in
+    each widget's inline style, but the page, the field surfaces and the
+    hover/focus states are CSS, so the base sheet needs the mode on the document
+    to pick its token block.
+
     Args:
         name: The project name.
         pyodide_base: The base URL Pyodide is loaded from — the jsdelivr CDN by
@@ -911,9 +917,6 @@ export async function boot() {{
       history.pushState({{}}, "", path);
     }}
   }};
-  // The theme's other half: the colours ride in each widget's inline style, but
-  // the page, the field surfaces and the hover/focus states are CSS, so the base
-  // sheet needs the resolved mode marked on the document.
   const onTheme = (mode) => applyThemeMode(mode);
 
   // Native capabilities (geolocation/clipboard/http/…): expose the in-process

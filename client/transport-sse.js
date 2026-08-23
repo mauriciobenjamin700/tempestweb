@@ -11,6 +11,11 @@
 // Reconnection is handled by the browser's EventSource (it resends the last seen
 // id via the Last-Event-ID header); the server replays the missed ticks. The
 // same DOM renderer runs above this transport as in every other mode.
+//
+// A "theme" envelope carries the half of dark mode that lives in CSS: the base
+// sheet reads the mode attribute for its token block, so the page, the field
+// surfaces and every hover/focus state follow the app's theme instead of the OS
+// alone. The Theme itself never crosses the wire — only the resolved mode does.
 
 import { dispatch, subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
 import { applyThemeMode } from "./theme.js";
@@ -152,9 +157,6 @@ export function createSSETransport(config) {
     } else if (envelope.kind === "navigate") {
       if (navigateHandler) navigateHandler(envelope.path);
     } else if (envelope.kind === "theme") {
-      // The half of dark mode that lives in CSS: the base sheet reads this
-      // attribute for its token block, so the page, the field surfaces and every
-      // hover/focus state follow the app's theme instead of the OS alone.
       applyThemeMode(envelope.mode);
     }
   });

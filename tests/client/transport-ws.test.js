@@ -460,6 +460,9 @@ test("native_result is NOT buffered across a reconnect (stale call_id)", async (
   assert.deepEqual(kinds, ["event"], "only the event flushed; native_result dropped");
 });
 
+// The half of dark mode the base sheet paints — the page, a field's surface,
+// every hover/focus state — needs the mode, because the Theme itself never
+// crosses the wire (#148): only the resolved mode does.
 test("ws transport marks the document when the server reports a theme mode", async () => {
   const dom = freshDom();
   globalThis.document = dom.document;
@@ -473,9 +476,6 @@ test("ws transport marks the document when the server reports a theme mode", asy
   const transport = createWebSocketTransport("ws://x/ws", { WebSocketImpl: Impl });
   await transport.ready;
 
-  // The half of dark mode the base sheet paints — the page, a field's surface,
-  // every hover/focus state — needs the mode, because the Theme itself never
-  // crosses the wire (#148).
   socket.serverSend({ kind: "theme", mode: "dark" });
   assert.equal(dom.document.documentElement.getAttribute(THEME_MODE_ATTR), "dark");
 

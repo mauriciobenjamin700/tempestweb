@@ -216,6 +216,12 @@ export function createWebSocketTransport(url, options = {}) {
 
   /**
    * Handle one server->client frame.
+   *
+   * A `theme` envelope carries the half of dark mode that lives in CSS: the base
+   * sheet reads the mode attribute for its token block, so the page, the field
+   * surfaces and every hover/focus state follow the app's theme instead of the OS
+   * alone. The Theme itself never crosses the wire — only the resolved mode does.
+   *
    * @param {{data: string}} event
    * @returns {void}
    */
@@ -235,9 +241,6 @@ export function createWebSocketTransport(url, options = {}) {
     } else if (envelope.kind === "navigate") {
       if (navigateHandler) navigateHandler(envelope.path);
     } else if (envelope.kind === "theme") {
-      // The half of dark mode that lives in CSS: the base sheet reads this
-      // attribute for its token block, so the page, the field surfaces and every
-      // hover/focus state follow the app's theme instead of the OS alone.
       applyThemeMode(envelope.mode);
     }
   }

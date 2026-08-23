@@ -136,9 +136,9 @@ class AppSession(Generic[S]):
         # client on "/" (its document URL), so we only emit a navigate envelope
         # once the app navigates somewhere else (view → URL).
         self._last_path: str = "/"
-        # Last theme mode the client was told. The base stylesheet paints what no
-        # inline style covers (page background, field surfaces, hover/focus), so
-        # it needs the mode; the Theme itself never crosses the wire.
+        #: Last theme mode the client was told. The base stylesheet paints what
+        #: no inline style covers (page background, field surfaces, hover/focus),
+        #: so it needs the mode; the Theme itself never crosses the wire.
         self._last_mode: str | None = None
         transport.on_native_result(self._resolve_native_result)
         transport.on_native_event(self._deliver_native_event)
@@ -230,6 +230,11 @@ class AppSession(Generic[S]):
         follow the OS reads ``app.media.platform_dark_mode`` in its own ``view``
         and calls ``set_theme`` — and then both halves move together.
 
+        The first ``light`` is not sent: the sheet's own tokens **are** the light
+        palette, so marking light at mount would spend a frame saying what the CSS
+        already says. Every later change is sent, including the return to light
+        after a dark spell.
+
         No-op when the mode is unchanged, the session is closed, or the app has
         not mounted.
         """
@@ -241,9 +246,6 @@ class AppSession(Generic[S]):
         first_and_light = self._last_mode is None and mode == "light"
         self._last_mode = mode
         if first_and_light:
-            # The sheet's own tokens are the light palette, so the first "light"
-            # is a frame that says nothing. Every later change is sent, including
-            # the return to light after a dark spell.
             return
         self._spawn(self.transport.send_theme(mode))
 
@@ -310,8 +312,6 @@ class AppSession(Generic[S]):
         self._bridge_installed = True
         scene = self.app.start()
         await self.transport.send_patches(scene_to_initial_patches(scene))
-        # The mount carries the theme mode too: the first paint has to land on the
-        # right palette, not flash light and then correct itself.
         mode = self._resolved_mode()
         if mode is not None:
             self._last_mode = mode
@@ -333,6 +333,12 @@ class AppSession(Generic[S]):
         virtualized window, ``navigate`` applies a URL change, and ``resync``
         re-sends the whole scene (the client asks for it when it could not apply
         a batch).
+
+        The theme mode is re-checked after every handler, not only after a batch:
+        a theme swap can change nothing in the tree — an app whose ``view`` does
+        not pass the theme to any widget rebuilds to the identical IR, so the core
+        emits no patch and the batch hook never runs — and the base stylesheet
+        still has to hear about it.
 
         Args:
             event: The JSON-able client event ``{"type", "key", "payload"}``.
@@ -366,11 +372,6 @@ class AppSession(Generic[S]):
         result = handler(arg) if handler_wants_event(handler) else handler()
         if asyncio.iscoroutine(result):
             await result
-        # A theme swap can change nothing in the tree — an app whose `view` does
-        # not pass the theme to any widget rebuilds to the identical IR, so the
-        # core emits no patch and the batch hook never runs. The base sheet still
-        # has to hear about it, so the mode is checked here too, after every
-        # handler.
         self._emit_theme_if_changed()
 
     async def resync(self) -> None:

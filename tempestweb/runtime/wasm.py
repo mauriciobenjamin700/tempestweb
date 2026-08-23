@@ -364,6 +364,10 @@ class WasmRuntime(Generic[S]):
         (``Theme.is_dark()``, no platform flag), so the sheet agrees with the
         inline styles already in the tree. No-op when nothing is wired or the mode
         is unchanged.
+
+        The first ``light`` is skipped, as in Mode B: the sheet's own tokens are
+        the light palette, so reporting light at mount would say what the CSS
+        already says.
         """
         if self._on_theme is None:
             return
@@ -376,7 +380,6 @@ class WasmRuntime(Generic[S]):
         first_and_light = self._last_mode is None and mode == "light"
         self._last_mode = mode
         if first_and_light:
-            # The sheet is already light; the first "light" would say nothing.
             return
         self._on_theme(mode)
 

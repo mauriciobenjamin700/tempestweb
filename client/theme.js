@@ -213,8 +213,8 @@ export const BASE_THEME_CSS = `
     background var(--tw-motion);
 }
 [data-tw-type="Switch"] > input:checked {
-  background: var(--tw-primary);
-  border-color: var(--tw-primary);
+  background: var(--tw-control-accent, var(--tw-primary));
+  border-color: var(--tw-control-accent, var(--tw-primary));
 }
 [data-tw-type="Switch"] > input:checked::after {
   left: 24px;

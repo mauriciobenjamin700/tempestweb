@@ -245,7 +245,9 @@ def test_native_control_style_is_adapted_like_the_client() -> None:
         "color": {"r": 88, "g": 71, "b": 133, "a": 1},
         "border_radius": 999,
     }
-    assert style_to_css(style, "Switch") == "accent-color: rgba(88, 71, 133, 1)"
+    assert style_to_css(style, "Switch") == (
+        "accent-color: rgba(88, 71, 133, 1); --tw-control-accent: rgba(88, 71, 133, 1)"
+    )
 
 
 def test_the_same_style_on_a_plain_widget_is_untouched() -> None:

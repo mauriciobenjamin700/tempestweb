@@ -463,6 +463,11 @@ function adaptNativeControlRules(rules) {
   }
   if (accent != null) {
     kept.push(`accent-color: ${accent}`);
+    // A Switch's track is painted by the base sheet, which cannot read
+    // `accent-color`: an app themed blue got a purple track from the default
+    // token (measured in examples/theme-switcher). The same colour therefore also
+    // travels as a custom property the sheet can consume.
+    kept.push(`--tw-control-accent: ${accent}`);
   }
   return kept;
 }

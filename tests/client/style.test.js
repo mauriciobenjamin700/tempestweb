@@ -259,6 +259,9 @@ test("a native control's part geometry is dropped and its tint becomes accent-co
   // The colour still comes from the core — as the property a native control
   // actually themes from.
   assert.equal(d["accent-color"], "rgba(88, 71, 133, 1)");
+  // The base sheet paints the switch track and cannot read accent-color, so the
+  // same colour also travels as a custom property.
+  assert.equal(d["--tw-control-accent"], "rgba(88, 71, 133, 1)");
   assert.equal(d["color"], undefined);
 });
 

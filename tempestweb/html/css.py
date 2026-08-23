@@ -409,4 +409,7 @@ def _adapt_native_control_rules(rules: list[str]) -> list[str]:
             kept.append(rule)
     if accent is not None:
         kept.append(f"accent-color: {accent}")
+        # A Switch's track is painted by the base sheet, which cannot read
+        # ``accent-color``; the same colour travels as a custom property it can.
+        kept.append(f"--tw-control-accent: {accent}")
     return kept

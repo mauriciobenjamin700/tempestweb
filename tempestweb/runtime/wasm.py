@@ -39,6 +39,7 @@ from tempestweb.runtime.events import (
     apply_navigate,
     apply_scroll,
     coerce_event,
+    handler_wants_event,
 )
 from tempestweb.runtime.routing import route_to_path
 from tempestweb.transports.base import (
@@ -378,7 +379,7 @@ class WasmRuntime(Generic[S]):
             return
         payload: Any = event.get("payload", {})
         arg = coerce_event(node_type, event_type, payload)
-        result = handler(arg) if _accepts_arg(handler) else handler()
+        result = handler(arg) if handler_wants_event(handler) else handler()
         if inspect.isawaitable(result):
             await result
 
@@ -425,32 +426,3 @@ class WasmRuntime(Generic[S]):
             except TransportClosedError:
                 return
             await self.dispatch_event(event)
-
-
-def _accepts_arg(handler: Callable[..., Any]) -> bool:
-    """Whether a handler accepts a positional argument.
-
-    Mirrors the core's calling convention: value-bearing events pass the payload
-    only when the handler declares a positional parameter; a zero-argument
-    handler is called bare. A handler whose signature cannot be introspected
-    (e.g. a builtin) is called bare.
-
-    Args:
-        handler: The handler callable to inspect.
-
-    Returns:
-        ``True`` if the handler takes at least one positional argument.
-    """
-    try:
-        params = inspect.signature(handler).parameters
-    except (TypeError, ValueError):
-        return False
-    return any(
-        p.kind
-        in (
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            inspect.Parameter.VAR_POSITIONAL,
-        )
-        for p in params.values()
-    )

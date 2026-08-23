@@ -27,7 +27,7 @@ from collections.abc import Callable, Coroutine
 from contextlib import suppress
 from typing import Any, Generic, TypeVar
 
-from tempest_core import App, Theme, Widget, handler_accepts_event
+from tempest_core import App, Theme, Widget
 from tempest_core import Patch as CorePatch
 from tempestweb.native.bridges import ProxyBridge
 from tempestweb.native.dispatch import (
@@ -42,6 +42,7 @@ from tempestweb.runtime.events import (
     apply_navigate,
     apply_scroll,
     coerce_event,
+    handler_wants_event,
 )
 from tempestweb.runtime.routing import route_to_path
 from tempestweb.runtime.serialize import (
@@ -303,7 +304,7 @@ class AppSession(Generic[S]):
             return
         payload = event.get("payload", {})
         arg = coerce_event(find_node_type(scene, key), event_type, payload)
-        result = handler(arg) if handler_accepts_event(handler) else handler()
+        result = handler(arg) if handler_wants_event(handler) else handler()
         if asyncio.iscoroutine(result):
             await result
 

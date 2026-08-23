@@ -985,6 +985,35 @@ def test_the_repos_own_field_layer_is_served() -> None:
     assert 'import { EmailField, LoginForm } from "./widgets.js";' in js
 
 
+def test_a_parameter_default_survives_into_the_arrow() -> None:
+    """The loop-capture idiom needs its default, and the default was dropped.
+
+    `def make_toggle(i: int = index)` compiled to `(i) => …` — the capture gone —
+    so every closure in the loop answered with an undefined index. Measured in
+    `examples/faq-accordion`.
+
+    Emitting it also restores the arity the runtime reads: JS counts parameters
+    *before* the first default, so this closure reports zero and is called bare,
+    exactly as Python calls it.
+    """
+    js = gen(
+        "def view(app):\n"
+        "    out = []\n"
+        "    for index in range(3):\n"
+        "        def toggle(i: int = index) -> None:\n"
+        "            out.append(i)\n"
+        "        out.append(toggle)\n"
+        "    return out\n"
+    )
+    assert "const toggle = (i = index) =>" in js
+
+
+def test_a_top_level_default_survives_too() -> None:
+    """A module-level `def` with a default keeps it."""
+    js = gen('def greet(name: str = "world") -> str:\n    return name\n')
+    assert 'export function greet(name = "world")' in js
+
+
 def test_an_empty_container_is_falsy_the_way_python_says() -> None:
     """`if s.errors:` entered its branch on a fresh state.
 

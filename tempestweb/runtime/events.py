@@ -15,6 +15,8 @@ invoking a handler.
 
 from __future__ import annotations
 
+import inspect
+from collections.abc import Callable
 from typing import Any
 
 from tempest_core import (
@@ -28,7 +30,57 @@ from tempest_core import (
 from tempestweb.runtime.routing import path_to_routes
 from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS
 
-__all__ = ["coerce_event", "apply_media", "apply_scroll", "apply_navigate"]
+__all__ = [
+    "apply_media",
+    "apply_navigate",
+    "apply_scroll",
+    "coerce_event",
+    "handler_wants_event",
+]
+
+
+#: Parameter kinds that can take the event positionally.
+_POSITIONAL: frozenset[inspect._ParameterKind] = frozenset(
+    {
+        inspect.Parameter.POSITIONAL_ONLY,
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+    }
+)
+
+
+def handler_wants_event(handler: Callable[..., Any]) -> bool:
+    """Whether a handler should be called with the event, or bare.
+
+    A parameter **with a default** is not something the caller has to supply,
+    so it does not mean "give me the event". That distinction is the whole
+    point: ``def make_toggle(i: int = index)`` is the idiom Python's own docs
+    teach for capturing a loop variable, and reading it as event-taking makes
+    the click event land in ``i``. Measured in ``examples/faq-accordion``:
+    ``open_index`` became a ``ClickEvent`` and the accordion stopped
+    responding for good.
+
+    ``*args`` counts — it can take the event, and Python would pass it.
+
+    Args:
+        handler: The handler callable to inspect.
+
+    Returns:
+        True when the handler declares a parameter the caller must fill.
+
+    Note:
+        ``tempest_core.handler_accepts_event`` answers the looser question
+        (any positional parameter at all), which is why this lives here. The
+        two should converge upstream — tracked in tempestweb#134.
+    """
+    try:
+        params = inspect.signature(handler).parameters
+    except (TypeError, ValueError):
+        return False
+    return any(
+        p.kind is inspect.Parameter.VAR_POSITIONAL
+        or (p.kind in _POSITIONAL and p.default is inspect.Parameter.empty)
+        for p in params.values()
+    )
 
 
 def apply_navigate(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-shaped payload

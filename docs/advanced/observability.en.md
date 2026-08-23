@@ -334,6 +334,17 @@ The clock stops when the app's first tree is on screen (the first
 `[data-tw-key]`), which is the honest definition of "the reader can use it" —
 waiting for `load` would stop before Pyodide even starts.
 
+!!! tip "Measured, and the result is counter-intuitive"
+    `examples/counter` in a real Chrome, against the built artifact: **cold
+    2,394 ms with 14,593 KB** transferred; **warm 2,354 ms with 8,751 KB**. The
+    service worker saved **5.8 MB of network and 40 ms of time** — 40% of the bytes
+    and **1.7%** of the clock.
+
+    The reading matters more than the numbers: in Mode A the dominant cost is the
+    **Pyodide boot (CPU)**, not the download. Optimising the network there does not
+    move the needle; anyone who needs first paint uses Mode B or C — which the
+    architecture docs already said, and now there is a measurement.
+
 ## Recap
 
 - Observability uses the **adapter pattern**: swap the backend without changing

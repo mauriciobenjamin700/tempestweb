@@ -332,6 +332,17 @@ O relógio para quando a primeira árvore da app está na tela (o primeiro
 `[data-tw-key]`), que é a definição honesta de "o leitor pode usar" — esperar
 `load` pararia antes de o Pyodide começar.
 
+!!! tip "Medido, e o resultado é contra-intuitivo"
+    `examples/counter` em Chrome real, artefato buildado: **cold 2.394 ms com
+    14.593 KB** transferidos; **warm 2.354 ms com 8.751 KB**. O service worker
+    poupou **5,8 MB de rede e 40 ms de tempo** — 40% dos bytes e **1,7%** do
+    relógio.
+
+    A leitura importa mais que os números: no Modo A o custo dominante é o **boot
+    do Pyodide (CPU)**, não o download. Otimizar rede aí não move a agulha; quem
+    precisa de first-paint usa Modo B ou C, que é o que a doc de arquitetura já
+    dizia — agora com medida.
+
 ## Recap
 
 - A observabilidade usa o **padrão adapter**: troca o backend sem mudar o app.

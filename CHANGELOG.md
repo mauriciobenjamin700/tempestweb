@@ -33,8 +33,14 @@ versioning.
 - **Cold-start do Modo A** (`benchmarks/bench_cold_start.mjs` + workflow
   `perf-cold-start.yml`): mede **cold** (sem SW/cache: Pyodide e core pela rede) e
   **warm** (precache do SW) até a primeira árvore na tela. Roda em **schedule**, e
-  não em PR, porque um download de ~6 MB no caminho crítico de cada PR compra um
-  número que ninguém lê naquele momento.
+  não em PR, porque um download desse tamanho no caminho crítico de cada PR compra
+  um número que ninguém lê naquele momento.
+
+  Primeira medição, em Chrome real com o artefato buildado do `examples/counter`:
+  **cold 2.394 ms / 14.593 KB**, **warm 2.354 ms / 8.751 KB**. O service worker
+  poupou 5,8 MB de rede e **40 ms** — 40% dos bytes, 1,7% do relógio. A leitura é
+  o que importa: no Modo A o custo dominante é o **boot do Pyodide (CPU)**, não o
+  download, então otimizar rede ali não move a agulha.
 
 ### Changed
 

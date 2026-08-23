@@ -103,6 +103,7 @@ Virtualized lists, galleries, chat, search, and drag-and-drop.
 Controls, disclosure, and feedback states.
 
 - [**Settings panel**](settings-panel.md) — `Switch`, `Checkbox`, `Slider`, `RadioGroup`, and `SegmentedControl` bound to state. **[A/B]**
+- [**Booking form**](booking-form.md) — `DatePicker`, `TimePicker`, `RangeSlider`, `Dropdown` and `FilePicker`, the browser's own controls. **[A/B/C]**
 - [**Rating & review**](rating-review.md) — `Rating` stars + `Chip` tags + a `TextArea` in a validated form. **[A/B]**
 - [**FAQ accordion**](faq-accordion.md) — a single-open `Accordion` with a live search filter. **[A/B]**
 - [**Notification center**](notification-center.md) — `Banner`, an unread `Badge`, and an `EmptyState` for the empty inbox. **[A/B]**

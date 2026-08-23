@@ -280,6 +280,36 @@ uv add "tempestweb>=0.94.0"
 
 ---
 
+### The switch will not toggle, the slider will not drag, the date picker will not open
+
+The same defect as above, in the **eleven** widgets that were left — the audit
+#130 asked for, done in #143. `Switch`, `Slider`, `RangeSlider`, `Dropdown`,
+`Autocomplete`, `DatePicker`, `TimePicker`, `FilePicker` and `TabBar` rendered as
+an anonymous `div`: no control to operate and no event to report, in all three
+modes.
+
+Fixed in 0.98.0 — each becomes the equivalent native control (see
+[Controls](tutorial/controls.md)). Three details came in the same package:
+
+- **`Checkbox` already existed and its `on_change` arrived as a raw dict.** The
+  client reported `{"value": "on"}`, which does not validate as
+  `ToggleEvent(checked)` — `event.checked` was an `AttributeError` waiting for the
+  first click. The payload now has the widget's shape.
+- **`TabView` and `RouteDrawer` stay a `div`, by decision.** Both hold an IR
+  child, and a renderer-owned child is only legal inside an IR leaf. The tab strip
+  is a `TabBar` beside them; a `RouteDrawer`'s `open` became `data-tw-open`, which
+  the base sheet uses to slide the drawer.
+- **The `Switch` was a square and the `Slider` 4px tall.** The Style the core
+  resolves for these widgets describes the **parts** a hand-drawing renderer
+  paints (the box, the knob, the track), and an inline style beats the base sheet.
+  The part geometry is now dropped and the resolved colour becomes `accent-color`.
+
+```bash
+uv add "tempestweb>=0.98.0"
+```
+
+---
+
 ### `setattr is not defined` (Mode C)
 
 `setattr(obj, name, value)` was only ported in the

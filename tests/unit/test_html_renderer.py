@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from tempest_core import (
+    Burger,
     Button,
     Canvas,
     Checkbox,
@@ -19,10 +20,13 @@ from tempest_core import (
     Container,
     Edge,
     Icon,
+    IconButton,
+    Icons,
     Image,
     Input,
     ProgressBar,
     Row,
+    Semantics,
     Spinner,
     Stack,
     Style,
@@ -363,3 +367,40 @@ def test_spinner_is_an_empty_themed_box() -> None:
     assert "border-top-color: currentColor" in html
     assert 'role="progressbar"' in html
     assert "data-tw-part" not in html
+
+
+def test_icon_button_is_a_named_button_not_an_anonymous_box() -> None:
+    """An ``IconButton`` is a real ``<button>`` carrying its accessible name.
+
+    The ``div`` fallback made the static page ship a 48x48 box with nothing in
+    it: no tag semantics, no name, no text — unfocusable and unannounced, while
+    a mouse click still worked in the hydrated page.
+    """
+    html = render_to_html(
+        IconButton(icon=Icons.MENU, on_click=lambda: None, label="menu", key="burger")
+    )
+    assert html.startswith('<button data-tw-type="IconButton" type="button"')
+    assert 'aria-label="menu"' in html
+    assert html.endswith("</button>")
+
+
+def test_icon_button_semantics_label_wins_over_the_icon_label() -> None:
+    """An app that names the control keeps its own name."""
+    html = render_to_html(
+        IconButton(
+            icon=Icons.X,
+            on_click=lambda: None,
+            label="clear",
+            semantics=Semantics(label="Limpar busca"),
+            key="c",
+        )
+    )
+    assert 'aria-label="Limpar busca"' in html
+    assert 'aria-label="clear"' not in html
+
+
+def test_a_burger_component_lowers_to_the_named_button() -> None:
+    """The core's ``Burger`` is an ``IconButton``, so it inherits the fix."""
+    html = render_to_html(Burger(on_click=lambda: None, key="burger"))
+    assert '<button data-tw-type="IconButton"' in html
+    assert 'aria-label="menu"' in html

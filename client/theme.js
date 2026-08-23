@@ -69,8 +69,14 @@ export const BASE_THEME_CSS = `
    adds only what inline Style cannot express: the structural bits a <button>
    needs for the overlay (position/overflow), the modern font family, and the
    MD3 interaction state layer (::before) — a translucent overlay of the
-   on-color tinting the surface on hover/focus/press. */
-[data-tw-type="Button"] {
+   on-color tinting the surface on hover/focus/press.
+
+   IconButton shares every rule: it is the same control with a glyph instead of
+   a label, and it renders as a real <button>, so it needs the same UA reset and
+   the same state layer. Painting only Button left the icon-only control with
+   the browser's own border and no hover/focus feedback. */
+[data-tw-type="Button"],
+[data-tw-type="IconButton"] {
   position: relative;
   overflow: hidden;
   display: inline-flex;
@@ -88,7 +94,8 @@ export const BASE_THEME_CSS = `
 }
 /* The state layer: an overlay tinted with the foreground color, invisible at
    rest and fading in for hover (8%) / focus & press (12%) per MD3 specs. */
-[data-tw-type="Button"]::before {
+[data-tw-type="Button"]::before,
+[data-tw-type="IconButton"]::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -98,18 +105,25 @@ export const BASE_THEME_CSS = `
   pointer-events: none;
 }
 /* State-layer overlay — universal, correct for every button variant. */
-[data-tw-type="Button"]:hover::before { opacity: 0.08; }
-[data-tw-type="Button"]:focus-visible { outline: none; }
-[data-tw-type="Button"]:focus-visible::before { opacity: 0.12; }
-[data-tw-type="Button"]:active::before { opacity: 0.12; }
+[data-tw-type="Button"]:hover::before,
+[data-tw-type="IconButton"]:hover::before { opacity: 0.08; }
+[data-tw-type="Button"]:focus-visible,
+[data-tw-type="IconButton"]:focus-visible { outline: none; }
+[data-tw-type="Button"]:focus-visible::before,
+[data-tw-type="IconButton"]:focus-visible::before { opacity: 0.12; }
+[data-tw-type="Button"]:active::before,
+[data-tw-type="IconButton"]:active::before { opacity: 0.12; }
 [data-tw-type="Button"]:disabled,
-[data-tw-type="Button"][aria-disabled="true"] {
+[data-tw-type="Button"][aria-disabled="true"],
+[data-tw-type="IconButton"]:disabled,
+[data-tw-type="IconButton"][aria-disabled="true"] {
   background: rgba(29,27,32,0.12);
   color: rgba(29,27,32,0.38);
   box-shadow: none;
   cursor: default;
 }
-[data-tw-type="Button"]:disabled::before { opacity: 0; }
+[data-tw-type="Button"]:disabled::before,
+[data-tw-type="IconButton"]:disabled::before { opacity: 0; }
 
 /* ── Input: interaction layer over the core's resolved outlined field ──────
    tempest-core resolves the Input's outline and radius inline; this sheet adds

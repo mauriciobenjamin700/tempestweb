@@ -108,6 +108,13 @@ Os widgets de entrada do core têm _slots_ de ícone: `Input`, `Dropdown` e
 aceitam `icon`. O nome vai **cru** — sem prefixo ele resolve no **Lucide**, para
 compatibilidade com o `Icon` do core:
 
+!!! info "O `label` do `IconButton` é o nome acessível"
+    Um `IconButton` renderiza como `<button>` de verdade, com o glifo do `icon`
+    dentro e o `label` em `aria-label` — não como texto visível. Então
+    `IconButton(icon=Icons.MENU, label="menu", …)` desenha `☰` e é anunciado como
+    "menu", em vez de escrever a palavra. Um `semantics.label` explícito ganha do
+    `label`. Vale nos três modos e no HTML estático.
+
 ```python hl_lines="7 8"
 from tempest_core import Input
 

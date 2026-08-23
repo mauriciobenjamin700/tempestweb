@@ -10,7 +10,7 @@ import {
 } from "../../client/icons/index.js";
 import { LUCIDE_PATHS } from "../../client/icons/lucide.js";
 import { MATERIAL_PATHS } from "../../client/icons/material.js";
-import { buildElement } from "../../client/dom.js";
+import { applyPatches, buildElement } from "../../client/dom.js";
 
 test("resolveIcon: a bare name resolves against the Lucide set (the default)", () => {
   const def = resolveIcon("mail");
@@ -125,4 +125,51 @@ test("registerIcon: a custom icon resolves by name with its own viewBox/mode", (
   assert.equal(def.d, "M0 0 h10");
   assert.equal(def.viewBox, "0 0 10 10");
   assert.equal(def.mode, "fill");
+});
+
+test("buildElement: an IconButton is a real <button> carrying its glyph", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = buildElement({
+    type: "IconButton",
+    key: "burger",
+    props: { icon: "menu", label: "menu" },
+    children: [],
+  });
+  assert.equal(el.tagName.toLowerCase(), "button");
+  assert.equal(el.getAttribute("type"), "button");
+  // The label names the control instead of being painted as text: an icon-only
+  // button showing the word "menu" is what the div fallback produced.
+  assert.equal(el.getAttribute("aria-label"), "menu");
+  assert.equal(el.textContent, "");
+  const glyph = el.querySelector('[data-tw-part="glyph"]');
+  assert.ok(glyph, "the glyph svg is drawn");
+  assert.equal(glyph.querySelector("path").getAttribute("d"), LUCIDE_PATHS["menu"]);
+});
+
+test("an Update patch swaps the IconButton glyph without duplicating it", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const root = buildElement({
+    type: "IconButton",
+    key: "b",
+    props: { icon: "menu", label: "menu" },
+    children: [],
+  });
+  applyPatches(root, [{ op: "update", path: [], set_props: { icon: "x" } }]);
+  assert.equal(root.querySelectorAll('[data-tw-part="glyph"]').length, 1);
+  const glyph = root.querySelector('[data-tw-part="glyph"]');
+  assert.equal(glyph.querySelector("path").getAttribute("d"), LUCIDE_PATHS["x"]);
+});
+
+test("buildElement: an app's semantics label wins over the icon label", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const el = buildElement({
+    type: "IconButton",
+    key: "b",
+    props: { icon: "x", label: "clear", semantics: { label: "Limpar busca" } },
+    children: [],
+  });
+  assert.equal(el.getAttribute("aria-label"), "Limpar busca");
 });

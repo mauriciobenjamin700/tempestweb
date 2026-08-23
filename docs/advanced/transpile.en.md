@@ -659,7 +659,14 @@ spirit of `mypy --strict`.
       (`camera`) is refused saying **which mode has it**, and an unknown member
       is refused **by name** (`geolocation.triangulate`).
 
-    Measured on the corpus: **31 of 57 examples** transpile, up from 14.
+    - **virtualized lists:** `LazyColumn`, `LazyRow` and `LazyGrid` materialize
+      the visible window by calling `item_builder(index)`, each item re-keyed by
+      its absolute index — which is what turns a window slide into a minimal
+      remove/reorder/insert instead of a rebuild. A `scroll` event slides the
+      window in the runtime, the way the server does in Mode B, and it survives
+      the `view` re-running.
+
+    Measured on the corpus: **35 of 57 examples** transpile, up from 14.
 
 !!! tip "Always give a component an explicit `key`"
     A component's default key is its own name (`card`, `alert`, `navbar`), so two

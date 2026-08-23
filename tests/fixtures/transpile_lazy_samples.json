@@ -1,0 +1,1099 @@
+{
+  "column_count_below_window_size": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 2,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": null,
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_default_window": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "2",
+        "props": {
+          "attrs": {},
+          "content": "row 2",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "3",
+        "props": {
+          "attrs": {},
+          "content": "row 3",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "4",
+        "props": {
+          "attrs": {},
+          "content": "row 4",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 5,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": null,
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_empty": {
+    "children": [],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 0,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": null,
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_explicit_window": {
+    "children": [
+      {
+        "children": [],
+        "key": "30",
+        "props": {
+          "attrs": {},
+          "content": "row 30",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "31",
+        "props": {
+          "attrs": {},
+          "content": "row 31",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "32",
+        "props": {
+          "attrs": {},
+          "content": "row 32",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "33",
+        "props": {
+          "attrs": {},
+          "content": "row 33",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 100,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": [
+        30,
+        34
+      ],
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_refreshing_and_threshold": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "2",
+        "props": {
+          "attrs": {},
+          "content": "row 2",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "3",
+        "props": {
+          "attrs": {},
+          "content": "row 3",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.5,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 8,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": true,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": null,
+      "window_size": 4
+    },
+    "type": "LazyColumn"
+  },
+  "column_styled": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "2",
+        "props": {
+          "attrs": {},
+          "content": "row 2",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 3,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": {
+        "align": null,
+        "align_self": null,
+        "aspect_ratio": null,
+        "background": null,
+        "border": null,
+        "bottom": null,
+        "color": null,
+        "direction": null,
+        "flex_wrap": null,
+        "font_asset": null,
+        "font_family": null,
+        "font_size": null,
+        "font_style": null,
+        "font_weight": null,
+        "gap": null,
+        "grow": null,
+        "height": 300.0,
+        "justify": null,
+        "left": null,
+        "letter_spacing": null,
+        "line_height": null,
+        "margin": null,
+        "max_height": null,
+        "max_lines": null,
+        "max_width": null,
+        "min_height": null,
+        "min_width": null,
+        "opacity": null,
+        "padding": null,
+        "position": null,
+        "radius": null,
+        "right": null,
+        "shadow": null,
+        "stack_align": null,
+        "text_align": null,
+        "text_decoration": null,
+        "text_overflow": null,
+        "text_scale": null,
+        "top": null,
+        "transition": null,
+        "width": null
+      },
+      "tag": null,
+      "window": null,
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_window_inverted": {
+    "children": [],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 10,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": [
+        6,
+        2
+      ],
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_window_negative_start": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 5,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": [
+        -3,
+        2
+      ],
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_window_out_of_range": {
+    "children": [],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 5,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": [
+        50,
+        60
+      ],
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_window_past_the_end": {
+    "children": [
+      {
+        "children": [],
+        "key": "3",
+        "props": {
+          "attrs": {},
+          "content": "row 3",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "4",
+        "props": {
+          "attrs": {},
+          "content": "row 4",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 5,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": [
+        3,
+        99
+      ],
+      "window_size": 20
+    },
+    "type": "LazyColumn"
+  },
+  "column_window_size_below_count": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "2",
+        "props": {
+          "attrs": {},
+          "content": "row 2",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 100,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": null,
+      "window_size": 3
+    },
+    "type": "LazyColumn"
+  },
+  "grid_default_window": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "2",
+        "props": {
+          "attrs": {},
+          "content": "row 2",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "3",
+        "props": {
+          "attrs": {},
+          "content": "row 3",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "4",
+        "props": {
+          "attrs": {},
+          "content": "row 4",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "5",
+        "props": {
+          "attrs": {},
+          "content": "row 5",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "6",
+        "props": {
+          "attrs": {},
+          "content": "row 6",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "columns": 3,
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 7,
+      "on_end_reached": null,
+      "on_scroll": null,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": null,
+      "window_size": 20
+    },
+    "type": "LazyGrid"
+  },
+  "grid_explicit_window": {
+    "children": [
+      {
+        "children": [],
+        "key": "12",
+        "props": {
+          "attrs": {},
+          "content": "row 12",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "13",
+        "props": {
+          "attrs": {},
+          "content": "row 13",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "14",
+        "props": {
+          "attrs": {},
+          "content": "row 14",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "columns": 2,
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 40,
+      "on_end_reached": null,
+      "on_scroll": null,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": [
+        12,
+        15
+      ],
+      "window_size": 20
+    },
+    "type": "LazyGrid"
+  },
+  "grid_window_size_below_count": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "2",
+        "props": {
+          "attrs": {},
+          "content": "row 2",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "3",
+        "props": {
+          "attrs": {},
+          "content": "row 3",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "4",
+        "props": {
+          "attrs": {},
+          "content": "row 4",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "5",
+        "props": {
+          "attrs": {},
+          "content": "row 5",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "columns": 4,
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 40,
+      "on_end_reached": null,
+      "on_scroll": null,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": null,
+      "window_size": 6
+    },
+    "type": "LazyGrid"
+  },
+  "row_default_window": {
+    "children": [
+      {
+        "children": [],
+        "key": "0",
+        "props": {
+          "attrs": {},
+          "content": "row 0",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "1",
+        "props": {
+          "attrs": {},
+          "content": "row 1",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "2",
+        "props": {
+          "attrs": {},
+          "content": "row 2",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "3",
+        "props": {
+          "attrs": {},
+          "content": "row 3",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 4,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": null,
+      "window_size": 20
+    },
+    "type": "LazyRow"
+  },
+  "row_explicit_window": {
+    "children": [
+      {
+        "children": [],
+        "key": "10",
+        "props": {
+          "attrs": {},
+          "content": "row 10",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "11",
+        "props": {
+          "attrs": {},
+          "content": "row 11",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      },
+      {
+        "children": [],
+        "key": "12",
+        "props": {
+          "attrs": {},
+          "content": "row 12",
+          "focus_order": null,
+          "focusable": null,
+          "semantics": null,
+          "style": null,
+          "tag": null
+        },
+        "type": "Text"
+      }
+    ],
+    "key": null,
+    "props": {
+      "attrs": {},
+      "end_reached_threshold": 0.8,
+      "focus_order": null,
+      "focusable": null,
+      "item_builder": null,
+      "item_count": 50,
+      "on_end_reached": null,
+      "on_refresh": null,
+      "on_scroll": null,
+      "refreshing": false,
+      "semantics": null,
+      "style": null,
+      "tag": null,
+      "window": [
+        10,
+        13
+      ],
+      "window_size": 20
+    },
+    "type": "LazyRow"
+  }
+}

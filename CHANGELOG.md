@@ -4,6 +4,55 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.86.0] — 2026-08-23
+
+### Added
+
+- **Listas virtualizadas rodam em Modo C**: `LazyColumn`, `LazyRow` e `LazyGrid`
+  eram os três widgets marcados como inportáveis, porque um builder gerado é
+  passthrough e eles são o único caso em que os filhos não existem até alguém
+  **rodar** — o core resolve a janela visível e chama `item_builder(índice)`
+  sobre ela, re-chaveando cada item pelo índice absoluto. O corpo agora é gerado
+  junto: `lazyChildren` espelha `_resolve_window` + `_materialize_items`,
+  incluindo o clamp nas duas pontas.
+- **A janela desliza no Modo C**, como o servidor faz no Modo B: o evento de
+  `scroll` chama `App.slide_window` e a janela rastreada é publicada para os
+  builders durante o build (o equivalente do `_inject_windows` do core). Sem
+  isso a lista materializava só a primeira janela para sempre — 200 itens com 30
+  visíveis e nenhum jeito de chegar no resto.
+- **Fidelidade fixada por matriz do core real**
+  (`tests/fixtures/transpile_lazy_samples.json`, 16 cenários): janela default,
+  explícita, `window_size` menor que a contagem, clamp nas duas pontas, janela
+  invertida, fora de alcance, lista vazia, `refreshing`, `columns` e estilo.
+
+### Fixed
+
+- **`Edge` do Modo C não era chamável.** No core `Edge` é um modelo de quatro
+  campos com default `0.0`, então `Edge(top=20.0, left=20.0)` é escrita normal —
+  e o Modo C exportava só os helpers `all`/`symmetric`. A chamada compilava e a
+  página morria no mount com `Edge is not a function`: medido no
+  `examples/image-gallery`, que renderizava **nada**.
+- **Janela deslizada sobrevive ao rebuild.** O `view` re-roda a cada mudança de
+  estado e não declara janela nenhuma, então sem o mapa rastreado a lista voltava
+  para `[0, window_size)` no próximo `set_state` — a lista pulava para o topo
+  quando qualquer coisa não relacionada mudava.
+
+### Notas
+
+- **Medido no corpus: 35 dos 57 exemplos transpilam** (eram 31). Entraram
+  `fetch`, `list_demo`, `todo` e `image-gallery`.
+- Verificado em Chrome real, SW e caches limpos: `list_demo` desliga a janela de
+  `0-24` para `6-35`, `26-55` e `45-74` com a roda do mouse, mantendo 30 nós no
+  DOM para 200 itens; `end_reached` carrega 25 → 50 → 75; pull-to-refresh arma
+  `data-tw-pull-armed` e recarrega. `image-gallery` monta os 12 thumbs da janela
+  inicial. Console limpo, sem overflow horizontal a 390px e 1280px.
+- **Dois achados de paridade, medidos nos dois modos e fora do escopo deste
+  bloco:** `LazyGrid.columns` é ignorado pelo renderizador compartilhado (Modos
+  B e C rendem `display: block`, 1 item por linha) — #132; e uma janela deslizada
+  contra uma lista que **encurta** clampa para vazio no core
+  (`_resolve_window` prende o `start` na contagem em vez da última página),
+  deixando a lista sem item e sem scroll para se corrigir — #133.
+
 ## [0.85.0] — 2026-08-23
 
 ### Added

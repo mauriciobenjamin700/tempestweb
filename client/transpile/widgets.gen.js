@@ -3,7 +3,7 @@
 // non-wire `__handlers` map (DOM event type -> closure); the runtime dispatches from it.
 // Regenerate: python -m tests.conformance._transpile_widgets. Do not edit.
 
-import { resolveWidgetStyle, Style } from "./widget-support.js";
+import { lazyChildren, resolveWidgetStyle, Style } from "./widget-support.js";
 export { Color, Edge, Style } from "./widget-support.js";
 
 // `Style` is re-exported for apps; reference it so linters see the import as used.
@@ -830,6 +830,98 @@ export function KeyboardAvoidingView({ key = null, focusOrder = null, focusable 
       tag: tag,
     },
     children: children,
+  };
+}
+
+/**
+ * Build a `LazyColumn` IR node (type `LazyColumn`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function LazyColumn({ itemBuilder, itemCount, key = null, endReachedThreshold = 0.8, focusOrder = null, focusable = null, refreshing = false, semantics = null, tag = null, window = null, windowSize = 20, attrs = {}, style = null, onScroll = null, onRefresh = null, onEndReached = null } = {}) {
+  return {
+    type: "LazyColumn",
+    key,
+    props: {
+      attrs,
+      end_reached_threshold: endReachedThreshold,
+      focus_order: focusOrder,
+      focusable: focusable,
+      item_builder: null,
+      item_count: itemCount,
+      on_end_reached: null,
+      on_refresh: null,
+      on_scroll: null,
+      refreshing: refreshing,
+      semantics: semantics,
+      style: style,
+      tag: tag,
+      window: window,
+      window_size: windowSize,
+    },
+    children: lazyChildren(key, itemBuilder, itemCount, window, windowSize),
+    __handlers: { "scroll": onScroll, "refresh": onRefresh, "end_reached": onEndReached },
+  };
+}
+
+/**
+ * Build a `LazyGrid` IR node (type `LazyGrid`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function LazyGrid({ itemBuilder, itemCount, key = null, columns = 2, endReachedThreshold = 0.8, focusOrder = null, focusable = null, semantics = null, tag = null, window = null, windowSize = 20, attrs = {}, style = null, onScroll = null, onEndReached = null } = {}) {
+  return {
+    type: "LazyGrid",
+    key,
+    props: {
+      attrs,
+      columns: columns,
+      end_reached_threshold: endReachedThreshold,
+      focus_order: focusOrder,
+      focusable: focusable,
+      item_builder: null,
+      item_count: itemCount,
+      on_end_reached: null,
+      on_scroll: null,
+      semantics: semantics,
+      style: style,
+      tag: tag,
+      window: window,
+      window_size: windowSize,
+    },
+    children: lazyChildren(key, itemBuilder, itemCount, window, windowSize),
+    __handlers: { "scroll": onScroll, "end_reached": onEndReached },
+  };
+}
+
+/**
+ * Build a `LazyRow` IR node (type `LazyRow`).
+ * @param {Object} [args]  Widget props (handlers stashed off-wire).
+ * @returns {import("../transport.js").Node}
+ */
+export function LazyRow({ itemBuilder, itemCount, key = null, endReachedThreshold = 0.8, focusOrder = null, focusable = null, refreshing = false, semantics = null, tag = null, window = null, windowSize = 20, attrs = {}, style = null, onScroll = null, onRefresh = null, onEndReached = null } = {}) {
+  return {
+    type: "LazyRow",
+    key,
+    props: {
+      attrs,
+      end_reached_threshold: endReachedThreshold,
+      focus_order: focusOrder,
+      focusable: focusable,
+      item_builder: null,
+      item_count: itemCount,
+      on_end_reached: null,
+      on_refresh: null,
+      on_scroll: null,
+      refreshing: refreshing,
+      semantics: semantics,
+      style: style,
+      tag: tag,
+      window: window,
+      window_size: windowSize,
+    },
+    children: lazyChildren(key, itemBuilder, itemCount, window, windowSize),
+    __handlers: { "scroll": onScroll, "refresh": onRefresh, "end_reached": onEndReached },
   };
 }
 

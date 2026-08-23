@@ -20,7 +20,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from tests.conformance._widgetspec import WidgetSpec, buildable_widgets
+from tests.conformance._widgetspec import (
+    LAZY_WIDGETS,
+    WidgetSpec,
+    buildable_widgets,
+)
 
 CLIENT_DIR: Path = Path(__file__).resolve().parents[2] / "client" / "transpile"
 WIDGETS_MODULE: Path = CLIENT_DIR / "widgets.gen.js"
@@ -94,6 +98,10 @@ def _variant_axis(spec: WidgetSpec) -> str | None:
 def _children_expr(spec: WidgetSpec) -> str:
     """Emit the expression that folds the widget's child slots into the IR array.
 
+    A lazy scroller has no child slot at all: its items are produced by running
+    ``item_builder`` over the resolved window, so its expression is the
+    ``lazyChildren`` call that mirrors the core.
+
     A node always carries one flat ``children`` list, but the Python slot it
     comes from varies: ``Column`` declares ``children`` (already a list),
     ``Container`` declares ``child`` (one widget or ``None``), ``Form`` declares
@@ -108,6 +116,8 @@ def _children_expr(spec: WidgetSpec) -> str:
     Returns:
         A JS expression evaluating to the node's ``children`` array.
     """
+    if spec.name in LAZY_WIDGETS:
+        return "lazyChildren(key, itemBuilder, itemCount, window, windowSize)"
     parts = [
         _camel(name) if is_list else f"({_camel(name)} == null ? [] : [{_camel(name)}])"
         for name, is_list in spec.child_fields
@@ -138,10 +148,12 @@ def _builder(spec: WidgetSpec) -> str:
         args.append(f"{_camel(handler)} = null")
 
     # Wire props object: attrs, passthrough props (snake wire key = camel arg),
-    # each handler prop forced null on the wire, and the resolved/passthrough style.
+    # each handler prop and live callable forced null on the wire (they never
+    # cross the boundary), and the resolved/passthrough style.
     lines: list[str] = ["      attrs,"]
     for prop in wire_props:
-        lines.append(f"      {prop}: {_camel(prop)},")
+        value = "null" if prop in spec.callable_props else _camel(prop)
+        lines.append(f"      {prop}: {value},")
     for handler in spec.handlers:
         lines.append(f"      {handler}: null,")
     if spec.styled:
@@ -200,7 +212,8 @@ def render_module_text() -> str:
         "dispatches from it.\n"
         "// Regenerate: python -m tests.conformance._transpile_widgets. Do not "
         "edit.\n\n"
-        'import { resolveWidgetStyle, Style } from "./widget-support.js";\n'
+        "import { lazyChildren, resolveWidgetStyle, Style } "
+        'from "./widget-support.js";\n'
         'export { Color, Edge, Style } from "./widget-support.js";\n\n'
         "// `Style` is re-exported for apps; reference it so linters see the "
         "import as used.\n"

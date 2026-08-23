@@ -88,6 +88,11 @@ const TAG_BY_TYPE = Object.freeze({
   DatePicker: "label",
   TimePicker: "label",
   FilePicker: "label",
+  // A TabBar is the strip a TabView cannot draw for itself: it holds no IR child,
+  // so its tabs are renderer-owned <button role="tab">s inside a role="tablist".
+  // It is what makes a tabbed screen switchable — the TabView beside it is only
+  // the panel (see applyPanelProps).
+  TabBar: "div",
   Image: "img",
   // A Canvas renders to a real <canvas>; its draw-command list is executed onto
   // the 2D context by paintCanvas (charts, overlays, the sketch pad).
@@ -125,6 +130,7 @@ const TAG_BY_TYPE = Object.freeze({
  * is declared once, here, next to the tags it qualifies.
  */
 export const NATIVE_CONTROL_TYPES = new Set([
+  // NOTE: keep CHANGE_REPORTING_TYPES below in sync when adding to this set.
   "Input",
   "TextArea",
   "MaskedInput",
@@ -139,6 +145,17 @@ export const NATIVE_CONTROL_TYPES = new Set([
   "TimePicker",
   "FilePicker",
 ]);
+
+/**
+ * Widget types whose `on_change` arrives as an `input`/`change` wire event.
+ *
+ * A superset of the native controls: a `TabBar` is a div holding buttons, so
+ * nothing about its markup says "change", yet a tab click is reported as one —
+ * that is the event its handler is declared against. Mode C's builder generator
+ * reads this to key the handler map; a widget missing from it binds `on_change`
+ * to `click` and never fires.
+ */
+export const CHANGE_REPORTING_TYPES = new Set([...NATIVE_CONTROL_TYPES, "TabBar"]);
 
 /** The native input `type` each picker widget renders. */
 const PICKER_INPUT_TYPES = Object.freeze({
@@ -1619,6 +1636,48 @@ function applyPickerProps(el, type, props) {
 }
 
 /**
+ * Draw a `TabBar`: one button per tab, inside a real tablist.
+ *
+ * The tabs are renderer-owned, which is legal because a TabBar holds no IR child
+ * — and necessary, because the strip is the only part of a tabbed screen the
+ * reader can actually operate. Each button carries its index, so a click reports
+ * the `params["index"]` the core's `RouteChangeEvent` convention puts it under.
+ *
+ * The buttons are rebuilt only when the labels change; switching tabs just moves
+ * `aria-selected`, so the strip does not flash on every keystroke elsewhere.
+ *
+ * @param {HTMLElement} el   The TabBar `<div>`.
+ * @param {Object} props     The props being applied.
+ * @returns {void}
+ */
+function applyTabBarProps(el, props) {
+  if (!el.hasAttribute("role")) {
+    el.setAttribute("role", "tablist");
+  }
+  if ("tabs" in props) {
+    const tabs = Array.isArray(props.tabs) ? props.tabs : [];
+    el.textContent = "";
+    tabs.forEach((label, index) => {
+      const tab = document.createElement("button");
+      tab.setAttribute("type", "button");
+      tab.setAttribute("role", "tab");
+      tab.setAttribute(ITEM_ATTR, "tab");
+      tab.setAttribute(ITEM_VALUE_ATTR, String(index));
+      tab.textContent = label == null ? "" : String(label);
+      el.appendChild(tab);
+    });
+  }
+  if ("active" in props) {
+    setOrRemove(el, ACTIVE_ATTR, props.active);
+  }
+  const active = Number(el.getAttribute(ACTIVE_ATTR) ?? 0);
+  Array.from(el.children).forEach((tab, index) => {
+    tab.setAttribute("aria-selected", String(index === active));
+    tab.setAttribute("tabindex", index === active ? "0" : "-1");
+  });
+}
+
+/**
  * Reflect a `TabView`'s active tab, and a `RouteDrawer`'s open state.
  *
  * Neither widget can be *driven* by this renderer: both hold IR children (a
@@ -1627,8 +1686,9 @@ function applyPickerProps(el, type, props) {
  * the corruption the contract forbids. What the renderer can do is say the truth
  * about the state, which is what a11y and the base sheet need: the panel is named
  * after its active tab, and the drawer's `open` becomes an attribute the sheet
- * slides on. The app draws the tab strip (a `TabBar`/`SegmentedControl`) and calls
- * the same handler — see docs/advanced/tabview-drawer.md.
+ * slides on. The strip itself is a `TabBar` beside the TabView — a widget with no
+ * IR child, so the renderer *can* draw its tabs (see applyTabBarProps) — wired to
+ * the same handler.
  *
  * @param {HTMLElement} el   The TabView / RouteDrawer element.
  * @param {string} type      The widget type.
@@ -1726,6 +1786,8 @@ function applyControlProps(el, type, props) {
     applyAutocompleteProps(el, props);
   } else if (type != null && type in PICKER_INPUT_TYPES) {
     applyPickerProps(el, type, props);
+  } else if (type === "TabBar") {
+    applyTabBarProps(el, props);
   } else if (type === "TabView" || type === "RouteDrawer") {
     applyPanelProps(el, type, props);
   } else if (type === "Image") {

@@ -352,6 +352,44 @@ export const BASE_THEME_CSS = `
   max-width: 18ch;
 }
 
+/* ── TabBar: the strip that makes a tabbed screen switchable ─────────────────
+   Renderer-owned <button role="tab">s in a role="tablist". The selected tab is
+   marked by aria-selected — state as an attribute the sheet reads, so nothing
+   here depends on a class the app would have to remember to pass. It scrolls
+   sideways rather than wrapping: five tabs on a phone belong in a strip that
+   scrolls, not in two rows that shift the content down. */
+[data-tw-type="TabBar"] {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--tw-outline);
+  font-family: var(--tw-font);
+}
+[data-tw-type="TabBar"] > [role="tab"] {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--tw-on-surface-variant);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--tw-motion), border-color var(--tw-motion);
+}
+[data-tw-type="TabBar"] > [role="tab"]:hover { color: var(--tw-on-surface); }
+[data-tw-type="TabBar"] > [role="tab"][aria-selected="true"] {
+  border-bottom-color: var(--tw-primary);
+  color: var(--tw-primary);
+}
+[data-tw-type="TabBar"] > [role="tab"]:focus-visible {
+  outline: 2px solid var(--tw-primary);
+  outline-offset: -2px;
+}
+
 /* ── RouteDrawer: "open" has to be visible, or the prop is a lie ─────────────
    The drawer is the second child (the core builds content, then drawer). It
    slides over the content instead of sitting next to it — inline, it pushed the

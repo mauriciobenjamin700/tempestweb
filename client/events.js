@@ -149,6 +149,38 @@ function sendMenuSelection(event, root, transport) {
 }
 
 /**
+ * Report a click on a `TabBar` tab as the `change` its handler is declared against.
+ *
+ * The tabs are renderer-owned buttons, so the click lands on an element the IR
+ * knows nothing about; the event belongs to the bar. The payload follows the
+ * core's `RouteChangeEvent` convention — the tab's label as `name`, its position
+ * under `params["index"]`, which is what every tabbed example reads.
+ *
+ * @param {Event} event      The click event.
+ * @param {HTMLElement} root The delegation root.
+ * @param {import("./transport.js").Transport} transport  The event sink.
+ * @returns {boolean}        True when the click was a tab selection.
+ */
+function sendTabSelection(event, root, transport) {
+  const tab = closestWithAttr(event.target, root, ITEM_ATTR);
+  if (tab == null || tab.getAttribute(ITEM_ATTR) !== "tab") {
+    return false;
+  }
+  const bar = tab.closest('[data-tw-type="TabBar"]');
+  const key = bar == null ? null : bar.getAttribute(KEY_ATTR);
+  if (key == null) {
+    return false;
+  }
+  const index = Number(tab.getAttribute(ITEM_VALUE_ATTR) ?? 0);
+  transport.sendEvent({
+    type: "change",
+    key,
+    payload: { name: tab.textContent ?? "", params: { index } },
+  });
+  return true;
+}
+
+/**
  * Report a filled-in `PinInput` as a `complete` event, if it just filled up.
  *
  * `on_complete` is what a code screen wants: it submits the moment the last digit
@@ -631,6 +663,9 @@ export function bindEvents(root, transport) {
     /** @param {Event} event */
     const handler = (event) => {
       if (domType === "click" && sendMenuSelection(event, root, transport)) {
+        return;
+      }
+      if (domType === "click" && sendTabSelection(event, root, transport)) {
         return;
       }
       if (domType === "click" && isOverlayHost(event.target)) {

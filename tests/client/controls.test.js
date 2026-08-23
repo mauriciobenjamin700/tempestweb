@@ -420,3 +420,58 @@ test("every widget in NATIVE_CONTROL_TYPES really renders a control", () => {
     assert.ok(control, `${type} rendered <${el.tagName.toLowerCase()}> with no control inside`);
   }
 });
+
+test("TabBar draws a real tablist and reports the tab that was clicked", () => {
+  const { dom, el, transport } = mountWidget("TabBar", "profile-tabs", {
+    tabs: ["Posts", "About", "Settings"],
+    active: 0,
+  });
+
+  assert.equal(el.getAttribute("role"), "tablist");
+  const tabs = el.querySelectorAll('[role="tab"]');
+  assert.equal(tabs.length, 3);
+  assert.equal(tabs[0].getAttribute("aria-selected"), "true");
+  assert.equal(tabs[1].getAttribute("aria-selected"), "false");
+  assert.equal(tabs[1].textContent, "About");
+
+  tabs[1].dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+
+  // RouteChangeEvent's convention, which every tabbed example reads: the label as
+  // `name`, the position under params["index"].
+  assert.deepEqual(transport.events.at(-1), {
+    type: "change",
+    key: "profile-tabs",
+    payload: { name: "About", params: { index: 1 } },
+  });
+});
+
+test("TabBar moves the selection on an Update without rebuilding the strip", () => {
+  withDocument();
+  const el = buildElement({
+    type: "TabBar",
+    key: "tabs",
+    props: { tabs: ["One", "Two"], active: 0 },
+    children: [],
+  });
+  const before = el.children[1];
+
+  applyPatches(el, [{ path: [], set_props: { active: 1 } }]);
+
+  assert.equal(el.children[1], before, "the same button, not a fresh one");
+  assert.equal(el.children[1].getAttribute("aria-selected"), "true");
+  assert.equal(el.children[0].getAttribute("tabindex"), "-1");
+});
+
+test("a TabBar click is not swallowed as a generic click on the bar", () => {
+  const { dom, el, transport } = mountWidget("TabBar", "tabs", {
+    tabs: ["One", "Two"],
+    active: 0,
+  });
+
+  el.querySelectorAll('[role="tab"]')[0].dispatchEvent(
+    new dom.window.MouseEvent("click", { bubbles: true }),
+  );
+
+  assert.equal(transport.events.length, 1);
+  assert.equal(transport.events[0].type, "change");
+});

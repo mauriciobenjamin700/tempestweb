@@ -70,4 +70,5 @@ def test_workflow_defines_pwa_jobs() -> None:
     for job in ("unit:", "lighthouse:", "push-e2e:"):
         assert job in text, f"missing job {job}"
     assert "node --check client/sw/sw.js" in text
+    assert "node --check client/sw/sw-teardown.js" in text
     assert "test_pwa*.py" in text

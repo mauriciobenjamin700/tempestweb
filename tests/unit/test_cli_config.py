@@ -110,3 +110,49 @@ def test_pwa_invalid_display_raises(tmp_path: Path) -> None:
     )
     with pytest.raises(ConfigError, match="invalid pwa.display"):
         load_config(tmp_path)
+
+
+def test_pwa_switches_default_to_on(tmp_path: Path) -> None:
+    """A project that never heard of the switches keeps the full PWA layer."""
+    cfg = load_config(tmp_path)
+    assert cfg.pwa.enabled is True
+    assert cfg.pwa.manifest is True
+    assert cfg.pwa.service_worker is True
+
+
+def test_pwa_enabled_false_turns_both_halves_off(tmp_path: Path) -> None:
+    """``enabled`` is the default the two halves fall back to."""
+    (tmp_path / "tempestweb.toml").write_text(
+        "[pwa]\nenabled = false\n", encoding="utf-8"
+    )
+    cfg = load_config(tmp_path)
+    assert cfg.pwa.manifest is False
+    assert cfg.pwa.service_worker is False
+
+
+def test_a_named_half_overrides_enabled(tmp_path: Path) -> None:
+    """Naming one half explicitly wins over the blanket default.
+
+    "Off by default, except the manifest" is a real shape: an installable app
+    that wants nothing to do with precache.
+    """
+    (tmp_path / "tempestweb.toml").write_text(
+        "[pwa]\nenabled = false\nmanifest = true\n", encoding="utf-8"
+    )
+    cfg = load_config(tmp_path)
+    assert cfg.pwa.manifest is True
+    assert cfg.pwa.service_worker is False
+
+
+def test_pwa_switch_rejects_a_non_boolean(tmp_path: Path) -> None:
+    """``service_worker = "false"`` must not silently mean ``True``.
+
+    A non-empty string is truthy in Python, so accepting one would make a switch
+    whose whole job is to turn something off do the exact opposite of what it
+    reads.
+    """
+    (tmp_path / "tempestweb.toml").write_text(
+        '[pwa]\nservice_worker = "false"\n', encoding="utf-8"
+    )
+    with pytest.raises(ConfigError, match="invalid pwa.service_worker"):
+        load_config(tmp_path)

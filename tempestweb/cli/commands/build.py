@@ -534,7 +534,13 @@ def _manifest_options(config: ProjectConfig) -> ManifestOptions:
 
 
 def _build_pwa(
-    out: Path, client: Path, manifest: ManifestOptions, precache: tuple[str, ...]
+    out: Path,
+    client: Path,
+    manifest: ManifestOptions,
+    precache: tuple[str, ...],
+    *,
+    with_manifest: bool = True,
+    with_service_worker: bool = True,
 ) -> None:
     """Emit the PWA layer (manifest + icons + service worker) into ``out``.
 
@@ -544,17 +550,40 @@ def _build_pwa(
     becomes the JSON app-shell list the worker caches on install. ``register.js``
     is copied verbatim for the page to register the worker.
 
+    Each half can be turned off from ``[pwa]``. Icons are emitted either way —
+    the shell links them as favicon and apple-touch-icon whether or not a
+    manifest exists.
+
+    Turning the worker off still writes ``sw.js``, but the teardown worker
+    (``client/sw/sw-teardown.js``) instead of the caching one. Emitting nothing
+    would leave every browser that already registered the caching worker serving
+    the app shell from a precache the deploy has moved past, with no way to
+    reach them; a worker that clears its caches and unregisters itself retires
+    the old one on their next visit.
+
     Args:
         out: The artifact root.
         client: The shared ``client/`` directory.
         manifest: The manifest options (name, colors, display) to emit.
         precache: The app-shell URLs the service worker precaches (cache-first).
+        with_manifest: Whether to write ``manifest.webmanifest``.
+        with_service_worker: Whether to emit the caching worker + ``register.js``.
+            When ``False``, ``sw.js`` is the teardown worker and no
+            ``register.js`` is written.
 
     Raises:
-        BuildError: If the service worker source is missing.
+        BuildError: If a service worker source is missing.
     """
-    write_manifest(out / "manifest.webmanifest", manifest)
+    if with_manifest:
+        write_manifest(out / "manifest.webmanifest", manifest)
     emit_icons(out / "icons")
+
+    if not with_service_worker:
+        teardown_source = client / "sw" / "sw-teardown.js"
+        if not teardown_source.is_file():
+            raise BuildError(f"missing service worker source: {teardown_source}")
+        shutil.copyfile(teardown_source, out / "sw.js")
+        return
 
     sw_source = client / "sw" / "sw.js"
     register_source = client / "sw" / "register.js"
@@ -781,6 +810,30 @@ _TRANSPILE_SW_REGISTER = """\
       }
     </script>"""
 
+# What the shell keeps when ``[pwa] service_worker = false``: the connectivity
+# banner is about the network, not about precaching, so an app that opts out of
+# the worker still tells the user when it goes offline.
+_NO_SW_REGISTER = """\
+    <script type="module">
+      import { mountConnectivityBanner } from "./client/pwa/connectivity-banner.js";
+      mountConnectivityBanner();
+    </script>"""
+
+
+def _manifest_link(with_manifest: bool) -> str:
+    """The manifest ``<link>`` line for a shell, or nothing when it is off.
+
+    Args:
+        with_manifest: Whether the build emits ``manifest.webmanifest``.
+
+    Returns:
+        The link tag with its trailing newline, or ``""`` — linking a manifest a
+        build did not write is a 404 on every load.
+    """
+    if not with_manifest:
+        return ""
+    return '    <link rel="manifest" href="./manifest.webmanifest" />\n'
+
 
 def _index_html(
     name: str,
@@ -788,6 +841,8 @@ def _index_html(
     theme_color: str = "#111111",
     *,
     dev: bool = False,
+    with_manifest: bool = True,
+    with_service_worker: bool = True,
 ) -> str:
     """Render the static ``index.html`` shell for a wasm artifact.
 
@@ -801,12 +856,21 @@ def _index_html(
         dev: When ``True`` (the ``tempestweb dev`` loop), inject the cache
             kill-switch instead of registering the caching service worker, so
             every reload serves the freshly rebuilt bundle.
+        with_manifest: Whether the build emits a manifest to link.
+        with_service_worker: Whether the shell registers the caching worker. When
+            ``False`` the connectivity banner still mounts — it reports the
+            network, not the precache.
 
     Returns:
         The HTML document that boots the app in the browser.
     """
     script_tags = "".join(f'\n    <script src="{src}"></script>' for src in scripts)
-    sw_block = _DEV_CACHE_KILL_SWITCH if dev else _WASM_SW_REGISTER
+    if dev:
+        sw_block = _DEV_CACHE_KILL_SWITCH
+    elif with_service_worker:
+        sw_block = _WASM_SW_REGISTER
+    else:
+        sw_block = _NO_SW_REGISTER
     return f"""\
 <!doctype html>
 <html lang="en">
@@ -814,7 +878,7 @@ def _index_html(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
-    <link rel="manifest" href="./manifest.webmanifest" />
+{_manifest_link(with_manifest)}\
     <meta name="theme-color" content="{theme_color}" />
     <link rel="icon" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />{script_tags}
@@ -1190,6 +1254,8 @@ def build_artifact(
             wasm=config.wasm,
             manifest=manifest,
             dev=dev,
+            with_manifest=config.pwa.manifest,
+            with_service_worker=config.pwa.service_worker,
         )
     elif resolved_mode == "transpile":
         files = _build_transpile(
@@ -1200,6 +1266,8 @@ def build_artifact(
             config.entrypoint_path.name,
             manifest=manifest,
             dev=dev,
+            with_manifest=config.pwa.manifest,
+            with_service_worker=config.pwa.service_worker,
         )
     else:
         files = _build_server(out, client, config.name, app_source)
@@ -1239,6 +1307,30 @@ def _copy_assets(project_root: Path, out: Path, patterns: tuple[str, ...]) -> li
     return sorted(written)
 
 
+def _pwa_artifact_files(
+    files: tuple[str, ...], *, with_manifest: bool, with_service_worker: bool
+) -> list[str]:
+    """Drop from a fixed artifact file list what the PWA switches did not emit.
+
+    ``sw.js`` stays in either case: with the worker off it is the teardown worker
+    rather than the caching one, so the file exists but does a different job.
+
+    Args:
+        files: The artifact's full file list (the PWA-complete case).
+        with_manifest: Whether ``manifest.webmanifest`` was written.
+        with_service_worker: Whether ``register.js`` was written.
+
+    Returns:
+        The list with the unwritten entries removed.
+    """
+    skipped: set[str] = set()
+    if not with_manifest:
+        skipped.add("manifest.webmanifest")
+    if not with_service_worker:
+        skipped.add("register.js")
+    return [name for name in files if name not in skipped]
+
+
 def _build_wasm(
     out: Path,
     client: Path,
@@ -1250,6 +1342,8 @@ def _build_wasm(
     wasm: WasmConfig | None = None,
     manifest: ManifestOptions | None = None,
     dev: bool = False,
+    with_manifest: bool = True,
+    with_service_worker: bool = True,
 ) -> tuple[str, ...]:
     """Write the wasm (static) artifact layout into ``out``.
 
@@ -1266,6 +1360,11 @@ def _build_wasm(
         manifest: The Web-App-Manifest options; defaults to a name-only manifest.
         dev: When ``True``, inject the dev cache kill-switch into the shell
             instead of registering the caching service worker.
+        with_manifest: Whether to emit ``manifest.webmanifest`` and link it
+            (``[pwa] manifest``).
+        with_service_worker: Whether to emit and register the caching worker
+            (``[pwa] service_worker``). When ``False``, ``sw.js`` is the teardown
+            worker and no ``register.js`` is written.
 
     Returns:
         The artifact-relative paths written, sorted.
@@ -1291,7 +1390,15 @@ def _build_wasm(
 
     theme_color = (manifest or ManifestOptions(name=name)).theme_color
     (out / "index.html").write_text(
-        _index_html(name, scripts, theme_color, dev=dev), encoding="utf-8"
+        _index_html(
+            name,
+            scripts,
+            theme_color,
+            dev=dev,
+            with_manifest=with_manifest,
+            with_service_worker=with_service_worker,
+        ),
+        encoding="utf-8",
     )
     (out / "bootstrap.js").write_text(
         _bootstrap_js(name, pyodide_base, extra_packages), encoding="utf-8"
@@ -1346,11 +1453,22 @@ def _build_wasm(
         *(s if s.startswith("/") else f"/{s}" for s in local_scripts),
         *(f"/pyodide/{file_name}" for file_name in vendored),
     )
-    _build_pwa(out, client, manifest or ManifestOptions(name=name), precache)
+    _build_pwa(
+        out,
+        client,
+        manifest or ManifestOptions(name=name),
+        precache,
+        with_manifest=with_manifest,
+        with_service_worker=with_service_worker,
+    )
     return tuple(
         sorted(
             [
-                *WASM_ARTIFACT_FILES,
+                *_pwa_artifact_files(
+                    WASM_ARTIFACT_FILES,
+                    with_manifest=with_manifest,
+                    with_service_worker=with_service_worker,
+                ),
                 *assets,
                 *(f"pyodide/{f}" for f in vendored),
             ]
@@ -1396,7 +1514,12 @@ def _build_server(
 
 
 def _index_html_transpile(
-    name: str, theme_color: str = "#111111", *, dev: bool = False
+    name: str,
+    theme_color: str = "#111111",
+    *,
+    dev: bool = False,
+    with_manifest: bool = True,
+    with_service_worker: bool = True,
 ) -> str:
     """Render the ``index.html`` shell for a transpile artifact (Mode C).
 
@@ -1417,11 +1540,18 @@ def _index_html_transpile(
             meta so the browser chrome matches the installed app.
         dev: When ``True`` (the ``tempestweb dev`` loop), inject the cache
             kill-switch instead of registering the caching service worker.
+        with_manifest: Whether the build emits a manifest to link.
+        with_service_worker: Whether the shell registers the caching worker.
 
     Returns:
         The HTML document that boots the transpiled app in the browser.
     """
-    sw_block = _DEV_CACHE_KILL_SWITCH if dev else _TRANSPILE_SW_REGISTER
+    if dev:
+        sw_block = _DEV_CACHE_KILL_SWITCH
+    elif with_service_worker:
+        sw_block = _TRANSPILE_SW_REGISTER
+    else:
+        sw_block = _NO_SW_REGISTER
     return f"""\
 <!doctype html>
 <html lang="en">
@@ -1429,7 +1559,7 @@ def _index_html_transpile(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
-    <link rel="manifest" href="./manifest.webmanifest" />
+{_manifest_link(with_manifest)}\
     <meta name="theme-color" content="{theme_color}" />
     <link rel="icon" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
@@ -1457,6 +1587,8 @@ def _build_transpile(
     *,
     manifest: ManifestOptions | None = None,
     dev: bool = False,
+    with_manifest: bool = True,
+    with_service_worker: bool = True,
 ) -> tuple[str, ...]:
     """Write the transpile (native-JS static) artifact layout into ``out`` (Mode C).
 
@@ -1476,6 +1608,11 @@ def _build_transpile(
         manifest: The Web-App-Manifest options; defaults to a name-only manifest.
         dev: When ``True``, inject the dev cache kill-switch into the shell
             instead of registering the caching service worker.
+        with_manifest: Whether to emit ``manifest.webmanifest`` and link it
+            (``[pwa] manifest``).
+        with_service_worker: Whether to emit and register the caching worker
+            (``[pwa] service_worker``). When ``False``, ``sw.js`` is the teardown
+            worker and no ``register.js`` is written.
 
     Returns:
         The artifact-relative paths written, sorted.
@@ -1559,10 +1696,31 @@ def _build_transpile(
         *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
     )
     manifest_options = manifest or ManifestOptions(name=name)
-    _build_pwa(out, client, manifest_options, precache)
+    _build_pwa(
+        out,
+        client,
+        manifest_options,
+        precache,
+        with_manifest=with_manifest,
+        with_service_worker=with_service_worker,
+    )
 
     (out / "index.html").write_text(
-        _index_html_transpile(name, manifest_options.theme_color, dev=dev),
+        _index_html_transpile(
+            name,
+            manifest_options.theme_color,
+            dev=dev,
+            with_manifest=with_manifest,
+            with_service_worker=with_service_worker,
+        ),
         encoding="utf-8",
     )
-    return tuple(sorted(TRANSPILE_ARTIFACT_FILES))
+    return tuple(
+        sorted(
+            _pwa_artifact_files(
+                TRANSPILE_ARTIFACT_FILES,
+                with_manifest=with_manifest,
+                with_service_worker=with_service_worker,
+            )
+        )
+    )

@@ -1872,7 +1872,33 @@ export function buildElement(node) {
 }
 
 /**
+ * Describe one element for a diagnostic message: its tag and widget key.
+ *
+ * A path failure is only actionable when you can tell *which* node the client
+ * has where Python expected another, and the widget `key` is the one identifier
+ * shared with the IR — the tag alone repeats across the tree.
+ *
+ * @param {Element | null} el   The element to describe (null-safe).
+ * @returns {string}            e.g. `div[data-tw-key="appbar-actions"]`.
+ */
+function describeElement(el) {
+  if (el == null) return "<none>";
+  const tag = el.tagName ? el.tagName.toLowerCase() : "?";
+  const key = el.getAttribute ? el.getAttribute("data-tw-key") : null;
+  return key ? `${tag}[data-tw-key="${key}"]` : tag;
+}
+
+/**
  * Walk a path of child indices from `root` down to the target element.
+ *
+ * When a step does not resolve, the thrown message carries the whole picture the
+ * caller needs to tell a stale tree from a bad patch: the full path, which step
+ * failed, and what the client actually has at that point — the parent's identity
+ * and how many children it holds against the index that was asked for. The bare
+ * `at index N` this used to throw named neither the node nor the shortfall, so
+ * every report of it needed a hand-patched `dom.js` to say anything at all
+ * (tempestweb#160).
+ *
  * @param {HTMLElement} root      The root element.
  * @param {number[]} path         Child indices from the root ([] = root).
  * @returns {HTMLElement}         The element at `path`.
@@ -1881,10 +1907,16 @@ export function buildElement(node) {
 function resolvePath(root, path) {
   /** @type {HTMLElement} */
   let el = root;
-  for (const index of path) {
+  for (let step = 0; step < path.length; step += 1) {
+    const index = path[step];
     const next = el.children[index];
     if (next == null) {
-      throw new RangeError(`tempestweb: patch path out of range at index ${index}`);
+      throw new RangeError(
+        `tempestweb: patch path out of range at index ${index} ` +
+          `(path [${path.join(", ")}], step ${step}): ` +
+          `${describeElement(el)} has ${el.children.length} children ` +
+          `[${Array.from(el.children).map(describeElement).join(", ")}]`,
+      );
     }
     el = /** @type {HTMLElement} */ (next);
   }

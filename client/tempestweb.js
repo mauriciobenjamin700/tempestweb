@@ -25,6 +25,45 @@ import { installBaseTheme } from "./theme.js";
 import { installVirtualization } from "./virtualize.js";
 
 /**
+ * Is patch debugging on for this page?
+ *
+ * Read per batch rather than captured once, because the flag exists to be flipped
+ * from the console on a page that is *already* misbehaving — a value sampled at
+ * mount time could never be turned on in time to see the batch that broke.
+ *
+ * @returns {boolean}  True when `globalThis.__tempestweb_debug` is truthy.
+ */
+function patchDebugOn() {
+  return Boolean(globalThis.__tempestweb_debug);
+}
+
+/**
+ * Render a compact outline of the DOM tree the client currently holds.
+ *
+ * A patch path is a walk of child indices, so the only thing that explains a
+ * failed walk is the *shape* the client has: which node sits at each step and how
+ * many children it holds. The outline prints exactly that and nothing else — an
+ * `outerHTML` dump of a real screen is unreadable and can be megabytes.
+ *
+ * @param {Element | null} el     The subtree root.
+ * @param {number} [maxDepth]     How deep to descend (default 4).
+ * @param {number} [depth]        Current depth, for the indent.
+ * @returns {string}              One indented `tag[key] (N children)` line per node.
+ */
+function outlineTree(el, maxDepth = 4, depth = 0) {
+  if (el == null) return "<empty>";
+  const tag = el.tagName ? el.tagName.toLowerCase() : "?";
+  const key = el.getAttribute ? el.getAttribute("data-tw-key") : null;
+  const label = key ? `${tag}[${key}]` : tag;
+  const line = `${"  ".repeat(depth)}${depth}:${label} (${el.children.length})`;
+  if (depth >= maxDepth || el.children.length === 0) return line;
+  const children = Array.from(el.children).map((child) =>
+    outlineTree(child, maxDepth, depth + 1),
+  );
+  return [line, ...children].join("\n");
+}
+
+/**
  * Is this patch a **root** Replace — an empty path with a replacement node (and
  * none of the other patch fields)?
  * @param {import("./transport.js").Patch} patch  The patch to classify.
@@ -209,6 +248,12 @@ export function mount(root, transport, initialNode = null) {
    * is the only repair, and it is requested once until it arrives, so a broken
    * stream cannot turn into a request flood.
    *
+   * A transport with no `requestResync` cannot be repaired at all: the failure is
+   * reported loudly rather than swallowed, because the screen from that moment on
+   * is silently missing whatever the failed batch carried. With
+   * `globalThis.__tempestweb_debug` on, the tree the client holds is dumped next
+   * to the patch that could not land.
+   *
    * @param {Error} error   The failure the patch raised.
    * @param {import("./transport.js").Patch} patch  The patch that failed.
    * @returns {void}
@@ -216,14 +261,31 @@ export function mount(root, transport, initialNode = null) {
   const onPatchFailure = (error, patch) => {
     if (typeof console !== "undefined" && console.error) {
       console.error("tempestweb: patch could not be applied", error, patch);
+      if (patchDebugOn()) {
+        console.error("tempestweb: client tree at failure\n" + outlineTree(tree));
+      }
     }
     if (resyncPending) return;
-    if (typeof transport.requestResync !== "function") return;
+    if (typeof transport.requestResync !== "function") {
+      if (typeof console !== "undefined" && console.error) {
+        console.error(
+          "tempestweb: this transport cannot request a resync, so the tree " +
+            "stays out of sync with Python until the page reloads",
+        );
+      }
+      return;
+    }
     resyncPending = true;
     transport.requestResync();
   };
 
+  let batchSeq = 0;
+
   transport.onPatches((patches) => {
+    batchSeq += 1;
+    if (patchDebugOn() && typeof console !== "undefined" && console.log) {
+      console.log(`tempestweb: patch batch #${batchSeq}`, patches);
+    }
     let batch = patches;
     if (patches.some(isRootReplace)) resyncPending = false;
     if (tree == null) {

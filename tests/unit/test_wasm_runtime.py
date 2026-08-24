@@ -269,3 +269,112 @@ async def test_run_dispatches_until_closed() -> None:
     await asyncio.wait_for(task, timeout=1.0)
 
     assert runtime.app.state.value == 2
+
+
+# --------------------------------------------------------------------------- #
+# WasmRuntime.resync                                                          #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_resync_re_sends_the_whole_scene() -> None:
+    """A ``resync`` event answers with one root replace carrying the live scene.
+
+    Mode A had no answer at all: ``requestResync`` was missing from the client
+    transport and ``dispatch_event`` had no branch, so a patch the renderer could
+    not apply left the DOM truncated for the rest of the page's life.
+    """
+    sent: list[list[dict[str, Any]]] = []
+    transport = WasmTransport(sent.append)
+    runtime: WasmRuntime[CounterState] = WasmRuntime(
+        CounterState(), counter_view, transport
+    )
+    runtime.start()
+
+    await runtime.dispatch_event({"type": "click", "key": "inc", "payload": {}})
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    sent.clear()
+
+    await runtime.dispatch_event({"type": "resync", "key": "", "payload": {}})
+
+    assert len(sent) == 1, "resync delivers exactly one batch"
+    batch = sent[0]
+    assert batch[0]["path"] == []
+    assert batch[0]["node"]["type"] == "Column"
+    assert batch[0]["node"]["children"][0]["props"]["content"] == "Count: 1"
+
+
+@pytest.mark.asyncio
+async def test_resync_reaches_no_app_handler() -> None:
+    """``resync`` is served by the runtime, so it never resolves to a widget."""
+    calls: list[str] = []
+
+    def view(app: App[CounterState]) -> Widget:
+        """Build a tree whose only widget carries a handler under the empty key."""
+        return Column(
+            children=[Button(label="x", on_click=lambda: calls.append("hit"), key="")]
+        )
+
+    sent: list[list[dict[str, Any]]] = []
+    transport = WasmTransport(sent.append)
+    runtime: WasmRuntime[CounterState] = WasmRuntime(CounterState(), view, transport)
+    runtime.start()
+    sent.clear()
+
+    await runtime.dispatch_event({"type": "resync", "key": "", "payload": {}})
+
+    assert calls == []
+    assert len(sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_resync_before_start_is_a_no_op() -> None:
+    """With no scene built yet there is nothing to re-send."""
+    sent: list[list[dict[str, Any]]] = []
+    transport = WasmTransport(sent.append)
+    runtime: WasmRuntime[CounterState] = WasmRuntime(
+        CounterState(), counter_view, transport
+    )
+
+    await runtime.resync()
+
+    assert sent == []
+
+
+@pytest.mark.asyncio
+async def test_resync_carries_the_overlay_layer() -> None:
+    """Overlays follow the root replace as inserts under the ``overlay`` path.
+
+    The initial Mode A mount hands the client only the root node, so an overlay
+    open at the moment of a failure would be lost by a resync that re-sent the
+    root alone.
+    """
+    from tempest_core import Dialog
+
+    sent: list[list[dict[str, Any]]] = []
+    transport = WasmTransport(sent.append)
+    runtime: WasmRuntime[CounterState] = WasmRuntime(
+        CounterState(), counter_view, transport
+    )
+    runtime.start()
+    runtime.app.show_dialog(
+        Dialog(
+            title="Hello",
+            key="dlg",
+            children=[Text(content="on top", key="top")],
+        ),
+        barrier=True,
+    )
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    sent.clear()
+
+    await runtime.resync()
+
+    batch = sent[0]
+    assert batch[0]["path"] == []
+    overlays = [patch for patch in batch if patch["path"] == ["overlay"]]
+    assert len(overlays) == 1
+    assert overlays[0]["index"] == 0
+    assert overlays[0]["node"]["type"] == "Dialog"

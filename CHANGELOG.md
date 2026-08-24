@@ -4,6 +4,61 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.99.0] — 2026-08-24
+
+### Fixed
+
+- **O Modo A não pedia resync, então um patch que falhava truncava a tela para
+  sempre** ([#159](https://github.com/mauriciobenjamin700/tempestweb/issues/159)).
+  O `onPatchFailure` do `mount` só pede reparo quando o transporte sabe pedir, e
+  `client/transport-wasm.js` não implementava `requestResync` — no Modo A o
+  handler degenerava em `console.error` e retornava. Dali em diante a árvore do
+  cliente não tinha conserto: todo patch seguinte é index-relativo a uma árvore
+  que não existe mais, então cada tick falhava igual e a tela ficava faltando
+  pedaço. No tempest-webtunnel isso significou um painel sem o botão Sair, sem um
+  campo do formulário e sem uma coluna da tabela, por semanas, com o console
+  reclamando a cada 7 segundos.
+
+  `WasmRuntime.dispatch_event` ganhou o branch `resync` que faltava (só o
+  `AppSession.dispatch` do Modo B tratava o tipo) e um `WasmRuntime.resync()` que
+  reenvia a scene atual como `Replace` de raiz, com os overlays abertos seguindo
+  como inserts sob `overlay` — o mount inicial do Modo A entrega só o nó raiz,
+  então um diálogo aberto sumiria de um resync que reenviasse só a raiz.
+
+  O pedido viaja como evento de fio comum, igual ao Modo B, e o runtime o serve
+  em vez de rotear para handler de app: o `key` vazio nunca precisa resolver para
+  um widget.
+
+- **O bootstrap do Modo A descartava, em silêncio, lote entregue antes do
+  transporte existir.** `start()` constrói o app e já inicia o loop de rebuild,
+  mas o transporte JS só nasce algumas instruções depois; o `onPatches` gerado
+  entregava o lote quando `deliverToTransport` estava setado e o **jogava fora**
+  caso contrário. Agora é bufferizado e drenado em ordem no `onDeliver` —
+  seguro, porque o nó inicial é um snapshot tirado dentro de `start()`, do qual
+  os lotes bufferizados diffam.
+
+### Added
+
+- **A falha de patch passa a dizer o que o cliente tem**
+  ([#160](https://github.com/mauriciobenjamin700/tempestweb/issues/160)). A
+  mensagem era `patch path out of range at index N`: não nomeava o path inteiro,
+  nem o passo que falhou, nem o nó que o cliente tem ali, nem quantos filhos ele
+  tem contra o índice pedido — diagnosticar uma ocorrência exigia patchar
+  `client/dom.js` dentro do artefato buildado. Agora carrega os quatro, com o pai
+  identificado por `data-tw-key`.
+
+- **`globalThis.__tempestweb_debug` liga o log do stream de patches:** uma linha
+  numerada por lote, mais um outline da árvore que o cliente tem no lote que
+  falha. A flag é lida a cada lote, não capturada no mount, porque ela existe
+  para ser ligada pelo console de uma página que já está com problema.
+
+- Transporte sem `requestResync` passa a reclamar alto em vez de sair calado.
+
+### Changed
+
+- `docs/troubleshooting.md` (+ EN) ganhou a seção **Render e patches**, com a
+  entrada de `patch path out of range` e o procedimento de investigação.
+
 ## [0.98.0] — 2026-08-23
 
 ### Fixed

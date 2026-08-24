@@ -4,6 +4,47 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.99.0] — 2026-08-24
+
+### Added
+
+- **`[pwa]` ganhou switch: dá para desligar o service worker no build**
+  ([#161](https://github.com/mauriciobenjamin700/tempestweb/issues/161)). Todo
+  build emitia `sw.js` + `register.js` e registrava o worker no `index.html`;
+  `PwaConfig` só permitia customizar o manifest, e o emissor não olhava nada
+  parecido. Sem switch, a saída era strippar o artefato depois do build com
+  regex sobre HTML gerado.
+
+  ```toml
+  [pwa]
+  enabled = false          # o default das duas metades
+  manifest = true          # nomear uma metade sobrepõe o enabled
+  service_worker = false
+  ```
+
+  Os dois eixos ficam separados porque as metades são úteis apart: o manifest
+  sozinho torna a app instalável e a nomeia na home screen; o worker é o que
+  precacheia a shell. Vale nos dois modos estáticos (A e C). Campo que não for
+  booleano é recusado — `service_worker = "false"` é truthy em Python, e um
+  switch cujo trabalho é desligar algo não pode fazer o oposto do que se lê.
+
+- **`client/sw/sw-teardown.js`**, o worker que um build emite quando o service
+  worker está desligado. Desligar não é o mesmo que nunca ter ligado: quem já
+  visitou a app tem o worker registrado, e worker registrado continua servindo a
+  shell do precache até ser substituído. Emitir nada deixaria essas pessoas
+  presas ao build antigo, sem nada no deploy capaz de alcançá-las — worker
+  registrado revalida o próprio script, então a única via é um worker na mesma
+  URL. O de teardown limpa todo cache do origin, se desregistra e recarrega as
+  páginas que controlava.
+
+### Changed
+
+- O banner de conectividade continua montando num artefato sem service worker:
+  ele reporta a rede, não o precache.
+- `docs/advanced/pwa.md` (+ EN) ganhou a seção **Desligando o PWA**, com o custo
+  do worker para quem não precisa dele e a tabela do que muda no artefato.
+  `docs/advanced/transpile.md` (+ EN) lista os três campos novos.
+
 ## [0.98.0] — 2026-08-23
 
 ### Fixed

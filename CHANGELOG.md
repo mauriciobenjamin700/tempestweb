@@ -54,6 +54,35 @@ versioning.
   componente antigo o gate reprova com `[critical] login_demo: label — Form
   elements must have labels`; com a correção, passa.
 
+- **Um `ScrollView` não rolava: chegava ao DOM como `div`, sem overflow e sem
+  eixo.** `Scaffold(scroll=True)` lowera para um, então a árvore dizia que o
+  corpo rolava dentro do frame e o browser rolava o **documento**. Medido em
+  Chrome num app real que prende o frame a `media.height`: 900px de frame sobre
+  3.249px de conteúdo, com a app bar e a barra de ações indo embora para cima.
+  Mesma família da `ProgressBar` emitida sem pintura (0.65.0) — o widget
+  atravessa a IR corretamente e o renderizador não tinha nada a dizer sobre ele.
+
+  O overflow vem da folha base, que é onde default visual mora (o `Style` inline
+  da app continua ganhando). O eixo é prop, não cabe na folha, então é espelhado
+  em `data-tw-horizontal` como o `open` do `RouteDrawer`. **`min-height: 0` é a
+  metade que parece redundante e não é:** o mínimo automático de um flex item é o
+  conteúdo dele, então sem isso o scroller cresce em vez de rolar. O SSR recebe
+  as mesmas declarações inline, pela mesma razão que a trilha de um indicador é
+  inline lá — página estática não tem folha nenhuma.
+
+  Depois, no mesmo app: `overflow-y: auto`, `clientHeight` 752 sobre
+  `scrollHeight` 3.249, e as duas barras nas **mesmas** coordenadas antes e
+  depois de rolar 1.500px dentro do frame.
+
+- **Os três shells do build não zeravam a margem de 8px do `body`** — só o
+  `render_document` do SSR zerava. Era 8px de espaço morto em todo app buildado
+  e, com um frame na altura exata do viewport, 16px de rolagem no documento que
+  levava as barras junto. Medido: `scrollHeight - clientHeight` de exatamente
+  **16** antes, **0** depois. Um teste por modo, porque os três templates são
+  três strings — "o que foi corrigido e os dois que não foram" é uma forma que
+  este repo já entregou (o renderizador SSR ficou cinco widgets atrás do cliente
+  na 0.98.0).
+
 ### Changed
 
 - `docs/tutorial/components.md` (PT + EN) ganha **Quem dá o nome ao campo**, com a

@@ -1,0 +1,11 @@
+{
+  "calibrated": {
+    "build": 667.74,
+    "diff": 20.97
+  },
+  "patches_for_one_change": 2,
+  "rows": {
+    "large": 400,
+    "small": 200
+  }
+}

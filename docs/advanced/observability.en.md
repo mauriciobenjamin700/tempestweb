@@ -352,6 +352,79 @@ first.
     0.665 ms to 0.689 ms average — **+3.6%**. That is the price of knowing what is
     happening.
 
+## Performance: what is measured, and how the gate avoids being a flake
+
+Three measurements in three places, because they cost very different amounts to
+collect.
+
+### The gate that blocks a PR
+
+```bash
+uv run python benchmarks/perf_gate.py
+```
+
+`benchmarks/perf_gate.py` runs in CI and fails the job. The hard part of a perf
+gate is not measuring — it is **not being a flake**: a shared runner varies by more
+than the regressions worth catching, so an absolute threshold either fires on noise
+(and gets disabled in the first week) or is loose enough to catch nothing. So it
+asserts only what survives a slow machine:
+
+| Claim | Why it survives noise |
+|---|---|
+| doubling the rows costs at most ~2.6x | it is a **ratio** between two measurements on the same machine, back to back; `O(n^2)` lands near 4x |
+| one changed row still yields 2 patches | correctness, not time — and the cheapest way to make a diff look fast is to stop being right |
+| calibrated cost within 1.8x of the baseline | the cost is divided by a calibration loop measured in the same process, which takes CPU speed out of the comparison |
+| N sessions sustain one session's total throughput | the loop is single-threaded and the rebuild is CPU-bound, so the **total** stays flat while the per-session share divides; a drop in the total is contention, not load |
+
+A deliberate change in cost: `--update-baseline`, and justify it in the PR. The
+baseline is versioned (`benchmarks/baseline.json`).
+
+### Mode B throughput
+
+```bash
+uv run python benchmarks/bench_ws_throughput.py --sessions 10 --events 100
+```
+
+Measures the loop a Mode B app lives in: an event arrives, a handler mutates state,
+the core diffs, the transport ships a batch. The transport **counts** instead of
+writing to a socket — what is under test is the Python above it, and the network
+only ever makes the number smaller; this is the ceiling.
+
+What the measurement shows: the total stays roughly **constant** while the
+per-session share divides. In other words, **Mode B saturates on CPU in the
+rebuild**, inside a single event loop. Scaling means more processes (Mode B is
+stateful per session, so each process needs session affinity), not more threads.
+
+### Mode A cold start
+
+```bash
+npm install --no-save playwright && npx playwright install chromium
+node benchmarks/bench_cold_start.mjs http://127.0.0.1:8000/
+```
+
+Runs in a **scheduled job** (`perf-cold-start.yml`), not on a PR: a ~6 MB Pyodide
+download in every PR's critical path buys a number nobody reads at that moment. It
+measures two values for the same page, and both matter:
+
+- **cold** — no service worker, no cache: Pyodide and the core come over the
+  network. This is a first visit.
+- **warm** — the SW precache serves them. This is every visit after.
+
+The clock stops when the app's first tree is on screen (the first
+`[data-tw-key]`), which is the honest definition of "the reader can use it" —
+waiting for `load` would stop before Pyodide even starts.
+
+!!! tip "Measured, and the result is counter-intuitive"
+    `examples/counter` in a real Chrome, against the built artifact: **cold
+    2,394 ms with 14,593 KB** transferred; **warm 2,354 ms with 8,751 KB**. The
+    service worker saved **5.8 MB of network and 40 ms of time** — 40% of the bytes
+    and **1.7%** of the clock.
+
+    The reading matters more than the numbers: in Mode A the dominant cost is the
+    **Pyodide boot (CPU)**, not the download. Optimising the network there does not
+    move the needle; anyone who needs first paint uses Mode B or C — which the
+    architecture docs already said, and now there is a measurement.
+
 ## Recap
 
 - Observability uses the **adapter pattern**: swap the backend without changing

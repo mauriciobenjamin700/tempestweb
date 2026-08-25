@@ -290,6 +290,7 @@ function applyProps(el, props) {
   applyDragProps(el, type, props);
   applyOverlayProps(el, type, props);
   applyEscapeHatchAttrs(el, props);
+  applyScrollProps(el, type, props);
   applyLazyProps(el, type, props);
   applyListEventProps(el, type, props);
   applySortAndPageProps(el, type, props);
@@ -592,6 +593,9 @@ export const ACTIVE_ATTR = "data-tw-active";
 
 /** Attribute marking a `RouteDrawer` whose drawer is open. */
 export const OPEN_ATTR = "data-tw-open";
+
+/** Attribute marking a `ScrollView` that scrolls along the horizontal axis. */
+export const HORIZONTAL_ATTR = "data-tw-horizontal";
 
 /** Attribute marking a `ReorderableList`, whose children can be dragged to sort. */
 export const REORDER_ATTR = "data-tw-reorder";
@@ -942,6 +946,26 @@ const LAZY_TYPES = Object.freeze(["LazyColumn", "LazyRow", "LazyGrid"]);
  * @param {Object} props       The props to apply.
  * @returns {void}
  */
+/**
+ * Mark a `ScrollView`'s axis so the base sheet can scroll it.
+ *
+ * The scrolling itself is the sheet's (`[data-tw-type="ScrollView"]`), because
+ * that is where a visual default belongs: the app's own Style still wins, being
+ * inline. What cannot come from the sheet is the axis, which is a prop — so it is
+ * mirrored to an attribute here, the way `RouteDrawer`'s `open` is.
+ *
+ * @param {HTMLElement} el     The target element.
+ * @param {?string} type       The widget type.
+ * @param {Object} props       The props to apply.
+ * @returns {void}
+ */
+function applyScrollProps(el, type, props) {
+  if (type !== "ScrollView" || !("horizontal" in props)) {
+    return;
+  }
+  setOrRemove(el, HORIZONTAL_ATTR, props.horizontal ? "" : null);
+}
+
 function applyLazyProps(el, type, props) {
   if (type == null || !LAZY_TYPES.includes(type)) {
     return;

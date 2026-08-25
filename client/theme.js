@@ -465,6 +465,26 @@ body {
 }
 [data-tw-type="RouteDrawer"][data-tw-open] > :nth-child(2) { transform: translateX(0); }
 
+/* ── ScrollView: the widget that promised to scroll and did not ──────────────
+   A ScrollView reached the DOM as a plain div: no overflow, no axis, nothing.
+   The tree said the body scrolled inside the frame and the browser scrolled the
+   document instead, so a Scaffold bounded to the viewport height kept its bars
+   only until the content grew past it -- measured at 900px of frame over 3249px
+   of content, with the app bar and the action bar riding away up the page.
+   min-height/min-width 0 is the other half: a flex item's automatic minimum is
+   its content, so without it the scroller grows instead of scrolling. */
+[data-tw-type="ScrollView"] {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+}
+[data-tw-type="ScrollView"][data-tw-horizontal] {
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  min-height: auto;
+}
+
 /* ── Text: inherit the modern font instead of the UA serif default ─────────── */
 [data-tw-type="Text"] { font-family: var(--tw-font); }
 

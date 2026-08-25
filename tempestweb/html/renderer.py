@@ -138,7 +138,10 @@ def _style_attribute(node: Node) -> list[str]:
 
     Mirrors ``applyProps``/``styleToCss`` in the client: the ``style`` prop is
     translated to a CSS body, and a ``Row``/``Column`` becomes a flex container by
-    type even without an explicit style. Emits nothing when the CSS body is empty.
+    type even without an explicit style. Two types also carry declarations the
+    client takes from the base sheet, which a static page does not have: an
+    indicator's track and fill, and a ``ScrollView``'s overflow. Emits nothing
+    when the CSS body is empty.
 
     Args:
         node: The IR node whose ``style`` prop to translate.
@@ -150,9 +153,32 @@ def _style_attribute(node: Node) -> list[str]:
     css = style_to_css(style, node.type)
     if node.type in _INDICATOR_TYPES:
         css = f"{_indicator_css(node)}{css}"
+    if node.type == "ScrollView":
+        css = f"{_scroll_css(node)}{css}"
     if not css:
         return []
     return [f'style="{escape_attr(css)}"']
+
+
+def _scroll_css(node: Node) -> str:
+    """Build the inline CSS that makes a ``ScrollView`` actually scroll.
+
+    Same reason as :func:`_indicator_css`: in the DOM this comes from the base
+    sheet, and a server-rendered page ships no stylesheet — so a scroller that
+    relied on one would be the plain ``div`` this exists to fix, with the page
+    scrolling instead of the box. ``min-height: 0`` is the half that is easy to
+    miss: a flex item's automatic minimum is its content, so a scroller inside a
+    bounded column grows past it instead of scrolling.
+
+    Args:
+        node: The ``ScrollView`` node, read for its axis.
+
+    Returns:
+        The declarations, ending in ``; `` so a style body can follow.
+    """
+    if bool(node.props.get("horizontal")):
+        return "overflow-x: auto; overflow-y: hidden; min-width: 0; "
+    return "overflow-y: auto; overflow-x: hidden; min-height: 0; "
 
 
 def _indicator_css(node: Node) -> str:

@@ -95,6 +95,7 @@ def _types(node: Node) -> set[str]:
 EXAMPLE_NAMES = [
     "admin-console",
     "booking-form",
+    "dark-mode",
     "counter",
     "todo",
     "form",

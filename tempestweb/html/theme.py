@@ -9,7 +9,8 @@ therefore shipped the baseline purple.
 
 :func:`theme_css` is that missing half. It maps the roles the sheet
 actually reads onto their variables and returns a CSS block to drop in the
-document head, **before** the base sheet is installed at mount:
+document head; the base sheet is inserted at the *top* of the head at
+mount, so this block always follows it in cascade order:
 
     from tempest_core import Theme, ThemeMode
     from tempest_core import Color
@@ -18,12 +19,23 @@ document head, **before** the base sheet is installed at mount:
     theme = Theme.from_seed(Color(r=39, g=58, b=79), mode=ThemeMode.SYSTEM)
     head = f"<style>{theme_css(theme)}</style>"
 
-Dark mode comes free and comes honestly: a ``SYSTEM`` theme emits the light
-scheme on ``:root`` and the dark one inside
-``@media (prefers-color-scheme: dark)``, so the page follows the reader's
-own setting rather than a preference the app guessed. A theme pinned to
-``LIGHT`` or ``DARK`` emits that one scheme and no media query, because a
-pinned theme that still flipped with the system would not be pinned.
+Dark mode keys off :data:`THEME_MODE_ATTR` — the same attribute the base
+sheet reads — and deliberately **not** ``prefers-color-scheme``. The core
+resolves a ``SYSTEM`` theme as *light* for every widget, because a widget
+never sees the OS, so darkening the page from the OS alone put a light tree
+on a dark page: the two halves of dark mode disagreed, and the half with
+inline precedence won. An app that wants to follow the reader's setting
+reads ``app.media.platform_dark_mode`` in its ``view`` and calls
+``set_theme``; then the resolved mode reaches the document as the attribute
+and everything moves together.
+
+So a ``SYSTEM`` theme emits the light scheme on ``:root`` and the dark one
+under ``:root[data-tw-theme="dark"]``. A theme pinned to ``DARK`` emits its
+dark scheme under **both**, so it paints before any attribute arrives *and*
+still outranks the base sheet's own dark block once it does — that block is
+``:root[data-tw-theme="dark"]`` too, and the base sheet is inserted at the
+top of the head while this goes after it, so equal specificity resolves in
+the app's favour. The base theme is a floor, not a cage.
 
 Only the variables the sheet reads are emitted. Writing all 39 roles would
 look thorough and would be worse: a variable nothing consumes is a promise
@@ -35,6 +47,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from tempest_core import ThemeMode
+
+#: The attribute the renderer writes on ``<html>`` to pin the active theme mode.
+#: Mirrors ``THEME_MODE_ATTR`` in ``client/theme.js``, which is what makes the
+#: app's palette and the base sheet's token block key off the same switch.
+THEME_MODE_ATTR: str = "data-tw-theme"
 
 if TYPE_CHECKING:
     from tempest_core import Color, ColorScheme, Theme
@@ -108,9 +125,10 @@ def theme_css(theme: Theme) -> str:
             :meth:`~tempest_core.Theme.from_seed`.
 
     Returns:
-        str: A CSS block for the document head — ``:root`` declarations,
-        plus a ``prefers-color-scheme: dark`` block when the theme follows
-        the system.
+        str: A CSS block for the document head — ``:root`` declarations, plus a
+        ``:root[data-tw-theme="dark"]`` block when the theme can go dark. Never a
+        ``prefers-color-scheme`` query: see the module docstring for why the OS
+        alone must not flip the page.
 
     Example:
         ```python
@@ -130,12 +148,11 @@ def theme_css(theme: Theme) -> str:
         ```
     """
     schemes = theme.tokens.schemes
+    dark_selector = f':root[{THEME_MODE_ATTR}="dark"]'
+    dark = _declarations(schemes.dark, "  ")
     if theme.mode is ThemeMode.DARK:
-        return f":root {{\n{_declarations(schemes.dark, '  ')}\n}}"
+        return f":root, {dark_selector} {{\n{dark}\n}}"
     light = f":root {{\n{_declarations(schemes.light, '  ')}\n}}"
     if theme.mode is ThemeMode.LIGHT:
         return light
-    dark = _declarations(schemes.dark, "    ")
-    return (
-        f"{light}\n@media (prefers-color-scheme: dark) {{\n  :root {{\n{dark}\n  }}\n}}"
-    )
+    return f"{light}\n{dark_selector} {{\n{dark}\n}}"

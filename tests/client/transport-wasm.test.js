@@ -98,3 +98,23 @@ test("close() is idempotent", async () => {
   await transport.close();
   assert.equal(fb.closedCalls(), 1);
 });
+
+test("requestResync pushes the wire event the runtime serves itself", () => {
+  const fb = fakeBridge();
+  const transport = createWasmTransport(fb.bridge);
+
+  transport.requestResync();
+
+  assert.equal(fb.pushed.length, 1);
+  assert.deepEqual(fb.pushed[0], { type: "resync", key: "", payload: {} });
+});
+
+test("requestResync is silent after close", async () => {
+  const fb = fakeBridge();
+  const transport = createWasmTransport(fb.bridge);
+
+  await transport.close();
+  transport.requestResync();
+
+  assert.equal(fb.pushed.length, 0);
+});

@@ -21,6 +21,7 @@
 // See docs/modo-c-transpile.md for the full contract.
 
 import { mount } from "../tempestweb.js";
+import { applyThemeMode } from "../theme.js";
 import { diff } from "./diff.js";
 import { NavStack, Route, pathToRoutes, routeToPath } from "./nav.js";
 import { MediaQueryData, Theme } from "./theme.js";
@@ -45,6 +46,23 @@ export { formValidate } from "./widget-support.js";
  * `instanceof`-checkable base.
  */
 export class State {}
+
+/**
+ * Mark the document with a theme's resolved mode, for the base stylesheet.
+ *
+ * Mode C's counterpart of Mode B's `theme` envelope: the colours the widgets
+ * resolve are already inline, but the page background, a field's surface and
+ * every hover/focus state are CSS, so the sheet needs the mode. Resolved the way
+ * a widget resolves it (`is_dark()` with no platform flag), so the sheet and the
+ * tree never disagree.
+ *
+ * @param {?Object} theme  The active theme.
+ * @returns {void}
+ */
+function markThemeMode(theme) {
+  const dark = theme != null && typeof theme.is_dark === "function" && theme.is_dark();
+  applyThemeMode(dark ? "dark" : "light");
+}
 
 /**
  * The application handle passed to `view(app)` and closed over by handlers.
@@ -121,6 +139,7 @@ export class App {
    */
   set_theme(theme) {
     this._theme = theme;
+    markThemeMode(theme);
     this._rerender();
   }
 

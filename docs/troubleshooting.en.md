@@ -308,6 +308,36 @@ Fixed in 0.98.0 — each becomes the equivalent native control (see
 uv add "tempestweb>=0.98.0"
 ```
 
+### Dark mode changes nothing in Mode C
+
+The app calls `app.set_theme(Theme(mode=ThemeMode.DARK))`, Mode B goes dark, and
+the same transpiled artifact stays light. Two causes, both fixed in 0.99.0:
+
+- **The generated style tables had no mode axis.** Mode C has no Python, so each
+  widget's resolved style travels as a generated table — and it was generated
+  with the default theme. Since an inline style beats the stylesheet, the half
+  with precedence was the half rendering light.
+- **The builder refused the `theme` kwarg.** There was no way to even *ask* for
+  dark: `Button(theme=app.theme)` compiled to a builder that did not name
+  `theme`, so Mode C dropped it while Modes A/B resolved correctly — the same
+  `view`, two results.
+
+```bash
+uv add "tempestweb>=0.99.0"
+```
+
+!!! note "Pass the theme to the widget"
+    The theme is a **field on the widget**, not ambient: `Button(label="x",
+    theme=app.theme)`. Without it the widget resolves the light palette in all
+    three modes — that is the core's rule, not a Mode C detail. See
+    [Theming](tutorial/theming.md#dark-mode-pass-the-theme-to-the-widget).
+
+!!! warning "The base sheet is still light"
+    An `Input`'s background, the page background and the hover/focus states come
+    from the `--tw-*` tokens, which have no mode axis — in a dark app the field
+    shows up white. Tracked in
+    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+
 ---
 
 ### `setattr is not defined` (Mode C)
@@ -482,6 +512,47 @@ Reference: [PWA & offline](advanced/pwa.md).
 
 ---
 
+## Rendering and patches
+
+### `patch path out of range` — and part of the screen is missing
+
+```text
+RangeError: tempestweb: patch path out of range at index 1 (path [0, 1],
+step 1): div[data-tw-key="appbar-actions"] has 1 children [button[data-tw-key="…"]]
+```
+
+Python computed a patch addressing a node the client does not have. A patch is a
+walk of child indices, so when a step does not resolve the batch **stops right
+there**: the screen keeps what it already had, missing exactly what the rest of
+the batch carried — a button, a table column, a form field.
+
+The symptom is treacherous because **it does not look like an error**: the screen
+renders, only incomplete. Only the console complains.
+
+**What the message gives you.** It names the whole path, which step failed, which
+node the client has at that point (by `data-tw-key`, the same identifier the IR
+uses) and how many children it actually holds. Compare that against the tree your
+`view()` builds: if the parent has fewer children than it should, some earlier
+batch never landed.
+
+**How to investigate.** Turn the patch-stream log on from the console — the flag
+is read per batch, so it works on a page that is already misbehaving:
+
+```js
+globalThis.__tempestweb_debug = true;
+```
+
+From then on every batch is printed numbered, and the batch that fails comes with
+an outline of the tree the client holds.
+
+!!! check "The client repairs itself"
+    When a batch will not apply, the client asks for a **resync** and Python
+    answers with the whole scene in a root `Replace`. This holds in all three
+    modes — Mode A got it in 0.102.0; before that, a patch that failed left the
+    screen truncated until a reload.
+
+---
+
 ## Connection (Mode B)
 
 ### `websocket disconnected` / `sse transport is closed`
@@ -539,6 +610,8 @@ Always use the glob, quoted so the shell does not expand it first.
   a script, or an incomplete bootstrap.
 - **A frozen interface with no error** is the serial dispatch; the answer is
   `spawn`.
+- **`patch path out of range`** is the client's tree drifting from Python's; the
+  message names the node, and `__tempestweb_debug` shows the whole stream.
 - **A screen that does not change** is a mutation without `set_state`.
 - **Old code after a build** is the service worker waiting; turn on *Update on
   reload* while developing.

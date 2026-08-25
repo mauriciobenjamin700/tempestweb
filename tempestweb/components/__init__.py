@@ -8,10 +8,14 @@ by hand:
     from tempestweb.components import filled_button, text_button
 
 ``EmailField``/``PasswordField`` and ``TextField`` are tempestweb-native, styled
-for the Material 3 light surface the base stylesheet renders; the BR fields
+Material 3 against the ``theme`` they are given; the BR fields
 (:class:`PhoneField`/:class:`CPFField`/:class:`CNPJField`/:class:`AddressField`)
 wrap the core's masked inputs. The ``*_button`` helpers build the MD3 button
 variants. Everything renders identically in Mode A (WASM) and Mode B (server).
+
+Pass ``theme=app.theme`` to a field or a form exactly as you would to a widget:
+the theme reaches the ``Input`` each field builds, the fields and submit button
+each form builds, and the colour of every label and error line.
 """
 
 from __future__ import annotations

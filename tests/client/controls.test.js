@@ -155,6 +155,32 @@ test("RangeSlider draws two thumbs and reports the pair, normalized", () => {
   });
 });
 
+// The RangeSlider wrapper is a role-less <div>, so its aria-label names nothing a
+// reader can reach. axe flagged both thumbs as critical (rule `label`) even with
+// semantics.label set on the widget, because the name stopped at the wrapper.
+test("RangeSlider names both thumbs, so neither is an unnamed control", () => {
+  const named = mountWidget("RangeSlider", "fare", {
+    low: 1,
+    high: 9,
+    min_value: 0,
+    max_value: 10,
+    semantics: { label: "Fare window" },
+  });
+  const namedThumbs = named.el.querySelectorAll("input[type=range]");
+  assert.equal(namedThumbs[0].getAttribute("aria-label"), "Fare window (minimum)");
+  assert.equal(namedThumbs[1].getAttribute("aria-label"), "Fare window (maximum)");
+
+  const bare = mountWidget("RangeSlider", "span", {
+    low: 1,
+    high: 9,
+    min_value: 0,
+    max_value: 10,
+  });
+  const bareThumbs = bare.el.querySelectorAll("input[type=range]");
+  assert.equal(bareThumbs[0].getAttribute("aria-label"), "Minimum");
+  assert.equal(bareThumbs[1].getAttribute("aria-label"), "Maximum");
+});
+
 test("Dropdown renders its options, its placeholder, and reports a selection", () => {
   const { dom, el, transport } = mountWidget("Dropdown", "theme", {
     options: ["System", "Light", "Dark"],
@@ -389,6 +415,10 @@ test("TabView names its panel after the active tab and stays a container", () =>
   assert.equal(el.children[0].getAttribute(TYPE_ATTR), "Text");
 });
 
+// Closed, the drawer is hidden from the accessibility tree — not `aria-expanded`,
+// which is only allowed on a handful of roles. This is a plain div, so axe flagged
+// that attribute as invalid ARIA (critical), and "expanded" describes the control
+// that toggles the drawer: the app's own button.
 test("RouteDrawer reflects open, so the prop is visible to sheet and reader", () => {
   withDocument();
   const el = buildElement({
@@ -402,12 +432,12 @@ test("RouteDrawer reflects open, so the prop is visible to sheet and reader", ()
   });
 
   assert.equal(el.hasAttribute("data-tw-open"), false);
-  assert.equal(el.getAttribute("aria-expanded"), "false");
+  assert.equal(el.getAttribute("aria-hidden"), "true");
 
   applyPatches(el, [{ path: [], set_props: { open: true } }]);
 
   assert.equal(el.hasAttribute("data-tw-open"), true);
-  assert.equal(el.getAttribute("aria-expanded"), "true");
+  assert.equal(el.hasAttribute("aria-hidden"), false);
   assert.equal(el.children.length, 2, "both IR children keep their indices");
 });
 
@@ -510,4 +540,35 @@ test("TabView keeps an aria-label the app set through semantics", () => {
   applyPatches(el, [{ path: [], set_props: { active: 1 } }]);
 
   assert.equal(el.getAttribute("aria-label"), "Profile sections");
+});
+
+
+// A <label> names its input through its text; an aria-label on the wrapper names
+// the label, not the control inside it — so the control came out nameless (axe:
+// `label`, critical). The name is copied inward.
+test("a wrapped control takes the name the app gave the widget", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Switch",
+    key: "notify",
+    props: { checked: false, semantics: { label: "Enable notifications" } },
+    children: [],
+  });
+
+  assert.equal(el.querySelector("input").getAttribute("aria-label"), "Enable notifications");
+});
+
+// Two names on one control is worse than one, and the visible caption is the
+// better name: it is what the reader sees.
+test("a visible caption wins over the semantics name, and is not duplicated", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Switch",
+    key: "notify",
+    props: { checked: false, label: "Notifications", semantics: { label: "Other" } },
+    children: [],
+  });
+
+  assert.equal(el.querySelector("input").hasAttribute("aria-label"), false);
+  assert.equal(el.textContent.trim(), "Notifications");
 });

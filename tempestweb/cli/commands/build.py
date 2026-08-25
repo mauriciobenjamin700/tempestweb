@@ -906,9 +906,19 @@ export async function boot() {{
 
   // 4. In-process bridge: Python delivers patches as a JSON string; events go
   //    back as JSON strings. No network — Python runs in this tab.
+  //    A batch delivered before the transport exists is BUFFERED, never dropped:
+  //    Python starts its rebuild loop inside start(), so a batch that lands in
+  //    the gap used to vanish with no error, and the mounted tree silently missed
+  //    whatever it carried (tempestweb#160).
   let deliverToTransport = null;
+  const bootPatches = [];
   const onPatches = (patchesJson) => {{
-    if (deliverToTransport) deliverToTransport(JSON.parse(patchesJson));
+    const patches = JSON.parse(patchesJson);
+    if (deliverToTransport) {{
+      deliverToTransport(patches);
+    }} else {{
+      bootPatches.push(patches);
+    }}
   }};
   // View -> URL: push the new path when the app navigates (no popstate fires, so
   // no loop with the router's URL -> view reporting).
@@ -963,6 +973,9 @@ export async function boot() {{
   const bridge = {{
     onDeliver(handler) {{
       deliverToTransport = handler;
+      while (bootPatches.length > 0) {{
+        deliverToTransport(bootPatches.shift());
+      }}
     }},
     pushEvent(event) {{
       handle.push_event_json(JSON.stringify(event));

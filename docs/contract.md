@@ -137,8 +137,14 @@ report é ida-e-volta no socket mais rebuild e diff.
 O `resync` existe porque a árvore do cliente só está correta enquanto **todo**
 patch foi aplicado em ordem: os patches são relativos a índice, então depois de
 uma falha nenhum patch seguinte serve. O cliente para o batch, pede o `resync`, e
-o servidor responde com um único **Replace na raiz** carregando a cena como ela
-está agora (`AppSession.resync`).
+o Python responde com um único **Replace na raiz** carregando a cena como ela
+está agora, seguido dos overlays abertos como inserts sob `overlay`.
+
+Os **três** modos servem o pedido, cada um no seu runtime — `AppSession.resync`
+no Modo B, `WasmRuntime.resync` no Modo A. No Modo A não há round-trip: o app
+está no mesmo processo. Cada transporte expõe `requestResync()`; um transporte
+que não expusesse deixaria a tela truncada até o reload, que era exatamente o
+estado do Modo A antes da 0.102.0.
 
 !!! note "Quem mais dispara um resync"
     A perna SSE pede o mesmo reparo por conta própria: se o cliente reconecta com

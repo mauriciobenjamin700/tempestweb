@@ -37,6 +37,7 @@ from tempestweb.transports.base import (
     encode_native_unsubscribe,
     encode_navigate,
     encode_patches,
+    encode_theme,
 )
 
 __all__ = ["WebSocketTransport"]
@@ -183,6 +184,17 @@ class WebSocketTransport:
             TransportClosedError: If the socket is no longer connected.
         """
         await self._send(encode_navigate(path))
+
+    async def send_theme(self, mode: str) -> None:
+        """Send a ``theme`` envelope so the base sheet follows the app's theme.
+
+        Args:
+            mode: The resolved theme mode (``"light"`` or ``"dark"``).
+
+        Raises:
+            TransportClosedError: If the socket is no longer connected.
+        """
+        await self._send(encode_theme(mode))
 
     async def send_native_call(
         self, call_id: str, capability: str, args: dict[str, Any]

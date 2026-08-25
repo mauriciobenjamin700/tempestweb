@@ -78,15 +78,42 @@ class TestHowTheModeDecidesDarkness:
     def test_system_emits_both_schemes(self) -> None:
         css = theme_css(Theme.from_seed(SEED, mode=ThemeMode.SYSTEM))
 
-        assert "@media (prefers-color-scheme: dark)" in css
+        assert ':root[data-tw-theme="dark"]' in css
         assert css.count("--tw-primary:") == 2
 
     @pytest.mark.parametrize("mode", [ThemeMode.LIGHT, ThemeMode.DARK])
     def test_a_pinned_theme_emits_one_scheme(self, mode: ThemeMode) -> None:
         css = theme_css(Theme.from_seed(SEED, mode=mode))
 
-        assert "@media" not in css
         assert css.count("--tw-primary:") == 1
+
+    @pytest.mark.parametrize(
+        "mode", [ThemeMode.LIGHT, ThemeMode.DARK, ThemeMode.SYSTEM]
+    )
+    def test_the_os_alone_never_flips_the_page(self, mode: ThemeMode) -> None:
+        """No mode emits a media query, whatever the reader's OS says.
+
+        The core resolves a ``SYSTEM`` theme as light for every widget — a widget
+        never sees the OS — so a page that darkened from ``prefers-color-scheme``
+        alone put a light tree on a dark background, and the inline half won.
+        Measured before this was fixed: ``--tw-surface`` went to the dark value
+        while every widget stayed light.
+        """
+        assert "prefers-color-scheme" not in theme_css(Theme.from_seed(SEED, mode=mode))
+
+    def test_a_pinned_dark_theme_outranks_the_base_sheet_dark_block(self) -> None:
+        """A pinned dark palette wins over the sheet's own dark tokens.
+
+        The base sheet's dark block is ``:root[data-tw-theme="dark"]``. An app
+        palette emitted on bare ``:root`` loses to it on specificity, so the app's
+        rebrand silently reverted to the baseline the moment the page went dark —
+        the base theme acting as a cage instead of a floor. Emitting the pinned
+        scheme under both selectors ties the specificity, and the app's block is
+        appended after the sheet, so the app wins.
+        """
+        css = theme_css(Theme.from_seed(SEED, mode=ThemeMode.DARK))
+
+        assert css.startswith(':root, :root[data-tw-theme="dark"] {')
 
     def test_dark_and_light_are_not_the_same_scheme(self) -> None:
         """A dark block copied from the light one would be worse than none."""

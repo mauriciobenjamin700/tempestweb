@@ -260,12 +260,17 @@ The block goes in the `<head>`, before the base sheet is installed at
 mount; since it declares the same names at the same specificity, yours wins
 by coming later.
 
-!!! tip "Dark mode comes free, and comes honestly"
-    A `SYSTEM` theme emits the light scheme on `:root` and the dark one
-    inside `@media (prefers-color-scheme: dark)`: the page follows the
-    reader's own setting. A theme pinned to `LIGHT` or `DARK` emits one
-    scheme and no media query — a pinned theme that still flipped with the
-    system would not be pinned.
+!!! tip "Dark mode comes free, through the sheet's own switch"
+    A `SYSTEM` theme emits the light scheme on `:root` and the dark one under
+    `:root[data-tw-theme="dark"]` — **the same selector** the base sheet uses,
+    so your palette and the sheet's tokens flip together, in the mode the app
+    resolved. A theme pinned to `DARK` emits its dark scheme under **both**
+    selectors: it paints before any attribute arrives and still outranks the
+    sheet once it does.
+
+    No media query is ever emitted. See "Why not `prefers-color-scheme`" below:
+    a widget never sees the OS, so darkening the page from the OS left a light
+    tree on a dark background — and the inline half is the half that wins.
 
 !!! info "Only what the sheet consumes"
     `theme_css` emits the variables the base sheet reads, not all 39 roles.
@@ -405,7 +410,7 @@ LoginForm(
 )
 ```
 
-!!! danger "Before 0.100.0 they were light by construction"
+!!! danger "Before 0.101.0 they were light by construction"
     None of the five declared a `theme`, and none passed one down, so a dark app
     got a light field **with no warning at all** — and the worst case is a dark
     background (from the base sheet) under dark text, i.e. unreadable. If you
@@ -425,12 +430,53 @@ LoginForm(
     beats the stylesheet, the half with precedence was the half that failed. The
     table now carries both modes and the builder picks by `theme.is_dark()`.
 
-!!! warning "The base sheet is still light"
-    What the inline `Style` resolves follows the theme; what only the **base
-    sheet** paints (an `Input`'s background, the page background, hover and focus
-    states) stays on the light palette, because the `--tw-*` tokens have no mode
-    axis. In a dark app that shows up as a white field inside a dark card. Tracked
-    in [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+## The base sheet follows the mode you declare
+
+The `Style` the core resolves travels **inline** on each widget, and inline beats
+the stylesheet. But half the screen is not inline: the page background, a field's
+surface, its `::placeholder`, every `:hover`/`:focus` state, an overlay's surface.
+That is CSS — and the CSS had no mode axis, so a dark app showed a white field
+inside a dark card.
+
+Now it has one. The renderer marks the document with the resolved mode:
+
+```html
+<html data-tw-theme="dark">
+```
+
+and the base sheet redefines its tokens under that selector. You write nothing for
+this: in Mode B (and SSE) the server sends a `theme` envelope; in Mode A the
+runtime calls the callback directly; in Mode C `set_theme` marks the document
+in-process.
+
+!!! warning "Declared dark? Pass `app.theme` to the widgets"
+    The marking follows the **app's** theme; each widget's colour follows the
+    `theme` **that widget** received. If you call
+    `app.set_theme(Theme(mode=DARK))` and do not pass `theme=app.theme` to the
+    widgets, the sheet goes dark and the widgets stay light — measured: an `Input`
+    with no `theme` ends up with a dark background (sheet) and dark text (inline),
+    i.e. unreadable. Pass the theme; it is the core's own rule.
+
+!!! info "Why not `prefers-color-scheme`"
+    It would be the obvious answer — and it would be wrong. A widget built with
+    `Theme(mode=SYSTEM)` resolves **light** in the core: it never sees the OS.
+    Darkening the sheet from the OS alone would put a light tree on a dark page. If
+    you want to follow the OS, read `app.media.platform_dark_mode` in your `view`
+    and call `set_theme` — then both halves move together.
+
+!!! check "The palette's pairs are contrast-gated"
+    axe's `color-contrast` rule needs real layout, so the a11y gate disables it and
+    the Lighthouse job is a soft signal — which is how an illegible dark palette
+    could have shipped unnoticed. What does **not** need layout is the pair of
+    roles: `--tw-on-surface` is by definition what goes on `--tw-surface`.
+    `tests/client/theme-contrast.test.js` computes the 12 pairs the sheet promises,
+    in both modes, and fails below AA. Tightest pair today: `warning` on `surface`
+    in light mode, **6.02:1** against a 4.5 minimum.
+
+!!! note "The first `light` is not sent"
+    The sheet's tokens **are** the light palette, so marking light on mount would
+    spend a frame saying what the CSS already says. Every later change is sent,
+    including the return to light.
 
 ## Progress indicators
 

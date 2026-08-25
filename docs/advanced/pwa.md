@@ -266,6 +266,86 @@ display = "standalone"
 Os campos completos estão documentados na página
 [Modo C — transpile](transpile.md#configurando-o-manifest-com-pwa).
 
+## Desligando o PWA (`enabled`, `manifest`, `service_worker`)
+
+Nem toda app quer precache offline. O caso claro é o **painel de administração
+atrás de login**, servido por um control plane: ele não ganha nada com offline
+— o usuário sempre tem rede quando usa — e paga por isso duas vezes.
+
+!!! warning "O que o worker custa quando você não precisa dele"
+    - **Asset antigo depois de um deploy.** O worker serve a shell do precache
+      até se atualizar, então o primeiro load pós-deploy pode ser da versão
+      anterior.
+    - **Disputa de conexão no primeiro load.** O precache busca ~90 arquivos
+      enquanto o Pyodide (Modo A) ainda está subindo.
+
+As duas metades do layer são eixos separados, porque são úteis apart:
+
+```toml
+[pwa]
+enabled = false
+```
+
+Isso é o atalho: desliga as duas. Nenhum `manifest.webmanifest`, nenhum
+`register.js`, nenhum `<link rel="manifest">` e nenhum registro de worker no
+`index.html`.
+
+Para desligar só uma:
+
+```toml
+[pwa]
+service_worker = false   # sem precache, mas o app continua instalável
+```
+
+```toml
+[pwa]
+manifest = false         # com precache, sem prompt de instalação
+```
+
+`enabled` é o **default** que as duas metades seguem; nomear uma metade
+explicitamente ganha dele. Então "desligado por padrão, exceto o manifest" se
+escreve assim:
+
+```toml
+[pwa]
+enabled = false
+manifest = true
+```
+
+!!! info "O campo tem que ser booleano de verdade"
+    `service_worker = "false"` (com aspas) é recusado no build. String não-vazia
+    é truthy em Python, e um switch cujo trabalho é desligar algo não pode fazer
+    o oposto do que se lê.
+
+### Desligar não é o mesmo que nunca ter ligado
+
+Quem já visitou o app **já tem o worker registrado**, e um worker registrado
+continua servindo a shell do precache até ser substituído. Simplesmente parar de
+emitir `sw.js` deixaria essas pessoas presas ao build antigo, sem nada no deploy
+capaz de alcançá-las.
+
+Por isso o build **continua emitindo `sw.js`** quando você desliga o worker — só
+que um worker diferente: ele limpa todo cache do origin, se desregistra e
+recarrega as páginas que controlava. Roda uma vez por browser que ainda tinha o
+worker antigo, e some.
+
+```toml
+[pwa]
+service_worker = false
+```
+
+| Arquivo | Com o worker ligado | Desligado |
+| --- | --- | --- |
+| `sw.js` | worker cache-first | worker de teardown |
+| `register.js` | emitido | **não emitido** |
+| registro no `index.html` | presente | **ausente** |
+| `manifest.webmanifest` | emitido | segue `manifest` |
+| ícones | emitidos | emitidos (favicon e apple-touch) |
+
+!!! check "O banner de conectividade continua"
+    Ele reporta a **rede**, não o precache, então uma app sem worker continua
+    avisando o usuário quando cai o sinal.
+
 ## Verificação manual
 
 !!! note "O que exige device/browser real"
@@ -286,5 +366,8 @@ Os campos completos estão documentados na página
 - **WebPush** (P3): `native.notifications.subscribe` no cliente; `tempestweb vapid`
   + `webpush_router` no servidor.
 - Alguns testes de PWA exigem device real — veja a verificação manual.
+- **`[pwa] enabled = false`** desliga o layer inteiro; `manifest` e
+  `service_worker` desligam uma metade só. Desligar o worker emite o worker de
+  teardown, para quem já registrou não ficar preso ao precache velho.
 
 Para a saúde em produção, veja [Observabilidade](observability.md). 🚀

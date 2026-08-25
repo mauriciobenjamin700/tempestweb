@@ -31,14 +31,32 @@ class ConfigError(RuntimeError):
 
 @dataclass(slots=True)
 class PwaConfig:
-    """Web-App-Manifest overrides a project declares under ``[pwa]``.
+    """The PWA layer a project declares under ``[pwa]``.
 
     Every field is optional: a project with no ``[pwa]`` section still ships an
-    installable-shaped manifest (the manifest emitter fills the defaults). These
-    feed :class:`tempestweb.pwa.ManifestOptions` at build time so the installed
-    app carries the project's own name, colors and display mode.
+    installable-shaped manifest and a caching service worker (the manifest
+    emitter fills the defaults). Most fields feed
+    :class:`tempestweb.pwa.ManifestOptions` at build time so the installed app
+    carries the project's own name, colors and display mode.
+
+    Three fields instead decide **whether each half of the layer is emitted at
+    all**. They are separate because the two halves are useful apart: a manifest
+    alone makes the app installable and names it on the home screen, while the
+    service worker is what precaches the shell — and an app behind a login,
+    served by a control plane, gains nothing from offline precache and pays for
+    it (stale assets after a deploy, ~90 files competing with boot for
+    connections).
 
     Attributes:
+        enabled: The default both halves fall back to. ``enabled = false`` with
+            neither half named turns the whole layer off.
+        manifest: Whether ``manifest.webmanifest`` and its ``<link>`` are
+            emitted. Defaults to ``enabled``.
+        service_worker: Whether the caching worker is emitted and registered.
+            Defaults to ``enabled``. When off, ``sw.js`` is still emitted — as a
+            worker that clears every cache and unregisters itself, so a browser
+            that already registered the caching one is not left on a stale
+            precache forever.
         name: Full application name. Falls back to the project name when unset.
         short_name: Home-screen label. Falls back to a trimmed project name.
         description: Human-readable description shown in the install UI.
@@ -51,6 +69,9 @@ class PwaConfig:
         categories: App-store categories (e.g. ``["productivity"]``).
     """
 
+    enabled: bool = True
+    manifest: bool = True
+    service_worker: bool = True
     name: str | None = None
     short_name: str | None = None
     description: str | None = None
@@ -240,6 +261,38 @@ _INSTALLABLE_DISPLAYS: frozenset[str] = frozenset(
 )
 
 
+def _flag(
+    value: Any,  # noqa: ANN401 - raw TOML value
+    key: str,
+    config_path: Path,
+    *,
+    default: bool,
+) -> bool:
+    """Coerce an optional ``[pwa]`` boolean field, or fall back to ``default``.
+
+    A truthy string (``"false"`` is truthy in Python) silently doing the opposite
+    of what it reads is the worst outcome for a switch whose whole job is to turn
+    something off, so anything that is not a TOML boolean is rejected.
+
+    Args:
+        value: The raw TOML value (expected to be a boolean or absent).
+        key: The field name, for error messages.
+        config_path: The config file path, for error messages.
+        default: What an absent key means.
+
+    Returns:
+        The declared boolean, or ``default`` when the key is absent.
+
+    Raises:
+        ConfigError: If the value is present but not a boolean.
+    """
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        raise ConfigError(f"invalid pwa.{key} in {config_path}; expected true or false")
+    return value
+
+
 def _opt_str(value: Any, key: str, config_path: Path) -> str | None:  # noqa: ANN401 - raw TOML value
     """Coerce an optional ``[pwa]`` string field, or ``None`` when absent.
 
@@ -286,7 +339,13 @@ def _parse_pwa(raw: Any, config_path: Path) -> PwaConfig:  # noqa: ANN401 - raw 
             f"expected one of {sorted(_INSTALLABLE_DISPLAYS)}"
         )
     defaults = PwaConfig()
+    enabled = _flag(raw.get("enabled"), "enabled", config_path, default=True)
     return PwaConfig(
+        enabled=enabled,
+        manifest=_flag(raw.get("manifest"), "manifest", config_path, default=enabled),
+        service_worker=_flag(
+            raw.get("service_worker"), "service_worker", config_path, default=enabled
+        ),
         name=_opt_str(raw.get("name"), "name", config_path),
         short_name=_opt_str(raw.get("short_name"), "short_name", config_path),
         description=_opt_str(raw.get("description"), "description", config_path),

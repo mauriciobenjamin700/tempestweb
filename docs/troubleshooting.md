@@ -308,6 +308,37 @@ Corrigido em 0.98.0 — cada um vira o controle nativo equivalente (veja
 uv add "tempestweb>=0.98.0"
 ```
 
+### Dark mode não muda nada em Modo C
+
+O app chama `app.set_theme(Theme(mode=ThemeMode.DARK))`, o Modo B escurece e o
+mesmo artefato transpilado continua claro. Duas causas, as duas corrigidas na
+0.99.0:
+
+- **As tabelas de estilo geradas não tinham eixo de modo.** O Modo C não tem
+  Python, então o estilo resolvido de cada widget viaja em tabela gerada — e ela
+  era gerada com o tema default. Como o estilo inline ganha do stylesheet, era a
+  metade com precedência que renderizava claro.
+- **O builder recusava o kwarg `theme`.** Não havia como nem *pedir* o modo
+  escuro: `Button(theme=app.theme)` compilava para um builder que não nomeava
+  `theme`, então o Modo C ignorava e os Modos A/B resolviam certo — a mesma
+  `view` com dois resultados.
+
+```bash
+uv add "tempestweb>=0.99.0"
+```
+
+!!! note "Passe o tema ao widget"
+    O tema é **campo do widget**, não ambiente: `Button(label="x",
+    theme=app.theme)`. Sem isso, o widget resolve a paleta clara nos três modos —
+    é a regra do core, não um detalhe do Modo C. Veja
+    [Tema](tutorial/theming.md#modo-escuro-passe-o-tema-ao-widget).
+
+!!! warning "A folha base continua clara"
+    O fundo do `Input`, o fundo da página e os estados de hover/foco vêm dos
+    tokens `--tw-*`, que não têm eixo de modo — num app escuro o campo aparece
+    branco. Rastreado em
+    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+
 ---
 
 ### `setattr is not defined` (Modo C)
@@ -481,6 +512,46 @@ Referência: [PWA e offline](advanced/pwa.md).
 
 ---
 
+## Render e patches
+
+### `patch path out of range` — e a tela fica faltando pedaço
+
+```text
+RangeError: tempestweb: patch path out of range at index 1 (path [0, 1],
+step 1): div[data-tw-key="appbar-actions"] has 1 children [button[data-tw-key="…"]]
+```
+
+O Python calculou um patch endereçando um nó que o cliente não tem. Um patch é
+uma caminhada por índices de filho, então quando um passo não resolve o lote
+**para ali**: a tela fica com o que já tinha, faltando exatamente o que o resto
+do lote carregava — um botão, uma coluna de tabela, um campo de formulário.
+
+O sintoma é traiçoeiro porque **não parece erro**: a tela renderiza, só que
+incompleta. Só o console reclama.
+
+**O que a mensagem te dá.** Ela nomeia o path inteiro, qual passo falhou, qual
+nó o cliente tem ali (pelo `data-tw-key`, o mesmo identificador da IR) e quantos
+filhos ele de fato tem. Compare com a árvore que o seu `view()` constrói: se o
+pai tem menos filhos do que deveria, algum lote anterior não chegou.
+
+**Como investigar.** Ligue o log do stream de patches pelo console — a flag é
+lida a cada lote, então funciona numa página que já está com problema:
+
+```js
+globalThis.__tempestweb_debug = true;
+```
+
+A partir daí cada lote sai numerado no console, e o lote que falhar vem
+acompanhado de um outline da árvore que o cliente tem.
+
+!!! check "O cliente se repara sozinho"
+    Quando um lote não aplica, o cliente pede um **resync** e o Python responde
+    com a scene inteira num `Replace` de raiz. Vale nos três modos — o Modo A
+    ganhou isso na 0.102.0; antes dela, um patch que falhasse deixava a tela
+    truncada até o reload.
+
+---
+
 ## Conexão (Modo B)
 
 ### `websocket disconnected` / `sse transport is closed`
@@ -537,6 +608,8 @@ Use sempre o glob, entre aspas para o shell não expandir antes.
 - **Ponte nativa ausente** significa "não há browser deste lado": teste, script
   ou bootstrap incompleto.
 - **Interface travada sem erro** é o dispatch serial; a resposta é `spawn`.
+- **`patch path out of range`** é árvore do cliente divergindo da do Python; a
+  mensagem diz qual nó, e `__tempestweb_debug` mostra o stream inteiro.
 - **Tela que não muda** é mutação sem `set_state`.
 - **Código velho depois do build** é o service worker esperando; ligue *Update
   on reload* durante o desenvolvimento.

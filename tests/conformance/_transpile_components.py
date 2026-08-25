@@ -66,6 +66,8 @@ from tempest_core import (
     Tabs,
     Tag,
     Text,
+    Theme,
+    ThemeMode,
     VStack,
     build,
 )
@@ -546,6 +548,21 @@ def build_samples() -> dict[str, Any]:
     pins what the unkeyed build cannot: that each *inner* key is namespaced under
     the caller's, the way ``Component.child_key`` does.
 
+    **Every** case is also built a second time in dark mode, under a ``__dark``
+    name. That twin is the whole guard for tempestweb#106: the Mode C tables were
+    baked from the default theme, so a component rendered light whatever the app
+    asked — and a light-only matrix could not see it, because light is what it
+    compared against. A component whose port forgets to pass the theme down to a
+    child fails here, on that child's colour.
+
+    With one exception that has to be said out loud, or the matrix reads as more
+    coverage than it is: the components in :data:`LIGHT_ONLY_COMPONENTS` cannot be
+    themed at all, so their twin is identical to the light case. The pair still
+    earns its place — it pins that the JS port ignores the theme *exactly* as the
+    core does — but it proves nothing about dark. See
+    ``tests/transpile/test_component_dark_axis.py``, which pins the split so a
+    theme dropped on the floor cannot hide among them.
+
     Returns:
         A scenario → serialized IR node map.
     """
@@ -555,11 +572,62 @@ def build_samples() -> dict[str, Any]:
         node = serialize_node(build(widget))
         node["key"] = None
         samples[name] = node
+        samples[f"{name}__dark"] = _dark_sample(widget)
     for name in KEYED_TWINS:
         twin = serialize_node(build(cases[name].model_copy(update={"key": "k9"})))
         twin["key"] = None
         samples[f"{name}__keyed"] = twin
     return samples
+
+
+#: Components that cannot be themed, and the reason: each renders core widgets
+#: without passing a theme down, so it is light-only **by construction**. They do
+#: not declare a ``theme`` field either, which matters here because
+#: ``model_copy(update=...)`` skips validation: injecting ``theme`` into one of
+#: them silently attaches an attribute the core ignores, and the "dark" twin comes
+#: out byte-identical to the light one. Naming them is what stops that twin from
+#: posing as coverage — and what makes a *new* unthemed component fail the
+#: generator instead of quietly joining them.
+#:
+#: The five tempestweb-owned ones (the two fields families and the two forms) left
+#: this list in 0.99.0 when they gained ``theme`` (tempestweb#158). ``Stepper`` is
+#: the one that stays, and not by choice: it lives in **tempest-core**, which is a
+#: separate repo — its ``model_fields`` carry no ``theme``, so giving it one means
+#: a core release, not a change here.
+LIGHT_ONLY_COMPONENTS: frozenset[str] = frozenset({"Stepper"})
+
+
+def _dark_sample(widget: Any) -> dict[str, Any]:  # noqa: ANN401 — any core component
+    """Build one case again in dark mode, serialized like its light twin.
+
+    A component that declares no ``theme`` field cannot be themed, so its twin is
+    identical to the light case by construction. That is allowed only for the
+    components named in :data:`LIGHT_ONLY_COMPONENTS`; anything else raising here
+    means a component lost its theme field (and its dark coverage) silently.
+
+    Args:
+        widget: The component instance the light sample was built from.
+
+    Returns:
+        The serialized IR node, with the root key dropped.
+
+    Raises:
+        AssertionError: If an unlisted component cannot take a theme, or a listed
+            one now can (the list would be stale).
+    """
+    name = type(widget).__name__
+    themable = "theme" in type(widget).model_fields
+    listed = name in LIGHT_ONLY_COMPONENTS
+    assert themable != listed, (
+        f"{name}: declares theme={themable} but is "
+        f"{'listed' if listed else 'not listed'} in LIGHT_ONLY_COMPONENTS — "
+        "a component that gained theming leaves the list; one that cannot be "
+        "themed joins it, with the reason written down."
+    )
+    dark = widget.model_copy(update={"theme": Theme(mode=ThemeMode.DARK)})
+    node = serialize_node(build(dark))
+    node["key"] = None
+    return node
 
 
 def render_fixture_text() -> str:

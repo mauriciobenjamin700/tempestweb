@@ -45,6 +45,14 @@ class RecordingTransport:
     async def send_navigate(self, path: str) -> None:
         """Discard navigation: irrelevant here."""
 
+    async def send_theme(self, mode: str) -> None:
+        """Mark the theme mode — unused by this harness.
+
+        Args:
+            mode: The resolved theme mode (ignored).
+        """
+        return None
+
     async def send_native_call(
         self, call_id: str, capability: str, args: dict[str, Any]
     ) -> None:

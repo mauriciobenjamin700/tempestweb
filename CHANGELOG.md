@@ -4,6 +4,226 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.107.0] — 2026-08-25
+
+### Fixed
+
+- **O gate de performance reprovava a `main` verde por 0,4%.** A checagem de custo
+  calibrado tinha tolerância de 1,8× sobre um baseline medido em máquina de
+  desenvolvimento, e o merge de #153 caiu em `build costs 1206.9 calibration units,
+  baseline 667.7 (limit 1201.9)` — 1,81×. Não era regressão: o **mesmo** código
+  mediu 975,8, 1130,9 e 1206,9 unidades em três runners da CI, e o run que reprovou
+  foi justamente o de **unidade de calibração mais rápida** (64 µs contra 104 µs).
+  Dividir por uma unidade menor infla o custo: a calibração remove clock de CPU, não
+  a diferença de memória/GC entre máquinas, então as duas medidas não escalam juntas.
+
+  `MAX_RELATIVE_REGRESSION` vai a **2,5×** e passa a ser o que sempre foi de fato —
+  tripwire grosso, que pega uma duplicação de custo. A precisão do gate fica nas
+  razões de escala (`MAX_SCALE_RATIO`, 2,6×) e na contagem de patches, que são
+  medidas **entre si** na mesma máquina e por isso imunes ao runner. O teste de
+  ruído passa a fixar 1,81× — o número real que a CI produziu —, logo apertar a
+  tolerância de novo reprova em `tests/unit/test_perf_gate.py` em vez de deixar a
+  `main` vermelha no merge seguinte. `docs/advanced/observability.md` (PT + EN)
+  registra o spread medido.
+
+## [0.106.0] — 2026-08-25
+
+### Added
+
+- **Gate de acessibilidade que trava de verdade**
+  ([#121](https://github.com/mauriciobenjamin700/tempestweb/issues/121)).
+  `docs/stability.md` declarava baseline de a11y e nada media: o job Lighthouse
+  roda com `|| echo soft-fail`, ou seja, não bloqueia nada — e um `IconButton`
+  chegou a produção como `div` sem foco e sem nome acessível sem nenhum job
+  reclamar (#109).
+
+  O job `a11y` do CI roda **axe-core** sobre o DOM que o renderizador de verdade
+  constrói e falha em violação `serious`/`critical`. As cenas são **geradas dos
+  apps que o repo entrega** (`tests/conformance/_a11y_scenes.py`): galeria de
+  componentes do Modo C, painel de controles, lista com campo, formulário, casca
+  de navegação e tela de imagens — auditar markup escrito à mão provaria que o
+  snippet do teste é acessível, não que o renderizador é.
+
+  Verificado que morde: imagem sem `alt` reprova como `critical` (`image-alt`),
+  botão sem nome reprova (`button-name`, a forma exata da #109) e `role` inválido
+  vindo de `semantics` reprova (`aria-roles`).
+
+- **O wire-contract é congelado** — `tempestweb.contract` expõe
+  `WIRE_CONTRACT_VERSION` (versão própria, independente da versão do pacote) e
+  `WIRE_SHAPE_DIGEST`, o hash da **forma** do fio (cada chave e seu tipo, nunca o
+  valor). As golden fixtures travavam drift acidental mas são regeneráveis do
+  core, então não distinguiam "regenerei" de "mudei o contrato".
+
+  `tests/unit/test_wire_contract_freeze.py` reprova mudança de forma e diz qual
+  escolha o autor deve: aditiva (chave opcional nova, `kind` novo, `type` novo →
+  digest novo, versão igual, entrada no CHANGELOG) ou quebra (renomear, remover,
+  retipar, mudar semântica de patch → bump da versão + nota de migração).
+  Regenerar fixture com valores novos do **mesmo tipo** não mexe no digest.
+
+  Uma borda fica registrada em teste em vez de virar susto: campo `null` na
+  fixture é gravado com o tipo `null`, então regenerar com um valor **move** o
+  digest — resposta certa (o cliente que só via nada agora tem tipo para parsear),
+  mas produzida por um valor. O outro lado é o limite real: enquanto um campo
+  nullable continuar `null` em toda fixture, o tipo declarado dele **não** está
+  pinado por este digest.
+
+### Fixed
+
+- **O gate novo pegou duas violações críticas na primeira execução** — as duas
+  entraram na 0.98.0 e são exatamente a classe de coisa que ele existe para achar:
+
+  - **`aria-expanded` num `div` sem role é ARIA inválido** (`aria-allowed-attr`).
+    O `RouteDrawer` o escrevia; "expandido" descreve o **controle** que abre a
+    gaveta (o botão da app), não o painel. Fechado, o painel agora diz o que
+    é verdade sobre ele: `aria-hidden="true"`.
+  - **Controle embrulhado ficava sem nome acessível** (`label`). Um `<label>`
+    nomeia o input pelo **texto**; quando a app nomeia por `semantics`, o
+    `aria-label` cai no wrapper e não nomeia o controle dentro dele. O nome passa
+    a ser copiado para dentro — e só quando não há legenda visível, porque dois
+    nomes num controle é pior que um. `examples/settings-panel` ganhou o nome nos
+    seis controles que tinham só um `Text` ao lado.
+
+- **Os dois thumbs do `RangeSlider` não tinham nome acessível** (`label`,
+  `critical`) — nos **dois** renderizadores, DOM e SSR. O wrapper é um `<div>` sem
+  role, então o `aria-label` dele não nomeia nada que o leitor alcance: o leitor
+  para nos dois `<input type="range">` que o renderizador cria. Medido em
+  `examples/booking-form`: o widget carregava `semantics.label` e os dois thumbs
+  continuavam anônimos, porque o nome parava no wrapper.
+
+  Cada thumb passa a ser nomeado pelo widget **mais a ponta que ele move**
+  (`Fare window (minimum)` / `(maximum)`; sem `semantics`, `Minimum` / `Maximum`),
+  porque dois controles anunciados igual são o mesmo defeito de terno.
+
+- **O `Dropdown` do `examples/booking-form` não tinha nome** (`select-name`,
+  `critical`): um `<select>` solto, nomeado só por um `Text` ao lado. Ganhou
+  `semantics`, como os do `settings-panel`.
+
+### Changed
+
+- **As cenas do gate cobriam 17 tipos de widget e deixavam sete controles de fora**
+  — justamente os que a #143 acabara de fazer falar (range slider, dropdown,
+  autocomplete, os dois pickers, file picker, tab bar). Diversidade se mede por
+  **tipo de widget**, não por número de telas: `booking-form`,
+  `search-autocomplete` e `tabs-profile` entraram, e as duas violações críticas
+  acima apareceram na hora. Nove cenas.
+
+- **`KNOWN_EXCEPTIONS` agora não pode apodrecer em silêncio.** O docstring
+  prometia que o gate reportaria exceção que parou de disparar, e ele não podia:
+  a passada bloqueante desliga essas regras, e regra desligada não produz
+  resultado nenhum. Uma segunda passada reabilita só o que é julgável em jsdom e
+  reporta o que ficou obsoleto.
+
+  Ela achou algo na estreia: `landmark-one-main`, `page-has-heading-one` e
+  `region` são regras de documento e **nunca** disparam quando o contexto é o
+  elemento de mount — as três saíram da lista. Sobra `color-contrast`, marcada
+  como não-julgável aqui (precisa de layout, amostra cor por canvas), então a
+  passada de obsolescência não a acusa nem finge medi-la.
+
+- `docs/stability.md` (PT + EN) descreve o que o gate pega e o que fica para a
+  camada Lighthouse (contraste e instalabilidade precisam de layout real), e a
+  tabela de compatibilidade do wire. `docs/roadmap.md`: S10 fecha.
+- `axe-core` entra como `devDependency` e `npm run a11y` roda o gate local.
+- **`WIRE_SHAPE_DIGEST` reflete o envelope `theme`.** O congelamento do wire e a
+  chegada do envelope de tema nasceram em frentes paralelas: cada uma passava
+  sozinha e o digest reprovava na integração — o guard fazendo o trabalho dele.
+  A mudança é **aditiva** (uma `EnvelopeKind` nova, nenhuma chave renomeada ou
+  retipada), então `WIRE_CONTRACT_VERSION` fica em `1` e só o digest muda.
+## [0.105.0] — 2026-08-25
+
+### Added
+
+- **Gate de performance no CI**
+  ([#120](https://github.com/mauriciobenjamin700/tempestweb/issues/120)).
+  `benchmarks/bench_reconcile.py` existia e ninguém rodava: uma mudança que
+  dobrasse o custo de `diff` passava por todo o gate atual, porque ruff, mypy,
+  pytest e jsdom são de correção — nenhum de tempo.
+
+  `benchmarks/perf_gate.py` roda no CI e falha o job. O difícil num gate de perf
+  não é medir, é **não ser flake**: runner compartilhado varia mais do que as
+  regressões que valem pegar. Então ele afirma só o que sobrevive a máquina lenta:
+  **escala** (dobrar as linhas custa no máximo ~2,6× — `O(n²)` aparece perto de
+  4×, e a razão é imune à velocidade da máquina), **patch mínimo** (1 mudança → 2
+  patches; o jeito mais barato de fazer um diff parecer rápido é parar de estar
+  certo), **custo calibrado** (dividido por um laço medido no mesmo processo, com
+  tolerância de 1,8×) e **escala de sessões**.
+
+- **Throughput do Modo B** (`benchmarks/bench_ws_throughput.py`): mede o loop em
+  que o app vive — evento, handler, diff, lote no transporte — com uma sessão e
+  com N concorrentes. Medido: **o total fica praticamente constante** (~1.000
+  eventos/s nesta máquina) e a fatia por sessão divide. Ou seja, Modo B satura em
+  CPU no rebuild, dentro de um único event loop: escalar é mais processo, não mais
+  thread. O gate fixa essa forma — queda no total é contenção, não carga.
+
+- **Cold-start do Modo A** (`benchmarks/bench_cold_start.mjs` + workflow
+  `perf-cold-start.yml`): mede **cold** (sem SW/cache: Pyodide e core pela rede) e
+  **warm** (precache do SW) até a primeira árvore na tela. Roda em **schedule**, e
+  não em PR, porque um download desse tamanho no caminho crítico de cada PR compra
+  um número que ninguém lê naquele momento.
+
+  Primeira medição, em Chrome real com o artefato buildado do `examples/counter`:
+  **cold 2.394 ms / 14.593 KB**, **warm 2.354 ms / 8.751 KB**. O service worker
+  poupou 5,8 MB de rede e **40 ms** — 40% dos bytes, 1,7% do relógio. A leitura é
+  o que importa: no Modo A o custo dominante é o **boot do Pyodide (CPU)**, não o
+  download, então otimizar rede ali não move a agulha.
+
+### Changed
+
+- `docs/advanced/observability.md` (PT + EN) documenta as três medidas e o porquê
+  de cada limite. `docs/roadmap.md`: S9 fecha.
+- `benchmarks/baseline.json` guarda o baseline calibrado, versionado; mudança
+  deliberada de custo usa `--update-baseline` e se justifica no PR.
+
+Gate verificado que morde, com teste por regra
+(`tests/unit/test_perf_gate.py`): `diff` escalando 4,1× reprova citando `O(n^2)`;
+1 patch em vez de 2 reprova; custo calibrado 2× reprova; ruído de 30% **passa**
+(era o requisito para o gate não ser desligado na primeira semana); e throughput
+total caindo a 0,30× reprova falando de contenção.
+## [0.104.0] — 2026-08-25
+
+### Added
+
+- **Observabilidade de servidor (S8)**
+  ([#119](https://github.com/mauriciobenjamin700/tempestweb/issues/119)).
+  `metrics=True` respondia **quantas** sessões existem; não respondia se estão
+  lentas, onde o tempo é gasto, nem o que o servidor fez para o cliente que
+  reclamou.
+
+  `create_app(..., observability=ServerObservability(...))` liga três coisas
+  independentes:
+
+  - **Latência e throughput** — histograma `tempestweb_patch_seconds` +
+    `tempestweb_patches_total` no mesmo `GET /metrics`. Mede a espera que o
+    **cliente** sente: do evento chegar até os patches irem para o transporte,
+    **rebuild incluído**. Isso importa porque o rebuild é coalescido e roda depois
+    do handler retornar — cronometrar o handler dava rodadas com **zero patches**,
+    que foi como o defeito apareceu na medição.
+  - **Log estruturado** — uma linha JSON por evento de sessão (`session.open` /
+    `session.close`), com `session_id` como **campo** e `reason` sendo o nome da
+    exceção quando a sessão morre de erro. `json_log_sink` é o sink novo.
+  - **Tracing** — span por sessão, por dispatch e por lote, atrás de adapter.
+    `otel_tracer()` importa `opentelemetry` **dentro da função**, e o extra novo
+    `tempestweb[otel]` traz só a API: exporter e sampler ficam com o
+    OpenTelemetry, onde já são configuráveis.
+
+  Nada disso é dependência forçada: o default é inerte — nenhum import, nenhum
+  relógio, nenhum span. Medido: com métricas **e** log ligados, 200 cliques
+  passaram de 0,665 ms para 0,689 ms de média (**+3,6%**).
+
+### Changed
+
+- `AppSession` aceita `observability` e `session_id`. O import do tipo é
+  `TYPE_CHECKING`-only porque o bundle do Modo A carrega esse módulo e não deve
+  carregar a observabilidade de servidor com ele (o teste de fechamento do bundle
+  pega isso).
+- `docs/advanced/observability.md` (PT + EN) documenta as três partes, incluindo o
+  custo medido e por que o histograma não fica em volta do handler.
+  `docs/roadmap.md`: S8 fecha.
+
+Verificado ao vivo num app Modo B com cliente WebSocket real: 40 cliques → 40 no
+histograma, 40 patches contados; cliente mediu 0,62 ms de ida e volta e o servidor
+0,30 ms de tempo de patch (49% da espera), ou seja o número do servidor bate e é o
+menor, como tem de ser. O log da sessão saiu parseável, com o mesmo `session_id`
+nos dois eventos.
 ## [0.103.0] — 2026-08-24
 
 ### Added

@@ -39,6 +39,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.websockets import WebSocket
 
 from tempest_core import App, Theme, Widget
+from tempestweb.observability.server import ServerObservability
 from tempestweb.runtime.session import AppSession
 from tempestweb.server.security import (
     Credentials,
@@ -152,6 +153,7 @@ class TempestWebServer(Generic[S]):
         title: str = "tempestweb",
         security: SecurityConfig | None = None,
         metrics: bool = False,
+        observability: ServerObservability | None = None,
         sse_backend: SessionRouter | None = None,
         concurrent_dispatch: bool = False,
         theme: Theme | None = None,
@@ -166,7 +168,14 @@ class TempestWebServer(Generic[S]):
                 the host open (dev) and logs a warning saying so — an open host
                 accepts a WebSocket from any origin, which CORS does not guard.
             metrics: When ``True``, mount ``GET /metrics`` (Prometheus text) with
-                connection counters (Track S — S8).
+                connection counters (Track S — S8). Latency and throughput join
+                them when ``observability`` carries a ``PatchMetrics``.
+            observability: Patch latency, structured session logs and tracing
+                (Track S — S8). ``None`` keeps the inert default: nothing is
+                collected, no exporter is imported, and the hot path pays two
+                attribute lookups. Pass
+                ``ServerObservability(metrics=PatchMetrics(), logger=…,
+                tracer=otel_tracer())`` for as much of it as you want.
             sse_backend: Router for SSE inbound events (Track S — S4). ``None``
                 uses the in-process router (needs sticky sessions across
                 instances); a :class:`RedisSessionRouter` drops that requirement.
@@ -195,6 +204,9 @@ class TempestWebServer(Generic[S]):
         self._security: SecurityConfig = security or SecurityConfig()
         self._live: int = 0  # concurrent live sessions (S2 cap)
         self._metrics_enabled: bool = metrics
+        self._observability: ServerObservability = (
+            observability if observability is not None else ServerObservability()
+        )
         self._opened: int = 0  # total sessions ever accepted
         self._rejected: int = 0  # total connections refused (auth/origin/cap)
         rpm = self._security.max_connections_per_minute
@@ -226,7 +238,7 @@ class TempestWebServer(Generic[S]):
                 "# TYPE tempestweb_sessions_max gauge",
                 f"tempestweb_sessions_max {cap}",
             ]
-        return "\n".join(lines) + "\n"
+        return "\n".join(lines) + "\n" + self._observability.prometheus()
 
     def _install_security_headers(self) -> None:
         """Add hardening response headers to every HTTP response (S6)."""
@@ -296,11 +308,15 @@ class TempestWebServer(Generic[S]):
             allow_credentials=not self._security.origins_wildcard,
         )
 
-    def _new_session(self, transport: PatchTransport) -> AppSession[S]:
+    def _new_session(
+        self, transport: PatchTransport, session_id: str | None = None
+    ) -> AppSession[S]:
         """Create an isolated session bound to a transport.
 
         Args:
             transport: The per-connection transport (WS or SSE).
+            session_id: The id metrics, logs and traces share for this
+                connection. ``None`` lets the session derive one.
 
         Returns:
             A fresh :class:`AppSession` for this connection.
@@ -311,6 +327,8 @@ class TempestWebServer(Generic[S]):
             transport,
             concurrent_dispatch=self._concurrent_dispatch,
             theme=self._theme,
+            observability=self._observability,
+            session_id=session_id,
         )
 
     def _register_routes(self) -> None:
@@ -347,6 +365,10 @@ class TempestWebServer(Generic[S]):
             The auth gate + origin allowlist (Track S) run on the upgrade before
             a session is created; a rejected connection is closed with ``1008``
             (policy violation) and never mounts.
+
+            The connection is wrapped in one observability span and two log lines,
+            carrying the same id the patch metrics carry — so "this client was
+            slow" is a query, not an archaeology project.
             """
             peer = websocket.client.host if websocket.client else None
             credentials = _credentials_from_headers(
@@ -376,7 +398,8 @@ class TempestWebServer(Generic[S]):
             )
             session = self._new_session(transport)
             try:
-                await session.run()
+                with self._observability.session(session.session_id, transport="ws"):
+                    await session.run()
             finally:
                 self._live -= 1
 
@@ -690,6 +713,7 @@ def create_app(
     title: str = "tempestweb",
     security: SecurityConfig | None = None,
     metrics: bool = False,
+    observability: ServerObservability | None = None,
     sse_backend: SessionRouter | None = None,
     concurrent_dispatch: bool = False,
     theme: Theme | None = None,
@@ -704,6 +728,12 @@ def create_app(
             leaves the host open (dev); pass a :class:`SecurityConfig` with an
             ``authenticate`` predicate and/or ``allowed_origins`` for production.
         metrics: When ``True``, mount ``GET /metrics`` (Prometheus text) — S8.
+        observability: Patch latency, structured session logs and tracing (S8).
+            ``None`` keeps the inert default: nothing collected, no exporter
+            imported. Pass ``ServerObservability(metrics=PatchMetrics())`` to get
+            the latency histogram alongside the connection counters, a ``logger``
+            for one JSON line per session lifecycle event, and ``tracer=
+            otel_tracer()`` for a span per session and per patch round.
         sse_backend: SSE inbound router (Track S — S4). ``None`` is in-process
             (sticky sessions); a ``RedisSessionRouter`` scales SSE without sticky.
         concurrent_dispatch: Dispatch each event as its own task (ordered per
@@ -725,6 +755,7 @@ def create_app(
         title=title,
         security=security,
         metrics=metrics,
+        observability=observability,
         sse_backend=sse_backend,
         concurrent_dispatch=concurrent_dispatch,
         theme=theme,

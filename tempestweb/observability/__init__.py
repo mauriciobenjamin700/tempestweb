@@ -62,6 +62,13 @@ from tempestweb.observability.logger import (
     console_sink,
     create_logger,
 )
+from tempestweb.observability.server import PatchMetrics as PatchMetrics
+from tempestweb.observability.server import ServerObservability as ServerObservability
+from tempestweb.observability.server import Span as Span
+from tempestweb.observability.server import Tracer as Tracer
+from tempestweb.observability.server import json_log_sink as json_log_sink
+from tempestweb.observability.server import noop_tracer as noop_tracer
+from tempestweb.observability.server import otel_tracer as otel_tracer
 from tempestweb.observability.telemetry import (
     ConsoleTelemetryAdapter,
     PostHogTelemetryAdapter,
@@ -71,6 +78,13 @@ from tempestweb.observability.telemetry import (
 )
 
 __all__ = [
+    "PatchMetrics",
+    "ServerObservability",
+    "Span",
+    "Tracer",
+    "json_log_sink",
+    "noop_tracer",
+    "otel_tracer",
     "TelemetryAdapter",
     "TelemetryProvider",
     "ConsoleTelemetryAdapter",

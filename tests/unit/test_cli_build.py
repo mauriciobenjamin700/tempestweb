@@ -319,9 +319,11 @@ def test_wasm_bootstrap_wires_the_streaming_native_bridge(tmp_path: Path) -> Non
     assert "__tempestweb_native_unsubscribe__" in bootstrap
     assert "const onNativeSubscribe = async (" in bootstrap
     assert "const onNativeUnsubscribe = async (" in bootstrap
-    assert "def _start(on_patches, dispatch, on_navigate, subscribe, unsubscribe):" in (
-        bootstrap
+    start_signature = (
+        "def _start(on_patches, dispatch, on_navigate, on_theme, "
+        "subscribe, unsubscribe):"
     )
+    assert start_signature in bootstrap
 
 
 def test_wasm_package_archive_carries_runtime(tmp_path: Path) -> None:

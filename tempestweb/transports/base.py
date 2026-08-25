@@ -22,6 +22,9 @@ JSON *envelope* tagging the payload with a ``kind``:
 - ``{"kind": "navigate", "path": "<route>"}`` — server → client, sync the URL
   when the app navigated imperatively (the reverse of the inbound ``navigate``
   event).
+- ``{"kind": "theme", "mode": "light"|"dark"}`` — server → client, the resolved
+  theme mode, so the base stylesheet can paint the half of dark mode that no
+  inline style covers (page background, field surfaces, hover/focus states).
 
 The envelope shape is identical for WebSocket and SSE; only the framing differs.
 """
@@ -61,6 +64,7 @@ EnvelopeKind = Literal[
     "native_unsubscribe",
     "native_event",
     "navigate",
+    "theme",
 ]
 
 #: A wire envelope: a JSON-able dict tagged by ``kind`` (see module docstring).
@@ -106,6 +110,28 @@ def encode_navigate(path: str) -> Envelope:
         The envelope ``{"kind": "navigate", "path": path}``.
     """
     return {"kind": "navigate", "path": path}
+
+
+def encode_theme(mode: str) -> Envelope:
+    """Wrap the app's resolved theme mode in a ``theme`` envelope (server → client).
+
+    The ``Theme`` itself never crosses the wire — the core strips it when
+    serializing, and the colours it resolves already travel baked into each
+    widget's inline style. What does not travel is the *mode*, and the base
+    stylesheet needs exactly that: the page background, a field's surface and
+    every hover/focus state live in CSS, so without the mode they stayed on the
+    light palette while the tree above them went dark.
+
+    Sent on mount and whenever the resolved mode changes (``app.set_theme``, or a
+    ``SYSTEM`` theme resolving differently after a media update).
+
+    Args:
+        mode: ``"light"`` or ``"dark"`` — the *resolved* mode, never ``"system"``.
+
+    Returns:
+        The envelope ``{"kind": "theme", "mode": mode}``.
+    """
+    return {"kind": "theme", "mode": mode}
 
 
 def encode_native_call(call_id: str, capability: str, args: dict[str, Any]) -> Envelope:
@@ -231,6 +257,21 @@ class PatchTransport(Protocol):
 
         Args:
             path: The new top-route path.
+
+        Raises:
+            TransportClosedError: If the underlying channel is gone.
+        """
+        ...
+
+    async def send_theme(self, mode: str) -> None:
+        """Tell the client which theme mode is resolved (``"light"``/``"dark"``).
+
+        Sent on mount and on every change, so the base stylesheet can paint what
+        no inline style covers. A transport whose client owns the theme itself
+        (Mode A) may treat this as a no-op.
+
+        Args:
+            mode: The resolved mode — never ``"system"``.
 
         Raises:
             TransportClosedError: If the underlying channel is gone.

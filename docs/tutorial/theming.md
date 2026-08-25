@@ -260,12 +260,17 @@ bloco vai no `<head>`, antes de a folha base ser instalada no mount; como
 ela declara os mesmos nomes com a mesma especificidade, o seu vence por vir
 depois.
 
-!!! tip "Modo escuro sai de graça, e sai honesto"
-    Tema em `SYSTEM` emite o esquema claro no `:root` e o escuro dentro de
-    `@media (prefers-color-scheme: dark)`: a página segue a configuração de
-    quem lê. Tema fixado em `LIGHT` ou `DARK` emite um esquema só e nenhuma
-    media query — um tema fixado que ainda virasse com o sistema não estaria
-    fixado.
+!!! tip "Modo escuro sai de graça, pelo mesmo interruptor da folha"
+    Tema em `SYSTEM` emite o esquema claro no `:root` e o escuro sob
+    `:root[data-tw-theme="dark"]` — **o mesmo seletor** que a folha base usa,
+    então a paleta da app e os tokens da folha viram juntos, no modo que a app
+    resolveu. Tema fixado em `DARK` emite o esquema escuro nos **dois**
+    seletores: pinta antes de qualquer atributo chegar e continua ganhando da
+    folha depois que ele chega.
+
+    Nunca sai media query. Ver "Por que não `prefers-color-scheme`" adiante:
+    um widget não vê o SO, então escurecer a página pelo SO deixava árvore
+    clara em fundo escuro — e o lado inline é o que ganha.
 
 !!! info "Só o que a folha consome"
     `theme_css` emite as variáveis que a folha base lê, não os 39 papéis.
@@ -391,12 +396,54 @@ def escurecer(app: App[State]) -> None:
     Agora a tabela carrega os dois modos e o builder escolhe por
     `theme.is_dark()`.
 
-!!! warning "A folha base ainda é clara"
-    O que o `Style` inline resolve segue o tema; o que só a **folha base** pinta
-    (o fundo do `Input`, o fundo da página, os estados de hover e foco) continua
-    na paleta clara, porque os tokens `--tw-*` não têm eixo de modo. Num app
-    escuro isso aparece como campo branco dentro de cartão escuro. Rastreado em
-    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+
+## A folha base segue o modo que você declara
+
+O `Style` que o core resolve viaja **inline** em cada widget, e inline ganha do
+stylesheet. Mas metade da tela não é inline: o fundo da página, a superfície de um
+campo, o `::placeholder`, todo estado de `:hover`/`:focus`, a superfície de um
+overlay. Isso é CSS — e o CSS não tinha eixo de modo, então um app escuro mostrava
+campo branco dentro de cartão escuro.
+
+Agora tem. O renderizador marca o documento com o modo resolvido:
+
+```html
+<html data-tw-theme="dark">
+```
+
+e a folha base redefine seus tokens sob esse seletor. Você não escreve nada para
+isso acontecer: no Modo B (e SSE) o servidor manda um envelope `theme`; no Modo A
+o runtime chama o callback direto; no Modo C o `set_theme` marca o documento em
+processo.
+
+!!! warning "Declarou escuro? Repasse `app.theme` aos widgets"
+    A marcação segue o **tema do app**; a cor de cada widget segue o `theme` que
+    **aquele widget** recebeu. Se você chama `app.set_theme(Theme(mode=DARK))` e
+    não repassa `theme=app.theme` aos widgets, a folha escurece e os widgets
+    continuam claros — medido: um `Input` sem `theme` fica com fundo escuro (folha)
+    e texto escuro (inline), ou seja, ilegível. Passe o tema; é a mesma regra do
+    core.
+
+!!! info "Por que não `prefers-color-scheme`"
+    Seria a resposta óbvia — e estaria errada. Um widget construído com
+    `Theme(mode=SYSTEM)` resolve **claro** no core: ele não vê o SO. Escurecer a
+    folha por causa do SO colocaria uma árvore clara numa página escura. Se você
+    quer seguir o SO, leia `app.media.platform_dark_mode` no seu `view` e chame
+    `set_theme` — aí as duas metades andam juntas.
+
+!!! check "Os pares da paleta têm gate de contraste"
+    A regra `color-contrast` do axe precisa de layout real, então o gate de a11y a
+    desliga e o job Lighthouse é sinal fraco — o que deixava uma paleta escura
+    ilegível passar sem ninguém notar. O que **não** precisa de layout é o par de
+    papéis: `--tw-on-surface` é, por definição, o que vai sobre `--tw-surface`.
+    `tests/client/theme-contrast.test.js` calcula os 12 pares que a folha promete,
+    nos dois modos, e reprova abaixo de AA. Par mais apertado hoje: `warning` sobre
+    `surface` no claro, **6,02:1** para um mínimo de 4,5.
+
+!!! note "O primeiro `light` não é enviado"
+    Os tokens da folha **são** a paleta clara, então marcar claro no mount gastaria
+    um frame para dizer o que o CSS já diz. Toda mudança posterior é enviada,
+    inclusive a volta ao claro.
 
 ## Indicadores de progresso
 

@@ -112,7 +112,7 @@ export function AspectRatio({ ratio, key = null, focusOrder = null, focusable = 
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Autocomplete({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, leadingIcon = null, options = [], placeholder = "", semantics = null, size = "md", tag = null, trailingIcon = null, value = "", attrs = {}, style = null, onChange = null, onSelect = null } = {}) {
+export function Autocomplete({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, leadingIcon = null, options = [], placeholder = "", semantics = null, size = "md", tag = null, trailingIcon = null, value = "", attrs = {}, style = null, theme = null, onChange = null, onSelect = null } = {}) {
   return {
     type: "Autocomplete",
     key,
@@ -129,7 +129,7 @@ export function Autocomplete({ key = null, colorScheme = "primary", fieldVariant
       placeholder: placeholder,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("Autocomplete", fieldVariant, size, colorScheme, style),
+      style: resolveWidgetStyle("Autocomplete", fieldVariant, size, colorScheme, style, theme),
       tag: tag,
       trailing_icon: trailingIcon,
       value: value,
@@ -211,7 +211,7 @@ export function BottomSheet({ key = null, focusOrder = null, focusable = null, s
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Button({ label, key = null, colorScheme = "primary", focusOrder = null, focusable = null, semantics = null, size = "md", tag = null, variant = "solid", attrs = {}, style = null, onClick = null } = {}) {
+export function Button({ label, key = null, colorScheme = "primary", focusOrder = null, focusable = null, semantics = null, size = "md", tag = null, variant = "solid", attrs = {}, style = null, theme = null, onClick = null } = {}) {
   return {
     type: "Button",
     key,
@@ -224,7 +224,7 @@ export function Button({ label, key = null, colorScheme = "primary", focusOrder 
       on_click: null,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("Button", variant, size, colorScheme, style),
+      style: resolveWidgetStyle("Button", variant, size, colorScheme, style, theme),
       tag: tag,
       variant: variant,
     },
@@ -287,7 +287,7 @@ export function Canvas({ key = null, commands = [], focusOrder = null, focusable
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Checkbox({ key = null, checked = false, colorScheme = "primary", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, attrs = {}, style = null, onChange = null } = {}) {
+export function Checkbox({ key = null, checked = false, colorScheme = "primary", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "Checkbox",
     key,
@@ -301,7 +301,7 @@ export function Checkbox({ key = null, checked = false, colorScheme = "primary",
       on_change: null,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("Checkbox", "_", size, colorScheme, style),
+      style: resolveWidgetStyle("Checkbox", "_", size, colorScheme, style, theme),
       tag: tag,
     },
     children: [],
@@ -379,7 +379,7 @@ export function Container({ key = null, focusOrder = null, focusable = null, sem
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function DatePicker({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, onChange = null } = {}) {
+export function DatePicker({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "DatePicker",
     key,
@@ -393,7 +393,7 @@ export function DatePicker({ key = null, colorScheme = "primary", fieldVariant =
       on_change: null,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("DatePicker", fieldVariant, size, colorScheme, style),
+      style: resolveWidgetStyle("DatePicker", fieldVariant, size, colorScheme, style, theme),
       tag: tag,
       value: value,
     },
@@ -525,7 +525,7 @@ export function Draggable({ key = null, dragData = "", focusOrder = null, focusa
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Dropdown({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, leadingIcon = null, options = [], placeholder = "Select…", semantics = null, size = "md", tag = null, trailingIcon = null, value = null, attrs = {}, style = null, onSelect = null } = {}) {
+export function Dropdown({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, leadingIcon = null, options = [], placeholder = "Select…", semantics = null, size = "md", tag = null, trailingIcon = null, value = null, attrs = {}, style = null, theme = null, onSelect = null } = {}) {
   return {
     type: "Dropdown",
     key,
@@ -541,7 +541,7 @@ export function Dropdown({ key = null, colorScheme = "primary", fieldVariant = "
       placeholder: placeholder,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("Dropdown", fieldVariant, size, colorScheme, style),
+      style: resolveWidgetStyle("Dropdown", fieldVariant, size, colorScheme, style, theme),
       tag: tag,
       trailing_icon: trailingIcon,
       value: value,
@@ -556,7 +556,7 @@ export function Dropdown({ key = null, colorScheme = "primary", fieldVariant = "
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function FilePicker({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, label = "Choose file", semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, onSelect = null } = {}) {
+export function FilePicker({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, label = "Choose file", semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, theme = null, onSelect = null } = {}) {
   return {
     type: "FilePicker",
     key,
@@ -570,7 +570,7 @@ export function FilePicker({ key = null, colorScheme = "primary", fieldVariant =
       on_select: null,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("FilePicker", fieldVariant, size, colorScheme, style),
+      style: resolveWidgetStyle("FilePicker", fieldVariant, size, colorScheme, style, theme),
       tag: tag,
       value: value,
     },
@@ -705,7 +705,7 @@ export function Icon({ name, key = null, focusOrder = null, focusable = null, se
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function IconButton({ icon, key = null, colorScheme = "primary", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, variant = "ghost", attrs = {}, style = null, onClick = null } = {}) {
+export function IconButton({ icon, key = null, colorScheme = "primary", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, variant = "ghost", attrs = {}, style = null, theme = null, onClick = null } = {}) {
   return {
     type: "IconButton",
     key,
@@ -719,7 +719,7 @@ export function IconButton({ icon, key = null, colorScheme = "primary", focusOrd
       on_click: null,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("IconButton", variant, size, colorScheme, style),
+      style: resolveWidgetStyle("IconButton", variant, size, colorScheme, style, theme),
       tag: tag,
       variant: variant,
     },
@@ -757,7 +757,7 @@ export function Image({ src, key = null, alt = "", fit = "contain", focusOrder =
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Input({ key = null, colorScheme = "primary", error = "", fieldVariant = "outline", focusOrder = null, focusable = null, keyboard = "text", leadingIcon = null, maxLength = null, pattern = null, placeholder = "", secure = false, semantics = null, size = "md", tag = null, trailingIcon = null, value = "", attrs = {}, style = null, onChange = null } = {}) {
+export function Input({ key = null, colorScheme = "primary", error = "", fieldVariant = "outline", focusOrder = null, focusable = null, keyboard = "text", leadingIcon = null, maxLength = null, pattern = null, placeholder = "", secure = false, semantics = null, size = "md", tag = null, trailingIcon = null, value = "", attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "Input",
     key,
@@ -777,7 +777,7 @@ export function Input({ key = null, colorScheme = "primary", error = "", fieldVa
       secure: secure,
       semantics: semantics,
       size: size,
-      style: resolveFieldStyle("Input", fieldVariant, size, colorScheme, error, style),
+      style: resolveFieldStyle("Input", fieldVariant, size, colorScheme, error, style, theme),
       tag: tag,
       trailing_icon: trailingIcon,
       value: value,
@@ -955,7 +955,7 @@ export function MapView({ key = null, focusOrder = null, focusable = null, latit
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function MaskedInput({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, keyboard = "text", mask = "", placeholder = "", semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, onChange = null } = {}) {
+export function MaskedInput({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, keyboard = "text", mask = "", placeholder = "", semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "MaskedInput",
     key,
@@ -971,7 +971,7 @@ export function MaskedInput({ key = null, colorScheme = "primary", fieldVariant 
       placeholder: placeholder,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("MaskedInput", fieldVariant, size, colorScheme, style),
+      style: resolveWidgetStyle("MaskedInput", fieldVariant, size, colorScheme, style, theme),
       tag: tag,
       value: value,
     },
@@ -1103,7 +1103,7 @@ export function PanHandlerWidget({ key = null, focusOrder = null, focusable = nu
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function PinInput({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, length = 6, secure = false, semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, onChange = null, onComplete = null } = {}) {
+export function PinInput({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, length = 6, secure = false, semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, theme = null, onChange = null, onComplete = null } = {}) {
   return {
     type: "PinInput",
     key,
@@ -1119,7 +1119,7 @@ export function PinInput({ key = null, colorScheme = "primary", fieldVariant = "
       secure: secure,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("PinInput", fieldVariant, size, colorScheme, style),
+      style: resolveWidgetStyle("PinInput", fieldVariant, size, colorScheme, style, theme),
       tag: tag,
       value: value,
     },
@@ -1204,7 +1204,7 @@ export function QrScanner({ key = null, focusOrder = null, focusable = null, sem
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function RangeSlider({ key = null, colorScheme = "primary", focusOrder = null, focusable = null, high = 100.0, low = 0.0, maxValue = 100.0, minValue = 0.0, semantics = null, size = "md", step = 1.0, tag = null, attrs = {}, style = null, onChange = null } = {}) {
+export function RangeSlider({ key = null, colorScheme = "primary", focusOrder = null, focusable = null, high = 100.0, low = 0.0, maxValue = 100.0, minValue = 0.0, semantics = null, size = "md", step = 1.0, tag = null, attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "RangeSlider",
     key,
@@ -1221,7 +1221,7 @@ export function RangeSlider({ key = null, colorScheme = "primary", focusOrder = 
       semantics: semantics,
       size: size,
       step: step,
-      style: resolveWidgetStyle("RangeSlider", "_", size, colorScheme, style),
+      style: resolveWidgetStyle("RangeSlider", "_", size, colorScheme, style, theme),
       tag: tag,
     },
     children: [],
@@ -1496,7 +1496,7 @@ export function Skeleton({ key = null, baseColor = {"r": 224, "g": 224, "b": 224
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Slider({ key = null, colorScheme = "primary", focusOrder = null, focusable = null, maxValue = 100.0, minValue = 0.0, semantics = null, size = "md", step = 1.0, tag = null, value = 0.0, attrs = {}, style = null, onChange = null } = {}) {
+export function Slider({ key = null, colorScheme = "primary", focusOrder = null, focusable = null, maxValue = 100.0, minValue = 0.0, semantics = null, size = "md", step = 1.0, tag = null, value = 0.0, attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "Slider",
     key,
@@ -1511,7 +1511,7 @@ export function Slider({ key = null, colorScheme = "primary", focusOrder = null,
       semantics: semantics,
       size: size,
       step: step,
-      style: resolveWidgetStyle("Slider", "_", size, colorScheme, style),
+      style: resolveWidgetStyle("Slider", "_", size, colorScheme, style, theme),
       tag: tag,
       value: value,
     },
@@ -1525,7 +1525,7 @@ export function Slider({ key = null, colorScheme = "primary", focusOrder = null,
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Spacer({ key = null, flex = 1.0, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null } = {}) {
+export function Spacer({ key = null, flex = 1.0, focusOrder = null, focusable = null, semantics = null, tag = null, attrs = {}, style = null, theme = null } = {}) {
   return {
     type: "Spacer",
     key,
@@ -1535,7 +1535,7 @@ export function Spacer({ key = null, flex = 1.0, focusOrder = null, focusable = 
       focus_order: focusOrder,
       focusable: focusable,
       semantics: semantics,
-      style: resolveWidgetStyle("Spacer", "_", "_", "_", style),
+      style: resolveWidgetStyle("Spacer", "_", "_", "_", style, theme),
       tag: tag,
     },
     children: [],
@@ -1614,7 +1614,7 @@ export function Svg({ src, key = null, fit = "contain", focusOrder = null, focus
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function Switch({ key = null, checked = false, colorScheme = "primary", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, attrs = {}, style = null, onChange = null } = {}) {
+export function Switch({ key = null, checked = false, colorScheme = "primary", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "Switch",
     key,
@@ -1628,7 +1628,7 @@ export function Switch({ key = null, checked = false, colorScheme = "primary", f
       on_change: null,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("Switch", "_", size, colorScheme, style),
+      style: resolveWidgetStyle("Switch", "_", size, colorScheme, style, theme),
       tag: tag,
     },
     children: [],
@@ -1713,7 +1713,7 @@ export function Text({ content, key = null, focusOrder = null, focusable = null,
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function TextArea({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, maxLength = null, placeholder = "", rows = 3, semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, onChange = null } = {}) {
+export function TextArea({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, maxLength = null, placeholder = "", rows = 3, semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "TextArea",
     key,
@@ -1729,7 +1729,7 @@ export function TextArea({ key = null, colorScheme = "primary", fieldVariant = "
       rows: rows,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("TextArea", fieldVariant, size, colorScheme, style),
+      style: resolveWidgetStyle("TextArea", fieldVariant, size, colorScheme, style, theme),
       tag: tag,
       value: value,
     },
@@ -1743,7 +1743,7 @@ export function TextArea({ key = null, colorScheme = "primary", fieldVariant = "
  * @param {Object} [args]  Widget props (handlers stashed off-wire).
  * @returns {import("../transport.js").Node}
  */
-export function TimePicker({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, onChange = null } = {}) {
+export function TimePicker({ key = null, colorScheme = "primary", fieldVariant = "outline", focusOrder = null, focusable = null, label = "", semantics = null, size = "md", tag = null, value = "", attrs = {}, style = null, theme = null, onChange = null } = {}) {
   return {
     type: "TimePicker",
     key,
@@ -1757,7 +1757,7 @@ export function TimePicker({ key = null, colorScheme = "primary", fieldVariant =
       on_change: null,
       semantics: semantics,
       size: size,
-      style: resolveWidgetStyle("TimePicker", fieldVariant, size, colorScheme, style),
+      style: resolveWidgetStyle("TimePicker", fieldVariant, size, colorScheme, style, theme),
       tag: tag,
       value: value,
     },

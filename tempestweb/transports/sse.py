@@ -49,6 +49,7 @@ from tempestweb.transports.base import (
     encode_native_unsubscribe,
     encode_navigate,
     encode_patches,
+    encode_theme,
 )
 
 __all__ = ["SSETransport"]
@@ -117,6 +118,17 @@ class SSETransport:
             TransportClosedError: If the transport has been closed.
         """
         self._enqueue(encode_navigate(path))
+
+    async def send_theme(self, mode: str) -> None:
+        """Queue a ``theme`` envelope for the SSE stream.
+
+        Args:
+            mode: The resolved theme mode (``"light"`` or ``"dark"``).
+
+        Raises:
+            TransportClosedError: If the transport has been closed.
+        """
+        self._enqueue(encode_theme(mode))
 
     async def send_native_call(
         self, call_id: str, capability: str, args: dict[str, Any]

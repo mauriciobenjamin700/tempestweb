@@ -15,9 +15,11 @@ is pinned below, so it reads as a decision instead of a surprise.
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 
 from tempestweb.contract import (
+    _SHAPE_FIXTURES,
     WIRE_CONTRACT_VERSION,
     WIRE_SHAPE_DIGEST,
     _shape_of,
@@ -92,3 +94,26 @@ def test_a_nullable_field_gaining_a_value_is_a_shape_change() -> None:
     assert _shape_of(node) != _shape_of(with_value)
     assert _shape_of(node)["key"] == "null"
     assert _shape_of(with_value)["key"] == "str"
+
+
+def test_every_golden_fixture_ships_inside_the_wheel() -> None:
+    """The wheel carries the goldens, or an installed client cannot use the module.
+
+    ``wire_shape()`` reads the fixtures, and they live outside the package dir, so
+    only the ``force-include`` block puts them in the wheel. Without it the module
+    imports fine — the constants are literals — and then raises
+    ``FileNotFoundError`` on the first call, which is a failure that only reaches
+    people who installed from PyPI. Adding a fourth golden fails here instead.
+    """
+    root = Path(__file__).resolve().parents[2]
+    pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    forced: dict[str, str] = pyproject["tool"]["hatch"]["build"]["targets"]["wheel"][
+        "force-include"
+    ]
+
+    for name in _SHAPE_FIXTURES:
+        source = f"tests/fixtures/{name}"
+        assert forced.get(source) == f"tempestweb/_fixtures/{name}", (
+            f"{source} is not force-included into the wheel — wire_shape() would "
+            "raise FileNotFoundError for anyone who installed the package"
+        )

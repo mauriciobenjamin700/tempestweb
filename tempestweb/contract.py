@@ -64,7 +64,27 @@ WIRE_SHAPE_DIGEST: str = (
     "9c2f4b439a10ea935c5d85b34e28e4cc5ca936e3a1a9f18a9ac94cf4a4d6b24c"
 )
 
-_FIXTURES: Path = Path(__file__).resolve().parents[1] / "tests" / "fixtures"
+
+def _fixtures_dir() -> Path:
+    """Locate the golden fixtures whose shape this module digests.
+
+    Prefers the copy shipped inside the installed package
+    (``tempestweb/_fixtures``, force-included into the wheel); falls back to the
+    repo's ``tests/fixtures`` when running from a source checkout. Without the
+    packaged copy, :func:`wire_shape` raised ``FileNotFoundError`` for anyone who
+    installed from PyPI — the goldens are the contract, so they ship with it.
+
+    Returns:
+        The absolute path to the directory holding the golden fixtures.
+    """
+    here = Path(__file__).resolve()
+    packaged = here.parent / "_fixtures"
+    if packaged.is_dir():
+        return packaged
+    return here.parents[1] / "tests" / "fixtures"
+
+
+_FIXTURES: Path = _fixtures_dir()
 
 #: The golden fixtures whose shape is the contract, in a stable order.
 _SHAPE_FIXTURES: tuple[str, ...] = (

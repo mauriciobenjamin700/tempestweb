@@ -8,6 +8,7 @@ browser or Pyodide. The live ``pyodide.ffi`` path is documented in NOTES-T3.md.
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -421,3 +422,80 @@ async def test_run_survives_a_resync_that_races_the_close() -> None:
 
     await asyncio.wait_for(task, timeout=1.0)
     assert task.done() and task.exception() is None
+
+
+def _label_of(node: dict[str, Any]) -> str:
+    """Read the counter label's text out of a serialized tree.
+
+    Args:
+        node: A serialized node, as ``initial_node_json`` returns it.
+
+    Returns:
+        The ``content`` prop of the node keyed ``"label"``, or ``""`` if absent.
+    """
+    if node.get("key") == "label":
+        return str(node["props"].get("content", ""))
+    for child in node.get("children", []):
+        found = _label_of(child)
+        if found:
+            return found
+    return ""
+
+
+# --------------------------------------------------------------------------- #
+# Mode A boot ordering (tempestweb#160, open item 3)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_the_initial_snapshot_is_frozen_before_the_rebuild_loop_runs() -> None:
+    """A state change after boot reaches the client as patches, never by mutation.
+
+    Pins the answer to the third open question of tempestweb#160 — "can Mode A's
+    ``initialNode`` be delivered *after* the app already advanced state?". It
+    cannot: :class:`WasmAppHandle` serializes the tree inside ``__init__``, before
+    the rebuild loop is scheduled, so the JSON the client mounts is the tree the
+    first patch batch was diffed **from**. If this inverted, mount would build a
+    newer tree and every index-relative patch in the queue would address a tree
+    that no longer exists — which is the failure shape the issue reports.
+    """
+    from tempestweb.runtime.wasm_main import bootstrap
+
+    batches: list[str] = []
+    handle = bootstrap(CounterState(), counter_view, batches.append)
+
+    before = json.loads(handle.initial_node_json())
+    runtime: WasmRuntime[CounterState] = handle._runtime
+    runtime.app.set_state(lambda s: setattr(s, "value", 7))
+    for _ in range(4):
+        await asyncio.sleep(0)
+    after = json.loads(handle.initial_node_json())
+
+    assert before == after, "the snapshot moved under the client"
+    assert _label_of(before) == "Count: 0"
+    assert batches, "the state change did not reach the client as patches"
+    assert "Count: 7" in batches[-1]
+    await handle.close()
+
+
+def test_the_generated_bootstrap_mounts_after_draining_the_boot_batches() -> None:
+    """The emitted glue reads the snapshot only once the transport can buffer.
+
+    The order in ``bootstrap.js`` is load-bearing, and it is a generated string no
+    other test reads: the transport is created first (which drains ``bootPatches``
+    into its own pending queue), the snapshot is read next, and ``mount`` runs
+    last with nothing awaited in between — so Python, single-threaded on Pyodide,
+    cannot advance the tree between the read and the mount.
+    """
+    from tempestweb.cli.commands.build import _bootstrap_js
+
+    source = _bootstrap_js("probe", "./pyodide/")
+    create = source.index("createWasmTransport(bridge)")
+    snapshot = source.index("initial_node_json()")
+    mount_call = source.index("mount(root, transport, initialNode)")
+
+    assert create < snapshot < mount_call, "boot order changed — see tempestweb#160"
+    assert "await" not in source[snapshot:mount_call], (
+        "an await between reading the snapshot and mounting lets Python advance "
+        "the tree under the client (tempestweb#160)"
+    )

@@ -73,6 +73,77 @@ Os campos disponíveis:
     error = validate_email(app.state.email) or ""
     ```
 
+## Quem dá o nome ao campo
+
+Um campo desce para uma `Column` — uma `<div>` **sem role** — em volta de um
+`Input`, e a legenda é um `Text` irmão, **não** um `<label for=…>`. Nada associa os
+dois: até a 0.113.0 o controle era nomeado pelo que o `placeholder` por acaso
+dizia. Um `PasswordField` não tem placeholder default, então ele era um controle
+anônimo — e o `LoginForm` entregava essa violação (axe `label`, **crítico**) para
+todo app que o usava.
+
+Hoje o campo **sempre** nomeia o controle, nesta ordem:
+
+1. o `semantics` que você passou;
+2. a legenda visível.
+
+```python
+from tempest_core import App, Column, Row, Semantics, Text, Widget
+from tempestweb.components import TextField
+
+
+def view(app: App[State]) -> Widget:
+    """Render one header row over caption-less, named cells."""
+
+    def set_quantity(value: str) -> None:
+        app.set_state(lambda s: setattr(s, "quantity", value))
+
+    return Column(
+        children=[
+            Row(children=[Text(content="Qtd."), Text(content="R$ unit.")]),
+            Row(
+                children=[
+                    TextField(
+                        value=app.state.quantity,
+                        label="",
+                        semantics=Semantics(label="Quantidade do item 3"),
+                        on_change=set_quantity,
+                        key="i3-quantity",
+                    ),
+                ],
+            ),
+        ],
+    )
+```
+
+O nome vai para o `<input>`, não para a coluna em volta dele:
+
+```html
+<div data-tw-key="i3-quantity">
+  <input aria-label="Quantidade do item 3" value="1.200" />
+</div>
+```
+
+!!! tip "É isso que libera a grade com uma linha de cabeçalho"
+    Uma grade densa não repete a legenda em cada célula — vinte itens dividem as
+    mesmas oito colunas. Sem `semantics`, um campo sem legenda visível não tem nome
+    acessível nenhum, e quem usa leitor de tela ouve "caixa de edição" vinte vezes.
+
+!!! warning "Não é onde o `aria-label` cairia sozinho"
+    `aria-label` numa `<div>` sem role é atributo **proibido**
+    (`aria-prohibited-attr`) e nomeia um elemento em que nenhum leitor para: o
+    leitor para no controle dentro dela, que continuaria anônimo (`label`,
+    crítico). Por isso o campo escolhe o destino em vez de repassar cru.
+
+!!! info "Legenda e `semantics` juntos"
+    O `semantics` ganha — é o que o app disse explicitamente. Mantenha o texto da
+    legenda dentro dele (WCAG 2.5.3, *Label in Name*): `Semantics(label="Quantidade
+    do item 3")` sobre a legenda `Qtd.` é bom; um nome que não contém a legenda
+    deixa quem usa comando de voz sem como chamar o campo.
+
+Vale para `TextField`, `EmailField` e `PasswordField`; `LoginForm` e `SignupForm`
+levam o `semantics` para a raiz do formulário, que é o lugar de um `role="form"`.
+
 ## Formulário de login completo
 
 `LoginForm` compõe e-mail + senha + botão de envio em **uma chamada**. Você só

@@ -32,6 +32,7 @@ import {
   validate_phone,
 } from "../../client/transpile/validators.js";
 import * as widgets from "../../client/transpile/widgets.gen.js";
+import { Semantics } from "../../client/transpile/values.gen.js";
 import {
   Accordion,
   AddressInput,
@@ -687,6 +688,31 @@ test("every ported component matches the core build (order-agnostic)", () => {
       key: "signup-email",
       onChange: noop, theme }),
     email_field_unlabelled: EmailField({ label: "", onChange: noop, theme }),
+    text_field_named_no_caption: TextField({
+      label: "",
+      value: "1.200",
+      key: "i3-quantity",
+      semantics: Semantics({ label: "Quantidade" }),
+      onChange: noop, theme }),
+    text_field_named_over_caption: TextField({
+      label: "Qtd.",
+      value: "1.200",
+      key: "i3-quantity",
+      semantics: Semantics({ label: "Quantidade", hint: "unidades contratadas" }),
+      onChange: noop, theme }),
+    text_field_named_by_caption: TextField({
+      label: "Qtd.",
+      value: "1.200",
+      key: "i3-quantity",
+      onChange: noop, theme }),
+    email_field_named_no_caption: EmailField({
+      label: "",
+      semantics: Semantics({ label: "E-mail de contato" }),
+      onChange: noop, theme }),
+    password_field_named_no_caption: PasswordField({
+      label: "",
+      semantics: Semantics({ label: "Senha" }),
+      onChange: noop, theme }),
     password_field_default: PasswordField({ onChange: noop, theme }),
     password_field_labelled_error: PasswordField({
       value: "x",
@@ -695,6 +721,11 @@ test("every ported component matches the core build (order-agnostic)", () => {
       key: "signup-confirm",
       onChange: noop, theme }),
     login_form_default: LoginForm({
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onSubmit: noop, theme }),
+    login_form_named: LoginForm({
+      semantics: Semantics({ label: "Acesso", role: "form" }),
       onEmailChange: noop,
       onPasswordChange: noop,
       onSubmit: noop, theme }),
@@ -710,6 +741,12 @@ test("every ported component matches the core build (order-agnostic)", () => {
       onPasswordChange: noop,
       onSubmit: noop, theme }),
     signup_form_default: SignupForm({
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onConfirmChange: noop,
+      onSubmit: noop, theme }),
+    signup_form_named: SignupForm({
+      semantics: Semantics({ label: "Criar conta", role: "form" }),
       onEmailChange: noop,
       onPasswordChange: noop,
       onConfirmChange: noop,

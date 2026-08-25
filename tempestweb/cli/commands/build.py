@@ -915,6 +915,7 @@ def _index_html(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
+{_SHELL_RESET}\
 {_manifest_link(with_manifest)}\
     <meta name="theme-color" content="{theme_color}" />
     <link rel="icon" href="./icons/icon-192.png" />
@@ -1107,6 +1108,20 @@ boot();
 """
 
 
+#: The reset every generated shell carries in its head.
+#:
+#: A user agent gives ``body`` an 8px margin, and until 0.113.0 no generated shell
+#: said otherwise — only the SSR path's ``render_document`` did. The gap was
+#: visible (8px of dead space around every app) and, once an app bounds a frame to
+#: ``media.height``, it stops being cosmetic: the frame fills the viewport, the
+#: margin pushes the document 16px past it, and the bars a ``Scaffold`` is holding
+#: still drift with the page scroll. Measured on a real app before this:
+#: ``scrollHeight - clientHeight`` of exactly 16.
+_SHELL_RESET: str = (
+    "    <style>*,*::before,*::after{box-sizing:border-box}body{margin:0}</style>\n"
+)
+
+
 def _index_html_server(name: str) -> str:
     """Render the ``index.html`` shell for a server artifact (Mode B).
 
@@ -1128,6 +1143,7 @@ def _index_html_server(name: str) -> str:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
+{_SHELL_RESET}\
     <link rel="icon" href="./static/favicon.png" />
   </head>
   <body>
@@ -1671,6 +1687,7 @@ def _index_html_transpile(
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
+{_SHELL_RESET}\
 {_manifest_link(with_manifest)}\
     <meta name="theme-color" content="{theme_color}" />
     <link rel="icon" href="./icons/icon-192.png" />

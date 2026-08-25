@@ -57,6 +57,7 @@ from tempest_core import (
     Scaffold,
     SearchBar,
     SegmentedControl,
+    Semantics,
     Sidebar,
     Stat,
     StatCard,
@@ -444,6 +445,36 @@ def _cases() -> dict[str, Any]:
             value="a@b.c", error="inválido", key="signup-email", on_change=_noop_event
         ),
         "email_field_unlabelled": EmailField(label="", on_change=_noop_event),
+        "text_field_named_no_caption": TextField(
+            label="",
+            value="1.200",
+            key="i3-quantity",
+            semantics=Semantics(label="Quantidade"),
+            on_change=_noop_event,
+        ),
+        "text_field_named_over_caption": TextField(
+            label="Qtd.",
+            value="1.200",
+            key="i3-quantity",
+            semantics=Semantics(label="Quantidade", hint="unidades contratadas"),
+            on_change=_noop_event,
+        ),
+        "text_field_named_by_caption": TextField(
+            label="Qtd.",
+            value="1.200",
+            key="i3-quantity",
+            on_change=_noop_event,
+        ),
+        "email_field_named_no_caption": EmailField(
+            label="",
+            semantics=Semantics(label="E-mail de contato"),
+            on_change=_noop_event,
+        ),
+        "password_field_named_no_caption": PasswordField(
+            label="",
+            semantics=Semantics(label="Senha"),
+            on_change=_noop_event,
+        ),
         "password_field_default": PasswordField(on_change=_noop_event),
         "password_field_labelled_error": PasswordField(
             value="x",
@@ -453,6 +484,12 @@ def _cases() -> dict[str, Any]:
             on_change=_noop_event,
         ),
         "login_form_default": LoginForm(
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_submit=lambda: None,
+        ),
+        "login_form_named": LoginForm(
+            semantics=Semantics(label="Acesso", role="form"),
             on_email_change=_noop_event,
             on_password_change=_noop_event,
             on_submit=lambda: None,
@@ -470,6 +507,13 @@ def _cases() -> dict[str, Any]:
             on_submit=lambda: None,
         ),
         "signup_form_default": SignupForm(
+            on_email_change=_noop_event,
+            on_password_change=_noop_event,
+            on_confirm_change=_noop_event,
+            on_submit=lambda: None,
+        ),
+        "signup_form_named": SignupForm(
+            semantics=Semantics(label="Criar conta", role="form"),
             on_email_change=_noop_event,
             on_password_change=_noop_event,
             on_confirm_change=_noop_event,

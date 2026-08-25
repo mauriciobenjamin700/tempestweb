@@ -368,7 +368,7 @@ afirma só o que sobrevive a uma máquina lenta:
 
 | Afirmação | Por que ela aguenta ruído |
 |---|---|
-| dobrar as linhas custa no máximo ~2,6× | é **razão** entre duas medidas na mesma máquina, uma atrás da outra; `O(n²)` aparece perto de 4× |
+| dobrar as linhas custa no máximo ~2,6× | é **razão** entre duas medidas na mesma máquina, uma atrás da outra; `O(n²)` aparece perto de 4×. Cada medida é a **rodada mais rápida** de cinco, não a mediana: interferência só consegue *somar* tempo, e num runner compartilhado ela chega a segurar a maioria das rodadas — foi assim que um `diff` que escala 2,04× localmente reportou 2,85× na CI e reprovou a `main` |
 | uma linha alterada gera 2 patches | é correção, não tempo — e o jeito mais barato de fazer um diff parecer rápido é parar de estar certo |
 | custo calibrado dentro de 2,5× do baseline | o custo é dividido por um laço de calibração medido no mesmo processo, o que remove a velocidade da CPU — mas não a de memória/GC: o mesmo build custou 975,8, 1130,9 e 1206,9 unidades em três runners da CI contra um baseline de 667,7 medido em máquina de desenvolvimento, então este limite é tripwire grosso (pega uma duplicação), e a precisão fica nas razões de escala |
 | N sessões sustentam o throughput total de uma | o loop é single-threaded e o rebuild é CPU-bound, então o **total** fica plano e a fatia por sessão divide; queda no total é contenção, não carga |

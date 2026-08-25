@@ -35,7 +35,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import statistics
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -50,8 +49,15 @@ BASELINE: Path = Path(__file__).resolve().parent / "baseline.json"
 SMALL_ROWS: int = 200
 LARGE_ROWS: int = 400
 
-#: Rounds per measurement; the median of these is what the gate reads. One sample
-#: on a shared runner is noise with a number attached.
+#: Rounds per measurement; the **fastest** of these is what the gate reads. One
+#: sample is a coin flip on a shared runner, and the median is not enough either:
+#: interference can hold for most of a window. Since noise only ever *adds* time,
+#: the minimum is the least-biased estimate of what the code actually costs — and
+#: the ratio between two sizes measured that way is what the scale check needs.
+#: Measured: a CI runner reported a median diff ratio of **2.85x** (over the 2.6
+#: limit, so the job failed) on the same tree that scales **2.01–2.04x** locally
+#: across three runs — its 400-row window was preempted, and half the rounds
+#: carried it, so the median carried it too.
 ROUNDS: int = 5
 
 #: Iterations inside one round. A build costs ~50x a diff, so they do not get the
@@ -114,15 +120,20 @@ def _view(rows: int, selected: int) -> Column:
     )
 
 
-def _median_us(operation: Callable[[], object], iters: int) -> float:
-    """Median microseconds per operation over :data:`ROUNDS` rounds.
+def _fastest_us(operation: Callable[[], object], iters: int) -> float:
+    """Fastest microseconds per operation over :data:`ROUNDS` rounds.
+
+    The minimum, not the median: a preempted round can only be *slower* than the
+    code is, never faster, so the fastest round is the least-biased estimate of
+    the real cost — and the one that keeps the scale ratio meaningful on a shared
+    runner (see :data:`ROUNDS`).
 
     Args:
         operation: The callable to time.
         iters: Iterations inside each round.
 
     Returns:
-        The median cost per call, in microseconds.
+        The fastest cost per call, in microseconds.
     """
     samples: list[float] = []
     for _ in range(ROUNDS):
@@ -130,7 +141,7 @@ def _median_us(operation: Callable[[], object], iters: int) -> float:
         for _ in range(iters):
             operation()
         samples.append((time.perf_counter() - start) / iters * 1e6)
-    return statistics.median(samples)
+    return min(samples)
 
 
 def _calibration_us() -> float:
@@ -141,7 +152,7 @@ def _calibration_us() -> float:
     scales both sides.
 
     Returns:
-        The median cost of one calibration unit, in microseconds.
+        The fastest cost of one calibration unit, in microseconds.
     """
 
     def unit() -> int:
@@ -150,14 +161,14 @@ def _calibration_us() -> float:
             total += i * i % 7
         return total
 
-    return _median_us(unit, ITERS_DIFF)
+    return _fastest_us(unit, ITERS_DIFF)
 
 
 def measure() -> dict[str, Any]:
     """Measure the reconciler's hot path.
 
     Returns:
-        The measurements: per-op medians, the scale ratios, the patch count for a
+        The measurements: per-op fastest rounds, the scale ratios, the patch count for a
         single-row change, and the calibrated (unit-free) costs.
     """
     small_old = build(_view(SMALL_ROWS, 0))
@@ -166,10 +177,10 @@ def measure() -> dict[str, Any]:
     large_new = build(_view(LARGE_ROWS, LARGE_ROWS // 2))
 
     calibration = _calibration_us()
-    build_small = _median_us(lambda: build(_view(SMALL_ROWS, 0)), ITERS_BUILD)
-    build_large = _median_us(lambda: build(_view(LARGE_ROWS, 0)), ITERS_BUILD)
-    diff_small = _median_us(lambda: diff(small_old, small_new), ITERS_DIFF)
-    diff_large = _median_us(lambda: diff(large_old, large_new), ITERS_DIFF)
+    build_small = _fastest_us(lambda: build(_view(SMALL_ROWS, 0)), ITERS_BUILD)
+    build_large = _fastest_us(lambda: build(_view(LARGE_ROWS, 0)), ITERS_BUILD)
+    diff_small = _fastest_us(lambda: diff(small_old, small_new), ITERS_DIFF)
+    diff_large = _fastest_us(lambda: diff(large_old, large_new), ITERS_DIFF)
     throughput = asyncio.run(ws_throughput(SESSION_ROWS, SESSION_EVENTS, SESSIONS))
 
     return {

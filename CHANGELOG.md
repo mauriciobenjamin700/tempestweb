@@ -4,6 +4,33 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.111.0] — 2026-08-25
+
+### Fixed
+
+- **O perf gate reprovou a `main` verde outra vez, agora pela razão de escala.** A
+  0.105.0 dizia que a precisão do gate mora nas razões, porque elas são medidas
+  entre si na mesma máquina — verdade, mas incompleta: cada medida era a **mediana**
+  de cinco rodadas, e num runner compartilhado a interferência segura a maioria das
+  rodadas. O `diff` reportou `scale 2.85x` (limite 2,6) sobre a mesma árvore que
+  escala **2,01–2,04×** aqui, em três execuções seguidas; a janela de 400 linhas foi
+  preemptada e a mediana carregou isso.
+
+  A medida passa a ser a **rodada mais rápida** de cinco. Interferência só consegue
+  *somar* tempo, nunca subtrair, então o mínimo é a estimativa menos enviesada do
+  que o código custa de fato — e é o que mantém a razão entre dois tamanhos
+  significativa. Nenhum limite foi relaxado: `MAX_SCALE_RATIO` fica em 2,6.
+
+  `benchmarks/baseline.json` foi regenerado com o estimador novo (build 680,82,
+  diff 21,35 unidades), porque trocar de estimador **é** mudança deliberada de
+  medida — os valores medidos caem, então o baseline antigo tornaria o teto de 2,5×
+  ainda mais frouxo em vez de mais honesto.
+
+### Changed
+
+- `docs/advanced/observability.md` (PT + EN): a linha da razão de escala explica o
+  estimador e cita os números que motivaram a troca.
+
 ## [0.110.0] — 2026-08-25
 
 ### Fixed

@@ -371,7 +371,7 @@ asserts only what survives a slow machine:
 
 | Claim | Why it survives noise |
 |---|---|
-| doubling the rows costs at most ~2.6x | it is a **ratio** between two measurements on the same machine, back to back; `O(n^2)` lands near 4x |
+| doubling the rows costs at most ~2.6x | it is a **ratio** between two measurements on the same machine, back to back; an `O(n²)` lands near 4x. Each measurement is the **fastest of five rounds**, not the median: interference can only *add* time, and on a shared runner it holds for most of a window — which is how a `diff` that scales 2.04x locally reported 2.85x in CI and failed `main` |
 | one changed row still yields 2 patches | correctness, not time — and the cheapest way to make a diff look fast is to stop being right |
 | calibrated cost within 2.5x of the baseline | the cost is divided by a calibration loop measured in the same process, which takes CPU speed out of the comparison — but not memory/GC: the same build cost 975.8, 1130.9 and 1206.9 units on three CI runners against a 667.7 baseline taken on a developer machine, so this limit is a coarse tripwire (it catches a doubling) and the precision lives in the scale ratios |
 | N sessions sustain one session's total throughput | the loop is single-threaded and the rebuild is CPU-bound, so the **total** stays flat while the per-session share divides; a drop in the total is contention, not load |

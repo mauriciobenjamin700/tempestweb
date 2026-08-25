@@ -165,6 +165,8 @@ def bootstrap(
     subscribe: NativeSubscribe | None = None,
     unsubscribe: NativeUnsubscribe | None = None,
     theme: Theme | None = None,
+    *,
+    on_theme: Callable[[str], Any] | None = None,
 ) -> WasmAppHandle[S]:
     """Wire an app to the JS client and start it.
 
@@ -197,6 +199,11 @@ def bootstrap(
             :class:`~tempestweb.native.dispatch.BrowserUnavailableError`.
         on_navigate: Optional JS callback invoked with the new top-route path when
             the app navigates, so the client can ``history.pushState`` (view → URL).
+        on_theme: Optional JS callback invoked with the resolved theme mode
+            (``"light"``/``"dark"``) on mount and on every change, so the client
+            marks the document for the base stylesheet. Mode B ships the same
+            information as a ``theme`` envelope; here it crosses the FFI directly,
+            because Python shares the tab.
         subscribe: Optional in-process streaming subscribe (the Pyodide proxy of
             the glue around ``window.__tempestweb_native_subscribe__``). Ignored
             when ``dispatch`` is ``None``, since no bridge is installed then.
@@ -217,7 +224,9 @@ def bootstrap(
         on_patches(json.dumps(patches))
 
     transport = WasmTransport(deliver)
-    runtime: WasmRuntime[S] = WasmRuntime(state, view, transport, on_navigate, theme)
+    runtime: WasmRuntime[S] = WasmRuntime(
+        state, view, transport, on_navigate, theme, on_theme=on_theme
+    )
     bridge_installed = False
     if dispatch is not None:
         install_bridge(FFIBridge(dispatch, subscribe, unsubscribe))

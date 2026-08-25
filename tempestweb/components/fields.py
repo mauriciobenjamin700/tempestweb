@@ -2,8 +2,10 @@
 
 ``TextField``/``EmailField``/``PasswordField`` are tempestweb-native: a labelled
 column wrapping a plain :class:`~tempest_core.widgets.inputs.Input`. tempest-core
-resolves the Input's light, outlined Material 3 style inline, so the fields look
-consistent with the rest of a tempestweb UI without any per-field styling. The
+resolves the Input's outlined Material 3 style inline **against the theme the
+field hands it**, so the fields look consistent with the rest of a tempestweb UI
+without any per-field styling — and follow a dark app into dark. Pass
+``theme=app.theme`` exactly as you would to a widget. The
 BR-specific fields (``PhoneField``/``CPFField``/``CNPJField``/``AddressField``)
 are aliases over the core's masked inputs (:mod:`tempest_core.components.brforms`),
 which keep their own masking logic.
@@ -13,6 +15,12 @@ which keep their own masking logic.
 Each field is *controlled*: pass the current ``value`` and an ``on_change`` that
 stores the new string; pass ``error`` to show a validation message. They render
 identically in both modes (the field is just core widgets).
+
+!!! note
+    Until 0.99.0 these three declared no ``theme`` at all and built their ``Input``
+    without one, so they were **light by construction**: an app in dark mode got a
+    light field with no warning, and in the worst case a dark surface under dark
+    text.
 """
 
 from __future__ import annotations
@@ -30,6 +38,7 @@ from tempest_core import (
 )
 from tempest_core import (
     Color,
+    ColorRole,
     Column,
     Component,
     Edge,
@@ -39,7 +48,9 @@ from tempest_core import (
     Style,
     Text,
     TextChangeEvent,
+    Theme,
     Widget,
+    current_theme,
     validate_cnpj,
     validate_cpf,
     validate_email,
@@ -66,18 +77,47 @@ __all__ = [
     "validate_phone",
 ]
 
-# Shared text colors for a field's label and error line, tuned for the light
-# Material 3 surface the base stylesheet renders against (client/theme.js).
-_LABEL_COLOR: Color = Color.from_hex("#49454f")
-_ERROR_COLOR: Color = Color.from_hex("#b3261e")
+
+def _label_color(theme: Theme) -> Color:
+    """The muted text colour a field's label paints with, for this theme.
+
+    Resolved from the theme's colour scheme rather than frozen as a hex, which is
+    what made these fields light-only: the label was tuned for the Material 3
+    light surface and stayed that colour in a dark app.
+
+    Args:
+        theme: The theme the field was given.
+
+    Returns:
+        The scheme's ``on_surface_variant`` role.
+    """
+    return theme.scheme().role(ColorRole.ON_SURFACE_VARIANT)
 
 
-def _labelled_field(label: str, field: Widget, error: str, key: str) -> Widget:
+def _error_color(theme: Theme) -> Color:
+    """The colour a field's validation message paints with, for this theme.
+
+    Args:
+        theme: The theme the field was given.
+
+    Returns:
+        The scheme's ``error`` role.
+    """
+    return theme.scheme().role(ColorRole.ERROR)
+
+
+def _labelled_field(
+    label: str, field: Widget, error: str, key: str, theme: Theme
+) -> Widget:
     """Wrap an input in an optional label + optional error column.
 
     Every child key is derived from ``key``. Keys are how the event router finds
     the handler that fired, so a literal key here would be shared by every field
     of this kind on the screen and edits would land on the wrong one.
+
+    ``Text`` takes no theme of its own, so the label and error colours are
+    resolved here and passed as inline style — which is why the theme has to
+    travel this far down rather than stopping at the ``Input``.
 
     Args:
         label: The label text shown above the field (omitted when empty).
@@ -85,6 +125,7 @@ def _labelled_field(label: str, field: Widget, error: str, key: str) -> Widget:
         error: The validation message; the error line is hidden when empty.
         key: The reconciler key for the wrapping column, and the prefix its
             children's keys are derived from.
+        theme: The theme whose scheme resolves the label and error colours.
 
     Returns:
         A :class:`~tempest_core.Column` of the optional label, the field and the
@@ -98,7 +139,7 @@ def _labelled_field(label: str, field: Widget, error: str, key: str) -> Widget:
                 style=Style(
                     font_size=13.0,
                     font_weight=FontWeight.MEDIUM,
-                    color=_LABEL_COLOR,
+                    color=_label_color(theme),
                 ),
                 key=f"{key}-label",
             )
@@ -108,7 +149,7 @@ def _labelled_field(label: str, field: Widget, error: str, key: str) -> Widget:
         children.append(
             Text(
                 content=error,
-                style=Style(font_size=12.0, color=_ERROR_COLOR),
+                style=Style(font_size=12.0, color=_error_color(theme)),
                 key=f"{key}-error",
             )
         )
@@ -126,8 +167,9 @@ class TextField(Component):
         value: The current text value (controlled).
         label: The label shown above the field (omitted when empty).
         placeholder: The empty-field hint.
-        error: The validation message; shown in red when non-empty.
+        error: The validation message; shown in the theme's error colour.
         on_change: Called with the new string value on each edit.
+        theme: The theme the input, label and error line resolve against.
     """
 
     value: str = Field(default="", description="The current text value (controlled).")
@@ -136,6 +178,10 @@ class TextField(Component):
     error: str = Field(default="", description="Validation message (shown when set).")
     on_change: Callable[[str], Any] = Field(
         description="Called with the new string value on each edit."
+    )
+    theme: Theme = Field(
+        default_factory=current_theme,
+        description="The theme the field's input, label and error resolve against.",
     )
 
     def render(self) -> Widget:
@@ -174,6 +220,7 @@ class TextField(Component):
                 value=self.value,
                 placeholder=self.placeholder,
                 on_change=_emit,
+                theme=self.theme,
                 key=f"{base}-input",
             )
         )
@@ -182,7 +229,7 @@ class TextField(Component):
                 Text(
                     content=self.error,
                     key=f"{base}-error",
-                    style=Style(color=_ERROR_COLOR),
+                    style=Style(color=_error_color(self.theme)),
                 )
             )
         return Column(
@@ -193,12 +240,13 @@ class TextField(Component):
 
 
 class EmailField(Component):
-    """A labelled e-mail field styled for the Material 3 light surface.
+    """A labelled, Material 3 e-mail field that follows the theme it is given.
 
     The tempestweb-native e-mail field: a muted label, a controlled
     :class:`~tempest_core.widgets.inputs.Input` on the e-mail keyboard, and an
-    optional error line. tempest-core resolves the Input's light, outlined
-    Material 3 style inline, so it matches the rest of a tempestweb UI.
+    optional error line. tempest-core resolves the Input's outlined Material 3
+    style inline **against ``theme``**, so it matches the rest of a tempestweb UI
+    in light and in dark alike.
 
     Validate with :func:`validate_email`.
 
@@ -206,8 +254,9 @@ class EmailField(Component):
         value: The current e-mail value (controlled).
         label: The label shown above the field (omitted when empty).
         placeholder: The empty-field hint.
-        error: The validation message; shown in red when non-empty.
+        error: The validation message; shown in the theme's error colour.
         on_change: Called with the new string value on each edit.
+        theme: The theme the input, label and error line resolve against.
     """
 
     value: str = Field(default="", description="The current e-mail value (controlled).")
@@ -218,6 +267,10 @@ class EmailField(Component):
     error: str = Field(default="", description="Validation message (shown when set).")
     on_change: Callable[[str], Any] = Field(
         description="Called with the new string value on each edit."
+    )
+    theme: Theme = Field(
+        default_factory=current_theme,
+        description="The theme the field's input, label and error resolve against.",
     )
 
     def render(self) -> Widget:
@@ -248,23 +301,26 @@ class EmailField(Component):
             placeholder=self.placeholder,
             keyboard=KeyboardType.EMAIL,
             on_change=_emit,
+            theme=self.theme,
             key=f"{base}-input",
         )
-        return _labelled_field(self.label, field, self.error, base)
+        return _labelled_field(self.label, field, self.error, base, self.theme)
 
 
 class PasswordField(Component):
-    """A labelled, secure password field styled for the MD3 light surface.
+    """A labelled, secure password field that follows the theme it is given.
 
-    Like :class:`EmailField` but the input is ``secure`` (masked) and carries no
-    inline style, so the MD3 base stylesheet renders a light, outlined field.
+    Like :class:`EmailField` but the input is ``secure`` (masked). It carries no
+    inline style of its own: the core resolves the outlined Material 3 treatment
+    from ``theme``, so the field is light in a light app and dark in a dark one.
 
     Attributes:
         value: The current password value (controlled).
         label: The label shown above the field (omitted when empty).
         placeholder: The empty-field hint.
-        error: The validation message; shown in red when non-empty.
+        error: The validation message; shown in the theme's error colour.
         on_change: Called with the new string value on each edit.
+        theme: The theme the input, label and error line resolve against.
     """
 
     value: str = Field(default="", description="The current password (controlled).")
@@ -273,6 +329,10 @@ class PasswordField(Component):
     error: str = Field(default="", description="Validation message (shown when set).")
     on_change: Callable[[str], Any] = Field(
         description="Called with the new string value on each edit."
+    )
+    theme: Theme = Field(
+        default_factory=current_theme,
+        description="The theme the field's input, label and error resolve against.",
     )
 
     def render(self) -> Widget:
@@ -303,6 +363,7 @@ class PasswordField(Component):
             placeholder=self.placeholder,
             secure=True,
             on_change=_emit,
+            theme=self.theme,
             key=f"{base}-input",
         )
-        return _labelled_field(self.label, field, self.error, base)
+        return _labelled_field(self.label, field, self.error, base, self.theme)

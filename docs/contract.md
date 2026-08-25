@@ -144,7 +144,7 @@ Os **três** modos servem o pedido, cada um no seu runtime — `AppSession.resyn
 no Modo B, `WasmRuntime.resync` no Modo A. No Modo A não há round-trip: o app
 está no mesmo processo. Cada transporte expõe `requestResync()`; um transporte
 que não expusesse deixaria a tela truncada até o reload, que era exatamente o
-estado do Modo A antes da 0.99.0.
+estado do Modo A antes da 0.102.0.
 
 !!! note "Quem mais dispara um resync"
     A perna SSE pede o mesmo reparo por conta própria: se o cliente reconecta com
@@ -266,3 +266,36 @@ pontas se sincronizam por mensagens nos dois sentidos:
 > No Modo A não há envelope: o `WasmRuntime` chama `history.pushState` direto via
 > `pyodide.ffi` (callback `on_navigate`). A **semântica é idêntica** nos dois modos
 > — só o transporte do sentido view→URL difere (envelope no B, callback no A).
+
+## Tema: o modo que a folha base precisa
+
+O `Theme` **não cruza o fio** — o core o remove ao serializar, e as cores que ele
+resolve já viajam embutidas no `style` inline de cada widget. O que não viaja é o
+**modo**, e a folha base precisa exatamente dele: o fundo da página, a superfície
+de um campo e todo estado de hover/foco são CSS, então sem o modo eles ficavam na
+paleta clara enquanto a árvore acima ia para o escuro.
+
+```json
+// servidor → cliente: o modo resolvido do tema ativo.
+{ "kind": "theme", "mode": "dark" }
+```
+
+- **O cliente só marca**: `applyThemeMode` escreve `data-tw-theme="dark"` na raiz
+  do documento, e a folha base redefine seus tokens sob esse seletor. Nenhuma
+  regra de widget sabe qual modo está ativo.
+- **O valor é sempre resolvido** (`"light"` ou `"dark"`, nunca `"system"`): quem
+  resolve é o Python, do mesmo jeito que um **widget** resolve — `Theme.is_dark()`
+  sem a flag de plataforma. É isso que garante que a folha nunca discorde da
+  árvore: um tema `SYSTEM` resolve claro para o widget (ele não vê o SO), então a
+  página também fica clara.
+- **O primeiro `light` não é enviado.** Os tokens da folha *são* a paleta clara,
+  então marcar claro no mount gastaria um frame para dizer o que o CSS já diz.
+  Toda mudança posterior é enviada, incluindo a volta ao claro.
+- **Enviado no mount e depois de cada handler**, não só quando há patch: uma troca
+  de tema numa app cujo `view` não repassa o tema a nenhum widget reconstrói para
+  a IR idêntica, então o core não emite patch nenhum — e a folha ficaria clara sob
+  uma app que foi para o escuro.
+
+> Nos Modos A e C não há envelope: o `WasmRuntime` chama o callback `on_theme` via
+> `pyodide.ffi` e o runtime do Modo C marca o documento no próprio `set_theme`. A
+> **semântica é idêntica** nos três modos — só o transporte difere.

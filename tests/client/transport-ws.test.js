@@ -6,7 +6,8 @@
 // wire shapes are the real goldens from tests/fixtures/.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fixture } from "./setup.js";
+import { fixture, freshDom } from "./setup.js";
+import { THEME_MODE_ATTR } from "../../client/theme.js";
 import { createWebSocketTransport, backoffDelay } from "../../client/transport-ws.js";
 
 /** Minimal WebSocket double the test drives as the server. */
@@ -457,4 +458,27 @@ test("native_result is NOT buffered across a reconnect (stale call_id)", async (
 
   const kinds = sockets[1].sent.map((e) => e.kind);
   assert.deepEqual(kinds, ["event"], "only the event flushed; native_result dropped");
+});
+
+// The half of dark mode the base sheet paints — the page, a field's surface,
+// every hover/focus state — needs the mode, because the Theme itself never
+// crosses the wire (#148): only the resolved mode does.
+test("ws transport marks the document when the server reports a theme mode", async () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  let socket;
+  const Impl = class extends FakeWebSocket {
+    constructor(url) {
+      super(url);
+      socket = this;
+    }
+  };
+  const transport = createWebSocketTransport("ws://x/ws", { WebSocketImpl: Impl });
+  await transport.ready;
+
+  socket.serverSend({ kind: "theme", mode: "dark" });
+  assert.equal(dom.document.documentElement.getAttribute(THEME_MODE_ATTR), "dark");
+
+  socket.serverSend({ kind: "theme", mode: "light" });
+  assert.equal(dom.document.documentElement.getAttribute(THEME_MODE_ATTR), "light");
 });

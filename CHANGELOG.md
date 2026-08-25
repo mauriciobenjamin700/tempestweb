@@ -91,6 +91,75 @@ para `#141218`/`#e6e0e9`/`#d0bcff` e o `body` para `rgb(20,18,24)`; voltar desfa
 Num app que repassa o tema, o campo vai de `rgb(254,247,255)/rgb(25,25,26)` para
 `rgb(20,18,24)/rgb(229,229,230)` — fundo escuro **com** texto claro — o
 `::placeholder` acompanha, e digitar continua funcionando. Console limpo.
+## [0.99.0] — 2026-08-23
+
+### Fixed
+
+- **Dark mode não alcançava widget nem componente em Modo C**
+  ([#106](https://github.com/mauriciobenjamin700/tempestweb/issues/106)). As
+  tabelas de estilo geradas (`widget-styles.gen.js`, `component-styles.gen.js`)
+  eram geradas com o tema default, então todo widget e todo componente
+  transpilado renderizava a paleta clara — e como o estilo inline resolvido ganha
+  do stylesheet, era a metade com precedência que falhava.
+
+  As tabelas ganham eixo de modo (o mais interno em `WIDGET_STYLES`, para
+  duplicar folha e não árvore de chaves; no topo nas sete tabelas de componente
+  que carregam cor), e os builders gerados passam a aceitar `theme` — o campo que
+  o core declara e que não cruza o fio — escolhendo a folha por
+  `theme.is_dark()`, com `light` como queda quando não há tema, exatamente como o
+  core resolve um widget sem tema.
+
+  **Custo medido, não estimado:** a tabela de widgets tinha 725K com um modo
+  (pretty printed); emitida compacta com os **dois** modos, 605K — menor do que
+  antes. Comprimida, a diferença entre um e dois modos é da ordem de 6K.
+
+  Os 47 componentes portados propagam o tema como o core propaga, componente por
+  componente: um `*Input` **é** o campo e repassa; um `SearchBar`/`*Field` compõe
+  um e sobrepõe o estilo resolvido, então o campo interno mantém a paleta
+  default. A matriz de paridade ganhou um par `__dark` por caso (185 → 336
+  amostras), que é o que fixa cada uma dessas decisões.
+
+  **Seis componentes ficam de fora, e agora isso está escrito:** `TextField`,
+  `EmailField`, `PasswordField`, `LoginForm`, `SignupForm` e `Stepper` não
+  declaram campo `theme` — são claros por construção, como os docstrings deles já
+  diziam ("styled for the Material 3 light surface"). O par `__dark` deles é
+  byte a byte igual ao claro. O par continua valendo (fixa que o port JS ignora o
+  tema **exatamente** como o core ignora), mas não prova nada sobre escuro, e a
+  matriz lia como mais cobertura do que tem.
+
+  `LIGHT_ONLY_COMPONENTS` nomeia os seis com o motivo, e
+  `tests/transpile/test_component_dark_axis.py` fixa a divisão nas duas direções:
+  componente que **pode** ser tematizado e mostra cor tem que diferir no escuro
+  (é a asserção da #106 no nível de componente), e a lista não pode apodrecer —
+  quem ganhar tematização sai dela, quem perder entra, e o gerador reprova até
+  isso ser feito. As três direções foram provadas por mutação.
+
+  Isso importa porque `model_copy(update={"theme": ...})` **pula a validação**:
+  `TextField` recusa o kwarg (`extra_forbidden`), e o gerador injetava de qualquer
+  forma um atributo que o core ignora. O caso "escuro" saía sendo o caso claro com
+  outro nome — que é exatamente a forma do defeito que a #106 existe para pegar.
+
+### Added
+
+- **`examples/dark-mode`** — o idioma `theme=app.theme` numa tela com `Card`,
+  `Badge`, `Input`, `Button` e `Alert`, com dois botões que trocam o tema em
+  runtime.
+- Seção **"Modo escuro: passe o tema ao widget"** no tutorial de tema (PT + EN),
+  entrada no troubleshooting nas duas línguas, e página do exemplo novo.
+- `test_mode_free_component_tables_really_are_mode_free` — `SHAPE_STEPS` e
+  `TYPOGRAPHY` são emitidas planas porque não carregam cor; o teste prova isso
+  contra o core, para o dia em que deixar de valer.
+
+Medido em Chrome real, Modo B e Modo C, com **os mesmos** valores computados nos
+dois — e eles são os que o core resolve: `Button` `rgb(88,71,133)` →
+`rgb(199,193,215)`, `Card` `rgb(252,252,252)` → `rgb(25,25,26)`, `Alert`
+`rgb(219,226,240)` → `rgb(29,59,124)`; voltar para Light desfaz; console limpo.
+
+!!! warning "A folha base continua clara"
+    O que só a folha base pinta (fundo do `Input`, fundo da página, hover/foco)
+    segue sem eixo de modo — rastreado em
+    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+
 ## [0.98.0] — 2026-08-23
 
 ### Fixed
@@ -159,7 +228,6 @@ real no `Switch` alterna o estado, arrasto move o `Slider` de 70% para 25%,
 upload real chega como `passaporte.txt`, digitar filtra o `Autocomplete` de 20
 para 3 opções, clique na 3ª aba troca o painel, e a gaveta sai de
 `translateX(-260px)` para `0`.
-
 ## [0.97.0] — 2026-08-23
 
 ### Fixed

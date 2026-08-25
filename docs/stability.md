@@ -36,8 +36,52 @@ first-paint/SEO.
 
 O cliente emite HTML semântico com roles/aria a partir de `Widget.semantics`
 (`aria-label`/`role`/`aria-description`), `tabindex` por `focus_order`, e usa
-controles nativos (`<input>`/`<button>`) onde possível. Um **gate axe-core no CI**
-é follow-up do Trilho S (S10).
+controles nativos (`<input>`/`<button>`) onde possível.
+
+**O baseline é medido, não declarado.** O job `a11y` do CI roda **axe-core** sobre
+o DOM que o renderizador de verdade constrói, para cenas geradas dos apps que este
+repo entrega (`tests/conformance/_a11y_scenes.py` → `scripts/a11y-gate.mjs`), e
+**trava o merge** em violação `serious` ou `critical`:
+
+| O que o gate pega | O que ele não pega |
+|---|---|
+| controle sem nome acessível, imagem sem `alt`, `role` inválido, interativo aninhado, rótulo sem campo, `id` duplicado | contraste de cor e instalabilidade — precisam de layout real, e ficam na camada Lighthouse (`pwa.yml`) |
+
+As cenas são **geradas**, não escritas à mão: a galeria de componentes do Modo C,
+o painel de controles, uma lista com campo de texto, um formulário, uma casca de
+navegação com gaveta e uma tela de imagens. Auditar markup escrito à mão provaria
+que o exemplo do teste é acessível, não que o renderizador é.
+
+Regra que só pode ser afrouxada por escrito: uma regra do axe que não se aplica a
+uma cena entra em `KNOWN_EXCEPTIONS` **com o motivo** (hoje: as quatro regras de
+documento inteiro — `landmark-one-main`, `page-has-heading-one`, `region` — e
+`color-contrast`, que é da camada Lighthouse). Silenciar sem motivo escrito é o que
+transformou "baseline de a11y" em declaração vazia antes.
+
+## O wire-contract é congelado
+
+O wire-contract ([`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md))
+é parte da superfície estável, então ele tem **versão própria** — independente da
+versão do pacote — em `tempestweb.contract`:
+
+```python
+from tempestweb.contract import WIRE_CONTRACT_VERSION, WIRE_SHAPE_DIGEST
+```
+
+As golden fixtures já travavam drift acidental, mas são **regeneráveis do core**:
+elas não distinguem "regenerei porque o core mudou" de "mudei o contrato". O
+`WIRE_SHAPE_DIGEST` distingue — ele é o hash da **forma** do fio (cada chave e seu
+tipo, nunca o valor), então:
+
+| Mudança | Digest | Versão | O que mais |
+|---|---|---|---|
+| fixture regenerada com valores novos | igual | igual | nada |
+| chave opcional nova, `kind` de envelope novo, `type` de evento novo | muda | **igual** | entrada no CHANGELOG |
+| chave renomeada/removida/retipada, semântica de patch alterada | muda | **bump** | nota de migração |
+
+`tests/unit/test_wire_contract_freeze.py` reprova a mudança de forma e diz, na
+mensagem, qual das duas escolhas o autor deve. Cliente de terceiro pinam
+`WIRE_CONTRACT_VERSION` e sabem com o que estão falando.
 
 ## Contrato do subset do Modo C (S11)
 

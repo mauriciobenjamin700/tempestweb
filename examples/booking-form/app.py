@@ -44,6 +44,7 @@ from tempest_core import (
     RangeSlider,
     Scaffold,
     SelectEvent,
+    Semantics,
     Style,
     Text,
     TimeChangeEvent,
@@ -193,6 +194,7 @@ def _fare_card(app: App[BookingState]) -> Widget:
             ),
             RangeSlider(
                 key="fare",
+                semantics=Semantics(label="Fare window"),
                 low=app.state.fare_low,
                 high=app.state.fare_high,
                 min_value=0.0,
@@ -250,6 +252,7 @@ def _cabin_card(app: App[BookingState]) -> Widget:
             ),
             Dropdown(
                 key="cabin",
+                semantics=Semantics(label="Cabin"),
                 options=_CABINS,
                 value=app.state.cabin,
                 placeholder="Choose a cabin",

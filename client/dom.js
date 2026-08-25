@@ -1493,6 +1493,29 @@ function applySwitchProps(el, props) {
   if ("checked" in props) {
     input.checked = Boolean(props.checked);
   }
+  nameNestedControl(el, input);
+}
+
+/**
+ * Give a wrapped control the accessible name its wrapper carries.
+ *
+ * A `<label>` names the input it wraps **through its text**. When the app names
+ * the widget through `semantics` instead, that lands as `aria-label` on the
+ * wrapper — which names the label, not the control inside it, so the control ends
+ * up nameless (axe: `label`, critical). This copies the name inward, and only
+ * when the caption is empty: a visible caption is the better name, and two names
+ * on one control is worse than one.
+ *
+ * @param {HTMLElement} el              The keyed wrapper.
+ * @param {HTMLInputElement} input      The nested control.
+ * @returns {void}
+ */
+function nameNestedControl(el, input) {
+  const wrapperName = el.getAttribute("aria-label");
+  const caption = (el.textContent ?? "").trim();
+  if (wrapperName && !caption) {
+    input.setAttribute("aria-label", wrapperName);
+  }
 }
 
 /**
@@ -1536,6 +1559,43 @@ function applyRangeBounds(el, props) {
 }
 
 /**
+ * The accessible name of one RangeSlider thumb: with the widget's own name, and
+ * standing alone when the widget has none.
+ */
+const RANGE_THUMB_NAMES = {
+  low: { suffix: "minimum", alone: "Minimum" },
+  high: { suffix: "maximum", alone: "Maximum" },
+};
+
+/**
+ * Name one of the two thumbs a RangeSlider owns.
+ *
+ * The wrapper is a role-less `<div>`, so an `aria-label` on it names nothing a
+ * reader can reach: what the reader lands on are the two `<input type="range">`
+ * children the renderer creates, and an unnamed range input is a critical axe
+ * violation (rule `label`). Measured on `examples/booking-form`: the widget
+ * carried `semantics.label` and both thumbs were still nameless, because the
+ * label stopped at the wrapper.
+ *
+ * Each thumb is named after the widget **plus the end it moves** — two controls
+ * announced "Fare window" would be indistinguishable, which is the same defect
+ * wearing a name.
+ *
+ * @param {HTMLElement} el          The RangeSlider `<div>`.
+ * @param {HTMLInputElement} thumb  The thumb to name.
+ * @param {string} part             Which end it is: `"low"` or `"high"`.
+ * @returns {void}
+ */
+function nameRangeThumb(el, thumb, part) {
+  const names = RANGE_THUMB_NAMES[part];
+  const wrapperName = el.getAttribute("aria-label");
+  thumb.setAttribute(
+    "aria-label",
+    wrapperName ? `${wrapperName} (${names.suffix})` : names.alone,
+  );
+}
+
+/**
  * Draw a `RangeSlider`: two native range inputs, one per end of the window.
  *
  * @param {HTMLElement} el   The RangeSlider `<div>`.
@@ -1545,6 +1605,8 @@ function applyRangeBounds(el, props) {
 function applyRangeSliderProps(el, props) {
   const low = ensureRangeThumb(el, "low");
   const high = ensureRangeThumb(el, "high");
+  nameRangeThumb(el, low, "low");
+  nameRangeThumb(el, high, "high");
   applyRangeBounds(low, props);
   applyRangeBounds(high, props);
   if ("low" in props) {
@@ -1597,6 +1659,7 @@ function applyDropdownProps(el, props) {
  */
 function applyAutocompleteProps(el, props) {
   const input = ensureNestedInput(el, "text");
+  nameNestedControl(el, input);
   const list = ensureDataList(el, input);
   if ("options" in props) {
     renderOptions(list, Array.isArray(props.options) ? props.options : [], null);
@@ -1624,6 +1687,7 @@ function applyAutocompleteProps(el, props) {
  */
 function applyPickerProps(el, type, props) {
   const input = ensureNestedInput(el, PICKER_INPUT_TYPES[type]);
+  nameNestedControl(el, input);
   if (!("value" in props)) {
     return;
   }
@@ -1723,6 +1787,12 @@ function nameActivePanel(el) {
  * IR child, so the renderer *can* draw its tabs (see applyTabBarProps) — wired to
  * the same handler.
  *
+ * A closed drawer says `aria-hidden`, not `aria-expanded`: that attribute is only
+ * allowed on a handful of roles, and a RouteDrawer is a plain div, so axe flags it
+ * as invalid ARIA — and it is right. What "expanded" describes is the *control*,
+ * which is the app's own button. What this element can say truthfully is whether
+ * it is hidden.
+ *
  * @param {HTMLElement} el   The TabView / RouteDrawer element.
  * @param {string} type      The widget type.
  * @param {Object} props     The props being applied.
@@ -1745,7 +1815,7 @@ function applyPanelProps(el, type, props) {
   if ("open" in props) {
     const open = Boolean(props.open);
     setOrRemove(el, OPEN_ATTR, open ? "" : null);
-    el.setAttribute("aria-expanded", String(open));
+    setOrRemove(el, "aria-hidden", open ? null : "true");
   }
 }
 
@@ -1791,6 +1861,7 @@ function applyControlProps(el, type, props) {
     applyPinProps(el, props);
   } else if (type === "Checkbox") {
     const input = ensureNestedInput(el, "checkbox");
+    nameNestedControl(el, input);
     if ("checked" in props) {
       input.checked = Boolean(props.checked);
     }

@@ -4,6 +4,108 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.106.0] — 2026-08-25
+
+### Added
+
+- **Gate de acessibilidade que trava de verdade**
+  ([#121](https://github.com/mauriciobenjamin700/tempestweb/issues/121)).
+  `docs/stability.md` declarava baseline de a11y e nada media: o job Lighthouse
+  roda com `|| echo soft-fail`, ou seja, não bloqueia nada — e um `IconButton`
+  chegou a produção como `div` sem foco e sem nome acessível sem nenhum job
+  reclamar (#109).
+
+  O job `a11y` do CI roda **axe-core** sobre o DOM que o renderizador de verdade
+  constrói e falha em violação `serious`/`critical`. As cenas são **geradas dos
+  apps que o repo entrega** (`tests/conformance/_a11y_scenes.py`): galeria de
+  componentes do Modo C, painel de controles, lista com campo, formulário, casca
+  de navegação e tela de imagens — auditar markup escrito à mão provaria que o
+  snippet do teste é acessível, não que o renderizador é.
+
+  Verificado que morde: imagem sem `alt` reprova como `critical` (`image-alt`),
+  botão sem nome reprova (`button-name`, a forma exata da #109) e `role` inválido
+  vindo de `semantics` reprova (`aria-roles`).
+
+- **O wire-contract é congelado** — `tempestweb.contract` expõe
+  `WIRE_CONTRACT_VERSION` (versão própria, independente da versão do pacote) e
+  `WIRE_SHAPE_DIGEST`, o hash da **forma** do fio (cada chave e seu tipo, nunca o
+  valor). As golden fixtures travavam drift acidental mas são regeneráveis do
+  core, então não distinguiam "regenerei" de "mudei o contrato".
+
+  `tests/unit/test_wire_contract_freeze.py` reprova mudança de forma e diz qual
+  escolha o autor deve: aditiva (chave opcional nova, `kind` novo, `type` novo →
+  digest novo, versão igual, entrada no CHANGELOG) ou quebra (renomear, remover,
+  retipar, mudar semântica de patch → bump da versão + nota de migração).
+  Regenerar fixture com valores novos do **mesmo tipo** não mexe no digest.
+
+  Uma borda fica registrada em teste em vez de virar susto: campo `null` na
+  fixture é gravado com o tipo `null`, então regenerar com um valor **move** o
+  digest — resposta certa (o cliente que só via nada agora tem tipo para parsear),
+  mas produzida por um valor. O outro lado é o limite real: enquanto um campo
+  nullable continuar `null` em toda fixture, o tipo declarado dele **não** está
+  pinado por este digest.
+
+### Fixed
+
+- **O gate novo pegou duas violações críticas na primeira execução** — as duas
+  entraram na 0.98.0 e são exatamente a classe de coisa que ele existe para achar:
+
+  - **`aria-expanded` num `div` sem role é ARIA inválido** (`aria-allowed-attr`).
+    O `RouteDrawer` o escrevia; "expandido" descreve o **controle** que abre a
+    gaveta (o botão da app), não o painel. Fechado, o painel agora diz o que
+    é verdade sobre ele: `aria-hidden="true"`.
+  - **Controle embrulhado ficava sem nome acessível** (`label`). Um `<label>`
+    nomeia o input pelo **texto**; quando a app nomeia por `semantics`, o
+    `aria-label` cai no wrapper e não nomeia o controle dentro dele. O nome passa
+    a ser copiado para dentro — e só quando não há legenda visível, porque dois
+    nomes num controle é pior que um. `examples/settings-panel` ganhou o nome nos
+    seis controles que tinham só um `Text` ao lado.
+
+- **Os dois thumbs do `RangeSlider` não tinham nome acessível** (`label`,
+  `critical`) — nos **dois** renderizadores, DOM e SSR. O wrapper é um `<div>` sem
+  role, então o `aria-label` dele não nomeia nada que o leitor alcance: o leitor
+  para nos dois `<input type="range">` que o renderizador cria. Medido em
+  `examples/booking-form`: o widget carregava `semantics.label` e os dois thumbs
+  continuavam anônimos, porque o nome parava no wrapper.
+
+  Cada thumb passa a ser nomeado pelo widget **mais a ponta que ele move**
+  (`Fare window (minimum)` / `(maximum)`; sem `semantics`, `Minimum` / `Maximum`),
+  porque dois controles anunciados igual são o mesmo defeito de terno.
+
+- **O `Dropdown` do `examples/booking-form` não tinha nome** (`select-name`,
+  `critical`): um `<select>` solto, nomeado só por um `Text` ao lado. Ganhou
+  `semantics`, como os do `settings-panel`.
+
+### Changed
+
+- **As cenas do gate cobriam 17 tipos de widget e deixavam sete controles de fora**
+  — justamente os que a #143 acabara de fazer falar (range slider, dropdown,
+  autocomplete, os dois pickers, file picker, tab bar). Diversidade se mede por
+  **tipo de widget**, não por número de telas: `booking-form`,
+  `search-autocomplete` e `tabs-profile` entraram, e as duas violações críticas
+  acima apareceram na hora. Nove cenas.
+
+- **`KNOWN_EXCEPTIONS` agora não pode apodrecer em silêncio.** O docstring
+  prometia que o gate reportaria exceção que parou de disparar, e ele não podia:
+  a passada bloqueante desliga essas regras, e regra desligada não produz
+  resultado nenhum. Uma segunda passada reabilita só o que é julgável em jsdom e
+  reporta o que ficou obsoleto.
+
+  Ela achou algo na estreia: `landmark-one-main`, `page-has-heading-one` e
+  `region` são regras de documento e **nunca** disparam quando o contexto é o
+  elemento de mount — as três saíram da lista. Sobra `color-contrast`, marcada
+  como não-julgável aqui (precisa de layout, amostra cor por canvas), então a
+  passada de obsolescência não a acusa nem finge medi-la.
+
+- `docs/stability.md` (PT + EN) descreve o que o gate pega e o que fica para a
+  camada Lighthouse (contraste e instalabilidade precisam de layout real), e a
+  tabela de compatibilidade do wire. `docs/roadmap.md`: S10 fecha.
+- `axe-core` entra como `devDependency` e `npm run a11y` roda o gate local.
+- **`WIRE_SHAPE_DIGEST` reflete o envelope `theme`.** O congelamento do wire e a
+  chegada do envelope de tema nasceram em frentes paralelas: cada uma passava
+  sozinha e o digest reprovava na integração — o guard fazendo o trabalho dele.
+  A mudança é **aditiva** (uma `EnvelopeKind` nova, nenhuma chave renomeada ou
+  retipada), então `WIRE_CONTRACT_VERSION` fica em `1` e só o digest muda.
 ## [0.105.0] — 2026-08-25
 
 ### Added

@@ -49,16 +49,12 @@ versioning.
   4 notas escalonadas sobe `rms 0.184 → 0.286 → 0.342` conforme elas se sobrepõem.
   Console limpo.
 
-  **Onde cada metade está verificada:** `sequence`/`stop` nos Modos A e B (o acorde
-  e o arpejo reportam nos dois). `watch_levels` no Modo B. No Modo A a subscrição
-  abre — o handler roda e a árvore reconstrói — mas o evento seguinte da página
-  deixa de ser despachado; o cliente emite os frames (6 em 600 ms dirigido à mão
-  pelo bridge) e `visibility.watch` roda bem no Modo A, então é específico deste
-  caminho, provavelmente a cadência de 100 ms num loop que também faz `recv_event`.
-  Aberto como [#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171),
-  e a doc diz isso em vez de prometer os três modos. O Modo C não compila `async for`
-  para stream nenhuma (`statement AsyncFor is not supported`) — pré-existente, vale
-  igual para `geolocation.watch`.
+  **Verificado nos Modos A e B.** Em Modo A, origem virgem: acorde reporta
+  `3 notas juntas, 700 ms`, o medidor lê `rms 0.374 · peak 0.766` enquanto ele soa,
+  e `stop` devolve `parado: 2 osciladores`. O Modo C não compila `async for` para
+  stream nenhuma (`statement AsyncFor is not supported`) — pré-existente, vale igual
+  para `geolocation.watch` —, então lá o medidor fica fora e `sequence`/`stop`
+  compilam.
 
   `tone` fica **intocado** — uma app que só precisa de um clique continua não
   pagando por mais nada. `Step` é `extra="forbid"` (modelo de opção do

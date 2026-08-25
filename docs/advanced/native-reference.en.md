@@ -580,22 +580,26 @@ permission prompt**, so an app can meter the audio it is playing itself.
 `source="mic"` opens `getUserMedia({audio: true})` and fails with
 `permission_denied` if the user refuses.
 
-!!! warning "`watch_levels` is verified in Mode B"
-    Two caveats, neither about audio:
+!!! check "Verified in Modes A and B"
+    `sequence`, `stop` and `watch_levels` measured in a real Chrome in both
+    interactive modes. In Mode A, on a virgin origin: the chord reports
+    `3 notas juntas, 700 ms`, the meter reads `rms 0.374 · peak 0.766` while it
+    sounds, and `stop` returns `parado: 2 osciladores`.
 
-    - **Mode C:** the compiler does not know `async for` yet
-      (`statement AsyncFor is not supported`), so **no** streaming capability is
-      reachable from a Mode C app — the same holds for `geolocation.watch`. The
-      Mode C facade already exposes `watch_levels` for hand-written JS.
-    - **Mode A:** with the subscription open, the page's next event stops being
-      dispatched (measured: after opening the meter, a click on another button
-      reports nothing, even though the meter did open). The client emits frames
-      fine — driven by hand through the bridge it delivers 6 frames in 600 ms —
-      and another streaming capability (`visibility.watch`) runs in Mode A
-      without trouble, so it is specific to this path. Tracked in
-      [#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171).
+!!! warning "Mode C reaches no streaming capability"
+    Not about audio: the compiler does not know `async for` yet
+    (`statement AsyncFor is not supported`), so **no** streaming capability is
+    reachable from a Mode C app — the same holds for `geolocation.watch`. The Mode
+    C facade already exposes `watch_levels` for hand-written JS, and
+    `sequence`/`stop` compile fine.
 
-    `sequence` and `stop` are verified in Modes A and B.
+!!! danger "Long consumption goes through `spawn`"
+    Both modes read events **in series**. An `async for` awaited straight inside a
+    handler holds the dispatch and the app stops responding — hand it to
+    `tempestweb.runtime.spawn`, the way `examples/webaudio_demo` does. That, in an
+    old artifact served by the service worker of a reused origin, is exactly what
+    produced the false positive in
+    [#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171).
 
 !!! check "Measured in a real Chrome"
     With a 700 ms chord sounding: `rms 0.365 → 0.376 → 0.353`, `peak 0.852 → 0.719`;

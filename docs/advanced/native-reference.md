@@ -581,23 +581,26 @@ sem prompt de permissão**, uma app mede o áudio que ela mesma toca.
 `source="mic"` abre `getUserMedia({audio: true})` e falha com
 `permission_denied` se o usuário recusar.
 
-!!! warning "`watch_levels` está verificado no Modo B"
-    Duas ressalvas, e nenhuma é sobre áudio:
+!!! check "Verificado nos Modos A e B"
+    `sequence`, `stop` e `watch_levels` medidos em Chrome real nos dois modos
+    interativos. Em Modo A, origem virgem: acorde reporta `3 notas juntas, 700 ms`,
+    o medidor lê `rms 0.374 · peak 0.766` enquanto ele soa, e `stop` devolve
+    `parado: 2 osciladores`.
 
-    - **Modo C:** o compilador ainda não conhece `async for`
-      (`statement AsyncFor is not supported`), então **nenhuma** capacidade de
-      stream é alcançável de uma app Modo C — o mesmo vale para
-      `geolocation.watch`. A fachada do Modo C já expõe `watch_levels` para JS
-      escrito à mão.
-    - **Modo A:** com a subscrição aberta, o próximo evento da página deixa de ser
-      despachado (medido: depois de abrir o medidor, um clique em outro botão não
-      reporta nada, embora o medidor tenha aberto). O cliente emite os frames
-      normalmente — dirigido à mão pelo bridge, entrega 6 frames em 600 ms — e
-      outra capacidade de stream (`visibility.watch`) roda no Modo A sem
-      problema, então é específico deste caminho. Rastreado em
-      [#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171).
+!!! warning "Modo C não alcança stream nenhuma"
+    Não é sobre áudio: o compilador ainda não conhece `async for`
+    (`statement AsyncFor is not supported`), então **nenhuma** capacidade de stream
+    é alcançável de uma app Modo C — o mesmo vale para `geolocation.watch`. A
+    fachada do Modo C já expõe `watch_levels` para JS escrito à mão, e
+    `sequence`/`stop` compilam normalmente.
 
-    `sequence` e `stop` estão verificados nos Modos A e B.
+!!! danger "Consumo longo vai para `spawn`"
+    Os dois modos leem eventos **em série**. Um `async for` awaitado direto no
+    handler segura o dispatch e a app para de responder — passe por
+    `tempestweb.runtime.spawn`, como `examples/webaudio_demo` faz. Foi exatamente
+    isso, num artefato antigo servido pelo service worker de uma origem reusada,
+    que virou o falso positivo da
+    [#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171).
 
 !!! check "Medido em Chrome real"
     Acorde de 700 ms tocando: `rms 0.365 → 0.376 → 0.353`, `peak 0.852 → 0.719`; em

@@ -13,13 +13,11 @@ Two capabilities, and the second one measures the first:
     tempestweb run --mode server --path examples/webaudio_demo
     tempestweb run --mode wasm --path examples/webaudio_demo
 
-!!! warning "Onde cada metade está verificada"
-    **Síntese** (`sequence`/`stop`): Modos A e B, medida em Chrome.
-    **Medidor** (`watch_levels`): Modo B, medido. No Modo A a subscrição abre mas o
-    evento seguinte da página deixa de ser despachado (tempestweb#171) — o cliente
-    emite os frames, e outra stream (`visibility.watch`) roda bem no Modo A, então é
-    específico deste caminho. O Modo C não compila `async for` para nenhuma stream
-    (`statement AsyncFor is not supported`).
+!!! check "Medido nos Modos A e B"
+    Acorde reporta `3 notas juntas, 700 ms` e o medidor lê `rms 0.374 · peak 0.766`
+    enquanto ele soa; `stop` devolve `parado: 2 osciladores`. O Modo C não compila
+    `async for` para stream nenhuma (`statement AsyncFor is not supported`), então
+    lá o medidor fica fora — `sequence` e `stop` compilam.
 
 !!! note
     Browsers block audio until the first user gesture, so the first phrase may

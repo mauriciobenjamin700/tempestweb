@@ -37,6 +37,22 @@ versioning.
   URL. O de teardown limpa todo cache do origin, se desregistra e recarrega as
   páginas que controlava.
 
+### Fixed
+
+- **O app shell do worker passa a seguir os switches.** A lista de precache
+  nomeava `manifest.webmanifest` e `register.js` incondicionalmente, então
+  `[pwa] manifest = false` com o worker ligado emitia um `sw.js` cujo shell
+  apontava para um arquivo que o build não escreveu. O worker instala com
+  `cache.addAll`, que **rejeita o lote inteiro** quando qualquer request falha —
+  então isso não degradava o precache, matava a instalação: registro descartado,
+  cache vazio, e nada no console. Medido em Chrome: **0 registros, 0 entradas em
+  cache**, com a página montando normalmente. Corrigido, e medido de novo: 1
+  worker ativo, 102 entradas.
+
+  O guard novo (`test_every_precached_url_exists_in_the_artifact`) confere que
+  **toda** URL do app shell existe no artefato, nos dois modos e nas quatro
+  combinações de switch — a classe inteira do defeito, não só este caso.
+
 ### Changed
 
 - O banner de conectividade continua montando num artefato sem service worker:

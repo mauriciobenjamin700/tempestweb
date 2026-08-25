@@ -1307,13 +1307,33 @@ def _copy_assets(project_root: Path, out: Path, patterns: tuple[str, ...]) -> li
     return sorted(written)
 
 
+def _unemitted_pwa_files(
+    *, with_manifest: bool, with_service_worker: bool
+) -> frozenset[str]:
+    """The artifact-relative names the PWA switches keep the build from writing.
+
+    ``sw.js`` is never in here: with the worker off it is the teardown worker
+    rather than the caching one, so the file exists and does a different job.
+
+    Args:
+        with_manifest: Whether ``manifest.webmanifest`` is written.
+        with_service_worker: Whether ``register.js`` is written.
+
+    Returns:
+        The names no file will exist for.
+    """
+    skipped: set[str] = set()
+    if not with_manifest:
+        skipped.add("manifest.webmanifest")
+    if not with_service_worker:
+        skipped.add("register.js")
+    return frozenset(skipped)
+
+
 def _pwa_artifact_files(
     files: tuple[str, ...], *, with_manifest: bool, with_service_worker: bool
 ) -> list[str]:
     """Drop from a fixed artifact file list what the PWA switches did not emit.
-
-    ``sw.js`` stays in either case: with the worker off it is the teardown worker
-    rather than the caching one, so the file exists but does a different job.
 
     Args:
         files: The artifact's full file list (the PWA-complete case).
@@ -1323,12 +1343,41 @@ def _pwa_artifact_files(
     Returns:
         The list with the unwritten entries removed.
     """
-    skipped: set[str] = set()
-    if not with_manifest:
-        skipped.add("manifest.webmanifest")
-    if not with_service_worker:
-        skipped.add("register.js")
+    skipped = _unemitted_pwa_files(
+        with_manifest=with_manifest, with_service_worker=with_service_worker
+    )
     return [name for name in files if name not in skipped]
+
+
+def _pwa_precache(
+    precache: tuple[str, ...], *, with_manifest: bool, with_service_worker: bool
+) -> tuple[str, ...]:
+    """Drop from the app shell what the PWA switches kept the build from writing.
+
+    The worker installs with ``cache.addAll``, which rejects the **whole batch**
+    when any one request fails. So a precache naming a file the build did not
+    write does not degrade — the install rejects, the registration is discarded,
+    and the app is left with no worker and an empty cache. Silently: the page
+    still mounts, and nothing reaches the console.
+
+    That is exactly what ``[pwa] manifest = false`` did while the worker stayed
+    on, until the app shell learned to follow the switches too.
+
+    Args:
+        precache: The app-shell URLs for the PWA-complete case.
+        with_manifest: Whether ``manifest.webmanifest`` was written.
+        with_service_worker: Whether ``register.js`` was written.
+
+    Returns:
+        The app shell with the unwritten URLs removed.
+    """
+    skipped = {
+        f"/{name}"
+        for name in _unemitted_pwa_files(
+            with_manifest=with_manifest, with_service_worker=with_service_worker
+        )
+    }
+    return tuple(url for url in precache if url not in skipped)
 
 
 def _build_wasm(
@@ -1457,7 +1506,11 @@ def _build_wasm(
         out,
         client,
         manifest or ManifestOptions(name=name),
-        precache,
+        _pwa_precache(
+            precache,
+            with_manifest=with_manifest,
+            with_service_worker=with_service_worker,
+        ),
         with_manifest=with_manifest,
         with_service_worker=with_service_worker,
     )
@@ -1700,7 +1753,11 @@ def _build_transpile(
         out,
         client,
         manifest_options,
-        precache,
+        _pwa_precache(
+            precache,
+            with_manifest=with_manifest,
+            with_service_worker=with_service_worker,
+        ),
         with_manifest=with_manifest,
         with_service_worker=with_service_worker,
     )

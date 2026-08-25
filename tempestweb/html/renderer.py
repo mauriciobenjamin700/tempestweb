@@ -237,6 +237,11 @@ def _control_attributes(node: Node) -> list[str]:
     ``src``/``alt``. Checkbox state is handled by :func:`_inner_html` (the nested
     input), and other types add nothing here.
 
+    A closed ``RouteDrawer`` says ``aria-hidden``, not ``aria-expanded``: that
+    attribute is invalid on a role-less div (axe: ``aria-allowed-attr``), and
+    "expanded" describes the control that toggles the drawer — the app's button.
+    What this element can say is that it is hidden.
+
     Args:
         node: The IR node whose control props to map.
 
@@ -288,9 +293,10 @@ def _control_attributes(node: Node) -> list[str]:
             attributes.append(f'aria-label="{escape_attr(tabs[active])}"')
     elif node.type == "RouteDrawer":
         open_ = bool(props.get("open"))
-        attributes.append(f'aria-expanded="{"true" if open_ else "false"}"')
         if open_:
             attributes.append('data-tw-open=""')
+        else:
+            attributes.append('aria-hidden="true"')
     elif node.type == "Input":
         attributes.append(f'type="{"password" if props.get("secure") else "text"}"')
         if "value" in props:
@@ -307,6 +313,39 @@ def _control_attributes(node: Node) -> list[str]:
     elif node.type in _INDICATOR_TYPES:
         attributes.extend(_indicator_attributes(node))
     return attributes
+
+
+#: The accessible name of one RangeSlider thumb: ``(suffix, standalone)`` — the
+#: suffix qualifies the widget's own name, the standalone form is used when the
+#: widget has none. Mirrors ``RANGE_THUMB_NAMES`` in ``client/dom.js``.
+_RANGE_THUMB_NAMES: dict[str, tuple[str, str]] = {
+    "low": ("minimum", "Minimum"),
+    "high": ("maximum", "Maximum"),
+}
+
+
+def _range_thumb_name(dumped: dict[str, Any], part: str) -> str:
+    """Return the accessible name for one RangeSlider thumb.
+
+    The wrapper is a role-less ``<div>``, so its ``aria-label`` names nothing a
+    reader can reach: the reader lands on the two range inputs, and an unnamed
+    range input is a critical axe violation (rule ``label``). Each thumb is named
+    after the widget **plus the end it moves**, because two controls announced by
+    the same name are the same defect wearing a name.
+
+    Args:
+        dumped: The node's props, as the wire carries them.
+        part: Which end the thumb is: ``"low"`` or ``"high"``.
+
+    Returns:
+        The name to put on the thumb's ``aria-label``.
+    """
+    suffix, alone = _RANGE_THUMB_NAMES[part]
+    semantics = _dump(dumped.get("semantics"))
+    label = semantics.get("label") if isinstance(semantics, dict) else None
+    if label is None or str(label) == "":
+        return alone
+    return f"{label} ({suffix})"
 
 
 def _range_attributes(props: dict[str, Any], value: Any) -> list[str]:  # noqa: ANN401 — wire-shaped prop value
@@ -544,9 +583,13 @@ def _inner_html(node: Node) -> str:
         props = node.props
         low_attrs = " ".join(_range_attributes(props, props.get("low")))
         high_attrs = " ".join(_range_attributes(props, props.get("high")))
+        low_name = _range_thumb_name(props, "low")
+        high_name = _range_thumb_name(props, "high")
         return (
-            f'<input type="range" data-tw-part="low" {low_attrs}>'
-            f'<input type="range" data-tw-part="high" {high_attrs}>'
+            f'<input type="range" data-tw-part="low" '
+            f'aria-label="{escape_attr(low_name)}" {low_attrs}>'
+            f'<input type="range" data-tw-part="high" '
+            f'aria-label="{escape_attr(high_name)}" {high_attrs}>'
         )
     if node.type == "TabBar":
         tabs = node.props.get("tabs")

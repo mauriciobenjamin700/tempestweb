@@ -35,8 +35,52 @@ boot (Mode A) is heavier on Safari/mobile — prefer B or C for first-paint/SEO.
 
 The client emits semantic HTML with roles/aria from `Widget.semantics`
 (`aria-label`/`role`/`aria-description`), `tabindex` from `focus_order`, and uses
-native controls (`<input>`/`<button>`) where possible. An **axe-core CI gate** is
-a Track-S follow-up (S10).
+native controls (`<input>`/`<button>`) wherever possible.
+
+**The baseline is measured, not declared.** The CI `a11y` job runs **axe-core**
+over the DOM the real renderer builds, for scenes generated from the apps this
+repo ships (`tests/conformance/_a11y_scenes.py` → `scripts/a11y-gate.mjs`), and it
+**blocks the merge** on a `serious` or `critical` violation:
+
+| What the gate catches | What it does not |
+|---|---|
+| a control with no accessible name, an image with no `alt`, an invalid `role`, a nested interactive, a label with no field, a duplicate `id` | colour contrast and installability — they need real layout, and live in the Lighthouse layer (`pwa.yml`) |
+
+The scenes are **generated**, not hand-written: the Mode C component gallery, the
+control panel, a list with a text field, a form, a nav shell with a drawer and an
+image screen. Auditing hand-written markup would prove the test's snippet is
+accessible, not that the renderer is.
+
+One rule may only be loosened in writing: an axe rule that cannot apply to a scene
+goes into `KNOWN_EXCEPTIONS` **with its reason** (today: the three whole-document
+rules — `landmark-one-main`, `page-has-heading-one`, `region` — plus
+`color-contrast`, which belongs to the Lighthouse layer). Silencing without a
+written reason is what turned "accessibility baseline" into an empty claim before.
+
+## The wire contract is frozen
+
+The wire contract ([`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md))
+is part of the stable surface, so it carries **its own version** — independent of
+the package version — in `tempestweb.contract`:
+
+```python
+from tempestweb.contract import WIRE_CONTRACT_VERSION, WIRE_SHAPE_DIGEST
+```
+
+The golden fixtures already caught accidental drift, but they are **regenerable
+from the core**: they cannot tell "I regenerated because the core moved" from "I
+changed the contract". `WIRE_SHAPE_DIGEST` can — it hashes the wire's **shape**
+(every key and its type, never its value), so:
+
+| Change | Digest | Version | What else |
+|---|---|---|---|
+| a fixture regenerated with new values | same | same | nothing |
+| a new optional key, a new envelope `kind`, a new event `type` | moves | **same** | a CHANGELOG entry |
+| a key renamed/removed/retyped, patch semantics changed | moves | **bump** | a migration note |
+
+`tests/unit/test_wire_contract_freeze.py` fails on a shape change and names, in
+its message, which of the two choices the author owes. A third-party client pins
+`WIRE_CONTRACT_VERSION` and knows what it is talking to.
 
 ## Mode C subset contract (S11)
 

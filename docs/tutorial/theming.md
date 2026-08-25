@@ -334,6 +334,70 @@ As duas pontas que o host cobre:
     Se a troca em runtime é o coração do seu app, declare `THEME` com a paleta que
     ele abre.
 
+## Modo escuro: passe o tema ao widget
+
+Um widget **estilizado** resolve as próprias cores do tema que ele carrega — do
+campo `theme` dele, não de um tema ambiente. É por isso que o idioma é uma linha:
+
+```python
+Button(label="Salvar", theme=app.theme, on_click=salvar)
+```
+
+Passe `app.theme` e a árvore inteira segue o `app.set_theme(...)`; deixe de fora
+e o widget resolve a paleta **clara**, mesmo que o app esteja em modo escuro.
+Vale igual nos três modos.
+
+```python
+from tempest_core import App, Card, Column, Text, Theme, ThemeMode, Widget
+
+
+def view(app: App[State]) -> Widget:
+    """Desenha um cartão que acompanha o tema do app."""
+    theme: Theme = app.theme
+    return Column(
+        key="body",
+        children=[
+            Card(
+                key="card",
+                theme=theme,
+                children=[Text(content="Segue o tema", key="label")],
+            ),
+        ],
+    )
+
+
+def escurecer(app: App[State]) -> None:
+    """Troca o tema do app, o que re-resolve todo widget que o recebeu."""
+    app.set_theme(Theme(mode=ThemeMode.DARK))
+```
+
+!!! note "Widget de layout não tem `theme`"
+    `Row`, `Column` e `Text` não carregam cor própria, então o core não lhes dá o
+    campo — passar `theme=` levanta `ValidationError` com o nome do campo. A cor
+    que eles mostram é a que herdam da caixa estilizada em volta.
+
+!!! tip "Componente propaga como o core propaga"
+    Um `EmailInput` **é** o campo: ele repassa o tema para o `Input` que constrói.
+    Um `SearchBar` ou um `TextField` **compõe** um campo e sobrepõe o estilo que
+    resolveu, então o campo interno mantém a paleta default — e o Modo C reproduz
+    essa distinção componente por componente, fixada por matriz de paridade nos
+    dois modos.
+
+!!! info "Modo C: as tabelas geradas têm eixo de modo desde a 0.99.0"
+    O Modo C não tem Python, então o estilo resolvido de cada widget viaja em
+    tabela gerada. Até a 0.98.0 essas tabelas eram geradas com o tema default:
+    todo widget e todo componente transpilado renderizava **claro**, e como o
+    estilo inline ganha do stylesheet, era a metade com precedência que falhava.
+    Agora a tabela carrega os dois modos e o builder escolhe por
+    `theme.is_dark()`.
+
+!!! warning "A folha base ainda é clara"
+    O que o `Style` inline resolve segue o tema; o que só a **folha base** pinta
+    (o fundo do `Input`, o fundo da página, os estados de hover e foco) continua
+    na paleta clara, porque os tokens `--tw-*` não têm eixo de modo. Num app
+    escuro isso aparece como campo branco dentro de cartão escuro. Rastreado em
+    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+
 ## Indicadores de progresso
 
 `ProgressBar` e `Spinner` não têm tamanho próprio: sem folha de estilo, os dois

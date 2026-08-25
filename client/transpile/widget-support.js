@@ -173,10 +173,12 @@ Object.freeze(Edge);
  * @param {string} size  The size axis, or `"_"`.
  * @param {string} colorScheme  The color-scheme axis, or `"_"`.
  * @param {?Object} override  The caller's explicit style, or `null`.
+ * @param {?Object} [theme]  The widget's theme; its mode picks the leaf.
  * @returns {Object<string, *>}  The resolved, full Style object.
  */
-export function resolveWidgetStyle(widget, variant, size, colorScheme, override) {
-  const base = WIDGET_STYLES[widget]?.[variant]?.[size]?.[colorScheme] ?? {};
+export function resolveWidgetStyle(widget, variant, size, colorScheme, override, theme) {
+  const leaf = WIDGET_STYLES[widget]?.[variant]?.[size]?.[colorScheme];
+  const base = leaf?.[themeMode(theme)] ?? {};
   const merged = { ...base };
   if (override != null) {
     for (const [field, value] of Object.entries(override)) {
@@ -186,6 +188,47 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override)
     }
   }
   return Style(merged);
+}
+
+/**
+ * Which leaf of a generated style table a theme selects: `"light"` or `"dark"`.
+ *
+ * A widget built with no theme resolves light in the core, so an absent theme
+ * answers `"light"` here too. `SYSTEM` defers to the platform flag exactly as
+ * `Theme.is_dark` does, which is why the theme object is asked instead of its
+ * `mode` string being read.
+ *
+ * @param {?Object} theme  A `Theme` (or anything with `is_dark`), or null.
+ * @returns {string}       The table key.
+ */
+export function themeMode(theme) {
+  return theme != null && typeof theme.is_dark === "function" && theme.is_dark()
+    ? "dark"
+    : "light";
+}
+
+/**
+ * The Material 3 colour roles of a theme, from the generated table.
+ *
+ * @param {?Object} theme  The widget's theme, or null for the light default.
+ * @returns {Object<string, Object>}  Role name -> serialized colour.
+ */
+export function colorRoles(theme) {
+  return COLOR_ROLES[themeMode(theme)];
+}
+
+/**
+ * The mode slice of any generated table that carries colour.
+ *
+ * Every colour-carrying table in `component-styles.gen.js` is keyed by mode
+ * first, so a component reads its own axes off this slice.
+ *
+ * @param {Object} table   The generated table.
+ * @param {?Object} theme  The component's theme, or null for light.
+ * @returns {Object}       The table for this theme's mode.
+ */
+export function modeTable(table, theme) {
+  return table[themeMode(theme)];
 }
 
 /**
@@ -205,16 +248,26 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override)
  * @param {string} colorScheme  The Material 3 scheme name.
  * @param {string} error        The validation message; empty means valid.
  * @param {?Object} override    The caller's style, or null.
+ * @param {?Object} [theme]     The widget's theme; its mode picks the palette.
  * @returns {Object}            The complete Style object.
  */
-export function resolveFieldStyle(widget, fieldVariant, size, colorScheme, error, override) {
+export function resolveFieldStyle(
+  widget,
+  fieldVariant,
+  size,
+  colorScheme,
+  error,
+  override,
+  theme,
+) {
   if (!error) {
-    return resolveWidgetStyle(widget, fieldVariant, size, colorScheme, override);
+    return resolveWidgetStyle(widget, fieldVariant, size, colorScheme, override, theme);
   }
-  const edge = Border({ width: 1.0, color: COLOR_ROLES.error });
+  const roles = colorRoles(theme);
+  const edge = Border({ width: 1.0, color: roles.error });
   const layered = {
     border: fieldVariant === "flushed" ? SideBorder({ bottom: edge }) : edge,
-    color: COLOR_ROLES.error,
+    color: roles.error,
   };
   if (override != null) {
     for (const [field, value] of Object.entries(override)) {
@@ -223,7 +276,7 @@ export function resolveFieldStyle(widget, fieldVariant, size, colorScheme, error
       }
     }
   }
-  return resolveWidgetStyle(widget, fieldVariant, size, colorScheme, layered);
+  return resolveWidgetStyle(widget, fieldVariant, size, colorScheme, layered, theme);
 }
 
 /**

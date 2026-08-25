@@ -521,9 +521,11 @@ async def follow_midi() -> None:
         app.set_state(lambda s: s.notes.append(msg.data))
 ```
 
-### `webaudio` — tom sintetizado
+### `webaudio` — tom, frase e medidor
 
-Toque um "beep" sem precisar de um asset de áudio (diferente de `audio.play`).
+Três formatos, em ordem crescente do que conseguem dizer.
+
+**Um beep**, sem precisar de um asset de áudio (diferente de `audio.play`):
 
 ```python
 from tempestweb import native
@@ -531,6 +533,77 @@ from tempestweb import native
 async def beep() -> None:
     await native.webaudio.tone(frequency=880.0, duration_ms=150, type="sine")
 ```
+
+**Uma frase inteira, numa chamada.** Cada `Step` ganha oscilador e ganho próprios
+sobre um barramento compartilhado, com envelope de attack/release. Passos com o
+mesmo `start_ms` soam juntos — é assim que se escreve um acorde:
+
+```python
+from tempestweb import native
+
+async def chord() -> None:
+    result = await native.webaudio.sequence(
+        [
+            native.webaudio.Step(frequency=261.63, duration_ms=700, gain=0.3),
+            native.webaudio.Step(frequency=329.63, duration_ms=700, gain=0.3),
+            native.webaudio.Step(frequency=392.00, duration_ms=700, gain=0.3),
+        ]
+    )
+    print(result.scheduled, result.ends_in_ms, result.blocked)   # 3 700 False
+
+async def hush() -> None:
+    await native.webaudio.stop()      # corta o que ainda soa; o contexto fica aberto
+```
+
+!!! info "Por que uma frase, e não um grafo de nós"
+    No Modo B cada chamada de capacidade é um round-trip. Uma API na forma do grafo
+    do Web Audio colocaria a **rede** entre um oscilador e seu ganho. O que uma app
+    precisa de "além de um tom" é *agendamento* e *forma* — os dois são por frase,
+    então a frase é a unidade que atravessa o fio.
+
+!!! tip "O envelope é o que separa uma nota de um clique"
+    `attack_ms`/`release_ms` (default 5/40) rampeiam do silêncio ao `gain` e de
+    volta. Sem eles a onda começa e termina no meio do ciclo, e o que se ouve é um
+    estalo nas duas pontas.
+
+**Um medidor**, em streaming, sobre a própria síntese ou o microfone:
+
+```python
+from tempestweb import native
+
+async def vu() -> None:
+    async for level in native.webaudio.watch_levels(interval_ms=100, bands=8):
+        app.set_state(lambda s: setattr(s, "vu", level.rms))
+```
+
+`source="output"` (default) escuta o barramento compartilhado: **sem microfone e
+sem prompt de permissão**, uma app mede o áudio que ela mesma toca.
+`source="mic"` abre `getUserMedia({audio: true})` e falha com
+`permission_denied` se o usuário recusar.
+
+!!! warning "`watch_levels` está verificado no Modo B"
+    Duas ressalvas, e nenhuma é sobre áudio:
+
+    - **Modo C:** o compilador ainda não conhece `async for`
+      (`statement AsyncFor is not supported`), então **nenhuma** capacidade de
+      stream é alcançável de uma app Modo C — o mesmo vale para
+      `geolocation.watch`. A fachada do Modo C já expõe `watch_levels` para JS
+      escrito à mão.
+    - **Modo A:** com a subscrição aberta, o próximo evento da página deixa de ser
+      despachado (medido: depois de abrir o medidor, um clique em outro botão não
+      reporta nada, embora o medidor tenha aberto). O cliente emite os frames
+      normalmente — dirigido à mão pelo bridge, entrega 6 frames em 600 ms — e
+      outra capacidade de stream (`visibility.watch`) roda no Modo A sem
+      problema, então é específico deste caminho. Rastreado em
+      [#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171).
+
+    `sequence` e `stop` estão verificados nos Modos A e B.
+
+!!! check "Medido em Chrome real"
+    Acorde de 700 ms tocando: `rms 0.365 → 0.376 → 0.353`, `peak 0.852 → 0.719`; em
+    t=720 ms — quando o release acaba — volta a `0.000`. O arpejo de 4 notas
+    escalonadas sobe `rms 0.184 → 0.286 → 0.342` conforme elas se sobrepõem.
+    `examples/webaudio_demo` é esse app.
 
 ---
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from tempestweb import native
 from tempestweb.native import (
@@ -451,3 +452,71 @@ async def test_webaudio_tone_explicit() -> None:
         "type": "square",
         "volume": 0.25,
     }
+
+
+async def test_webaudio_sequence_sends_every_step_with_defaults_filled() -> None:
+    bridge = _install(
+        {"webaudio.sequence": {"scheduled": 2, "ends_in_ms": 450, "blocked": False}}
+    )
+
+    result = await native.webaudio.sequence(
+        [
+            native.webaudio.Step(frequency=440.0, duration_ms=200),
+            native.webaudio.Step(frequency=550.0, duration_ms=250, start_ms=200),
+        ]
+    )
+
+    assert result == native.webaudio.SequenceResult(
+        scheduled=2, ends_in_ms=450, blocked=False
+    )
+    assert bridge.calls[0]["capability"] == "webaudio.sequence"
+    assert bridge.calls[0]["args"]["steps"] == [
+        {
+            "frequency": 440.0,
+            "duration_ms": 200,
+            "start_ms": 0,
+            "type": "sine",
+            "gain": 0.5,
+            "attack_ms": 5,
+            "release_ms": 40,
+        },
+        {
+            "frequency": 550.0,
+            "duration_ms": 250,
+            "start_ms": 200,
+            "type": "sine",
+            "gain": 0.5,
+            "attack_ms": 5,
+            "release_ms": 40,
+        },
+    ]
+
+
+async def test_webaudio_sequence_of_nothing_still_reports() -> None:
+    """An empty phrase needs no special case at the call site."""
+    _install({"webaudio.sequence": {}})
+    result = await native.webaudio.sequence([])
+    assert result.scheduled == 0
+    assert result.blocked is False
+
+
+async def test_webaudio_step_refuses_an_unknown_field() -> None:
+    """`Step` is a developer-facing option model: a typo must hurt."""
+    with pytest.raises(ValidationError):
+        native.webaudio.Step(freqency=440.0)  # type: ignore[call-arg]
+
+
+async def test_webaudio_stop_reports_how_many_it_stopped() -> None:
+    bridge = _install({"webaudio.stop": {"stopped": 3}})
+    assert await native.webaudio.stop() == 3
+    assert bridge.calls[0]["capability"] == "webaudio.stop"
+    assert bridge.calls[0]["args"] == {}
+
+
+async def test_webaudio_level_ignores_a_field_a_newer_client_adds() -> None:
+    """Browser payloads stay forward-compatible (unlike `Step`)."""
+    level = native.webaudio.Level.model_validate(
+        {"rms": 0.5, "peak": 0.9, "bands": [0.1, 0.2], "loudness_lufs": -14.0}
+    )
+    assert level.rms == 0.5
+    assert level.bands == [0.1, 0.2]

@@ -520,9 +520,11 @@ async def follow_midi() -> None:
         app.set_state(lambda s: s.notes.append(msg.data))
 ```
 
-### `webaudio` — synthesized tone
+### `webaudio` — tone, phrase and meter
 
-Play a "beep" without needing an audio asset (unlike `audio.play`).
+Three shapes, in increasing order of what they can say.
+
+**One beep**, with no audio asset needed (unlike `audio.play`):
 
 ```python
 from tempestweb import native
@@ -530,6 +532,76 @@ from tempestweb import native
 async def beep() -> None:
     await native.webaudio.tone(frequency=880.0, duration_ms=150, type="sine")
 ```
+
+**A whole phrase, in one call.** Every `Step` gets its own oscillator and gain on a
+shared bus, with an attack/release envelope. Steps sharing a `start_ms` sound
+together — that is how a chord is written:
+
+```python
+from tempestweb import native
+
+async def chord() -> None:
+    result = await native.webaudio.sequence(
+        [
+            native.webaudio.Step(frequency=261.63, duration_ms=700, gain=0.3),
+            native.webaudio.Step(frequency=329.63, duration_ms=700, gain=0.3),
+            native.webaudio.Step(frequency=392.00, duration_ms=700, gain=0.3),
+        ]
+    )
+    print(result.scheduled, result.ends_in_ms, result.blocked)   # 3 700 False
+
+async def hush() -> None:
+    await native.webaudio.stop()      # cuts what still sounds; the context stays open
+```
+
+!!! info "Why a phrase, and not a node graph"
+    In Mode B every capability call is a round-trip. An API shaped like Web Audio's
+    own node graph would put the **network** between an oscillator and its gain.
+    What an app needs from "beyond a single tone" is *scheduling* and *shaping*, and
+    both are per-phrase — so the phrase is the unit that crosses the wire.
+
+!!! tip "The envelope is what separates a note from a click"
+    `attack_ms`/`release_ms` (5/40 by default) ramp from silence to `gain` and back.
+    Without them the waveform starts and stops mid-cycle, and what you hear is a
+    click at both edges.
+
+**A meter**, streaming, over the synthesis itself or the microphone:
+
+```python
+from tempestweb import native
+
+async def vu() -> None:
+    async for level in native.webaudio.watch_levels(interval_ms=100, bands=8):
+        app.set_state(lambda s: setattr(s, "vu", level.rms))
+```
+
+`source="output"` (the default) taps the shared bus: **no microphone and no
+permission prompt**, so an app can meter the audio it is playing itself.
+`source="mic"` opens `getUserMedia({audio: true})` and fails with
+`permission_denied` if the user refuses.
+
+!!! warning "`watch_levels` is verified in Mode B"
+    Two caveats, neither about audio:
+
+    - **Mode C:** the compiler does not know `async for` yet
+      (`statement AsyncFor is not supported`), so **no** streaming capability is
+      reachable from a Mode C app — the same holds for `geolocation.watch`. The
+      Mode C facade already exposes `watch_levels` for hand-written JS.
+    - **Mode A:** with the subscription open, the page's next event stops being
+      dispatched (measured: after opening the meter, a click on another button
+      reports nothing, even though the meter did open). The client emits frames
+      fine — driven by hand through the bridge it delivers 6 frames in 600 ms —
+      and another streaming capability (`visibility.watch`) runs in Mode A
+      without trouble, so it is specific to this path. Tracked in
+      [#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171).
+
+    `sequence` and `stop` are verified in Modes A and B.
+
+!!! check "Measured in a real Chrome"
+    With a 700 ms chord sounding: `rms 0.365 → 0.376 → 0.353`, `peak 0.852 → 0.719`;
+    at t=720 ms — when the release ends — back to `0.000`. A 4-note staggered
+    arpeggio climbs `rms 0.184 → 0.286 → 0.342` as the notes overlap.
+    `examples/webaudio_demo` is that app.
 
 ---
 

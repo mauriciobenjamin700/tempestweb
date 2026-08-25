@@ -298,7 +298,10 @@ NATIVE_MEMBERS: Mapping[str, frozenset[str]] = {
     ),
     "webaudio": frozenset(
         {
+            "sequence",
+            "stop",
             "tone",
+            "watch_levels",
         }
     ),
     "webauthn": frozenset(
@@ -483,6 +486,13 @@ NATIVE_TYPES: Mapping[str, frozenset[str]] = {
     "usb": frozenset(
         {
             "UsbDevice",
+        }
+    ),
+    "webaudio": frozenset(
+        {
+            "Level",
+            "SequenceResult",
+            "Step",
         }
     ),
 }

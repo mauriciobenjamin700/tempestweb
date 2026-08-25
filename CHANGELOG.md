@@ -4,6 +4,75 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.112.0] — 2026-08-25
+
+### Added
+
+- **Web Audio além de um tom: uma frase por chamada, e um medidor (T24)**
+  ([#118](https://github.com/mauriciobenjamin700/tempestweb/issues/118)). O
+  `webaudio` tinha só `tone` — uma frequência, uma duração, um contexto novo por
+  beep. Agora tem três formatos:
+
+  ```python
+  result = await native.webaudio.sequence([
+      native.webaudio.Step(frequency=261.63, duration_ms=700, gain=0.3),
+      native.webaudio.Step(frequency=329.63, duration_ms=700, gain=0.3),
+      native.webaudio.Step(frequency=392.00, duration_ms=700, gain=0.3),
+  ])                                  # 3 notas juntas = acorde
+  await native.webaudio.stop()        # corta sem fechar o contexto
+
+  async for level in native.webaudio.watch_levels():
+      app.set_state(lambda s: setattr(s, "vu", level.rms))
+  ```
+
+  **`sequence`** agenda a frase inteira numa chamada: cada `Step` ganha oscilador e
+  ganho próprios sobre um barramento compartilhado, com envelope de
+  `attack_ms`/`release_ms` — sem ele a onda começa e termina no meio do ciclo, e o
+  que se ouve é um estalo. Passos com o mesmo `start_ms` soam juntos. **`stop`**
+  para os osciladores e deixa o contexto aberto (um `AudioContext` fechado não
+  reabre). **`watch_levels`** streama `rms`/`peak`/`bands` de um `AnalyserNode`
+  sobre o barramento de síntese (`source="output"`, o default: **sem microfone e
+  sem prompt de permissão**) ou sobre o microfone.
+
+  **Grafo de nós arbitrário fica de fora, de propósito:** no Modo B cada chamada de
+  capacidade é um round-trip, então uma API na forma do grafo do Web Audio poria a
+  rede entre um oscilador e seu ganho. O que uma app precisa de "além de um tom" é
+  agendamento e forma, e os dois são por frase.
+
+  Um contexto compartilhado para a app toda, não um por frase: o browser limita
+  quantos contextos uma página abre, e uma app que dá beep por contexto bate nesse
+  teto.
+
+  **Medido em Chrome real** (`examples/webaudio_demo`, Modo B, análise medindo a
+  própria síntese): acorde de 700 ms tocando → `rms 0.365 → 0.376 → 0.353`,
+  `peak 0.852 → 0.719`; em **t=720 ms**, quando o release acaba, `0.000`. Arpejo de
+  4 notas escalonadas sobe `rms 0.184 → 0.286 → 0.342` conforme elas se sobrepõem.
+  Console limpo.
+
+  **Onde cada metade está verificada:** `sequence`/`stop` nos Modos A e B (o acorde
+  e o arpejo reportam nos dois). `watch_levels` no Modo B. No Modo A a subscrição
+  abre — o handler roda e a árvore reconstrói — mas o evento seguinte da página
+  deixa de ser despachado; o cliente emite os frames (6 em 600 ms dirigido à mão
+  pelo bridge) e `visibility.watch` roda bem no Modo A, então é específico deste
+  caminho, provavelmente a cadência de 100 ms num loop que também faz `recv_event`.
+  Aberto como [#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171),
+  e a doc diz isso em vez de prometer os três modos. O Modo C não compila `async for`
+  para stream nenhuma (`statement AsyncFor is not supported`) — pré-existente, vale
+  igual para `geolocation.watch`.
+
+  `tone` fica **intocado** — uma app que só precisa de um clique continua não
+  pagando por mais nada. `Step` é `extra="forbid"` (modelo de opção do
+  desenvolvedor: nome errado tem que doer); `SequenceResult` e `Level` ignoram
+  extras, para chave nova de cliente novo não quebrar Python antigo.
+
+### Changed
+
+- `docs/advanced/native-reference.md` (PT + EN) documenta os três formatos com o
+  porquê da frase-como-unidade; `docs/roadmap.md`: **T24 fecha**;
+  `docs/examples/index.md` (PT + EN) lista o demo novo.
+- `tempestweb/transpile/_native.py` regenerado — o Modo C expõe
+  `sequence`/`stop`/`watch_levels` pela fachada, com os mesmos defaults do `Step`.
+
 ## [0.111.0] — 2026-08-25
 
 ### Fixed

@@ -422,6 +422,10 @@ LoginForm(
     core release, not a change here. Until then, `Stepper` renders light in any
     app. Tracked in
     [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158).
+    A `SearchBar` or a `TextField` **composes** one and layers the style it
+    resolved on top, so the inner field keeps the default palette — and Mode C
+    reproduces that distinction component by component, pinned by a parity matrix
+    in both modes.
 
 !!! info "Mode C: the generated tables carry a mode axis since 0.99.0"
     Mode C has no Python, so each widget's resolved style travels as a generated
@@ -429,6 +433,7 @@ LoginForm(
     transpiled widget and component rendered **light**, and since an inline style
     beats the stylesheet, the half with precedence was the half that failed. The
     table now carries both modes and the builder picks by `theme.is_dark()`.
+
 
 ## The base sheet follows the mode you declare
 

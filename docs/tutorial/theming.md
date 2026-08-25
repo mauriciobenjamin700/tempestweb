@@ -419,6 +419,10 @@ LoginForm(
     release do core, não uma mudança aqui. Até lá, `Stepper` renderiza claro em
     qualquer app. Rastreado na
     [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158).
+    Um `SearchBar` ou um `TextField` **compõe** um campo e sobrepõe o estilo que
+    resolveu, então o campo interno mantém a paleta default — e o Modo C reproduz
+    essa distinção componente por componente, fixada por matriz de paridade nos
+    dois modos.
 
 !!! info "Modo C: as tabelas geradas têm eixo de modo desde a 0.99.0"
     O Modo C não tem Python, então o estilo resolvido de cada widget viaja em
@@ -427,6 +431,7 @@ LoginForm(
     estilo inline ganha do stylesheet, era a metade com precedência que falhava.
     Agora a tabela carrega os dois modos e o builder escolhe por
     `theme.is_dark()`.
+
 
 ## A folha base segue o modo que você declara
 

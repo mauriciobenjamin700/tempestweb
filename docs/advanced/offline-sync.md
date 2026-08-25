@@ -333,7 +333,18 @@ de sync. O tempestweb drena a fila em três gatilhos:
 - **Evento `online`.** Assim que o browser reporta conectividade, a fila é
   drenada (aba aberta).
 - **Background Sync.** Onde o navegador suporta (Chromium), o service worker
-  drena a fila **mesmo com a aba fechada**.
+  drena a fila **mesmo com a aba fechada**. O `enqueue` registra a tag
+  (`tw-offline-replay`) sozinho, então não há nada a ligar no seu app.
+
+    !!! check "Medido em Chrome real, com a aba fechada"
+        Duas mutações enfileiradas offline, aba **fechada**, rede de volta: as duas
+        saíram **1,01 s depois de a aba fechar** e 3 ms depois do reconnect, com
+        zero páginas da origem abertas, e a fila no IndexedDB ficou vazia. Até a
+        0.110.0 isso **não** acontecia: o worker alcançava os módulos da fila com
+        um `import()` dinâmico, que nenhum service worker pode fazer — a spec o
+        proíbe no `ServiceWorkerGlobalScope` — então todo `sync` caía no fallback
+        de pingar clientes, e com a aba fechada não existe cliente para pingar. A
+        fila ficava parada, em silêncio.
 - **Explícito.** O seu app chama `await native.offline.replay()` quando quiser
   (ex.: um botão "Sincronizar" ou ao abrir a tela).
 

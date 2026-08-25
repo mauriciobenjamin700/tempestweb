@@ -336,7 +336,18 @@ protocol. tempestweb drains the queue on three triggers:
 - **The `online` event.** As soon as the browser reports connectivity, the queue
   drains (tab open).
 - **Background Sync.** Where the browser supports it (Chromium), the service
-  worker drains the queue **even with the tab closed**.
+  worker drains the queue **even with the tab closed**. `enqueue` registers the
+  tag (`tw-offline-replay`) itself, so there is nothing to wire in your app.
+
+    !!! check "Measured in a real Chrome, with the tab closed"
+        Two mutations queued offline, tab **closed**, network back: both left
+        **1.01 s after the tab closed** and 3 ms after reconnect, with no page of
+        that origin open, and the IndexedDB queue came back empty. Until 0.110.0
+        this did **not** happen: the worker reached its queue modules with a
+        dynamic `import()`, which no service worker may do — the spec forbids it on
+        `ServiceWorkerGlobalScope` — so every `sync` fell into the ping-a-client
+        fallback, and with the tab closed there is no client to ping. The queue
+        silently stayed put.
 - **Explicit.** Your app calls `await native.offline.replay()` whenever you want
   (e.g. a "Sync" button or when a screen opens).
 

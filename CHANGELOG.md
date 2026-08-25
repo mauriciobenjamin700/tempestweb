@@ -49,6 +49,15 @@ versioning.
 - `docs/tutorial/theming.md` (+ EN) ganhou **Os componentes do tempestweb seguem
   o mesmo idioma**, e a nota que dizia que `TextField` mantinha a paleta default
   deixou de valer para ele (segue valendo para o `SearchBar` do core).
+- `examples/login_demo` passa `theme=app.theme` — é a documentação executável do
+  `LoginForm`, e estava ensinando a forma que ignora o tema.
+- `docs/advanced/transpile.md` (+ EN) dizia que a matriz de paridade tem **185**
+  casos; ela tem **336** (151 componentes × claro/escuro, mais 34 pares
+  `__keyed`). O número parou em 185 quando a #106 introduziu o eixo de modo, e a
+  página passou a subestimar a própria cobertura em quase metade. Agora um guard
+  (`tests/unit/test_docs_matrix_count.py`) compara a prosa das duas línguas com o
+  tamanho real da fixture, porque a contagem muda exatamente quando ninguém
+  lembra de procurar na doc.
 
 ## [0.100.0] — 2026-08-23
 

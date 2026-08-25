@@ -106,6 +106,102 @@ versioning.
   sozinha e o digest reprovava na integração — o guard fazendo o trabalho dele.
   A mudança é **aditiva** (uma `EnvelopeKind` nova, nenhuma chave renomeada ou
   retipada), então `WIRE_CONTRACT_VERSION` fica em `1` e só o digest muda.
+## [0.105.0] — 2026-08-25
+
+### Added
+
+- **Gate de performance no CI**
+  ([#120](https://github.com/mauriciobenjamin700/tempestweb/issues/120)).
+  `benchmarks/bench_reconcile.py` existia e ninguém rodava: uma mudança que
+  dobrasse o custo de `diff` passava por todo o gate atual, porque ruff, mypy,
+  pytest e jsdom são de correção — nenhum de tempo.
+
+  `benchmarks/perf_gate.py` roda no CI e falha o job. O difícil num gate de perf
+  não é medir, é **não ser flake**: runner compartilhado varia mais do que as
+  regressões que valem pegar. Então ele afirma só o que sobrevive a máquina lenta:
+  **escala** (dobrar as linhas custa no máximo ~2,6× — `O(n²)` aparece perto de
+  4×, e a razão é imune à velocidade da máquina), **patch mínimo** (1 mudança → 2
+  patches; o jeito mais barato de fazer um diff parecer rápido é parar de estar
+  certo), **custo calibrado** (dividido por um laço medido no mesmo processo, com
+  tolerância de 1,8×) e **escala de sessões**.
+
+- **Throughput do Modo B** (`benchmarks/bench_ws_throughput.py`): mede o loop em
+  que o app vive — evento, handler, diff, lote no transporte — com uma sessão e
+  com N concorrentes. Medido: **o total fica praticamente constante** (~1.000
+  eventos/s nesta máquina) e a fatia por sessão divide. Ou seja, Modo B satura em
+  CPU no rebuild, dentro de um único event loop: escalar é mais processo, não mais
+  thread. O gate fixa essa forma — queda no total é contenção, não carga.
+
+- **Cold-start do Modo A** (`benchmarks/bench_cold_start.mjs` + workflow
+  `perf-cold-start.yml`): mede **cold** (sem SW/cache: Pyodide e core pela rede) e
+  **warm** (precache do SW) até a primeira árvore na tela. Roda em **schedule**, e
+  não em PR, porque um download desse tamanho no caminho crítico de cada PR compra
+  um número que ninguém lê naquele momento.
+
+  Primeira medição, em Chrome real com o artefato buildado do `examples/counter`:
+  **cold 2.394 ms / 14.593 KB**, **warm 2.354 ms / 8.751 KB**. O service worker
+  poupou 5,8 MB de rede e **40 ms** — 40% dos bytes, 1,7% do relógio. A leitura é
+  o que importa: no Modo A o custo dominante é o **boot do Pyodide (CPU)**, não o
+  download, então otimizar rede ali não move a agulha.
+
+### Changed
+
+- `docs/advanced/observability.md` (PT + EN) documenta as três medidas e o porquê
+  de cada limite. `docs/roadmap.md`: S9 fecha.
+- `benchmarks/baseline.json` guarda o baseline calibrado, versionado; mudança
+  deliberada de custo usa `--update-baseline` e se justifica no PR.
+
+Gate verificado que morde, com teste por regra
+(`tests/unit/test_perf_gate.py`): `diff` escalando 4,1× reprova citando `O(n^2)`;
+1 patch em vez de 2 reprova; custo calibrado 2× reprova; ruído de 30% **passa**
+(era o requisito para o gate não ser desligado na primeira semana); e throughput
+total caindo a 0,30× reprova falando de contenção.
+## [0.104.0] — 2026-08-25
+
+### Added
+
+- **Observabilidade de servidor (S8)**
+  ([#119](https://github.com/mauriciobenjamin700/tempestweb/issues/119)).
+  `metrics=True` respondia **quantas** sessões existem; não respondia se estão
+  lentas, onde o tempo é gasto, nem o que o servidor fez para o cliente que
+  reclamou.
+
+  `create_app(..., observability=ServerObservability(...))` liga três coisas
+  independentes:
+
+  - **Latência e throughput** — histograma `tempestweb_patch_seconds` +
+    `tempestweb_patches_total` no mesmo `GET /metrics`. Mede a espera que o
+    **cliente** sente: do evento chegar até os patches irem para o transporte,
+    **rebuild incluído**. Isso importa porque o rebuild é coalescido e roda depois
+    do handler retornar — cronometrar o handler dava rodadas com **zero patches**,
+    que foi como o defeito apareceu na medição.
+  - **Log estruturado** — uma linha JSON por evento de sessão (`session.open` /
+    `session.close`), com `session_id` como **campo** e `reason` sendo o nome da
+    exceção quando a sessão morre de erro. `json_log_sink` é o sink novo.
+  - **Tracing** — span por sessão, por dispatch e por lote, atrás de adapter.
+    `otel_tracer()` importa `opentelemetry` **dentro da função**, e o extra novo
+    `tempestweb[otel]` traz só a API: exporter e sampler ficam com o
+    OpenTelemetry, onde já são configuráveis.
+
+  Nada disso é dependência forçada: o default é inerte — nenhum import, nenhum
+  relógio, nenhum span. Medido: com métricas **e** log ligados, 200 cliques
+  passaram de 0,665 ms para 0,689 ms de média (**+3,6%**).
+
+### Changed
+
+- `AppSession` aceita `observability` e `session_id`. O import do tipo é
+  `TYPE_CHECKING`-only porque o bundle do Modo A carrega esse módulo e não deve
+  carregar a observabilidade de servidor com ele (o teste de fechamento do bundle
+  pega isso).
+- `docs/advanced/observability.md` (PT + EN) documenta as três partes, incluindo o
+  custo medido e por que o histograma não fica em volta do handler.
+  `docs/roadmap.md`: S8 fecha.
+
+Verificado ao vivo num app Modo B com cliente WebSocket real: 40 cliques → 40 no
+histograma, 40 patches contados; cliente mediu 0,62 ms de ida e volta e o servidor
+0,30 ms de tempo de patch (49% da espera), ou seja o número do servidor bate e é o
+menor, como tem de ser. O log da sessão saiu parseável, com o mesmo `session_id`
+nos dois eventos.
 ## [0.103.0] — 2026-08-24
 
 ### Added

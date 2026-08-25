@@ -1,0 +1,41 @@
+name: Perf — Mode A cold start
+
+# The Mode A cold start needs a real browser and a Pyodide download, so it is a
+# scheduled measurement rather than a PR gate (Track S — S9): putting a ~6 MB
+# download in every PR's critical path buys a number nobody reads at that moment.
+# Weekly, plus on demand — the trend is what matters here, not the sample.
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  cold-start:
+    name: Cold vs warm first paint (Mode A)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install
+        run: uv sync --all-extras
+      - name: Build the Mode A artifact
+        run: uv run tempestweb build --mode wasm --path examples/counter
+      - name: Install a browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Serve the artifact
+        run: |
+          python3 -m http.server 8000 --directory examples/counter/dist/wasm &
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8000/ && break
+            sleep 1
+          done
+      - name: Measure cold and warm first paint
+        run: node benchmarks/bench_cold_start.mjs http://127.0.0.1:8000/

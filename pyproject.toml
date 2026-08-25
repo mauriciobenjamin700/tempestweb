@@ -26,6 +26,13 @@ cli = [
     # Round-trip TOML editing for `tempestweb sync` (preserves comments/format).
     "tomlkit>=0.13",
 ]
+# OpenTelemetry tracing for Mode B (S8). Only the API: the SDK, the exporter and
+# the sampler are the deployment's choice, and wrapping them here would be a
+# second, worse configuration surface. Imported lazily by `otel_tracer()`, so an
+# app that does not trace never touches it.
+otel = [
+    "opentelemetry-api>=1.25",
+]
 # Server-side WebPush (P3). Mirrors tempest-fastapi-sdk[webpush]; lazily imported
 # so tempestweb.server.webpush imports without it (the dep is touched only on send).
 webpush = [

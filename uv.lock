@@ -1428,6 +1428,18 @@ wheels = [
 ]
 
 [[package]]
+name = "opentelemetry-api"
+version = "1.44.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ee/8b/aa9e2d8b8dfa7c946f7dec5d1f8f6ba8eca062f43509a06bdb5ce93d26c0/opentelemetry_api-1.44.0.tar.gz", hash = "sha256:67647e5e9566edcf421166fdf022b3537f818635daa852b289e34604dc6fb33a", size = 72406, upload-time = "2026-07-16T15:25:32.678Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/6f/a04e900f465ff3221ccc395522503e2d10e79fa21f2723c8e177aae1e0d1/opentelemetry_api-1.44.0-py3-none-any.whl", hash = "sha256:94b98c893a91b88657eaac1e3ba89618cdb85be6918196705354f34728b2cdef", size = 60018, upload-time = "2026-07-16T15:25:11.657Z" },
+]
+
+[[package]]
 name = "ort-vision-sdk"
 version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2117,6 +2129,9 @@ docs = [
     { name = "mkdocs-static-i18n" },
     { name = "mkdocstrings", extra = ["python"] },
 ]
+otel = [
+    { name = "opentelemetry-api" },
+]
 server = [
     { name = "fastapi" },
     { name = "uvicorn", extra = ["standard"] },
@@ -2142,6 +2157,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
     { name = "numpy", marker = "extra == 'dev'", specifier = ">=1.26" },
     { name = "numpy", marker = "extra == 'vision'", specifier = ">=1.26" },
+    { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.25" },
     { name = "ort-vision-sdk", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "ort-vision-sdk", marker = "extra == 'vision'", specifier = ">=0.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
@@ -2154,7 +2170,7 @@ requires-dist = [
     { name = "watchfiles", marker = "extra == 'cli'", specifier = ">=0.21" },
     { name = "websockets", marker = "extra == 'server'", specifier = ">=12" },
 ]
-provides-extras = ["server", "cli", "webpush", "vision", "dev", "docs"]
+provides-extras = ["server", "cli", "otel", "webpush", "vision", "dev", "docs"]
 
 [[package]]
 name = "tomlkit"

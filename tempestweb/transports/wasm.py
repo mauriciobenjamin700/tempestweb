@@ -141,6 +141,20 @@ class WasmTransport:
         """
         return None
 
+    async def send_theme(self, mode: str) -> None:
+        """Mark the resolved theme mode — a no-op in Mode A.
+
+        In Mode A the Python runtime shares the tab, so
+        :class:`~tempestweb.runtime.wasm.WasmRuntime` writes the mode onto the
+        document itself over ``pyodide.ffi`` (its ``on_theme`` callback), never
+        through the transport. This exists to satisfy the
+        :class:`~tempestweb.transports.base.PatchTransport` Protocol.
+
+        Args:
+            mode: The resolved theme mode (ignored here).
+        """
+        return None
+
     async def send_native_call(
         self, call_id: str, capability: str, args: dict[str, Any]
     ) -> None:

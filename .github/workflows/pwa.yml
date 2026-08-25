@@ -30,7 +30,7 @@ jobs:
           node-version: "22"
       - run: npm install
       - name: Service worker syntax check
-        run: node --check client/sw/sw.js
+        run: node --check client/sw/sw.js && node --check client/sw/sw-teardown.js
       - name: PWA client tests (manifest, sw, offline, push)
         run: >-
           node --test

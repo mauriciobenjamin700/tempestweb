@@ -4,6 +4,13 @@ These compose the labelled fields into a complete, laid-out form so an app wires
 one component instead of assembling inputs, labels, errors and a submit button by
 hand. They are *controlled*: the app holds the field values in its state and
 passes them in with ``on_*_change`` handlers; the form only lays out and dispatches.
+
+Pass ``theme=app.theme`` as you would to a widget: the form hands it to every
+field and to the submit button, so the whole form follows a dark app into dark.
+
+!!! note
+    Until 0.101.0 neither form declared a ``theme``, and neither passed one down,
+    so a form dropped into a dark app rendered light with no warning.
 """
 
 from __future__ import annotations
@@ -13,7 +20,17 @@ from typing import Any
 
 from pydantic import Field
 
-from tempest_core import Button, Column, Component, Edge, Style, Text, Widget
+from tempest_core import (
+    Button,
+    Column,
+    Component,
+    Edge,
+    Style,
+    Text,
+    Theme,
+    Widget,
+    current_theme,
+)
 from tempestweb.components.fields import EmailField, PasswordField
 
 __all__ = ["LoginForm", "SignupForm"]
@@ -52,6 +69,7 @@ class LoginForm(Component):
         password_error: Validation message under the password field.
         title: Optional heading shown above the fields.
         submit_label: The submit button label.
+        theme: The theme handed to every field and to the submit button.
     """
 
     email: str = Field(default="", description="The current e-mail value.")
@@ -69,6 +87,10 @@ class LoginForm(Component):
     password_error: str = Field(default="", description="Password validation message.")
     title: str = Field(default="", description="Optional heading above the fields.")
     submit_label: str = Field(default="Entrar", description="Submit button label.")
+    theme: Theme = Field(
+        default_factory=current_theme,
+        description="The theme the fields and the submit button resolve against.",
+    )
 
     def render(self) -> Widget:
         """Lay out the title, fields and submit button in a column.
@@ -87,17 +109,20 @@ class LoginForm(Component):
                     value=self.email,
                     on_change=self.on_email_change,
                     error=self.email_error,
+                    theme=self.theme,
                     key=f"{base}-email",
                 ),
                 PasswordField(
                     value=self.password,
                     on_change=self.on_password_change,
                     error=self.password_error,
+                    theme=self.theme,
                     key=f"{base}-password",
                 ),
                 Button(
                     label=self.submit_label,
                     on_click=self.on_submit,
+                    theme=self.theme,
                     key=f"{base}-submit",
                 ),
             ]
@@ -130,6 +155,7 @@ class SignupForm(Component):
         confirm_error: Validation message under the confirm-password field.
         title: Optional heading shown above the fields.
         submit_label: The submit button label.
+        theme: The theme handed to every field and to the submit button.
     """
 
     email: str = Field(default="", description="The current e-mail value.")
@@ -152,6 +178,10 @@ class SignupForm(Component):
     confirm_error: str = Field(default="", description="Confirm validation message.")
     title: str = Field(default="", description="Optional heading above the fields.")
     submit_label: str = Field(default="Cadastrar", description="Submit button label.")
+    theme: Theme = Field(
+        default_factory=current_theme,
+        description="The theme the fields and the submit button resolve against.",
+    )
 
     def render(self) -> Widget:
         """Lay out the title, fields and submit button in a column.
@@ -170,12 +200,14 @@ class SignupForm(Component):
                     value=self.email,
                     on_change=self.on_email_change,
                     error=self.email_error,
+                    theme=self.theme,
                     key=f"{base}-email",
                 ),
                 PasswordField(
                     value=self.password,
                     on_change=self.on_password_change,
                     error=self.password_error,
+                    theme=self.theme,
                     key=f"{base}-password",
                 ),
                 PasswordField(
@@ -183,11 +215,13 @@ class SignupForm(Component):
                     on_change=self.on_confirm_change,
                     error=self.confirm_error,
                     label="Confirmar senha",
+                    theme=self.theme,
                     key=f"{base}-confirm",
                 ),
                 Button(
                     label=self.submit_label,
                     on_click=self.on_submit,
+                    theme=self.theme,
                     key=f"{base}-submit",
                 ),
             ]

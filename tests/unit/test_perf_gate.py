@@ -99,23 +99,29 @@ def test_losing_the_minimal_patch_fails() -> None:
 
 
 def test_a_relative_slowdown_beyond_the_tolerance_fails() -> None:
-    """Twice the calibrated cost is a regression, not runner noise."""
+    """Three times the calibrated cost is a regression, not runner noise."""
     baseline = _baseline()
     measured = _healthy(baseline)
-    measured["calibrated"]["diff"] = baseline["calibrated"]["diff"] * 2.0
+    measured["calibrated"]["diff"] = baseline["calibrated"]["diff"] * 3.0
 
     failures = check(measured, baseline)
 
     assert len(failures) == 1
     assert "calibration units" in failures[0]
-    assert "2.00x" in failures[0]
+    assert "3.00x" in failures[0]
 
 
 def test_noise_within_the_tolerance_passes() -> None:
-    """A 30% swing is what a shared runner does; it must not fail the build."""
+    """The spread between machines must not fail the build.
+
+    1.81x is not hypothetical: it is what a CI runner reported for the very build
+    the developer machine measured into the baseline, on identical code. Pinning
+    it here means a future tightening of MAX_RELATIVE_REGRESSION fails this test
+    instead of turning main red on the next merge.
+    """
     baseline = _baseline()
     measured = _healthy(baseline)
-    measured["calibrated"]["build"] = baseline["calibrated"]["build"] * 1.3
+    measured["calibrated"]["build"] = baseline["calibrated"]["build"] * 1.81
 
     assert check(measured, baseline) == []
 

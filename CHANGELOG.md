@@ -4,6 +4,28 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.107.0] — 2026-08-25
+
+### Fixed
+
+- **O gate de performance reprovava a `main` verde por 0,4%.** A checagem de custo
+  calibrado tinha tolerância de 1,8× sobre um baseline medido em máquina de
+  desenvolvimento, e o merge de #153 caiu em `build costs 1206.9 calibration units,
+  baseline 667.7 (limit 1201.9)` — 1,81×. Não era regressão: o **mesmo** código
+  mediu 975,8, 1130,9 e 1206,9 unidades em três runners da CI, e o run que reprovou
+  foi justamente o de **unidade de calibração mais rápida** (64 µs contra 104 µs).
+  Dividir por uma unidade menor infla o custo: a calibração remove clock de CPU, não
+  a diferença de memória/GC entre máquinas, então as duas medidas não escalam juntas.
+
+  `MAX_RELATIVE_REGRESSION` vai a **2,5×** e passa a ser o que sempre foi de fato —
+  tripwire grosso, que pega uma duplicação de custo. A precisão do gate fica nas
+  razões de escala (`MAX_SCALE_RATIO`, 2,6×) e na contagem de patches, que são
+  medidas **entre si** na mesma máquina e por isso imunes ao runner. O teste de
+  ruído passa a fixar 1,81× — o número real que a CI produziu —, logo apertar a
+  tolerância de novo reprova em `tests/unit/test_perf_gate.py` em vez de deixar a
+  `main` vermelha no merge seguinte. `docs/advanced/observability.md` (PT + EN)
+  registra o spread medido.
+
 ## [0.106.0] — 2026-08-25
 
 ### Added

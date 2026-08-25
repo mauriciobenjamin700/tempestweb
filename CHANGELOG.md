@@ -4,6 +4,52 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.100.0] — 2026-08-24
+
+### Fixed
+
+- **Cinco componentes eram claros por construção: `TextField`, `EmailField`,
+  `PasswordField`, `LoginForm` e `SignupForm` não aceitavam tema**
+  ([#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158)). Nenhum
+  declarava `theme`, e nenhum repassava tema nenhum para os widgets do core que
+  constrói, então ficavam **claros num app escuro** — nos três modos. Não era
+  regressão: era como sempre foram, e os docstrings diziam
+  ("styled for the Material 3 **light** surface").
+
+  O idioma que a doc ensina é `theme=app.theme` em cada widget. Um usuário que
+  seguia isso e usava `TextField` num app escuro recebia um campo claro sem
+  nenhum aviso — e o pior caso é fundo escuro (folha base) com texto escuro
+  (inline), ou seja, ilegível.
+
+  Os cinco passam a declarar `theme` (com `default_factory=current_theme`, como
+  todo widget colorido do core) e a repassá-lo para tudo que constroem: o
+  `Input` de cada campo, os campos e o botão de submit de cada form. As cores do
+  label e da linha de erro deixam de ser hex fixo (`#49454f` / `#b3261e`) e
+  passam a sair dos papéis `on_surface_variant` / `error` do esquema do tema —
+  `Text` não aceita tema próprio, então elas são resolvidas pelo componente e
+  passam como style inline.
+
+  O builder do Modo C acompanha (`client/transpile/components.js`): o `Input` de
+  cada campo e o botão de cada form recebem o tema, e as duas constantes de cor
+  viram `colorRoles(theme)`.
+
+- **A matriz de paridade do Modo C deixa de ter treze pares vazios.** Com os
+  cinco tematizáveis, `LIGHT_ONLY_COMPONENTS` cai de seis nomes para um, e o
+  guard passa a **exigir** que o par `__dark` deles difira do claro — sem
+  nenhuma mudança no teste, que já pinava a divisão nas duas direções.
+
+### Known issues
+
+- **`Stepper` continua sem `theme`.** Ele mora no `tempest-core`, que é outro
+  repositório: dar tema a ele é um release do core, não uma mudança aqui. É o
+  único nome que sobra em `LIGHT_ONLY_COMPONENTS`, com o motivo escrito ao lado.
+
+### Changed
+
+- `docs/tutorial/theming.md` (+ EN) ganhou **Os componentes do tempestweb seguem
+  o mesmo idioma**, e a nota que dizia que `TextField` mantinha a paleta default
+  deixou de valer para ele (segue valendo para o `SearchBar` do core).
+
 ## [0.99.0] — 2026-08-23
 
 ### Fixed

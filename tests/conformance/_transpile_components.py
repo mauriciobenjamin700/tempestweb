@@ -581,24 +581,20 @@ def build_samples() -> dict[str, Any]:
 
 
 #: Components that cannot be themed, and the reason: each renders core widgets
-#: without passing a theme down, so it is light-only **by construction** — their
-#: own docstrings say so ("styled for the Material 3 light surface"). They do not
-#: declare a ``theme`` field either, which matters here because
+#: without passing a theme down, so it is light-only **by construction**. They do
+#: not declare a ``theme`` field either, which matters here because
 #: ``model_copy(update=...)`` skips validation: injecting ``theme`` into one of
 #: them silently attaches an attribute the core ignores, and the "dark" twin comes
 #: out byte-identical to the light one. Naming them is what stops that twin from
 #: posing as coverage — and what makes a *new* unthemed component fail the
 #: generator instead of quietly joining them.
-LIGHT_ONLY_COMPONENTS: frozenset[str] = frozenset(
-    {
-        "EmailField",
-        "LoginForm",
-        "PasswordField",
-        "SignupForm",
-        "Stepper",
-        "TextField",
-    }
-)
+#:
+#: The five tempestweb-owned ones (the two fields families and the two forms) left
+#: this list in 0.99.0 when they gained ``theme`` (tempestweb#158). ``Stepper`` is
+#: the one that stays, and not by choice: it lives in **tempest-core**, which is a
+#: separate repo — its ``model_fields`` carry no ``theme``, so giving it one means
+#: a core release, not a change here.
+LIGHT_ONLY_COMPONENTS: frozenset[str] = frozenset({"Stepper"})
 
 
 def _dark_sample(widget: Any) -> dict[str, Any]:  # noqa: ANN401 — any core component

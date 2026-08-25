@@ -1950,23 +1950,6 @@ export function AddressInput({
 }
 
 /**
- * The label color the tempestweb-native fields paint with (`#49454f`).
- *
- * These fields predate the theme-resolved BR inputs above and carry their own
- * two constants, tuned for the light Material 3 surface the base stylesheet
- * renders against. They are not the theme's `on_surface_variant`/`error` roles —
- * porting them as such would shift the color a few units and break parity.
- * @type {Readonly<Object>}
- */
-const FIELD_LABEL_COLOR = Object.freeze({ r: 73, g: 69, b: 79, a: 1.0 });
-
-/**
- * The error color the tempestweb-native fields paint with (`#b3261e`).
- * @type {Readonly<Object>}
- */
-const FIELD_ERROR_COLOR = Object.freeze({ r: 179, g: 38, b: 30, a: 1.0 });
-
-/**
  * Wrap an input in the tempestweb field's label + error column.
  *
  * Every child key is derived from `key`: keys are how the event router finds the
@@ -1977,6 +1960,9 @@ const FIELD_ERROR_COLOR = Object.freeze({ r: 179, g: 38, b: 30, a: 1.0 });
  * @param {import("../transport.js").Node} field  The input to wrap.
  * @param {string} error   The validation message; empty means no error line.
  * @param {string} key     The column's key, and the prefix of its children's.
+ * @param {?Object} theme  The theme whose scheme resolves the label and error
+ *                         colours. `Text` takes no theme of its own, so they are
+ *                         resolved here and passed as inline style.
  * @returns {import("../transport.js").Node}
  */
 function tempestwebField(label, field, error, key, theme) {
@@ -1986,7 +1972,7 @@ function tempestwebField(label, field, error, key, theme) {
       Text({
         content: label,
         key: `${key}-label`,
-        style: Style({ font_size: 13.0, font_weight: 500, color: FIELD_LABEL_COLOR }), theme }),
+        style: Style({ font_size: 13.0, font_weight: 500, color: colorRoles(theme).on_surface_variant }), theme }),
     );
   }
   children.push(field);
@@ -1995,7 +1981,7 @@ function tempestwebField(label, field, error, key, theme) {
       Text({
         content: error,
         key: `${key}-error`,
-        style: Style({ font_size: 12.0, color: FIELD_ERROR_COLOR }), theme }),
+        style: Style({ font_size: 12.0, color: colorRoles(theme).error }), theme }),
     );
   }
   return Column({ key, style: Style({ gap: 4.0 }), children, theme });
@@ -2026,11 +2012,11 @@ export function TextField({
     children.push(Text({ content: label, key: `${base}-label`, theme }));
   }
   children.push(
-    Input({ value, placeholder, onChange: onValue(onChange), key: `${base}-input` }),
+    Input({ value, placeholder, onChange: onValue(onChange), theme, key: `${base}-input` }),
   );
   if (error) {
     children.push(
-      Text({ content: error, key: `${base}-error`, style: Style({ color: FIELD_ERROR_COLOR }), theme }),
+      Text({ content: error, key: `${base}-error`, style: Style({ color: colorRoles(theme).error }), theme }),
     );
   }
   return Column({
@@ -2065,6 +2051,7 @@ export function EmailField({
     placeholder,
     keyboard: "email",
     onChange: onValue(onChange),
+    theme,
     key: `${base}-input` });
   return tempestwebField(label, field, error, base, theme);
 }
@@ -2091,6 +2078,7 @@ export function PasswordField({
     placeholder,
     secure: true,
     onChange: onValue(onChange),
+    theme,
     key: `${base}-input` });
   return tempestwebField(label, field, error, base, theme);
 }
@@ -2138,7 +2126,7 @@ export function LoginForm({
       onChange: onPasswordChange,
       error: passwordError,
       key: `${base}-password`, theme }),
-    Button({ label: submitLabel, onClick: onSubmit, key: `${base}-submit` }),
+    Button({ label: submitLabel, onClick: onSubmit, theme, key: `${base}-submit` }),
   );
   return Column({
     key: key ?? "login-form",
@@ -2194,7 +2182,7 @@ export function SignupForm({
       error: confirmError,
       label: "Confirmar senha",
       key: `${base}-confirm`, theme }),
-    Button({ label: submitLabel, onClick: onSubmit, key: `${base}-submit` }),
+    Button({ label: submitLabel, onClick: onSubmit, theme, key: `${base}-submit` }),
   );
   return Column({
     key: key ?? "signup-form",

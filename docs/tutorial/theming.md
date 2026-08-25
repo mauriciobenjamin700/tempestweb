@@ -378,10 +378,42 @@ def escurecer(app: App[State]) -> None:
 
 !!! tip "Componente propaga como o core propaga"
     Um `EmailInput` **é** o campo: ele repassa o tema para o `Input` que constrói.
-    Um `SearchBar` ou um `TextField` **compõe** um campo e sobrepõe o estilo que
-    resolveu, então o campo interno mantém a paleta default — e o Modo C reproduz
-    essa distinção componente por componente, fixada por matriz de paridade nos
-    dois modos.
+    Um `SearchBar` **compõe** um campo e sobrepõe o estilo que resolveu, então o
+    campo interno mantém a paleta default — e o Modo C reproduz essa distinção
+    componente por componente, fixada por matriz de paridade nos dois modos.
+
+### Os componentes do tempestweb seguem o mesmo idioma
+
+`TextField`, `EmailField`, `PasswordField`, `LoginForm` e `SignupForm` (de
+`tempestweb.components`) recebem `theme` como qualquer widget, e repassam para
+tudo que constroem — o `Input` de cada campo, os campos de cada form, o botão de
+submit, e a cor do label e da linha de erro:
+
+```python
+from tempestweb.components import LoginForm
+
+LoginForm(
+    email=app.state.email,
+    password=app.state.password,
+    on_email_change=set_email,
+    on_password_change=set_password,
+    on_submit=entrar,
+    theme=app.theme,
+    key="login",
+)
+```
+
+!!! danger "Antes da 0.100.0 eles eram claros por construção"
+    Os cinco não declaravam `theme` e não repassavam nenhum, então um app escuro
+    recebia campo claro **sem nenhum aviso** — e o pior caso é fundo escuro (da
+    folha base) com texto escuro (inline), ou seja, ilegível. Se você seguia o
+    idioma `theme=app.theme` em cada widget, esses cinco eram os que ignoravam.
+
+!!! warning "`Stepper` continua sem `theme`"
+    Ele mora no **tempest-core**, que é outro repositório: dar tema a ele é um
+    release do core, não uma mudança aqui. Até lá, `Stepper` renderiza claro em
+    qualquer app. Rastreado na
+    [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158).
 
 !!! info "Modo C: as tabelas geradas têm eixo de modo desde a 0.99.0"
     O Modo C não tem Python, então o estilo resolvido de cada widget viaja em

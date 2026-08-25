@@ -2,14 +2,19 @@
 
 The matrix builds every component twice, light and dark, and that second half is
 the guard for tempestweb#106 — a port that forgets to pass the theme down to a
-child fails on that child's colour. Except for thirteen cases where the two halves
-are **byte-identical**, and for two different reasons that a reader cannot tell
-apart by looking:
+child fails on that child's colour. Except for the cases where the two halves are
+**byte-identical**, and for two different reasons that a reader cannot tell apart
+by looking:
 
 * the component has no colour of its own (``Grid``, ``HStack``, ``VStack``,
   ``StyledContainer``, ``Drawer``) — identical is the truth about it;
 * the component cannot be themed at all (:data:`LIGHT_ONLY_COMPONENTS`) — the
   twin is a light case wearing a dark name, and proves nothing about dark.
+
+The second kind used to be thirteen pairs across six components. Five of them —
+the tempestweb-owned fields and forms — gained theming in 0.100.0
+(tempestweb#158) and left the list, so what remains is ``Stepper``, which lives
+in tempest-core and cannot be fixed from this repo.
 
 The second kind is where the #106 bug would hide if it came back: a component that
 *can* take a theme, drops it on the floor, and lands in the identical set looking

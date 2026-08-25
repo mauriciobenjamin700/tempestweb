@@ -174,6 +174,10 @@ class AppSession(Generic[S]):
         # client on "/" (its document URL), so we only emit a navigate envelope
         # once the app navigates somewhere else (view → URL).
         self._last_path: str = "/"
+        #: Last theme mode the client was told. The base stylesheet paints what
+        #: no inline style covers (page background, field surfaces, hover/focus),
+        #: so it needs the mode; the Theme itself never crosses the wire.
+        self._last_mode: str | None = None
         transport.on_native_result(self._resolve_native_result)
         transport.on_native_event(self._deliver_native_event)
 
@@ -236,6 +240,7 @@ class AppSession(Generic[S]):
         else:
             self._spawn(self.transport.send_patches(wire))
         self._emit_nav_if_changed()
+        self._emit_theme_if_changed()
 
     def _emit_nav_if_changed(self) -> None:
         """Push a ``navigate`` envelope when the app's top route changed.
@@ -257,6 +262,54 @@ class AppSession(Generic[S]):
             self._last_path = path
             self._spawn(self.transport.send_navigate(path))
 
+    def _emit_theme_if_changed(self) -> None:
+        """Push a ``theme`` envelope when the resolved theme mode changed.
+
+        Called after each coalesced rebuild, next to :meth:`_emit_nav_if_changed`
+        and for the same reason: something the browser owns has to follow what the
+        app decided. Here it is the base stylesheet — the page background, a
+        field's surface and every hover/focus state are CSS, so without the mode
+        they stayed light while the tree above them went dark.
+
+        The mode is resolved **the way a widget resolves it** — ``Theme.is_dark()``
+        with no platform flag — because that is the whole point: the attribute
+        exists to make the sheet agree with the inline styles already in the tree.
+        A ``SYSTEM`` theme resolves light in the core, so an app that wants to
+        follow the OS reads ``app.media.platform_dark_mode`` in its own ``view``
+        and calls ``set_theme`` — and then both halves move together.
+
+        The first ``light`` is not sent: the sheet's own tokens **are** the light
+        palette, so marking light at mount would spend a frame saying what the CSS
+        already says. Every later change is sent, including the return to light
+        after a dark spell.
+
+        No-op when the mode is unchanged, the session is closed, or the app has
+        not mounted.
+        """
+        if self._closed or self.app is None:
+            return
+        mode = self._resolved_mode()
+        if mode is None or mode == self._last_mode:
+            return
+        first_and_light = self._last_mode is None and mode == "light"
+        self._last_mode = mode
+        if first_and_light:
+            return
+        self._spawn(self.transport.send_theme(mode))
+
+    def _resolved_mode(self) -> str | None:
+        """Resolve the app's theme mode to ``"light"``/``"dark"``.
+
+        Returns:
+            The resolved mode, or ``None`` when the app carries no theme at all.
+        """
+        if self.app is None:
+            return None
+        theme = getattr(self.app, "theme", None)
+        if theme is None:
+            return None
+        return "dark" if theme.is_dark() else "light"
+
     def _spawn(self, coro: Coroutine[Any, Any, None]) -> None:
         """Schedule a coroutine as a tracked session task.
 
@@ -276,8 +329,9 @@ class AppSession(Generic[S]):
         Builds the isolated app, installs this session's :class:`ProxyBridge` as
         the process-wide native bridge (so ``await native.<capability>()`` inside a
         handler proxies to the client), records the initial scene, and pushes the
-        initial patch batch (a root replace) so the client renders the first
-        screen.
+        initial patch batch (a root replace) plus the resolved theme mode, so the
+        client renders the first screen on the right palette instead of flashing
+        light and correcting itself.
 
         Note:
             ``install_bridge`` stores the bridge in a context-local variable (see
@@ -306,6 +360,11 @@ class AppSession(Generic[S]):
         self._bridge_installed = True
         scene = self.app.start()
         await self.transport.send_patches(scene_to_initial_patches(scene))
+        mode = self._resolved_mode()
+        if mode is not None:
+            self._last_mode = mode
+            if mode != "light":
+                await self.transport.send_theme(mode)
 
     async def dispatch(self, event: Event) -> None:
         """Resolve and invoke the handler for one client event.
@@ -328,6 +387,13 @@ class AppSession(Generic[S]):
         the rebuild is coalesced and runs *after* the handler returns, so timing
         this block reported rounds with zero patches. The histogram is taken where
         the batch actually leaves.
+
+        The theme mode is re-checked after every handler, not only after a batch:
+        a theme swap can change nothing in the tree — an app whose ``view`` does
+        not pass the theme to any widget rebuilds to the identical IR, so the core
+        emits no patch and the batch hook never runs — and the base stylesheet
+        still has to hear about it. The check runs outside the handler span, so a
+        stylesheet envelope is not accounted to the handler.
 
         Args:
             event: The JSON-able client event ``{"type", "key", "payload"}``.
@@ -368,6 +434,7 @@ class AppSession(Generic[S]):
             result = handler(arg) if handler_wants_event(handler) else handler()
             if asyncio.iscoroutine(result):
                 await result
+        self._emit_theme_if_changed()
 
     async def resync(self) -> None:
         """Re-send the current scene as a full initial patch batch.

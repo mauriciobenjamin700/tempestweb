@@ -503,6 +503,9 @@ display = "standalone"
 
 | Campo | Tipo | Padrão | O que faz |
 |---|---|---|---|
+| `enabled` | booleano | `true` | O default que `manifest` e `service_worker` seguem. |
+| `manifest` | booleano | `enabled` | Emite `manifest.webmanifest` e o `<link>` dele. |
+| `service_worker` | booleano | `enabled` | Emite e registra o worker cache-first. |
 | `name` | string | nome do projeto | Nome completo exibido na instalação/splash. |
 | `short_name` | string | — | Nome curto para o ícone da tela inicial. |
 | `description` | string | — | Descrição do app no prompt de instalação. |
@@ -520,9 +523,15 @@ display = "standalone"
 
 !!! note "Automático no Modo C"
     Você não precisa escrever service worker, manifest nem código de registro à
-    mão: o `build --mode transpile` gera tudo. A seção `[pwa]` só **ajusta** os
+    mão: o `build --mode transpile` gera tudo. A seção `[pwa]` **ajusta** os
     metadados de instalação — o comportamento offline vem de graça porque o bundle
     é estático.
+
+!!! tip "App que não quer PWA"
+    `enabled = false` desliga o layer inteiro; `manifest` e `service_worker`
+    desligam uma metade só. Desligar o worker emite um worker de teardown no
+    lugar do de cache, para quem já registrou não ficar preso ao precache antigo
+    — o porquê está em [PWA e offline](pwa.md#desligando-o-pwa-enabled-manifest-service_worker).
 
 !!! tip "Prompt de atualização"
     Quando você publica uma versão nova, o service worker antigo continua no ar
@@ -622,8 +631,12 @@ no espírito do `mypy --strict`.
     resolvedores de estilo do core viaja em tabela gerada
     (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
     pelos widgets. Cada builder é fixado por uma matriz de props construída do
-    core real — 185 casos — então drift de composição ou de estilo falha no teste.
-    Trinta e quatro deles são o **par `__keyed`**: o mesmo componente construído
+    core real — **336 casos** — então drift de composição ou de estilo falha no
+    teste. São 151 componentes, cada um com um **par `__dark`** (o eixo de modo
+    que a [#106](https://github.com/mauriciobenjamin700/tempestweb/issues/106)
+    trouxe: um port que esquece de repassar o tema para um filho falha na cor
+    daquele filho), mais trinta e quatro
+    **pares `__keyed`**: o mesmo componente construído
     com `key=` explícita, porque o build sem chave esconde justamente a derivação
     (`Accordion()` emite `accordion-header` derivando ou não, enquanto
     `Accordion(key="faq-3")` só emite `faq-3-header` se o builder deriva de

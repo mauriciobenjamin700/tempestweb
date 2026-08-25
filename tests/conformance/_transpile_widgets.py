@@ -220,7 +220,20 @@ def _children_expr(spec: WidgetSpec) -> str:
 
 
 def _builder(spec: WidgetSpec) -> str:
-    """Emit the JS source for one widget's builder function."""
+    """Emit the JS source for one widget's builder function.
+
+    A styled widget's builder takes a ``theme`` argument. ``theme`` never crosses
+    the wire — the core drops it when serializing — but it decides which mode's
+    leaf of the style table the widget resolves from, so the builder has to accept
+    it. Without it Mode C could not even be *asked* for dark: the table was baked
+    light and the kwarg was refused (tempestweb#106).
+
+    Args:
+        spec: The widget's spec, from the shared widget table.
+
+    Returns:
+        The builder function's JS source.
+    """
     # All wire prop names the builder writes through (required + defaulted).
     wire_props = sorted([*spec.required, *spec.props])
 
@@ -232,6 +245,8 @@ def _builder(spec: WidgetSpec) -> str:
         args.append(f"{_camel(prop)} = {_lit(spec.props[prop])}")
     args.append("attrs = {}")
     args.append("style = null")
+    if spec.styled:
+        args.append("theme = null")
     for name, is_list in spec.child_fields:
         args.append(f"{_camel(name)} = {'[]' if is_list else 'null'}")
     for handler in spec.handlers:
@@ -255,12 +270,12 @@ def _builder(spec: WidgetSpec) -> str:
         if _is_validated_field(spec):
             style_expr = (
                 f'resolveFieldStyle("{spec.name}", {variant_expr}, '
-                f"{size_expr}, {scheme_expr}, error, style)"
+                f"{size_expr}, {scheme_expr}, error, style, theme)"
             )
         else:
             style_expr = (
                 f'resolveWidgetStyle("{spec.name}", {variant_expr}, '
-                f"{size_expr}, {scheme_expr}, style)"
+                f"{size_expr}, {scheme_expr}, style, theme)"
             )
     else:
         style_expr = "style"

@@ -102,6 +102,7 @@ Virtualized lists, galleries, chat, search, and drag-and-drop.
 
 Controls, disclosure, and feedback states.
 
+- [**Dark mode**](dark-mode.md) — the theme reaches the widget: `theme=app.theme` and `app.set_theme`, with the same values in all three modes. **[A/B/C]**
 - [**Settings panel**](settings-panel.md) — `Switch`, `Checkbox`, `Slider`, `RadioGroup`, and `SegmentedControl` bound to state. **[A/B]**
 - [**Booking form**](booking-form.md) — `DatePicker`, `TimePicker`, `RangeSlider`, `Dropdown` and `FilePicker`, the browser's own controls. **[A/B/C]**
 - [**Rating & review**](rating-review.md) — `Rating` stars + `Chip` tags + a `TextArea` in a validated form. **[A/B]**

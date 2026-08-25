@@ -79,6 +79,14 @@ class _ScriptedTransport:
             path: The new path.
         """
 
+    async def send_theme(self, mode: str) -> None:
+        """Mark the theme mode — unused by this harness.
+
+        Args:
+            mode: The resolved theme mode (ignored).
+        """
+        return None
+
     async def recv_event(self) -> Event:
         """Return the next scripted event.
 

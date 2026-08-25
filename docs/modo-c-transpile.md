@@ -174,25 +174,32 @@ compilador, prova no Playwright. **Estilo mínimo/ausente** (botões nus estiliz
 pelo base theme).
 
 **Adiante (fases C1+):**
-- **C1 — fidelidade de estilo. 🚧 Button feito** (via estratégia **(c)**:
-  introspecção em build-time do core instalado → tabela `widget-styles.gen.js`).
-  O gerador (`tests/conformance/_transpile_widget_styles.py`) constrói cada combo
-  de Button (variant × size × color_scheme) com o core real e grava o `style`
-  resolvido; `widgets.js` faz o lookup e mescla o `style` explícito por cima (os
-  campos setados do usuário vencem) — paridade MD3 com A/B, verificado no
-  Playwright (botões solid/primary preenchidos). **`state_styles` (hover/pressed)
-  é N/A:** o IR não carrega estado de interação — os Modos A/B também não aplicam
-  hover/pressed via IR, então a paridade já está atingida.
-- **Port completo dos widgets. ✅** Os **~64 widgets** do `tempest_core` têm
-  builders JS **gerados por introspecção** (`widgets.gen.js` +
-  `_transpile_widgets.py`), com o estilo MD3 resolvido dos 14 styled
+- **C1 — fidelidade de estilo. ✅** (via estratégia **(c)**: introspecção em
+  build-time do core instalado → tabela `widget-styles.gen.js`). O gerador
+  (`tests/conformance/_transpile_widget_styles.py`) constrói **todo widget
+  estilizado** (`buildable_widgets()`, filtrado por `spec.styled`) em cada combo
+  dos eixos que ele aceita — variant/field_variant × size × color_scheme — com o
+  core real, e grava o `style` resolvido; o builder gerado faz o lookup e mescla o
+  `style` explícito por cima (os campos setados do usuário vencem). Paridade MD3
+  com A/B travada por golden contra o core, não por inspeção visual.
+  **`state_styles` (hover/pressed) é N/A:** o IR não carrega estado de interação —
+  os Modos A/B também não aplicam hover/pressed via IR, então a paridade já está
+  atingida.
+- **Port completo dos widgets. ✅** Todo widget buildável do `tempest_core`
+  (`buildable_widgets()` — a lista é derivada, não escrita aqui) tem builder JS
+  **gerado por introspecção** (`widgets.gen.js` + `_transpile_widgets.py`), com o
+  estilo MD3 resolvido para os que declaram eixos de estilo
   (`widget-styles.gen.js`, eixos variant/field_variant × size × color_scheme,
   normalizados com `"_"`). Handlers stashados num mapa não-wire `__handlers`
-  keyed por evento DOM — ligados por tipo IR (`Button`→click,
-  `Input`/`Checkbox`→input/change, `Switch` div→click). Golden tests travam ambos
-  os módulos gerados contra o core; galeria multi-widget verificada no Playwright.
-  **Falta:** eventos exóticos que o cliente ainda não emite.
-- **Componentes estruturais do core. ✅** Os 35 componentes cuja árvore **não**
+  keyed por evento DOM, **derivado da declaração do renderizador**
+  (`NATIVE_CONTROL_TYPES`/`CHANGE_REPORTING_TYPES` em `client/dom.js`): um widget
+  que o renderizador desenha como controle nativo liga `on_change` a
+  `input`/`change`, o resto liga a `click`. A lista era escrita à mão ao lado do
+  gerador e driftou — `on_change` de campo mascarado ia para `click`, o campo
+  aceitava digitação e nunca avisava a app (#142/#143). Golden tests travam ambos
+  os módulos gerados contra o core. **Falta:** eventos exóticos que o cliente
+  ainda não emite.
+- **Componentes estruturais do core. ✅** Os componentes cuja árvore **não**
   depende dos dados recebidos rodam em Modo C: os aliases `HStack`/`VStack`, as
   superfícies (`Surface`, `StyledContainer`, `Card`, `Scaffold`, `Grid`,
   `Sidebar`, `Drawer`, `Divider`), as barras (`AppBar`, `Header`, `Footer`,
@@ -203,23 +210,33 @@ pelo base theme).
   hand-authored em `components.js` (reescrita do `render()` do core, com as mesmas
   chaves) e o estilo vem de tabela gerada dos resolvedores puros
   (`component-styles.gen.js`), como `widget-styles.gen.js` faz pelos widgets.
-  Travados por matriz derivada do core (`transpile_component_samples.json`, 117
-  casos, comparação order-agnostic via `diff`) e exercitados em
+  Travados por matriz derivada do core (`transpile_component_samples.json`, um
+  caso por eixo que muda o estilo resolvido, comparação order-agnostic via `diff`)
+  e exercitados em
   `examples/mode-c-components`. **O que fica fora é o dirigido por dados**
   (`DataTable`/`Table`, `Tabs`, `Accordion`, charts, `DetectionOverlay`,
   `ResultView`, `Calendar`/`Clock`, pickers, `CollapsingAppBar`): a árvore
   depende dos dados, então não há composição fixa para portar sem compilar o
   `render()` do core (projeto separado maior) — acompanhado em
   [#107](https://github.com/mauriciobenjamin700/tempestweb/issues/107).
-- **C2 — cobertura do subset. 🚧 em progresso.** Expressões: operadores
+- **C2 — cobertura do subset. 🚧 em progresso** (o subset cresce; o que fica fora é recusado no build). Expressões: operadores
   aritméticos (`* / %`), comparação (`== != < <= > >=`), booleanos (`and`/`or`),
   unários (`not`/`-`), ternário (`a if c else b`), comprehensions
   (`[e for x in it if c]` → `.filter().map()`), `in`/`not in` → `.includes()`,
   subscript, lambdas de expressão (`lambda s: s.inc()`). Statements: `if`/`elif`/
   `else`, `for … in` → `for…of`, `Assign` (`const`), `AugAssign` (`+=`…).
   **Métodos de state** (classe → métodos JS; `self` → `this`). Novo widget:
-  `Container` (layout + escape-hatch `tag`/`attrs`). **Falta:** mais widgets,
-  dict/set/tuple, f-string com format-spec.
+  `Container` (layout + escape-hatch `tag`/`attrs`). **f-string com format-spec**
+  também entrou (`codegen.py`): `.Nf`, `,`, `,.Nf`, `.N%`, `d` e `,d`.
+
+  **O que falta é o que o compilador recusa** — e ele recusa alto, com
+  `arquivo:linha`, em vez de emitir JS que quebra no browser. A lista viva é o
+  corpus de exemplos rodado por `tests/transpile/`, categorizado nas issues
+  [#110](https://github.com/mauriciobenjamin700/tempestweb/issues/110)–[#117](https://github.com/mauriciobenjamin700/tempestweb/issues/117);
+  o zero-padding e os specs de alinhamento/sinal de f-string ficaram em
+  [#116](https://github.com/mauriciobenjamin700/tempestweb/issues/116). Não
+  repetir a lista aqui é deliberado: ela envelhece a cada release, e o gate é
+  quem sabe a verdade.
 - **C3 — CLI. ✅ feito.** `tempestweb build --mode transpile <path>` (e
   `run --mode transpile`, que serve o bundle estático como o wasm) transpila o
   `app.py` do projeto para `client/transpile/app.gen.js` e emite um bundle

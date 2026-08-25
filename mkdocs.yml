@@ -170,6 +170,7 @@ plugins:
             "Overlays and modals": "Overlays e modais"
             "Controls (fields, switches, pickers)": "Controles (campos, switches, pickers)"
             "Booking form (pickers)": "Formulário de reserva (pickers)"
+            "Dark mode": "Modo escuro"
             "Drag, reorder, paginate": "Arrastar, reordenar, paginar"
             "PWA & offline": "PWA e offline"
             "Offline + backend sync": "Offline + sincronização com backend"
@@ -324,6 +325,7 @@ nav:
       - "Kanban board": examples/kanban-board.md
       - "Settings panel": examples/settings-panel.md
       - "Booking form (pickers)": examples/booking-form.md
+      - "Dark mode": examples/dark-mode.md
       - "Rating & review": examples/rating-review.md
       - "FAQ accordion": examples/faq-accordion.md
       - "Notification center": examples/notification-center.md

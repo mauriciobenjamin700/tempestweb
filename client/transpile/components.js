@@ -32,7 +32,14 @@ import {
 } from "./widgets.gen.js";
 import { EMAIL_PATTERN } from "./validators.js";
 import { SPACING_STEPS } from "./spacing.gen.js";
-import { Color, Edge, Style, resolveWidgetStyle } from "./widget-support.js";
+import {
+  Color,
+  Edge,
+  Style,
+  colorRoles,
+  modeTable,
+  resolveWidgetStyle,
+} from "./widget-support.js";
 import { Border, MUTED, ON_SURFACE, SideBorder } from "./values.gen.js";
 import {
   ALERT_STYLES,
@@ -76,12 +83,11 @@ function resolveGap(gap) {
  *          align?: ?string, justify?: ?string, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function HStack({ children = [], gap = "md", align = "center", justify = null, key = null } = {}) {
+export function HStack({ children = [], gap = "md", align = "center", justify = null, key = null, theme = null } = {}) {
   return Row({
     key,
     children,
-    style: Style({ gap: resolveGap(gap), align, justify }),
-  });
+    style: Style({ gap: resolveGap(gap), align, justify }), theme });
 }
 
 /**
@@ -95,12 +101,11 @@ export function HStack({ children = [], gap = "md", align = "center", justify = 
  *          align?: ?string, justify?: ?string, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function VStack({ children = [], gap = "md", align = null, justify = null, key = null } = {}) {
+export function VStack({ children = [], gap = "md", align = null, justify = null, key = null, theme = null } = {}) {
   return Column({
     key,
     children,
-    style: Style({ gap: resolveGap(gap), align, justify }),
-  });
+    style: Style({ gap: resolveGap(gap), align, justify }), theme });
 }
 
 /**
@@ -141,9 +146,9 @@ function mergeStyle(base, override) {
  * @param {string} radiusStep   The shape-scale step for the corner radius.
  * @returns {Object}            The resolved (sparse) style fields.
  */
-function surfaceStyle(variant, colorScheme, elevation, radiusStep) {
+function surfaceStyle(variant, colorScheme, elevation, radiusStep, theme) {
   const level = elevation == null ? "default" : String(elevation);
-  const base = SURFACE_STYLES[variant]?.[colorScheme]?.[level] ?? {};
+  const base = modeTable(SURFACE_STYLES, theme)[variant]?.[colorScheme]?.[level] ?? {};
   return { ...base, radius: SHAPE_STEPS[radiusStep] ?? 0.0 };
 }
 
@@ -170,6 +175,7 @@ export function Card({
   gapStep = "sm",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "card";
   const inner = Container({
@@ -178,14 +184,12 @@ export function Card({
     child: Column({
       key: `${base}-col`,
       style: Style({ gap: SPACING_STEPS[gapStep] ?? 0.0 }),
-      children,
-    }),
+      children, theme }),
   });
   return Container({
     key: base,
-    style: mergeStyle(surfaceStyle(variant, colorScheme, elevation, radiusStep), style),
-    child: inner,
-  });
+    style: mergeStyle(surfaceStyle(variant, colorScheme, elevation, radiusStep, theme), style),
+    child: inner, theme });
 }
 
 /**
@@ -195,14 +199,13 @@ export function Card({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Divider({ thickness = 1.0, colorScheme = null, style = null, key = null } = {}) {
+export function Divider({ thickness = 1.0, colorScheme = null, style = null, key = null, theme = null } = {}) {
   const height = typeof thickness === "string" ? SPACING_STEPS[thickness] ?? 0.0 : thickness;
   const tinted = colorScheme != null && colorScheme !== "neutral";
-  const color = tinted ? COLOR_ROLES[colorScheme] : COLOR_ROLES.outline_variant;
+  const color = tinted ? colorRoles(theme)[colorScheme] : colorRoles(theme).outline_variant;
   return Container({
     key: key ?? "divider",
-    style: mergeStyle({ height, background: color }, style),
-  });
+    style: mergeStyle({ height, background: color }, style), theme });
 }
 
 /**
@@ -221,14 +224,15 @@ export function Chip({
   size = "md",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const variant = selected ? "solid" : "subtle";
-  const pill = BADGE_STYLES[variant]?.[size]?.[colorScheme] ?? {};
+  const pill = modeTable(BADGE_STYLES, theme)[variant]?.[size]?.[colorScheme] ?? {};
   const merged = mergeStyle(pill, style);
   if (onClick != null) {
-    return Button({ label, onClick, key: key ?? "chip", style: merged });
+    return Button({ label, onClick, key: key ?? "chip", style: merged, theme });
   }
-  return Text({ content: label, key: key ?? "chip", style: merged });
+  return Text({ content: label, key: key ?? "chip", style: merged, theme });
 }
 
 /**
@@ -247,25 +251,25 @@ export function SegmentedControl({
   size = "sm",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "segmented";
   const children = options.map((label, index) => {
     const variant = index === selected ? "solid" : "ghost";
-    const segment = resolveWidgetStyle("Button", variant, size, colorScheme, null);
+    const segment = resolveWidgetStyle("Button", variant, size, colorScheme, null, theme);
     return Button({
       label,
       key: `${base}-item-${index}`,
       onClick: onSelect == null ? null : () => onSelect(index),
-      style: mergeStyle(segment, { grow: 1.0 }),
-    });
+      style: mergeStyle(segment, { grow: 1.0 }), theme });
   });
   const strip = {
     gap: SPACING_STEPS.xs,
     padding: Edge.all(SPACING_STEPS.xs),
     radius: SHAPE_STEPS.md,
-    background: COLOR_ROLES.surface_variant,
+    background: colorRoles(theme).surface_variant,
   };
-  return Row({ key: base, style: mergeStyle(strip, style), children });
+  return Row({ key: base, style: mergeStyle(strip, style), children, theme });
 }
 
 /**
@@ -289,10 +293,11 @@ export function AppBar({
   elevation = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "appbar";
-  const surface = surfaceStyle(variant, colorScheme, elevation, "md");
-  const content = surface.color ?? COLOR_ROLES.on_surface;
+  const surface = surfaceStyle(variant, colorScheme, elevation, "md", theme);
+  const content = surface.color ?? colorRoles(theme).on_surface;
   const children = [];
   if (leading != null) {
     children.push(leading);
@@ -301,12 +306,11 @@ export function AppBar({
     Text({
       content: title,
       key: `${base}-title`,
-      style: Style({ grow: 1.0, font_size: 20.0, font_weight: 700, color: content }),
-    }),
+      style: Style({ grow: 1.0, font_size: 20.0, font_weight: 700, color: content }), theme }),
   );
   if (actions.length > 0) {
     children.push(
-      Row({ key: `${base}-actions`, style: Style({ gap: 8.0 }), children: actions }),
+      Row({ key: `${base}-actions`, style: Style({ gap: 8.0 }), children: actions, theme }),
     );
   }
   const bar = {
@@ -315,7 +319,7 @@ export function AppBar({
     gap: 12.0,
     align: "center",
   };
-  return Row({ key: base, style: mergeStyle(bar, style), children });
+  return Row({ key: base, style: mergeStyle(bar, style), children, theme });
 }
 
 /**
@@ -334,14 +338,15 @@ export function RadioGroup({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "radiogroup";
-  const surface = COLOR_ROLES.surface;
+  const surface = colorRoles(theme).surface;
   const children = options.map((label, index) => {
     const chosen = index === selected;
     const state = chosen ? "checked" : "unchecked";
-    const accent = SELECTION_ACCENT[size]?.[colorScheme]?.[state] ?? null;
-    const marker = chosen && accent != null ? accent : COLOR_ROLES.on_surface_variant;
+    const accent = modeTable(SELECTION_ACCENT, theme)[size]?.[colorScheme]?.[state] ?? null;
+    const marker = chosen && accent != null ? accent : colorRoles(theme).on_surface_variant;
     return Button({
       label: `${chosen ? "\u25c9" : "\u25cb"}  ${label}`,
       key: `${base}-item-${index}`,
@@ -351,14 +356,12 @@ export function RadioGroup({
         radius: SHAPE_STEPS.sm,
         background: surface,
         color: marker,
-      }),
-    });
+      }), theme });
   });
   return Column({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.sm }, style),
-    children,
-  });
+    children, theme });
 }
 
 /**
@@ -377,23 +380,24 @@ export function Scaffold({
   scroll = false,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "scaffold";
   const children = [];
   if (appBar != null) {
     children.push(appBar);
   }
-  const content = body ?? Column({});
+  const content = body ?? Column({ theme });
   children.push(
     scroll
-      ? ScrollView({ key: `${base}-body`, style: Style({ grow: 1.0 }), children: [content] })
-      : Container({ key: `${base}-body`, style: Style({ grow: 1.0 }), child: content }),
+      ? ScrollView({ key: `${base}-body`, style: Style({ grow: 1.0 }), children: [content], theme })
+      : Container({ key: `${base}-body`, style: Style({ grow: 1.0 }), child: content, theme }),
   );
   if (bottomBar != null) {
     children.push(bottomBar);
   }
-  const shell = { gap: 0.0, background: COLOR_ROLES.background };
-  return Column({ key: base, style: mergeStyle(shell, style), children });
+  const shell = { gap: 0.0, background: colorRoles(theme).background };
+  return Column({ key: base, style: mergeStyle(shell, style), children, theme });
 }
 
 /**
@@ -415,12 +419,12 @@ export function Surface({
   radiusStep = "md",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   return Container({
     key: key ?? "surface",
-    style: mergeStyle(surfaceStyle(variant, colorScheme, elevation, radiusStep), style),
-    child,
-  });
+    style: mergeStyle(surfaceStyle(variant, colorScheme, elevation, radiusStep, theme), style),
+    child, theme });
 }
 
 /**
@@ -433,13 +437,12 @@ export function Surface({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function StyledContainer({ child = null, padding = "md", style = null, key = null } = {}) {
+export function StyledContainer({ child = null, padding = "md", style = null, key = null, theme = null } = {}) {
   const amount = typeof padding === "string" ? SPACING_STEPS[padding] ?? 0.0 : padding;
   return Container({
     key: key ?? "styled-container",
     style: mergeStyle({ padding: Edge.all(amount) }, style),
-    child,
-  });
+    child, theme });
 }
 
 /**
@@ -452,7 +455,7 @@ export function StyledContainer({ child = null, padding = "md", style = null, ke
  *          gap?: number|string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key = null } = {}) {
+export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key = null, theme = null } = {}) {
   const base = key ?? "grid";
   const perRow = Math.max(1, columns);
   const space = typeof gap === "string" ? SPACING_STEPS[gap] ?? 0.0 : gap;
@@ -460,22 +463,21 @@ export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key 
   for (let start = 0; start < children.length; start += perRow) {
     const chunk = children.slice(start, start + perRow);
     const cells = chunk.map((child, offset) =>
-      Container({ key: `${base}-cell-${start + offset}`, style: Style({ grow: 1.0 }), child }),
+      Container({ key: `${base}-cell-${start + offset}`, style: Style({ grow: 1.0 }), child, theme }),
     );
     for (let pad = chunk.length; pad < perRow; pad += 1) {
       cells.push(
-        Container({ key: `${base}-cell-pad-${start}-${pad}`, style: Style({ grow: 1.0 }) }),
+        Container({ key: `${base}-cell-pad-${start}-${pad}`, style: Style({ grow: 1.0 }), theme }),
       );
     }
     rows.push(
-      Row({ key: `${base}-row-${start}`, style: Style({ gap: space }), children: cells }),
+      Row({ key: `${base}-row-${start}`, style: Style({ gap: space }), children: cells, theme }),
     );
   }
   return Column({
     key: base,
     style: mergeStyle({ gap: space }, style),
-    children: rows,
-  });
+    children: rows, theme });
 }
 
 /**
@@ -490,14 +492,14 @@ export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key 
  * @param {?Object} style        The caller's style override.
  * @returns {import("../transport.js").Node}
  */
-function lateralPanel(key, children, width, variant, colorScheme, elevation, style) {
+function lateralPanel(key, children, width, variant, colorScheme, elevation, style, theme) {
   const frame = {
-    ...surfaceStyle(variant, colorScheme, elevation, "md"),
+    ...surfaceStyle(variant, colorScheme, elevation, "md", theme),
     width,
     padding: Edge.all(16.0),
     gap: 10.0,
   };
-  return Column({ key, style: mergeStyle(frame, style), children });
+  return Column({ key, style: mergeStyle(frame, style), children, theme });
 }
 
 /**
@@ -516,8 +518,9 @@ export function Sidebar({
   elevation = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
-  return lateralPanel(key ?? "sidebar", children, width, variant, colorScheme, elevation, style);
+  return lateralPanel(key ?? "sidebar", children, width, variant, colorScheme, elevation, style, theme);
 }
 
 /**
@@ -540,11 +543,12 @@ export function Drawer({
   elevation = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   if (!open) {
-    return Container({ key: key ?? "drawer" });
+    return Container({ key: key ?? "drawer", theme });
   }
-  return lateralPanel(key ?? "drawer", children, width, variant, colorScheme, elevation, style);
+  return lateralPanel(key ?? "drawer", children, width, variant, colorScheme, elevation, style, theme);
 }
 
 /**
@@ -565,6 +569,7 @@ export function Burger({
   size = "md",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   return IconButton({
     icon: "menu",
@@ -574,8 +579,7 @@ export function Burger({
     colorScheme,
     size,
     key: key ?? "burger",
-    style,
-  });
+    style, theme });
 }
 
 /**
@@ -589,12 +593,12 @@ export function Burger({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Header({ title = "", subtitle = null, colorScheme = null, style = null, key = null } = {}) {
+export function Header({ title = "", subtitle = null, colorScheme = null, style = null, key = null, theme = null } = {}) {
   const base = key ?? "header";
   const titleColor =
     colorScheme != null && colorScheme !== "neutral"
-      ? COLOR_ROLES[colorScheme]
-      : COLOR_ROLES.on_surface;
+      ? colorRoles(theme)[colorScheme]
+      : colorRoles(theme).on_surface;
   const children = [
     Text({
       content: title,
@@ -603,8 +607,7 @@ export function Header({ title = "", subtitle = null, colorScheme = null, style 
         font_size: TYPOGRAPHY.headline_small.font_size,
         font_weight: 700,
         color: titleColor,
-      }),
-    }),
+      }), theme }),
   ];
   if (subtitle != null) {
     children.push(
@@ -613,17 +616,16 @@ export function Header({ title = "", subtitle = null, colorScheme = null, style 
         key: `${base}-subtitle`,
         style: Style({
           font_size: TYPOGRAPHY.body_medium.font_size,
-          color: COLOR_ROLES.on_surface_variant,
-        }),
-      }),
+          color: colorRoles(theme).on_surface_variant,
+        }), theme }),
     );
   }
   const chrome = {
     padding: Edge.all(SPACING_STEPS.lg),
     gap: SPACING_STEPS.xs,
-    background: COLOR_ROLES.surface_variant,
+    background: colorRoles(theme).surface_variant,
   };
-  return Column({ key: base, style: mergeStyle(chrome, style), children });
+  return Column({ key: base, style: mergeStyle(chrome, style), children, theme });
 }
 
 /**
@@ -643,14 +645,15 @@ export function Footer({
   elevation = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = {
-    ...surfaceStyle(variant, colorScheme, elevation, "md"),
+    ...surfaceStyle(variant, colorScheme, elevation, "md", theme),
     padding: Edge.symmetric({ vertical: 12.0, horizontal: 16.0 }),
     gap: 12.0,
     align: "center",
   };
-  return Row({ key: key ?? "footer", style: mergeStyle(base, style), children });
+  return Row({ key: key ?? "footer", style: mergeStyle(base, style), children, theme });
 }
 
 /**
@@ -673,27 +676,27 @@ export function NavBar({
   size = "md",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "navbar";
   const children = items.map((label, index) => {
     const itemStyle =
       index === active
-        ? BADGE_STYLES.solid?.[size]?.[colorScheme] ?? {}
-        : resolveWidgetStyle("Button", "ghost", size, "neutral", null);
+        ? modeTable(BADGE_STYLES, theme).solid?.[size]?.[colorScheme] ?? {}
+        : resolveWidgetStyle("Button", "ghost", size, "neutral", null, theme);
     return Button({
       label,
       key: `${base}-item-${index}`,
       onClick: onSelect == null ? null : () => onSelect(index),
-      style: mergeStyle(itemStyle, { grow: 1.0 }),
-    });
+      style: mergeStyle(itemStyle, { grow: 1.0 }), theme });
   });
   const bar = {
-    ...surfaceStyle("filled", "neutral", null, "md"),
+    ...surfaceStyle("filled", "neutral", null, "md", theme),
     gap: 8.0,
     padding: Edge.all(8.0),
     justify: "center",
   };
-  return Row({ key: base, style: mergeStyle(bar, style), children });
+  return Row({ key: base, style: mergeStyle(bar, style), children, theme });
 }
 
 /**
@@ -713,6 +716,7 @@ export function Breadcrumb({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "breadcrumb";
   const children = [];
@@ -722,8 +726,7 @@ export function Breadcrumb({
         Text({
           content: separator,
           key: `${base}-sep-${index}`,
-          style: Style({ color: COLOR_ROLES.on_surface_variant, font_size: 14.0 }),
-        }),
+          style: Style({ color: colorRoles(theme).on_surface_variant, font_size: 14.0 }), theme }),
       );
     }
     const isLast = index === items.length - 1;
@@ -733,8 +736,7 @@ export function Breadcrumb({
           label,
           key: `${base}-item-${index}`,
           onClick: () => onSelect(index),
-          style: resolveWidgetStyle("Button", "link", "sm", colorScheme, null),
-        }),
+          style: resolveWidgetStyle("Button", "link", "sm", colorScheme, null, theme), theme }),
       );
       return;
     }
@@ -743,18 +745,16 @@ export function Breadcrumb({
         content: label,
         key: `${base}-item-${index}`,
         style: Style({
-          color: isLast ? COLOR_ROLES.on_surface : COLOR_ROLES.on_surface_variant,
+          color: isLast ? colorRoles(theme).on_surface : colorRoles(theme).on_surface_variant,
           font_size: 14.0,
           font_weight: isLast ? 700 : 400,
-        }),
-      }),
+        }), theme }),
     );
   });
   return Row({
     key: base,
     style: mergeStyle({ gap: 6.0, align: "center" }, style),
-    children,
-  });
+    children, theme });
 }
 
 /**
@@ -777,12 +777,13 @@ export function ListTile({
   colorScheme = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "listtile";
   const titleColor =
     colorScheme != null && colorScheme !== "neutral"
-      ? COLOR_ROLES[colorScheme]
-      : COLOR_ROLES.on_surface;
+      ? colorRoles(theme)[colorScheme]
+      : colorRoles(theme).on_surface;
   const textChildren = [
     Text({
       content: title,
@@ -791,8 +792,7 @@ export function ListTile({
         font_size: TYPOGRAPHY.body_large.font_size,
         font_weight: TYPOGRAPHY.body_large.font_weight,
         color: titleColor,
-      }),
-    }),
+      }), theme }),
   ];
   if (subtitle != null) {
     textChildren.push(
@@ -801,9 +801,8 @@ export function ListTile({
         key: `${base}-subtitle`,
         style: Style({
           font_size: TYPOGRAPHY.body_small.font_size,
-          color: COLOR_ROLES.on_surface_variant,
-        }),
-      }),
+          color: colorRoles(theme).on_surface_variant,
+        }), theme }),
     );
   }
   const children = [];
@@ -814,8 +813,7 @@ export function ListTile({
     Column({
       key: `${base}-text`,
       style: Style({ grow: 1.0, gap: SPACING_STEPS.xs }),
-      children: textChildren,
-    }),
+      children: textChildren, theme }),
   );
   if (trailing != null) {
     children.push(trailing);
@@ -825,7 +823,7 @@ export function ListTile({
     align: "center",
     padding: Edge.symmetric({ vertical: SPACING_STEPS.sm, horizontal: SPACING_STEPS.md }),
   };
-  return Row({ key: base, style: mergeStyle(tile, style), children });
+  return Row({ key: base, style: mergeStyle(tile, style), children, theme });
 }
 
 /**
@@ -838,9 +836,9 @@ export function ListTile({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", style = null, key = null } = {}) {
+export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", style = null, key = null, theme = null } = {}) {
   const base = key ?? "avatar";
-  const pair = AVATAR_COLORS[colorScheme] ?? AVATAR_COLORS.primary;
+  const pair = modeTable(AVATAR_COLORS, theme)[colorScheme] ?? modeTable(AVATAR_COLORS, theme).primary;
   const disc = {
     width: size,
     height: size,
@@ -854,9 +852,7 @@ export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", st
     child: Text({
       content: initials,
       key: `${base}-text`,
-      style: Style({ color: pair.color, font_weight: 700, text_align: "center" }),
-    }),
-  });
+      style: Style({ color: pair.color, font_weight: 700, text_align: "center" }), theme }), theme });
 }
 
 /**
@@ -870,8 +866,8 @@ export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", st
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Tag({ label = "", colorScheme = "primary", size = "md", style = null, key = null } = {}) {
-  return Chip({ label, colorScheme, size, style, key });
+export function Tag({ label = "", colorScheme = "primary", size = "md", style = null, key = null, theme = null } = {}) {
+  return Chip({ label, colorScheme, size, style, key, theme });
 }
 
 /**
@@ -891,9 +887,10 @@ export function Rating({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "rating";
-  const color = COLOR_ROLES[colorScheme];
+  const color = colorRoles(theme)[colorScheme];
   const children = [];
   for (let index = 0; index < maxStars; index += 1) {
     const glyph = index < value ? "★" : "☆";
@@ -904,24 +901,21 @@ export function Rating({
           key: `${base}-star-${index}`,
           variant: "ghost",
           onClick: () => onRate(index + 1),
-          style: Style({ font_size: 24.0, color, background: Color({ a: 0.0 }) }),
-        }),
+          style: Style({ font_size: 24.0, color, background: Color({ a: 0.0 }) }), theme }),
       );
     } else {
       children.push(
         Text({
           content: glyph,
           key: `${base}-star-${index}`,
-          style: Style({ font_size: 24.0, color }),
-        }),
+          style: Style({ font_size: 24.0, color }), theme }),
       );
     }
   }
   return Row({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
-    children,
-  });
+    children, theme });
 }
 
 /**
@@ -943,6 +937,7 @@ export function Stepper({
   onChange = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "stepper";
   const clamped = (candidate) => {
@@ -965,8 +960,7 @@ export function Stepper({
         background: MUTED,
         color: ON_SURFACE,
         font_size: 18.0,
-      }),
-    });
+      }), theme });
   return Row({
     key: base,
     style: mergeStyle({ gap: 10.0, align: "center" }, style),
@@ -975,11 +969,9 @@ export function Stepper({
       Text({
         content: String(value),
         key: `${base}-value`,
-        style: Style({ font_size: 18.0, font_weight: 700, color: ON_SURFACE }),
-      }),
+        style: Style({ font_size: 18.0, font_weight: 700, color: ON_SURFACE }), theme }),
       button("+", step, `${base}-up`),
-    ],
-  });
+    ], theme });
 }
 
 /**
@@ -1003,17 +995,17 @@ export function SearchBar({
   size = "md",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "searchbar";
-  const field = FIELD_STYLES[fieldVariant]?.[size]?.[colorScheme] ?? {};
+  const field = modeTable(FIELD_STYLES, theme)[fieldVariant]?.[size]?.[colorScheme] ?? {};
   const children = [
     Input({
       value,
       placeholder,
       onChange,
       key: `${base}-input`,
-      style: mergeStyle(field, { grow: 1.0 }),
-    }),
+      style: mergeStyle(field, { grow: 1.0 }) }),
   ];
   if (onClear != null && value) {
     children.push(
@@ -1024,17 +1016,16 @@ export function SearchBar({
         variant: "ghost",
         colorScheme,
         size,
-        key: `${base}-clear`,
-      }),
+        key: `${base}-clear`, theme }),
     );
   }
   const box = {
-    ...surfaceStyle("filled", colorScheme, null, "lg"),
+    ...surfaceStyle("filled", colorScheme, null, "lg", theme),
     gap: 8.0,
     align: "center",
     padding: Edge.all(8.0),
   };
-  return Row({ key: base, style: mergeStyle(box, style), children });
+  return Row({ key: base, style: mergeStyle(box, style), children, theme });
 }
 
 /**
@@ -1066,22 +1057,22 @@ export function Banner({
   action = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "banner";
   const scheme = colorScheme ?? toneScheme(tone);
-  const resolved = ALERT_STYLES[variant]?.[scheme] ?? {};
+  const resolved = modeTable(ALERT_STYLES, theme)[variant]?.[scheme] ?? {};
   const children = [
     Text({
       content: message,
       key: `${base}-text`,
-      style: Style({ grow: 1.0, color: resolved.color ?? null, font_size: 14.0 }),
-    }),
+      style: Style({ grow: 1.0, color: resolved.color ?? null, font_size: 14.0 }), theme }),
   ];
   if (action != null) {
     children.push(action);
   }
   const strip = { ...resolved, gap: 12.0, align: "center" };
-  return Row({ key: base, style: mergeStyle(strip, style), children });
+  return Row({ key: base, style: mergeStyle(strip, style), children, theme });
 }
 
 /**
@@ -1105,24 +1096,23 @@ export function Alert({
   dismiss = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "alert";
-  const resolved = ALERT_STYLES[variant]?.[colorScheme] ?? {};
+  const resolved = modeTable(ALERT_STYLES, theme)[variant]?.[colorScheme] ?? {};
   const content = resolved.color ?? null;
   const columnChildren = [
     Text({
       content: title,
       key: `${base}-title`,
-      style: Style({ color: content, font_size: 15.0, font_weight: 700 }),
-    }),
+      style: Style({ color: content, font_size: 15.0, font_weight: 700 }), theme }),
   ];
   if (body != null) {
     columnChildren.push(
       Text({
         content: body,
         key: `${base}-body`,
-        style: Style({ color: content, font_size: 13.0 }),
-      }),
+        style: Style({ color: content, font_size: 13.0 }), theme }),
     );
   }
   const children = [];
@@ -1131,22 +1121,20 @@ export function Alert({
       Text({
         content: glyph,
         key: `${base}-glyph`,
-        style: Style({ color: content, font_size: 20.0 }),
-      }),
+        style: Style({ color: content, font_size: 20.0 }), theme }),
     );
   }
   children.push(
     Column({
       key: `${base}-col`,
       style: Style({ grow: 1.0, gap: SPACING_STEPS.xs }),
-      children: columnChildren,
-    }),
+      children: columnChildren, theme }),
   );
   if (dismiss != null) {
     children.push(dismiss);
   }
   const block = { ...resolved, gap: SPACING_STEPS.sm, align: "center" };
-  return Row({ key: base, style: mergeStyle(block, style), children });
+  return Row({ key: base, style: mergeStyle(block, style), children, theme });
 }
 
 /**
@@ -1165,14 +1153,14 @@ export function Badge({
   size = "sm",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const scheme = colorScheme ?? toneScheme(tone);
-  const pill = BADGE_STYLES[variant]?.[size]?.[scheme] ?? {};
+  const pill = modeTable(BADGE_STYLES, theme)[variant]?.[size]?.[scheme] ?? {};
   return Text({
     content: label,
     key: key ?? "badge",
-    style: mergeStyle({ ...pill, text_align: "center" }, style),
-  });
+    style: mergeStyle({ ...pill, text_align: "center" }, style), theme });
 }
 
 /**
@@ -1190,33 +1178,31 @@ export function EmptyState({
   action = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "emptystate";
-  const muted = COLOR_ROLES.on_surface_variant;
+  const muted = colorRoles(theme).on_surface_variant;
   const children = [
     Text({
       content: glyph,
       key: `${base}-glyph`,
-      style: Style({ font_size: 48.0, color: muted, text_align: "center" }),
-    }),
+      style: Style({ font_size: 48.0, color: muted, text_align: "center" }), theme }),
     Text({
       content: title,
       key: `${base}-title`,
       style: Style({
         font_size: 18.0,
         font_weight: 700,
-        color: COLOR_ROLES.on_surface,
+        color: colorRoles(theme).on_surface,
         text_align: "center",
-      }),
-    }),
+      }), theme }),
   ];
   if (subtitle != null) {
     children.push(
       Text({
         content: subtitle,
         key: `${base}-subtitle`,
-        style: Style({ font_size: 14.0, color: muted, text_align: "center" }),
-      }),
+        style: Style({ font_size: 14.0, color: muted, text_align: "center" }), theme }),
     );
   }
   if (action != null) {
@@ -1227,7 +1213,7 @@ export function EmptyState({
     align: "center",
     padding: Edge.all(SPACING_STEPS.lg),
   };
-  return Column({ key: base, style: mergeStyle(frame, style), children });
+  return Column({ key: base, style: mergeStyle(frame, style), children, theme });
 }
 
 /**
@@ -1240,19 +1226,17 @@ export function EmptyState({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Stat({ label = "", value = "", delta = null, deltaUp = true, style = null, key = null } = {}) {
+export function Stat({ label = "", value = "", delta = null, deltaUp = true, style = null, key = null, theme = null } = {}) {
   const base = key ?? "stat";
   const children = [
     Text({
       content: label,
       key: `${base}-label`,
-      style: Style({ color: COLOR_ROLES.on_surface_variant, font_size: 13.0 }),
-    }),
+      style: Style({ color: colorRoles(theme).on_surface_variant, font_size: 13.0 }), theme }),
     Text({
       content: value,
       key: `${base}-value`,
-      style: Style({ color: COLOR_ROLES.on_surface, font_size: 28.0, font_weight: 700 }),
-    }),
+      style: Style({ color: colorRoles(theme).on_surface, font_size: 28.0, font_weight: 700 }), theme }),
   ];
   if (delta != null) {
     children.push(
@@ -1260,18 +1244,16 @@ export function Stat({ label = "", value = "", delta = null, deltaUp = true, sty
         content: `${deltaUp ? "▲" : "▼"} ${delta}`,
         key: `${base}-delta`,
         style: Style({
-          color: deltaUp ? COLOR_ROLES.success : COLOR_ROLES.error,
+          color: deltaUp ? colorRoles(theme).success : colorRoles(theme).error,
           font_size: 13.0,
           font_weight: 500,
-        }),
-      }),
+        }), theme }),
     );
   }
   return Column({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
-    children,
-  });
+    children, theme });
 }
 
 /**
@@ -1287,16 +1269,16 @@ export function Stat({ label = "", value = "", delta = null, deltaUp = true, sty
  * @param {string} base         The stepper's key, which the cell's hangs off.
  * @returns {import("../transport.js").Node}
  */
-function stepCell(index, label, current, colorScheme, base) {
+function stepCell(index, label, current, colorScheme, base, theme) {
   const doneOrActive = index <= current;
-  const muted = COLOR_ROLES.on_surface_variant;
+  const muted = colorRoles(theme).on_surface_variant;
   const disc = doneOrActive
     ? Style({
         width: 28.0,
         height: 28.0,
         radius: 14.0,
-        background: COLOR_ROLES[colorScheme],
-        color: COLOR_ROLES[`on_${colorScheme}`],
+        background: colorRoles(theme)[colorScheme],
+        color: colorRoles(theme)[`on_${colorScheme}`],
         align: "center",
         text_align: "center",
         font_weight: 700,
@@ -1306,7 +1288,7 @@ function stepCell(index, label, current, colorScheme, base) {
         width: 28.0,
         height: 28.0,
         radius: 14.0,
-        border: { width: 1.0, color: COLOR_ROLES.outline },
+        border: { width: 1.0, color: colorRoles(theme).outline },
         color: muted,
         align: "center",
         text_align: "center",
@@ -1316,17 +1298,15 @@ function stepCell(index, label, current, colorScheme, base) {
     key: `${base}-step-${index}`,
     style: Style({ gap: SPACING_STEPS.xs, align: "center" }),
     children: [
-      Text({ content: String(index + 1), key: `${base}-step-disc-${index}`, style: disc }),
+      Text({ content: String(index + 1), key: `${base}-step-disc-${index}`, style: disc, theme }),
       Text({
         content: label,
         key: `${base}-step-label-${index}`,
         style: Style({
-          color: doneOrActive ? COLOR_ROLES.on_surface : muted,
+          color: doneOrActive ? colorRoles(theme).on_surface : muted,
           font_size: 12.0,
-        }),
-      }),
-    ],
-  });
+        }), theme }),
+    ], theme });
 }
 
 /**
@@ -1345,6 +1325,7 @@ export function ProgressStepper({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "progress-stepper";
   const children = [];
@@ -1358,18 +1339,16 @@ export function ProgressStepper({
             grow: 1.0,
             height: 2.0,
             background:
-              index <= current ? COLOR_ROLES[colorScheme] : COLOR_ROLES.outline_variant,
-          }),
-        }),
+              index <= current ? colorRoles(theme)[colorScheme] : colorRoles(theme).outline_variant,
+          }), theme }),
       );
     }
-    children.push(stepCell(index, label, current, colorScheme, base));
+    children.push(stepCell(index, label, current, colorScheme, base, theme));
   });
   return Row({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs, align: "center" }, style),
-    children,
-  });
+    children, theme });
 }
 
 /**
@@ -1394,6 +1373,7 @@ export function MetricCard({
   trailing = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "metric-card";
   const stat = Stat({
@@ -1402,23 +1382,20 @@ export function MetricCard({
     delta,
     deltaUp,
     key: `${base}-stat`,
-    style: Style({ grow: 1.0 }),
-  });
+    style: Style({ grow: 1.0 }), theme });
   const body =
     trailing == null
       ? stat
       : Row({
           key: `${base}-row`,
           style: Style({ gap: SPACING_STEPS.md, align: "center" }),
-          children: [stat, trailing],
-        });
+          children: [stat, trailing], theme });
   return Card({
     key: base,
     variant,
     colorScheme,
     style,
-    children: [body],
-  });
+    children: [body], theme });
 }
 
 /**
@@ -1440,6 +1417,7 @@ export function StatCard({
   trailing = null,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   return MetricCard({
     label,
@@ -1450,8 +1428,7 @@ export function StatCard({
     variant,
     trailing,
     style,
-    key: key ?? "stat-card",
-  });
+    key: key ?? "stat-card", theme });
 }
 
 /**
@@ -1494,6 +1471,7 @@ export function ConfidenceBadge({
   mid = 0.5,
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const percent = `${(confidence * 100).toFixed(0)}%`;
   return Badge({
@@ -1501,8 +1479,7 @@ export function ConfidenceBadge({
     label: label ? `${label} ${percent}`.trim() : percent,
     colorScheme: confidence_scheme(confidence, { high, mid }),
     variant: "subtle",
-    style,
-  });
+    style, theme });
 }
 
 /**
@@ -1528,6 +1505,7 @@ export function Accordion({
   colorScheme = "neutral",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "accordion";
   const header = Button({
@@ -1535,11 +1513,10 @@ export function Accordion({
     onClick: onToggle,
     key: `${base}-header`,
     style: Style({
-      ...surfaceStyle(variant, colorScheme, null, "sm"),
+      ...surfaceStyle(variant, colorScheme, null, "sm", theme),
       padding: Edge.all(SPACING_STEPS.sm),
       font_weight: 700,
-    }),
-  });
+    }), theme });
   const body = open
     ? [
         Column({
@@ -1548,15 +1525,13 @@ export function Accordion({
             gap: SPACING_STEPS.sm,
             padding: Edge.all(SPACING_STEPS.md),
           }),
-          children,
-        }),
+          children, theme }),
       ]
     : [];
   return Column({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
-    children: [header, ...body],
-  });
+    children: [header, ...body], theme });
 }
 
 /**
@@ -1581,9 +1556,10 @@ export function Tabs({
   size = "md",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "tabs";
-  const accent = COLOR_ROLES[colorScheme] ?? COLOR_ROLES.primary;
+  const accent = colorRoles(theme)[colorScheme] ?? colorRoles(theme).primary;
   const children = tabs.map((label, index) => {
     const chosen = index === active;
     const resting = resolveWidgetStyle(
@@ -1592,6 +1568,7 @@ export function Tabs({
       size,
       chosen ? colorScheme : "neutral",
       null,
+    theme,
     );
     const overrides = chosen
       ? { grow: 1.0, border: SideBorder({ bottom: Border({ width: 2.0, color: accent }) }) }
@@ -1600,17 +1577,16 @@ export function Tabs({
       label,
       key: `${base}-item-${index}`,
       onClick: onSelect == null ? null : () => onSelect(index),
-      style: mergeStyle(resting, overrides),
-    });
+      style: mergeStyle(resting, overrides), theme });
   });
   const strip = {
-    ...surfaceStyle("filled", "neutral", null, "none"),
+    ...surfaceStyle("filled", "neutral", null, "none", theme),
     gap: 4.0,
     padding: Edge.symmetric({ vertical: 0.0, horizontal: 4.0 }),
     justify: "center",
     align: "stretch",
   };
-  return Row({ key: base, style: mergeStyle(strip, style), children });
+  return Row({ key: base, style: mergeStyle(strip, style), children, theme });
 }
 
 /**
@@ -1620,12 +1596,11 @@ export function Tabs({
  * @param {string} key    The reconciler key.
  * @returns {import("../transport.js").Node}
  */
-function labelText(label, key) {
+function labelText(label, key, theme) {
   return Text({
     content: label,
     key,
-    style: Style({ font_size: 13.0, font_weight: 500, color: COLOR_ROLES.on_surface_variant }),
-  });
+    style: Style({ font_size: 13.0, font_weight: 500, color: colorRoles(theme).on_surface_variant }), theme });
 }
 
 /**
@@ -1642,10 +1617,10 @@ function labelText(label, key) {
  * @param {?Object} style  The caller's style for the column.
  * @returns {import("../transport.js").Node}
  */
-function labelledField(label, field, error, key, style) {
+function labelledField(label, field, error, key, style, theme) {
   const children = [];
   if (label) {
-    children.push(labelText(label, `${key}-field-label`));
+    children.push(labelText(label, `${key}-field-label`, theme));
   }
   children.push(field);
   if (error) {
@@ -1653,11 +1628,10 @@ function labelledField(label, field, error, key, style) {
       Text({
         content: error,
         key: `${key}-field-error`,
-        style: Style({ font_size: 12.0, color: COLOR_ROLES.error }),
-      }),
+        style: Style({ font_size: 12.0, color: colorRoles(theme).error }), theme }),
     );
   }
-  return Column({ key, style: mergeStyle({ gap: 4.0 }, style), children });
+  return Column({ key, style: mergeStyle({ gap: 4.0 }, style), children, theme });
 }
 
 /**
@@ -1693,6 +1667,7 @@ export function EmailInput({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "email-input";
   const field = Input({
@@ -1706,9 +1681,8 @@ export function EmailInput({
     key: `${base}-field`,
     fieldVariant,
     size,
-    colorScheme,
-  });
-  return labelledField(label, field, error, base, style);
+    colorScheme, theme });
+  return labelledField(label, field, error, base, style, theme);
 }
 
 /**
@@ -1730,6 +1704,7 @@ export function PasswordInput({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "password-input";
   const field = Input({
@@ -1742,9 +1717,8 @@ export function PasswordInput({
     key: `${base}-field`,
     fieldVariant,
     size,
-    colorScheme,
-  });
-  return labelledField(label, field, error, base, style);
+    colorScheme, theme });
+  return labelledField(label, field, error, base, style, theme);
 }
 
 /**
@@ -1771,7 +1745,7 @@ function maskedField({
   colorScheme,
   style,
   key,
-}) {
+}, theme) {
   const base = key ?? defaultKey;
   const field = MaskedInput({
     value,
@@ -1782,9 +1756,8 @@ function maskedField({
     key: `${base}-field`,
     fieldVariant,
     size,
-    colorScheme,
-  });
-  return labelledField(label, field, error, base, style);
+    colorScheme, theme });
+  return labelledField(label, field, error, base, style, theme);
 }
 
 /**
@@ -1806,6 +1779,7 @@ export function PhoneInput({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   return maskedField({
     mask: "(99) 99999-9999",
@@ -1821,7 +1795,7 @@ export function PhoneInput({
     colorScheme,
     style,
     key,
-  });
+  }, theme);
 }
 
 /**
@@ -1843,6 +1817,7 @@ export function CPFInput({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   return maskedField({
     mask: "999.999.999-99",
@@ -1858,7 +1833,7 @@ export function CPFInput({
     colorScheme,
     style,
     key,
-  });
+  }, theme);
 }
 
 /**
@@ -1880,6 +1855,7 @@ export function CNPJInput({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   return maskedField({
     mask: "99.999.999/9999-99",
@@ -1895,7 +1871,7 @@ export function CNPJInput({
     colorScheme,
     style,
     key,
-  });
+  }, theme);
 }
 
 /**
@@ -1926,13 +1902,14 @@ export function AddressInput({
   colorScheme = "primary",
   style = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "address-input";
   const report = (fieldName) =>
     onChange == null ? null : (event) => onChange(fieldName, event.value);
   const children = [];
   if (label) {
-    children.push(labelText(label, "address-label"));
+    children.push(labelText(label, "address-label", theme));
   }
   children.push(
     MaskedInput({
@@ -1944,8 +1921,7 @@ export function AddressInput({
       key: `${base}-cep`,
       fieldVariant,
       size,
-      colorScheme,
-    }),
+      colorScheme, theme }),
   );
   const textFields = [
     ["street", street, "Rua"],
@@ -1964,33 +1940,14 @@ export function AddressInput({
         key: `${base}-${fieldName}`,
         fieldVariant,
         size,
-        colorScheme,
-      }),
+        colorScheme, theme }),
     );
   }
   return Column({
     key: base,
     style: mergeStyle({ gap: 8.0 }, style),
-    children,
-  });
+    children, theme });
 }
-
-/**
- * The label color the tempestweb-native fields paint with (`#49454f`).
- *
- * These fields predate the theme-resolved BR inputs above and carry their own
- * two constants, tuned for the light Material 3 surface the base stylesheet
- * renders against. They are not the theme's `on_surface_variant`/`error` roles —
- * porting them as such would shift the color a few units and break parity.
- * @type {Readonly<Object>}
- */
-const FIELD_LABEL_COLOR = Object.freeze({ r: 73, g: 69, b: 79, a: 1.0 });
-
-/**
- * The error color the tempestweb-native fields paint with (`#b3261e`).
- * @type {Readonly<Object>}
- */
-const FIELD_ERROR_COLOR = Object.freeze({ r: 179, g: 38, b: 30, a: 1.0 });
 
 /**
  * Wrap an input in the tempestweb field's label + error column.
@@ -2003,17 +1960,19 @@ const FIELD_ERROR_COLOR = Object.freeze({ r: 179, g: 38, b: 30, a: 1.0 });
  * @param {import("../transport.js").Node} field  The input to wrap.
  * @param {string} error   The validation message; empty means no error line.
  * @param {string} key     The column's key, and the prefix of its children's.
+ * @param {?Object} theme  The theme whose scheme resolves the label and error
+ *                         colours. `Text` takes no theme of its own, so they are
+ *                         resolved here and passed as inline style.
  * @returns {import("../transport.js").Node}
  */
-function tempestwebField(label, field, error, key) {
+function tempestwebField(label, field, error, key, theme) {
   const children = [];
   if (label) {
     children.push(
       Text({
         content: label,
         key: `${key}-label`,
-        style: Style({ font_size: 13.0, font_weight: 500, color: FIELD_LABEL_COLOR }),
-      }),
+        style: Style({ font_size: 13.0, font_weight: 500, color: colorRoles(theme).on_surface_variant }), theme }),
     );
   }
   children.push(field);
@@ -2022,11 +1981,10 @@ function tempestwebField(label, field, error, key) {
       Text({
         content: error,
         key: `${key}-error`,
-        style: Style({ font_size: 12.0, color: FIELD_ERROR_COLOR }),
-      }),
+        style: Style({ font_size: 12.0, color: colorRoles(theme).error }), theme }),
     );
   }
-  return Column({ key, style: Style({ gap: 4.0 }), children });
+  return Column({ key, style: Style({ gap: 4.0 }), children, theme });
 }
 
 /**
@@ -2046,25 +2004,25 @@ export function TextField({
   error = "",
   onChange = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "text-field";
   const children = [];
   if (label) {
-    children.push(Text({ content: label, key: `${base}-label` }));
+    children.push(Text({ content: label, key: `${base}-label`, theme }));
   }
   children.push(
-    Input({ value, placeholder, onChange: onValue(onChange), key: `${base}-input` }),
+    Input({ value, placeholder, onChange: onValue(onChange), theme, key: `${base}-input` }),
   );
   if (error) {
     children.push(
-      Text({ content: error, key: `${base}-error`, style: Style({ color: FIELD_ERROR_COLOR }) }),
+      Text({ content: error, key: `${base}-error`, style: Style({ color: colorRoles(theme).error }), theme }),
     );
   }
   return Column({
     key: base,
     style: Style({ gap: 4.0, padding: Edge.symmetric({ vertical: 4.0 }) }),
-    children,
-  });
+    children, theme });
 }
 
 /**
@@ -2085,6 +2043,7 @@ export function EmailField({
   error = "",
   onChange = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "email-field";
   const field = Input({
@@ -2092,9 +2051,9 @@ export function EmailField({
     placeholder,
     keyboard: "email",
     onChange: onValue(onChange),
-    key: `${base}-input`,
-  });
-  return tempestwebField(label, field, error, base);
+    theme,
+    key: `${base}-input` });
+  return tempestwebField(label, field, error, base, theme);
 }
 
 /**
@@ -2111,6 +2070,7 @@ export function PasswordField({
   error = "",
   onChange = null,
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "password-field";
   const field = Input({
@@ -2118,9 +2078,9 @@ export function PasswordField({
     placeholder,
     secure: true,
     onChange: onValue(onChange),
-    key: `${base}-input`,
-  });
-  return tempestwebField(label, field, error, base);
+    theme,
+    key: `${base}-input` });
+  return tempestwebField(label, field, error, base, theme);
 }
 
 /**
@@ -2148,32 +2108,30 @@ export function LoginForm({
   title = "",
   submitLabel = "Entrar",
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "login";
   const children = [];
   if (title) {
-    children.push(Text({ content: title, key: `${base}-title` }));
+    children.push(Text({ content: title, key: `${base}-title`, theme }));
   }
   children.push(
     EmailField({
       value: email,
       onChange: onEmailChange,
       error: emailError,
-      key: `${base}-email`,
-    }),
+      key: `${base}-email`, theme }),
     PasswordField({
       value: password,
       onChange: onPasswordChange,
       error: passwordError,
-      key: `${base}-password`,
-    }),
-    Button({ label: submitLabel, onClick: onSubmit, key: `${base}-submit` }),
+      key: `${base}-password`, theme }),
+    Button({ label: submitLabel, onClick: onSubmit, theme, key: `${base}-submit` }),
   );
   return Column({
     key: key ?? "login-form",
     style: Style({ gap: 12.0, padding: Edge.all(16) }),
-    children,
-  });
+    children, theme });
 }
 
 /**
@@ -2200,39 +2158,36 @@ export function SignupForm({
   title = "",
   submitLabel = "Cadastrar",
   key = null,
+  theme = null,
 } = {}) {
   const base = key ?? "signup";
   const children = [];
   if (title) {
-    children.push(Text({ content: title, key: `${base}-title` }));
+    children.push(Text({ content: title, key: `${base}-title`, theme }));
   }
   children.push(
     EmailField({
       value: email,
       onChange: onEmailChange,
       error: emailError,
-      key: `${base}-email`,
-    }),
+      key: `${base}-email`, theme }),
     PasswordField({
       value: password,
       onChange: onPasswordChange,
       error: passwordError,
-      key: `${base}-password`,
-    }),
+      key: `${base}-password`, theme }),
     PasswordField({
       value: confirm,
       onChange: onConfirmChange,
       error: confirmError,
       label: "Confirmar senha",
-      key: `${base}-confirm`,
-    }),
-    Button({ label: submitLabel, onClick: onSubmit, key: `${base}-submit` }),
+      key: `${base}-confirm`, theme }),
+    Button({ label: submitLabel, onClick: onSubmit, theme, key: `${base}-submit` }),
   );
   return Column({
     key: key ?? "signup-form",
     style: Style({ gap: 12.0, padding: Edge.all(16) }),
-    children,
-  });
+    children, theme });
 }
 
 export {

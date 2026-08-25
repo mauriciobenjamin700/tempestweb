@@ -266,6 +266,85 @@ display = "standalone"
 The full field list is documented on the
 [Mode C — transpile](transpile.md#configuring-the-manifest-with-pwa) page.
 
+## Turning the PWA off (`enabled`, `manifest`, `service_worker`)
+
+Not every app wants offline precache. The clear case is the **admin panel behind
+a login**, served by a control plane: it gains nothing from offline — whoever is
+using it always has the network — and pays for it twice.
+
+!!! warning "What the worker costs when you do not need it"
+    - **Stale assets after a deploy.** The worker serves the shell from its
+      precache until it updates, so the first load after a deploy can be the
+      previous version.
+    - **Connection contention on the first load.** The precache fetches ~90 files
+      while Pyodide (Mode A) is still booting.
+
+The layer's two halves are separate axes, because they are useful apart:
+
+```toml
+[pwa]
+enabled = false
+```
+
+That is the shortcut: it turns both off. No `manifest.webmanifest`, no
+`register.js`, no `<link rel="manifest">` and no worker registration in
+`index.html`.
+
+To turn off only one:
+
+```toml
+[pwa]
+service_worker = false   # no precache, but the app is still installable
+```
+
+```toml
+[pwa]
+manifest = false         # precache, no install prompt
+```
+
+`enabled` is the **default** the two halves fall back to; naming a half
+explicitly wins over it. So "off by default, except the manifest" reads:
+
+```toml
+[pwa]
+enabled = false
+manifest = true
+```
+
+!!! info "The field must be a real boolean"
+    `service_worker = "false"` (quoted) is rejected at build time. A non-empty
+    string is truthy in Python, and a switch whose whole job is to turn something
+    off must not do the opposite of what it reads.
+
+### Turning it off is not the same as never turning it on
+
+Anyone who already visited the app **already has the worker registered**, and a
+registered worker keeps serving the shell from its precache until it is replaced.
+Simply not emitting `sw.js` any more would strand those people on the old build,
+with nothing in a deploy able to reach them.
+
+That is why the build **still emits `sw.js`** when you turn the worker off — just
+a different worker: it clears every cache on the origin, unregisters itself, and
+reloads the pages it controlled. It runs once per browser that still had the old
+worker, then it is gone.
+
+```toml
+[pwa]
+service_worker = false
+```
+
+| File | Worker on | Off |
+| --- | --- | --- |
+| `sw.js` | cache-first worker | teardown worker |
+| `register.js` | emitted | **not emitted** |
+| registration in `index.html` | present | **absent** |
+| `manifest.webmanifest` | emitted | follows `manifest` |
+| icons | emitted | emitted (favicon and apple-touch) |
+
+!!! check "The connectivity banner stays"
+    It reports the **network**, not the precache, so an app with no worker still
+    tells the user when the signal drops.
+
 ## Manual verification
 
 !!! note "What requires a real device/browser"
@@ -286,5 +365,8 @@ The full field list is documented on the
 - **WebPush** (P3): `native.notifications.subscribe` on the client; `tempestweb
   vapid` + `webpush_router` on the server.
 - Some PWA tests require a real device — see the manual verification.
+- **`[pwa] enabled = false`** turns the whole layer off; `manifest` and
+  `service_worker` turn off one half. Turning the worker off emits the teardown
+  worker, so whoever already registered one is not stuck on the old precache.
 
 For production health, see [Observability](observability.md). 🚀

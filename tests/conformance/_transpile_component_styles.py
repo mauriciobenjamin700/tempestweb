@@ -11,7 +11,8 @@ cannot run there — but they are deterministic, so their *output* travels as a
 table, the same trick ``widget-styles.gen.js`` already uses for the styled
 widgets.
 
-The tables, each keyed by the axes the components actually expose:
+The tables, each keyed by theme mode and then by the axes the components
+actually expose:
 
 * ``COLOR_ROLES`` — the 39 Material 3 roles of the default theme.
 * ``SHAPE_STEPS`` — the shape scale (corner radii), by step name.
@@ -34,11 +35,20 @@ The tables, each keyed by the axes the components actually expose:
 * ``AVATAR_COLORS`` — color scheme → the tonal ``(background, color)`` pair the
   ``Avatar`` circle fills with, resolved through the core's own role mapping so
   the pairing cannot drift here.
+
+Every table that carries a **colour** is keyed by theme mode first
+(``TABLE[mode][...]``), because a table baked from the default theme made every
+component in Mode C render light whatever the app asked (tempestweb#106). The two
+scale tables — ``SHAPE_STEPS`` and ``TYPOGRAPHY`` — carry no colour and are
+identical in both modes, so they stay flat; a test asserts that, so the day the
+core makes a radius or a type step mode-dependent the build fails instead of
+quietly resolving light.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +61,7 @@ from tempest_core import (
     FieldVariant,
     Size,
     Theme,
+    ThemeMode,
 )
 from tempest_core.components.cards import _avatar_colors
 from tempest_core.variants import (
@@ -66,6 +77,14 @@ STYLES_MODULE: Path = CLIENT_DIR / "component-styles.gen.js"
 
 #: Material 3 elevation levels a surface accepts, plus the per-variant default.
 _ELEVATIONS: tuple[str, ...] = ("default", "0", "1", "2", "3", "4", "5")
+
+#: The theme mode axis of every colour-carrying table. ``SYSTEM`` is not an entry:
+#: the core resolves it against the platform flag, which a component does not see,
+#: so it resolves light exactly as ``LIGHT`` does.
+_MODES: tuple[tuple[str, ThemeMode], ...] = (
+    ("light", ThemeMode.LIGHT),
+    ("dark", ThemeMode.DARK),
+)
 
 
 def _schemes() -> list[str]:
@@ -307,7 +326,6 @@ def render_module_text() -> str:
     Returns:
         The full ``component-styles.gen.js`` source.
     """
-    theme = Theme()
     header = (
         "// component-styles.gen.js — GENERATED from tempest_core by tempestweb "
         "transpile (Mode C).\n"
@@ -332,25 +350,38 @@ def render_module_text() -> str:
         body = json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False)
         return f"export const {name} = {body};\n"
 
+    def themed(name: str, builder: Callable[[Theme], Any]) -> str:
+        """Render one table keyed by theme mode.
+
+        Args:
+            name: The export name.
+            builder: The per-theme table builder.
+
+        Returns:
+            The export statement, keyed ``{"light": ..., "dark": ...}``.
+        """
+        return block(name, {key: builder(Theme(mode=mode)) for key, mode in _MODES})
+
+    light = Theme(mode=ThemeMode.LIGHT)
     return (
         f"{header}\n"
-        + block("COLOR_ROLES", color_roles(theme))
+        + themed("COLOR_ROLES", color_roles)
         + "\n"
-        + block("SHAPE_STEPS", shape_steps(theme))
+        + block("SHAPE_STEPS", shape_steps(light))
         + "\n"
-        + block("SURFACE_STYLES", surface_styles(theme))
+        + themed("SURFACE_STYLES", surface_styles)
         + "\n"
-        + block("BADGE_STYLES", badge_styles(theme))
+        + themed("BADGE_STYLES", badge_styles)
         + "\n"
-        + block("SELECTION_ACCENT", selection_accent(theme))
+        + themed("SELECTION_ACCENT", selection_accent)
         + "\n"
-        + block("ALERT_STYLES", alert_styles(theme))
+        + themed("ALERT_STYLES", alert_styles)
         + "\n"
-        + block("FIELD_STYLES", field_styles(theme))
+        + themed("FIELD_STYLES", field_styles)
         + "\n"
-        + block("TYPOGRAPHY", typography(theme))
+        + block("TYPOGRAPHY", typography(light))
         + "\n"
-        + block("AVATAR_COLORS", avatar_colors(theme))
+        + themed("AVATAR_COLORS", avatar_colors)
     )
 
 

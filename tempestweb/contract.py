@@ -61,7 +61,7 @@ WIRE_CONTRACT_VERSION: int = 1
 #: SHA-256 of :func:`wire_shape`, frozen. Update it in the same commit that
 #: changes the shape, together with the CHANGELOG entry the change deserves.
 WIRE_SHAPE_DIGEST: str = (
-    "34367004565e4796261ac3d967e3b95d862e21a10ce3d682ab8078800b85416d"
+    "9c2f4b439a10ea935c5d85b34e28e4cc5ca936e3a1a9f18a9ac94cf4a4d6b24c"
 )
 
 _FIXTURES: Path = Path(__file__).resolve().parents[1] / "tests" / "fixtures"

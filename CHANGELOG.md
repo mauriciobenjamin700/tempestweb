@@ -101,6 +101,11 @@ versioning.
   camada Lighthouse (contraste e instalabilidade precisam de layout real), e a
   tabela de compatibilidade do wire. `docs/roadmap.md`: S10 fecha.
 - `axe-core` entra como `devDependency` e `npm run a11y` roda o gate local.
+- **`WIRE_SHAPE_DIGEST` reflete o envelope `theme`.** O congelamento do wire e a
+  chegada do envelope de tema nasceram em frentes paralelas: cada uma passava
+  sozinha e o digest reprovava na integração — o guard fazendo o trabalho dele.
+  A mudança é **aditiva** (uma `EnvelopeKind` nova, nenhuma chave renomeada ou
+  retipada), então `WIRE_CONTRACT_VERSION` fica em `1` e só o digest muda.
 ## [0.103.0] — 2026-08-24
 
 ### Added

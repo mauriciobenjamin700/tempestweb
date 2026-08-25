@@ -385,6 +385,43 @@ def go_dark(app: App[State]) -> None:
 
 !!! tip "A component propagates the way the core propagates"
     An `EmailInput` **is** the field: it hands its theme to the `Input` it builds.
+    A `SearchBar` **composes** one and layers the style it resolved on top, so the
+    inner field keeps the default palette — and Mode C reproduces that distinction
+    component by component, pinned by a parity matrix in both modes.
+
+### tempestweb's own components speak the same idiom
+
+`TextField`, `EmailField`, `PasswordField`, `LoginForm` and `SignupForm` (from
+`tempestweb.components`) take a `theme` like any widget, and hand it to
+everything they build — each field's `Input`, each form's fields, the submit
+button, and the colour of the label and the error line:
+
+```python
+from tempestweb.components import LoginForm
+
+LoginForm(
+    email=app.state.email,
+    password=app.state.password,
+    on_email_change=set_email,
+    on_password_change=set_password,
+    on_submit=sign_in,
+    theme=app.theme,
+    key="login",
+)
+```
+
+!!! danger "Before 0.101.0 they were light by construction"
+    None of the five declared a `theme`, and none passed one down, so a dark app
+    got a light field **with no warning at all** — and the worst case is a dark
+    background (from the base sheet) under dark text, i.e. unreadable. If you
+    were following the `theme=app.theme` idiom on every widget, these five were
+    the ones ignoring it.
+
+!!! warning "`Stepper` still has no `theme`"
+    It lives in **tempest-core**, a separate repository: giving it a theme is a
+    core release, not a change here. Until then, `Stepper` renders light in any
+    app. Tracked in
+    [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158).
     A `SearchBar` or a `TextField` **composes** one and layers the style it
     resolved on top, so the inner field keeps the default palette — and Mode C
     reproduces that distinction component by component, pinned by a parity matrix

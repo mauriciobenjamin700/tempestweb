@@ -4,6 +4,11 @@ Uses :class:`tempestweb.components.LoginForm`, which composes the email and
 password fields with a submit button. The app only holds the field values in
 state and validates on submit — no manual layout, labels or error wiring.
 
+``theme=app.theme`` is the same one-line idiom every styled widget takes: the
+form hands it to both fields, to the submit button, and to the colour of each
+label and error line, so the whole screen follows ``app.set_theme(...)``. Leave it
+out and the form resolves the light palette, whatever the app's theme says.
+
     tempestweb run --mode wasm     # Python in the browser (Pyodide)
 """
 
@@ -70,6 +75,7 @@ def view(app: App[LoginState]) -> Widget:
                 on_submit=submit,
                 email_error=app.state.email_error,
                 title="Sign in",
+                theme=app.theme,
             ),
             Text(content=app.state.status, key="status"),
         ],

@@ -9,6 +9,8 @@
 //     this transport forwards each batch to the registered `onPatches` handler.
 //   - Events in (client -> Python): `sendEvent(ev)` calls the Python side's
 //     `push_event`, which enqueues it for the runtime's event loop.
+//   - Repair (client -> Python): `requestResync()` pushes a `resync` event the
+//     runtime serves itself, answering with the whole scene as a root Replace.
 //
 // The pyodide.ffi specifics (proxying Python callables, converting a Python list
 // of dicts into a JS array of objects) are handled in the `bridge` adapter built
@@ -78,6 +80,25 @@ export function createWasmTransport(bridge) {
     sendEvent(event) {
       if (closed) return;
       bridge.pushEvent(event);
+    },
+
+    /**
+     * Ask the Python side to re-send the whole scene.
+     *
+     * The DOM is only correct while every patch has applied in order, so a batch
+     * the renderer could not apply leaves a tree no later index-relative patch
+     * fits — without this the Mode A client had no repair and stayed truncated
+     * for the rest of the page's life, every following tick failing the same way.
+     *
+     * The request travels as an ordinary wire event, exactly like Mode B's: the
+     * runtime serves `resync` itself instead of routing it to an app handler, so
+     * the empty `key` never has to resolve to a widget.
+     *
+     * @returns {void}
+     */
+    requestResync() {
+      if (closed) return;
+      bridge.pushEvent({ type: "resync", key: "", payload: {} });
     },
 
     /**

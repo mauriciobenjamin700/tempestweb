@@ -60,6 +60,82 @@ versioning.
 - `docs/advanced/pwa.md` (+ EN) ganhou a seção **Desligando o PWA**, com o custo
   do worker para quem não precisa dele e a tabela do que muda no artefato.
   `docs/advanced/transpile.md` (+ EN) lista os três campos novos.
+## [0.102.0] — 2026-08-24
+
+### Fixed
+
+- **O Modo A não pedia resync, então um patch que falhava truncava a tela para
+  sempre** ([#159](https://github.com/mauriciobenjamin700/tempestweb/issues/159)).
+  O `onPatchFailure` do `mount` só pede reparo quando o transporte sabe pedir, e
+  `client/transport-wasm.js` não implementava `requestResync` — no Modo A o
+  handler degenerava em `console.error` e retornava. Dali em diante a árvore do
+  cliente não tinha conserto: todo patch seguinte é index-relativo a uma árvore
+  que não existe mais, então cada tick falhava igual e a tela ficava faltando
+  pedaço. No tempest-webtunnel isso significou um painel sem o botão Sair, sem um
+  campo do formulário e sem uma coluna da tabela, por semanas, com o console
+  reclamando a cada 7 segundos.
+
+  `WasmRuntime.dispatch_event` ganhou o branch `resync` que faltava (só o
+  `AppSession.dispatch` do Modo B tratava o tipo) e um `WasmRuntime.resync()` que
+  reenvia a scene atual como `Replace` de raiz, com os overlays abertos seguindo
+  como inserts sob `overlay` — o mount inicial do Modo A entrega só o nó raiz,
+  então um diálogo aberto sumiria de um resync que reenviasse só a raiz.
+
+  O pedido viaja como evento de fio comum, igual ao Modo B, e o runtime o serve
+  em vez de rotear para handler de app: o `key` vazio nunca precisa resolver para
+  um widget.
+
+- **O bootstrap do Modo A descartava, em silêncio, lote entregue antes do
+  transporte existir.** `start()` constrói o app e já inicia o loop de rebuild,
+  mas o transporte JS só nasce algumas instruções depois; o `onPatches` gerado
+  entregava o lote quando `deliverToTransport` estava setado e o **jogava fora**
+  caso contrário. Agora é bufferizado e drenado em ordem no `onDeliver` —
+  seguro, porque o nó inicial é um snapshot tirado dentro de `start()`, do qual
+  os lotes bufferizados diffam.
+
+### Added
+
+- **A falha de patch passa a dizer o que o cliente tem**
+  ([#160](https://github.com/mauriciobenjamin700/tempestweb/issues/160)). A
+  mensagem era `patch path out of range at index N`: não nomeava o path inteiro,
+  nem o passo que falhou, nem o nó que o cliente tem ali, nem quantos filhos ele
+  tem contra o índice pedido — diagnosticar uma ocorrência exigia patchar
+  `client/dom.js` dentro do artefato buildado. Agora carrega os quatro, com o pai
+  identificado por `data-tw-key`.
+
+- **`globalThis.__tempestweb_debug` liga o log do stream de patches:** uma linha
+  numerada por lote, mais um outline da árvore que o cliente tem no lote que
+  falha. A flag é lida a cada lote, não capturada no mount, porque ela existe
+  para ser ligada pelo console de uma página que já está com problema.
+
+  A lista de filhos na mensagem é truncada em 12, com a contagem real ao lado:
+  uma lista virtualizada tem centenas de filhos, e imprimir todos transformaria a
+  única linha útil do console num muro ilegível.
+
+- Transporte sem `requestResync` passa a reclamar alto em vez de sair calado.
+
+- **O resync passa a substituir a camada de overlay, em vez de empilhar sobre
+  ela.** Um resync carrega todo overlay aberto como `Insert`, e insert
+  **adiciona**: um diálogo aberto na hora da falha voltava uma segunda vez, em
+  cima do primeiro, e cada resync seguinte somava mais um. Agora o cliente esvazia
+  a camada antes de aplicar os inserts — **só** num resync, porque um `Replace` de
+  raiz comum vindo do diff não reenvia overlay que não mudou, e limpar ali apagaria
+  um diálogo que ninguém repõe. Vale nos três modos: o Modo B chega no mesmo
+  código de cliente com o mesmo lote.
+
+- **`WasmRuntime.resync()` deixa de derrubar o loop de eventos num transporte
+  fechado.** É o único branch de `dispatch_event` que aguarda o transporte
+  diretamente — os outros passam trabalho para o `set_state` e deixam o loop de
+  rebuild agendar o envio — então era o único que podia levantar
+  `TransportClosedError` na hora do dispatch. O `run()` só captura esse erro em
+  volta do `recv_event`, então um resync chegando enquanto a aba fecha matava o
+  loop inteiro na saída. O `AppSession` do Modo B guarda o mesmo caso com o
+  `_closed`.
+
+### Changed
+
+- `docs/troubleshooting.md` (+ EN) ganhou a seção **Render e patches**, com a
+  entrada de `patch path out of range` e o procedimento de investigação.
 ## [0.101.0] — 2026-08-24
 
 ### Fixed

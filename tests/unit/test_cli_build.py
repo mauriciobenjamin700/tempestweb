@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -324,6 +326,47 @@ def test_wasm_bootstrap_wires_the_streaming_native_bridge(tmp_path: Path) -> Non
         "subscribe, unsubscribe):"
     )
     assert start_signature in bootstrap
+
+
+def test_wasm_bootstrap_buffers_patches_delivered_before_the_transport(
+    tmp_path: Path,
+) -> None:
+    """A batch that lands before the transport exists must be kept, not dropped.
+
+    ``start()`` builds the app and starts its rebuild loop, but the JS transport
+    is only created a few statements later. The glue used to hand each batch to
+    ``deliverToTransport`` when it was set and **silently discard it otherwise**,
+    so anything delivered in that gap vanished with no error and the mounted tree
+    was missing whatever it carried (tempestweb#160). The initial node is a
+    snapshot taken in ``start()``, so buffering is safe: the buffered batches diff
+    from exactly the tree the client mounts.
+    """
+    result = build_artifact(_project(tmp_path), mode="wasm")
+    bootstrap = (result.out_dir / "bootstrap.js").read_text(encoding="utf-8")
+    assert "const bootPatches = [];" in bootstrap
+    assert "bootPatches.push(patches);" in bootstrap
+    assert "while (bootPatches.length > 0) {" in bootstrap
+
+
+def test_wasm_bootstrap_parses(tmp_path: Path) -> None:
+    """The generated bootstrap must be JS Node can parse.
+
+    It is rendered from an f-string template, where every literal brace has to be
+    doubled — a class of typo that no other test in this file would catch, since
+    they all match substrings. ``node --check`` parses without executing or
+    resolving imports, so it needs neither a browser nor Pyodide.
+    """
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not available")
+    result = build_artifact(_project(tmp_path), mode="wasm")
+    completed = subprocess.run(
+        [node, "--check", str(result.out_dir / "bootstrap.js")],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_wasm_package_archive_carries_runtime(tmp_path: Path) -> None:

@@ -1872,7 +1872,57 @@ export function buildElement(node) {
 }
 
 /**
+ * Describe one element for a diagnostic message: its tag and widget key.
+ *
+ * A path failure is only actionable when you can tell *which* node the client
+ * has where Python expected another, and the widget `key` is the one identifier
+ * shared with the IR — the tag alone repeats across the tree.
+ *
+ * @param {Element | null} el   The element to describe (null-safe).
+ * @returns {string}            e.g. `div[data-tw-key="appbar-actions"]`.
+ */
+function describeElement(el) {
+  if (el == null) return "<none>";
+  const tag = el.tagName ? el.tagName.toLowerCase() : "?";
+  const key = el.getAttribute ? el.getAttribute("data-tw-key") : null;
+  return key ? `${tag}[data-tw-key="${key}"]` : tag;
+}
+
+/**
+ * How many of a parent's children a path-failure message lists before eliding.
+ *
+ * The list is there so you can see which node sits where the patch expected
+ * another. A virtualized list has hundreds of children, and printing them all
+ * turns the one useful line in the console into an unreadable wall — so it is
+ * capped, and the count says what was left out.
+ * @type {number}
+ */
+const PATH_ERROR_CHILD_LIMIT = 12;
+
+/**
+ * List a parent's children for a diagnostic message, eliding a long tail.
+ *
+ * @param {HTMLElement} el   The parent whose children to describe.
+ * @returns {string}         `a, b, c` or `a, b, c, … (+97 more)`.
+ */
+function describeChildren(el) {
+  const all = Array.from(el.children);
+  const shown = all.slice(0, PATH_ERROR_CHILD_LIMIT).map(describeElement);
+  const hidden = all.length - shown.length;
+  return hidden > 0 ? `${shown.join(", ")}, … (+${hidden} more)` : shown.join(", ");
+}
+
+/**
  * Walk a path of child indices from `root` down to the target element.
+ *
+ * When a step does not resolve, the thrown message carries the whole picture the
+ * caller needs to tell a stale tree from a bad patch: the full path, which step
+ * failed, and what the client actually has at that point — the parent's identity
+ * and how many children it holds against the index that was asked for. The bare
+ * `at index N` this used to throw named neither the node nor the shortfall, so
+ * every report of it needed a hand-patched `dom.js` to say anything at all
+ * (tempestweb#160).
+ *
  * @param {HTMLElement} root      The root element.
  * @param {number[]} path         Child indices from the root ([] = root).
  * @returns {HTMLElement}         The element at `path`.
@@ -1881,10 +1931,16 @@ export function buildElement(node) {
 function resolvePath(root, path) {
   /** @type {HTMLElement} */
   let el = root;
-  for (const index of path) {
+  for (let step = 0; step < path.length; step += 1) {
+    const index = path[step];
     const next = el.children[index];
     if (next == null) {
-      throw new RangeError(`tempestweb: patch path out of range at index ${index}`);
+      throw new RangeError(
+        `tempestweb: patch path out of range at index ${index} ` +
+          `(path [${path.join(", ")}], step ${step}): ` +
+          `${describeElement(el)} has ${el.children.length} children ` +
+          `[${describeChildren(el)}]`,
+      );
     }
     el = /** @type {HTMLElement} */ (next);
   }

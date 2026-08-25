@@ -392,12 +392,22 @@ class WasmRuntime(Generic[S]):
         Async handlers are awaited. Unknown keys or event types are ignored (the
         widget may have been removed between dispatch and delivery).
 
+        Four event types are served by the runtime itself instead of an app
+        handler, matching what a Mode B session does with the same wire event:
+        ``scroll`` slides a virtualized window, ``navigate`` applies a URL
+        change, ``media`` updates the media-query context, and ``resync``
+        re-sends the whole scene (the client asks for it when a patch would not
+        apply).
+
         Args:
             event: The wire event ``{"type", "key", "payload"}``.
         """
         key = event.get("key")
         event_type = event.get("type")
         if not isinstance(key, str) or not isinstance(event_type, str):
+            return
+        if event_type == "resync":
+            await self.resync()
             return
         if event_type == "scroll":
             apply_scroll(self._app, key, event.get("payload", {}))
@@ -420,6 +430,46 @@ class WasmRuntime(Generic[S]):
         result = handler(arg) if handler_wants_event(handler) else handler()
         if inspect.isawaitable(result):
             await result
+
+    async def resync(self) -> None:
+        """Re-send the current scene as a full initial patch batch.
+
+        The client's tree is only correct while it has applied *every* patch in
+        order. Once a batch fails to apply, no later index-relative patch can be
+        trusted — they address a tree that no longer exists — so the DOM stays
+        truncated and every following tick fails the same way. One root
+        ``Replace`` carrying the scene as it stands now is the only repair, and
+        in Mode A it costs no round-trip: the app runs in this same tab.
+
+        Overlays follow the root replace as inserts under the reserved
+        ``"overlay"`` path, mirroring what a Mode B session sends, so a resync
+        restores the overlay layer too and not only the root tree.
+
+        A no-op before the app has started (no current scene), and on a transport
+        that has closed. That second guard is not decoration: this is the only
+        branch of :meth:`dispatch_event` that awaits the transport directly — the
+        others hand work to ``set_state`` and let the rebuild loop schedule the
+        send — so without it a resync arriving as the tab tears down raises
+        :class:`TransportClosedError` out of :meth:`run`, which only catches that
+        error around :meth:`recv_event`. The whole event loop would die on the way
+        out. Mode B's session guards the same case with its ``_closed`` flag.
+        """
+        scene = self._app.current_tree
+        if scene is None:
+            return
+        patches: list[WirePatch] = [{"path": [], "node": serialize_node(scene.root)}]
+        for index, overlay in enumerate(scene.overlays):
+            patches.append(
+                {
+                    "path": ["overlay"],
+                    "index": index,
+                    "node": serialize_node(overlay),
+                }
+            )
+        try:
+            await self._transport.send_patches(patches)
+        except TransportClosedError:
+            return
 
     def spawn(self, coro: Coroutine[Any, Any, None]) -> None:
         """Schedule a coroutine as a tracked background task.

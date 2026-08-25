@@ -512,6 +512,46 @@ Referência: [PWA e offline](advanced/pwa.md).
 
 ---
 
+## Render e patches
+
+### `patch path out of range` — e a tela fica faltando pedaço
+
+```text
+RangeError: tempestweb: patch path out of range at index 1 (path [0, 1],
+step 1): div[data-tw-key="appbar-actions"] has 1 children [button[data-tw-key="…"]]
+```
+
+O Python calculou um patch endereçando um nó que o cliente não tem. Um patch é
+uma caminhada por índices de filho, então quando um passo não resolve o lote
+**para ali**: a tela fica com o que já tinha, faltando exatamente o que o resto
+do lote carregava — um botão, uma coluna de tabela, um campo de formulário.
+
+O sintoma é traiçoeiro porque **não parece erro**: a tela renderiza, só que
+incompleta. Só o console reclama.
+
+**O que a mensagem te dá.** Ela nomeia o path inteiro, qual passo falhou, qual
+nó o cliente tem ali (pelo `data-tw-key`, o mesmo identificador da IR) e quantos
+filhos ele de fato tem. Compare com a árvore que o seu `view()` constrói: se o
+pai tem menos filhos do que deveria, algum lote anterior não chegou.
+
+**Como investigar.** Ligue o log do stream de patches pelo console — a flag é
+lida a cada lote, então funciona numa página que já está com problema:
+
+```js
+globalThis.__tempestweb_debug = true;
+```
+
+A partir daí cada lote sai numerado no console, e o lote que falhar vem
+acompanhado de um outline da árvore que o cliente tem.
+
+!!! check "O cliente se repara sozinho"
+    Quando um lote não aplica, o cliente pede um **resync** e o Python responde
+    com a scene inteira num `Replace` de raiz. Vale nos três modos — o Modo A
+    ganhou isso na 0.102.0; antes dela, um patch que falhasse deixava a tela
+    truncada até o reload.
+
+---
+
 ## Conexão (Modo B)
 
 ### `websocket disconnected` / `sse transport is closed`
@@ -568,6 +608,8 @@ Use sempre o glob, entre aspas para o shell não expandir antes.
 - **Ponte nativa ausente** significa "não há browser deste lado": teste, script
   ou bootstrap incompleto.
 - **Interface travada sem erro** é o dispatch serial; a resposta é `spawn`.
+- **`patch path out of range`** é árvore do cliente divergindo da do Python; a
+  mensagem diz qual nó, e `__tempestweb_debug` mostra o stream inteiro.
 - **Tela que não muda** é mutação sem `set_state`.
 - **Código velho depois do build** é o service worker esperando; ligue *Update
   on reload* durante o desenvolvimento.

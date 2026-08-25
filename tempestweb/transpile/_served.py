@@ -48,6 +48,7 @@ SERVED_NAMES: frozenset[str] = frozenset(
         "Breakpoints",
         "Burger",
         "Button",
+        "CARRIED_PROPS",
         "CNPJField",
         "CNPJInput",
         "COLOR_ROLES",

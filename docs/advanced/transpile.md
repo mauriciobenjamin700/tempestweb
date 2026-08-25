@@ -631,7 +631,7 @@ no espírito do `mypy --strict`.
     resolvedores de estilo do core viaja em tabela gerada
     (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
     pelos widgets. Cada builder é fixado por uma matriz de props construída do
-    core real — **350 casos** — então drift de composição ou de estilo falha no
+    core real — **356 casos** — então drift de composição ou de estilo falha no
     teste. São 151 componentes, cada um com um **par `__dark`** (o eixo de modo
     que a [#106](https://github.com/mauriciobenjamin700/tempestweb/issues/106)
     trouxe: um port que esquece de repassar o tema para um filho falha na cor
@@ -652,6 +652,29 @@ no espírito do `mypy --strict`.
     nome do `Input` que emite o evento — e o Modo C carrega essa derivação.
 
     `examples/mode-c-components` exercita o lote inteiro num app só.
+
+!!! check "O componente carrega as props da base — inclusive aqui"
+    Todo widget declara `semantics`, `focusable`, `focus_order`, `tag` e `attrs`.
+    Nos Modos A e B quem as carrega para a raiz que o componente renderiza é o
+    `build` do core (`tempest-core` 0.17.0). Em Modo C **um componente é uma
+    função**, não um nó que alguém expande: prop que o builder não lê chegaria a
+    nó nenhum, e uma tela acessível no browser ficaria muda na build transpilada
+    de si mesma.
+
+    Cada builder de `components.js` passa a carregar, com a regra do core: **o
+    render é dono do que ele tocou**. Prop que a árvore construída já define em
+    qualquer nó fica intacta — é o que mantém um campo correto, porque ele põe o
+    nome acessível no `<input>` em que o leitor de tela para, e uma segunda cópia
+    no wrapper sem role anunciaria o mesmo controle duas vezes.
+
+    ```python
+    Card(semantics=Semantics(label="Totais"), tag="section", children=[total])
+    ```
+
+    Nos três modos, esse `Card` sai como uma `<section>` que se anuncia "Totais".
+    Fixado por seis **pares `__named`** na matriz de paridade (os dois ramos da
+    regra) e por um sweep sobre **todos** os builders em
+    `tests/client/component-carry.test.js`.
 
 !!! check "As formas que o app real escreve"
     O subset aceita o que um app de verdade escreve, não só o mínimo do counter:

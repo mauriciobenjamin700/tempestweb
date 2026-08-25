@@ -68,6 +68,9 @@ const Border_DEFAULTS = Object.freeze({
   width: 0.0,
 });
 
+/** `CARRIED_PROPS` — a core design token. */
+export const CARRIED_PROPS = ["attrs", "focus_order", "focusable", "semantics", "tag"];
+
 /**
  * Build a `CameraFrameEvent` wire fragment.
  * @param {Object} [partial]  Fields to override, in the wire's snake_case.

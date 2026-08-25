@@ -835,12 +835,38 @@ test("every ported component matches the core build (order-agnostic)", () => {
     tabs_second_lg: Tabs({ tabs: ["a", "b", "c"], active: 1, onSelect: noop, size: "lg", key: "k9" }),
     text_field_default: TextField({ onChange: noop, key: "k9" }),
   };
+  // The named twins: the same builder called with the base props any widget
+  // takes. The core carries them onto the root the component rendered, so a
+  // hand-authored Mode C builder that drops them makes a name work in Modes A
+  // and B and vanish in C. `text_field_default` is the other branch: it routes
+  // the name to its own `Input`, and the wrapper must stay anonymous.
+  const base = {
+    semantics: Semantics({ label: "Quantidade contratada" }),
+    focusable: false,
+    focusOrder: 0,
+    tag: "section",
+    attrs: { "data-probe": "1" },
+  };
+  const named = {
+    alert_title_only: Alert({ title: "Heads up", ...base }),
+    card_default: Card({ children: [child()], ...base }),
+    listtile_with_subtitle: ListTile({ title: "Maria", subtitle: "admin", ...base }),
+    login_form_default: LoginForm({
+      onEmailChange: noop,
+      onPasswordChange: noop,
+      onSubmit: noop, ...base }),
+    scaffold_body_only: Scaffold({ body: child(), ...base }),
+    text_field_default: TextField({ onChange: noop, ...base }),
+  };
   const cases = { ...casesFor(undefined) };
   for (const [name, built] of Object.entries(casesFor(new Theme({ mode: ThemeMode.DARK })))) {
     cases[`${name}__dark`] = built;
   }
   for (const [name, built] of Object.entries(keyed)) {
     cases[`${name}__keyed`] = built;
+  }
+  for (const [name, built] of Object.entries(named)) {
+    cases[`${name}__named`] = built;
   }
   assert.equal(
     Object.keys(cases).length,

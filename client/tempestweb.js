@@ -195,6 +195,22 @@ export function mount(root, transport, initialNode = null) {
   }
 
   let overlayRoot = null;
+  /**
+   * Empty the overlay layer, for a batch that re-sends the whole scene.
+   *
+   * A resync carries every open overlay as an insert, and an insert *adds*: a
+   * dialog that was open before the repair came back a second time, stacked on
+   * the first, and each later resync added another. Only a resync clears the
+   * layer — an ordinary root Replace from the diff does not re-send overlays it
+   * did not change, so clearing there would delete a dialog nothing would put
+   * back.
+   *
+   * @returns {void}
+   */
+  const clearOverlays = () => {
+    if (overlayRoot === null) return;
+    while (overlayRoot.firstChild) overlayRoot.removeChild(overlayRoot.firstChild);
+  };
   const overlayHost = () => {
     if (overlayRoot === null) {
       overlayRoot = document.createElement("div");
@@ -287,6 +303,7 @@ export function mount(root, transport, initialNode = null) {
       console.log(`tempestweb: patch batch #${batchSeq}`, patches);
     }
     let batch = patches;
+    const isResync = resyncPending && patches.some(isRootReplace);
     if (patches.some(isRootReplace)) resyncPending = false;
     if (tree == null) {
       const first = patches[0];
@@ -312,6 +329,7 @@ export function mount(root, transport, initialNode = null) {
     if (treePatches.length > 0) {
       tree = applyTreePatches(tree, treePatches, root, onPatchFailure);
     }
+    if (isResync) clearOverlays();
     if (overlayPatches.length > 0) {
       applyPatches(overlayHost(), overlayPatches, onPatchFailure);
     }

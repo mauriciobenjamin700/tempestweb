@@ -90,3 +90,78 @@ test("the repaired tree accepts the patches that follow", () => {
   assert.equal(fb.pushed.length, 1, "no second resync piled up after the repair");
   assert.equal(dom.root.firstChild.children[0].textContent, "Count: 7");
 });
+
+test("the resync replaces the overlay layer instead of stacking onto it", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const fb = fakeBridge();
+  const transport = createWasmTransport(fb.bridge);
+  const initial = fixture("node_initial.json");
+  mount(dom.root, transport, initial);
+
+  const dialog = { type: "Dialog", key: "dlg", props: {}, children: [] };
+  fb.deliver([{ path: ["overlay"], index: 0, node: dialog }]);
+  const host = dom.root.querySelector("[data-tw-overlays]");
+  assert.equal(host.children.length, 1, "the dialog is open before the failure");
+
+  fb.deliver([{ path: [99], set_props: { content: "nope" } }]);
+  fb.deliver([
+    { path: [], node: initial },
+    { path: ["overlay"], index: 0, node: dialog },
+  ]);
+
+  assert.equal(
+    host.children.length,
+    1,
+    "a resync carries every open overlay as an insert, and an insert adds — " +
+      "without clearing the layer first the dialog comes back stacked on itself",
+  );
+});
+
+test("a plain root Replace leaves the overlay layer alone", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const fb = fakeBridge();
+  const transport = createWasmTransport(fb.bridge);
+  const initial = fixture("node_initial.json");
+  mount(dom.root, transport, initial);
+
+  const dialog = { type: "Dialog", key: "dlg", props: {}, children: [] };
+  fb.deliver([{ path: ["overlay"], index: 0, node: dialog }]);
+  const host = dom.root.querySelector("[data-tw-overlays]");
+
+  fb.deliver([{ path: [], node: initial }]);
+
+  assert.equal(
+    host.children.length,
+    1,
+    "the diff re-sends a root Replace whenever the root's type changes, and it " +
+      "does not re-send overlays it did not touch — clearing here would delete " +
+      "a dialog nothing would put back",
+  );
+});
+
+test("a resync with no overlays empties a layer that had some", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const fb = fakeBridge();
+  const transport = createWasmTransport(fb.bridge);
+  const initial = fixture("node_initial.json");
+  mount(dom.root, transport, initial);
+
+  fb.deliver([
+    { path: ["overlay"], index: 0, node: { type: "Dialog", key: "dlg", props: {}, children: [] } },
+  ]);
+  const host = dom.root.querySelector("[data-tw-overlays]");
+  assert.equal(host.children.length, 1);
+
+  fb.deliver([{ path: [99], set_props: { content: "nope" } }]);
+  fb.deliver([{ path: [], node: initial }]);
+
+  assert.equal(
+    host.children.length,
+    0,
+    "the scene closed the dialog while the tree was broken; the repaired screen " +
+      "must not still show it",
+  );
+});

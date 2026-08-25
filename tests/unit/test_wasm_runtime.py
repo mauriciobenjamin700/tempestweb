@@ -378,3 +378,46 @@ async def test_resync_carries_the_overlay_layer() -> None:
     assert len(overlays) == 1
     assert overlays[0]["index"] == 0
     assert overlays[0]["node"]["type"] == "Dialog"
+
+
+@pytest.mark.asyncio
+async def test_resync_on_a_closed_transport_does_not_kill_the_event_loop() -> None:
+    """A resync arriving as the tab tears down must not raise out of ``run``.
+
+    This is the only branch of ``dispatch_event`` that awaits the transport
+    directly — the others hand work to ``set_state`` and let the rebuild loop
+    schedule the send — so it is the only one that can raise
+    ``TransportClosedError`` at dispatch time. ``run`` catches that error only
+    around ``recv_event``, so an unguarded raise here takes the whole loop down on
+    the way out.
+    """
+    sent: list[list[dict[str, Any]]] = []
+    transport = WasmTransport(sent.append)
+    runtime: WasmRuntime[CounterState] = WasmRuntime(
+        CounterState(), counter_view, transport
+    )
+    runtime.start()
+    await transport.close()
+
+    await runtime.dispatch_event({"type": "resync", "key": "", "payload": {}})
+
+    assert sent == []
+
+
+@pytest.mark.asyncio
+async def test_run_survives_a_resync_that_races_the_close() -> None:
+    """The same case end to end: the loop exits cleanly, not by exception."""
+    transport = WasmTransport(lambda _patches: None)
+    runtime: WasmRuntime[CounterState] = WasmRuntime(
+        CounterState(), counter_view, transport
+    )
+    runtime.start()
+    loop = asyncio.get_running_loop()
+    task: asyncio.Future[None] = loop.create_task(runtime.run())
+    await asyncio.sleep(0)
+
+    transport.push_event({"type": "resync", "key": "", "payload": {}})
+    await transport.close()
+
+    await asyncio.wait_for(task, timeout=1.0)
+    assert task.done() and task.exception() is None

@@ -120,3 +120,33 @@ test("a transport that cannot resync says so instead of failing quietly", () => 
 
   assert.match(errors.join("\n"), /cannot request a resync/);
 });
+
+test("a long child list is elided, so the message stays one readable line", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const transport = mockTransport();
+  const wide = {
+    type: "Column",
+    key: "wide",
+    props: {},
+    children: Array.from({ length: 60 }, (_, i) => ({
+      type: "Text",
+      key: `item-${i}`,
+      props: { content: String(i) },
+      children: [],
+    })),
+  };
+  mount(dom.root, transport, wide);
+
+  const { errors } = captureConsole(() => {
+    transport.push([{ path: [999], set_props: { content: "nope" } }]);
+  });
+
+  const message = errors.join("\n");
+  assert.match(message, /has 60 children/, "the real count is still reported");
+  assert.match(message, /\+48 more/, "the tail is elided, not printed");
+  assert.ok(
+    !message.includes("item-59"),
+    "a virtualized list would otherwise bury the console in one message",
+  );
+});

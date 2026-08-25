@@ -1889,6 +1889,30 @@ function describeElement(el) {
 }
 
 /**
+ * How many of a parent's children a path-failure message lists before eliding.
+ *
+ * The list is there so you can see which node sits where the patch expected
+ * another. A virtualized list has hundreds of children, and printing them all
+ * turns the one useful line in the console into an unreadable wall — so it is
+ * capped, and the count says what was left out.
+ * @type {number}
+ */
+const PATH_ERROR_CHILD_LIMIT = 12;
+
+/**
+ * List a parent's children for a diagnostic message, eliding a long tail.
+ *
+ * @param {HTMLElement} el   The parent whose children to describe.
+ * @returns {string}         `a, b, c` or `a, b, c, … (+97 more)`.
+ */
+function describeChildren(el) {
+  const all = Array.from(el.children);
+  const shown = all.slice(0, PATH_ERROR_CHILD_LIMIT).map(describeElement);
+  const hidden = all.length - shown.length;
+  return hidden > 0 ? `${shown.join(", ")}, … (+${hidden} more)` : shown.join(", ");
+}
+
+/**
  * Walk a path of child indices from `root` down to the target element.
  *
  * When a step does not resolve, the thrown message carries the whole picture the
@@ -1915,7 +1939,7 @@ function resolvePath(root, path) {
         `tempestweb: patch path out of range at index ${index} ` +
           `(path [${path.join(", ")}], step ${step}): ` +
           `${describeElement(el)} has ${el.children.length} children ` +
-          `[${Array.from(el.children).map(describeElement).join(", ")}]`,
+          `[${describeChildren(el)}]`,
       );
     }
     el = /** @type {HTMLElement} */ (next);

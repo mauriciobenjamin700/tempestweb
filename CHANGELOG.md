@@ -52,7 +52,29 @@ versioning.
   falha. A flag é lida a cada lote, não capturada no mount, porque ela existe
   para ser ligada pelo console de uma página que já está com problema.
 
+  A lista de filhos na mensagem é truncada em 12, com a contagem real ao lado:
+  uma lista virtualizada tem centenas de filhos, e imprimir todos transformaria a
+  única linha útil do console num muro ilegível.
+
 - Transporte sem `requestResync` passa a reclamar alto em vez de sair calado.
+
+- **O resync passa a substituir a camada de overlay, em vez de empilhar sobre
+  ela.** Um resync carrega todo overlay aberto como `Insert`, e insert
+  **adiciona**: um diálogo aberto na hora da falha voltava uma segunda vez, em
+  cima do primeiro, e cada resync seguinte somava mais um. Agora o cliente esvazia
+  a camada antes de aplicar os inserts — **só** num resync, porque um `Replace` de
+  raiz comum vindo do diff não reenvia overlay que não mudou, e limpar ali apagaria
+  um diálogo que ninguém repõe. Vale nos três modos: o Modo B chega no mesmo
+  código de cliente com o mesmo lote.
+
+- **`WasmRuntime.resync()` deixa de derrubar o loop de eventos num transporte
+  fechado.** É o único branch de `dispatch_event` que aguarda o transporte
+  diretamente — os outros passam trabalho para o `set_state` e deixam o loop de
+  rebuild agendar o envio — então era o único que podia levantar
+  `TransportClosedError` na hora do dispatch. O `run()` só captura esse erro em
+  volta do `recv_event`, então um resync chegando enquanto a aba fecha matava o
+  loop inteiro na saída. O `AppSession` do Modo B guarda o mesmo caso com o
+  `_closed`.
 
 ### Changed
 

@@ -407,7 +407,14 @@ class WasmRuntime(Generic[S]):
         ``"overlay"`` path, mirroring what a Mode B session sends, so a resync
         restores the overlay layer too and not only the root tree.
 
-        A no-op before the app has started (no current scene).
+        A no-op before the app has started (no current scene), and on a transport
+        that has closed. That second guard is not decoration: this is the only
+        branch of :meth:`dispatch_event` that awaits the transport directly — the
+        others hand work to ``set_state`` and let the rebuild loop schedule the
+        send — so without it a resync arriving as the tab tears down raises
+        :class:`TransportClosedError` out of :meth:`run`, which only catches that
+        error around :meth:`recv_event`. The whole event loop would die on the way
+        out. Mode B's session guards the same case with its ``_closed`` flag.
         """
         scene = self._app.current_tree
         if scene is None:
@@ -421,7 +428,10 @@ class WasmRuntime(Generic[S]):
                     "node": serialize_node(overlay),
                 }
             )
-        await self._transport.send_patches(patches)
+        try:
+            await self._transport.send_patches(patches)
+        except TransportClosedError:
+            return
 
     def spawn(self, coro: Coroutine[Any, Any, None]) -> None:
         """Schedule a coroutine as a tracked background task.

@@ -503,6 +503,9 @@ display = "standalone"
 
 | Field | Type | Default | What it does |
 |---|---|---|---|
+| `enabled` | boolean | `true` | The default `manifest` and `service_worker` fall back to. |
+| `manifest` | boolean | `enabled` | Emits `manifest.webmanifest` and its `<link>`. |
+| `service_worker` | boolean | `enabled` | Emits and registers the cache-first worker. |
 | `name` | string | project name | Full name shown at install/splash. |
 | `short_name` | string | — | Short name for the home-screen icon. |
 | `description` | string | — | App description in the install prompt. |
@@ -520,9 +523,16 @@ display = "standalone"
 
 !!! note "Automatic in Mode C"
     You don't have to hand-write a service worker, manifest, or registration code:
-    `build --mode transpile` generates all of it. The `[pwa]` section only **tunes**
+    `build --mode transpile` generates all of it. The `[pwa]` section **tunes**
     the install metadata — offline behavior comes for free because the bundle is
     static.
+
+!!! tip "An app that does not want a PWA"
+    `enabled = false` turns the whole layer off; `manifest` and `service_worker`
+    turn off one half. Turning the worker off emits a teardown worker in place of
+    the caching one, so whoever already registered one is not stuck on the old
+    precache — the why is in
+    [PWA and offline](pwa.md#turning-the-pwa-off-enabled-manifest-service_worker).
 
 !!! tip "Update prompt"
     When you ship a new version the old service worker keeps serving until the tab

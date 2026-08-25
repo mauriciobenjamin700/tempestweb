@@ -17,7 +17,7 @@ stores the new string; pass ``error`` to show a validation message. They render
 identically in both modes (the field is just core widgets).
 
 !!! note
-    Until 0.99.0 these three declared no ``theme`` at all and built their ``Input``
+    Until 0.101.0 these three declared no ``theme`` at all and built their ``Input``
     without one, so they were **light by construction**: an app in dark mode got a
     light field with no warning, and in the worst case a dark surface under dark
     text.

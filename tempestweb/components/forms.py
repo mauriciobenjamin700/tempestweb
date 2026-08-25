@@ -9,7 +9,7 @@ Pass ``theme=app.theme`` as you would to a widget: the form hands it to every
 field and to the submit button, so the whole form follows a dark app into dark.
 
 !!! note
-    Until 0.99.0 neither form declared a ``theme``, and neither passed one down,
+    Until 0.101.0 neither form declared a ``theme``, and neither passed one down,
     so a form dropped into a dark app rendered light with no warning.
 """
 

@@ -73,6 +73,79 @@ The available fields:
     error = validate_email(app.state.email) or ""
     ```
 
+## Who names the field
+
+A field lowers to a `Column` — a **role-less** `<div>` — wrapping an `Input`, and
+the caption is a sibling `Text`, **not** a `<label for=…>`. Nothing associates the
+two: until 0.113.0 the control was named by whatever the `placeholder` happened to
+say. A `PasswordField` has no default placeholder, so it was an anonymous control —
+and `LoginForm` shipped that violation (axe `label`, **critical**) to every app
+that used it.
+
+Now a field **always** names its control, in this order:
+
+1. the `semantics` you passed;
+2. the visible caption.
+
+```python
+from tempest_core import App, Column, Row, Semantics, Text, Widget
+from tempestweb.components import TextField
+
+
+def view(app: App[State]) -> Widget:
+    """Render one header row over caption-less, named cells."""
+
+    def set_quantity(value: str) -> None:
+        app.set_state(lambda s: setattr(s, "quantity", value))
+
+    return Column(
+        children=[
+            Row(children=[Text(content="Qty."), Text(content="Unit price")]),
+            Row(
+                children=[
+                    TextField(
+                        value=app.state.quantity,
+                        label="",
+                        semantics=Semantics(label="Quantity for item 3"),
+                        on_change=set_quantity,
+                        key="i3-quantity",
+                    ),
+                ],
+            ),
+        ],
+    )
+```
+
+The name lands on the `<input>`, not on the column around it:
+
+```html
+<div data-tw-key="i3-quantity">
+  <input aria-label="Quantity for item 3" value="1,200" />
+</div>
+```
+
+!!! tip "This is what unlocks a grid with one header row"
+    A dense grid does not repeat the caption in every cell — twenty items share the
+    same eight columns. Without `semantics`, a field with no visible caption has no
+    accessible name at all, and a screen-reader user hears "edit box" twenty times.
+
+!!! warning "Not where an `aria-label` would land on its own"
+    An `aria-label` on a role-less `<div>` is a **prohibited** attribute
+    (`aria-prohibited-attr`) and names an element no reader stops at: the reader
+    stops at the control inside it, which would still be anonymous (`label`,
+    critical). That is why the field picks the destination instead of forwarding
+    as-is.
+
+!!! info "Caption and `semantics` together"
+    `semantics` wins — it is what the app said explicitly. Keep the caption's text
+    inside it (WCAG 2.5.3, *Label in Name*): `Semantics(label="Quantity for item
+    3")` over the caption `Qty.` is fine; a name that does not contain the caption
+    leaves voice-control users with no way to address the field.
+
+This holds for `TextField`, `EmailField` and `PasswordField`; `LoginForm` and
+`SignupForm` carry `semantics` to the form root, which is where a `role="form"`
+belongs.
+
 ## A complete login form
 
 `LoginForm` composes email + password + a submit button in **one call**. You only

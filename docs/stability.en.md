@@ -51,6 +51,14 @@ control panel, a list with a text field, a form, a nav shell with a drawer and a
 image screen. Auditing hand-written markup would prove the test's snippet is
 accessible, not that the renderer is.
 
+Coverage is measured by **widget type and by component**, and the second axis had a
+hole: nine scenes and not one used the fields this repo owns
+(`TextField`/`EmailField`/`PasswordField` and the two forms). The `login-form`
+scene looks like it does and does not — it builds the core's
+`EmailInput`/`PasswordInput` inside a `FormField`, which the renderer names. The
+result: `PasswordField` shipped an anonymous control (`label`, critical) with a
+green gate until 0.113.0. `login_demo` closes that axis.
+
 One rule may only be loosened in writing: an axe rule that cannot apply to a scene
 goes into `KNOWN_EXCEPTIONS` **with its reason** (today: the three whole-document
 rules — `landmark-one-main`, `page-has-heading-one`, `region` — plus

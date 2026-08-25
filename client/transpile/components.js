@@ -40,7 +40,7 @@ import {
   modeTable,
   resolveWidgetStyle,
 } from "./widget-support.js";
-import { Border, SideBorder } from "./values.gen.js";
+import { Border, Semantics, SideBorder } from "./values.gen.js";
 import {
   ALERT_STYLES,
   AVATAR_COLORS,
@@ -1961,6 +1961,28 @@ export function AddressInput({
 }
 
 /**
+ * Decide what a field's control announces.
+ *
+ * The Python side is `_control_semantics` in `tempestweb/components/fields.py`,
+ * and the rule has to match or the same view announces two different names in two
+ * modes. A field's caption is a sibling `Text`, not a `<label for=…>`, so the
+ * control is named explicitly: by the app's `semantics` when it passed one, and by
+ * the visible caption otherwise. The wrapper announces nothing — `aria-label` on a
+ * role-less `<div>` is a prohibited attribute and names nothing a reader reaches.
+ *
+ * @param {string} label       The caption above the input; empty means none.
+ * @param {?Object} semantics  What the app asked for, or null.
+ * @returns {?Object}          The control's semantics, or null when there is no
+ *                             name to give it.
+ */
+function controlSemantics(label, semantics) {
+  if (semantics != null) {
+    return semantics;
+  }
+  return label ? Semantics({ label }) : null;
+}
+
+/**
  * Wrap an input in the tempestweb field's label + error column.
  *
  * Every child key is derived from `key`: keys are how the event router finds the
@@ -2005,7 +2027,7 @@ function tempestwebField(label, field, error, key, theme) {
  * and an optional error line, in a column that also carries vertical padding.
  *
  * @param {{value?: string, label?: string, placeholder?: string, error?: string,
- *          onChange?: ?Function, key?: ?string}} [args]
+ *          onChange?: ?Function, semantics?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
 export function TextField({
@@ -2014,16 +2036,24 @@ export function TextField({
   placeholder = "",
   error = "",
   onChange = null,
+  semantics = null,
   key = null,
   theme = null,
 } = {}) {
   const base = key ?? "text-field";
+  const controlName = controlSemantics(label, semantics);
   const children = [];
   if (label) {
     children.push(Text({ content: label, key: `${base}-label`, theme }));
   }
   children.push(
-    Input({ value, placeholder, onChange: onValue(onChange), theme, key: `${base}-input` }),
+    Input({
+      value,
+      placeholder,
+      onChange: onValue(onChange),
+      theme,
+      semantics: controlName,
+      key: `${base}-input` }),
   );
   if (error) {
     children.push(
@@ -2044,7 +2074,7 @@ export function TextField({
  * its resting outline.
  *
  * @param {{value?: string, label?: string, placeholder?: string, error?: string,
- *          onChange?: ?Function, key?: ?string}} [args]
+ *          onChange?: ?Function, semantics?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
 export function EmailField({
@@ -2053,16 +2083,19 @@ export function EmailField({
   placeholder = "you@example.com",
   error = "",
   onChange = null,
+  semantics = null,
   key = null,
   theme = null,
 } = {}) {
   const base = key ?? "email-field";
+  const controlName = controlSemantics(label, semantics);
   const field = Input({
     value,
     placeholder,
     keyboard: "email",
     onChange: onValue(onChange),
     theme,
+    semantics: controlName,
     key: `${base}-input` });
   return tempestwebField(label, field, error, base, theme);
 }
@@ -2071,7 +2104,7 @@ export function EmailField({
  * `PasswordField` — the tempestweb-native labelled secure field.
  *
  * @param {{value?: string, label?: string, placeholder?: string, error?: string,
- *          onChange?: ?Function, key?: ?string}} [args]
+ *          onChange?: ?Function, semantics?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
 export function PasswordField({
@@ -2080,16 +2113,19 @@ export function PasswordField({
   placeholder = "",
   error = "",
   onChange = null,
+  semantics = null,
   key = null,
   theme = null,
 } = {}) {
   const base = key ?? "password-field";
+  const controlName = controlSemantics(label, semantics);
   const field = Input({
     value,
     placeholder,
     secure: true,
     onChange: onValue(onChange),
     theme,
+    semantics: controlName,
     key: `${base}-input` });
   return tempestwebField(label, field, error, base, theme);
 }
@@ -2105,7 +2141,7 @@ export function PasswordField({
  * @param {{email?: string, password?: string, onEmailChange?: ?Function,
  *          onPasswordChange?: ?Function, onSubmit?: ?Function,
  *          emailError?: string, passwordError?: string, title?: string,
- *          submitLabel?: string, key?: ?string}} [args]
+ *          submitLabel?: string, semantics?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
 export function LoginForm({
@@ -2118,6 +2154,7 @@ export function LoginForm({
   passwordError = "",
   title = "",
   submitLabel = "Entrar",
+  semantics = null,
   key = null,
   theme = null,
 } = {}) {
@@ -2142,7 +2179,7 @@ export function LoginForm({
   return Column({
     key: key ?? "login-form",
     style: Style({ gap: 12.0, padding: Edge.all(16) }),
-    children, theme });
+    children, theme, semantics });
 }
 
 /**
@@ -2152,7 +2189,8 @@ export function LoginForm({
  *          onEmailChange?: ?Function, onPasswordChange?: ?Function,
  *          onConfirmChange?: ?Function, onSubmit?: ?Function,
  *          emailError?: string, passwordError?: string, confirmError?: string,
- *          title?: string, submitLabel?: string, key?: ?string}} [args]
+ *          title?: string, submitLabel?: string, semantics?: ?Object,
+ *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
 export function SignupForm({
@@ -2168,6 +2206,7 @@ export function SignupForm({
   confirmError = "",
   title = "",
   submitLabel = "Cadastrar",
+  semantics = null,
   key = null,
   theme = null,
 } = {}) {
@@ -2198,7 +2237,7 @@ export function SignupForm({
   return Column({
     key: key ?? "signup-form",
     style: Style({ gap: 12.0, padding: Edge.all(16) }),
-    children, theme });
+    children, theme, semantics });
 }
 
 export {

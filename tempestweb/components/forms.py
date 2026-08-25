@@ -10,7 +10,9 @@ field and to the submit button, so the whole form follows a dark app into dark.
 
 !!! note
     Until 0.101.0 neither form declared a ``theme``, and neither passed one down,
-    so a form dropped into a dark app rendered light with no warning.
+    so a form dropped into a dark app rendered light with no warning. Until
+    0.113.0 neither read the ``semantics`` it declared either, so a form named by
+    the app reached the DOM anonymous.
 """
 
 from __future__ import annotations
@@ -131,6 +133,7 @@ class LoginForm(Component):
             key=self.key or "login-form",
             style=Style(gap=12.0, padding=Edge.all(16)),
             children=children,
+            semantics=self.semantics,
         )
 
 
@@ -230,4 +233,5 @@ class SignupForm(Component):
             key=self.key or "signup-form",
             style=Style(gap=12.0, padding=Edge.all(16)),
             children=children,
+            semantics=self.semantics,
         )

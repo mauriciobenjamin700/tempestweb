@@ -21,6 +21,16 @@ identically in both modes (the field is just core widgets).
     without one, so they were **light by construction**: an app in dark mode got a
     light field with no warning, and in the worst case a dark surface under dark
     text.
+
+!!! note
+    Until 0.113.0 the control was named by **whatever its placeholder happened to
+    say**. The caption is a sibling ``Text``, not a ``<label for=…>``, so nothing
+    associated it with the ``Input``: a ``PasswordField`` (no default placeholder)
+    was an anonymous control, and so were ``LoginForm`` and ``SignupForm`` through
+    it — axe ``label``, critical. ``semantics`` did not help either: every
+    ``Component`` declares it and none of these read it. Now the field always names
+    its control, from ``semantics`` when the app passes one and from the visible
+    caption otherwise.
 """
 
 from __future__ import annotations
@@ -45,6 +55,7 @@ from tempest_core import (
     FontWeight,
     Input,
     KeyboardType,
+    Semantics,
     Style,
     Text,
     TextChangeEvent,
@@ -104,6 +115,47 @@ def _error_color(theme: Theme) -> Color:
         The scheme's ``error`` role.
     """
     return theme.scheme().role(ColorRole.ERROR)
+
+
+def _control_semantics(label: str, semantics: Semantics | None) -> Semantics | None:
+    """Decide what a field's control announces.
+
+    A field lowers to a ``Column`` — a role-less ``<div>`` — wrapping an
+    ``Input``, and the caption is a sibling ``Text``, not a ``<label for=…>``.
+    Nothing associates the two, so the control was named by **whatever its
+    placeholder happened to say**. Measured with axe over the components' own
+    IR: ``password_field_default`` (caption "Senha", no placeholder) failed
+    ``label`` as *critical*, and so did ``LoginForm`` and ``SignupForm`` through
+    it; ``email_field_default`` passed only because its default placeholder
+    ``you@example.com`` accidentally named the field.
+
+    So the control is always named, and the order is the only part with a
+    choice in it:
+
+    * ``semantics`` the app passed — it was declared by every ``Component`` and
+      read by none of these until 0.113.0, so naming a caption-less cell (the
+      shape a grid with one header row wants) did nothing at all;
+    * otherwise the visible caption, which is the name a ``<label>`` would have
+      given the control anyway.
+
+    The wrapper announces nothing: an ``aria-label`` on a role-less ``<div>`` is
+    a prohibited attribute (axe: ``aria-prohibited-attr``) and names an element
+    no reader stops at.
+
+    Args:
+        label: The caption shown above the input, empty when there is none.
+        semantics: What the app asked the field to announce, or ``None``.
+
+    Returns:
+        The semantics for the control, or ``None`` when there is no name to give
+        it — a caption-less field the app did not name, which is the one case
+        only the app can fix.
+    """
+    if semantics is not None:
+        return semantics
+    if label:
+        return Semantics(label=label)
+    return None
 
 
 def _labelled_field(
@@ -212,6 +264,7 @@ class TextField(Component):
             on_change(event.value)
 
         base = self.key or "text-field"
+        control_name = _control_semantics(self.label, self.semantics)
         children: list[Widget] = []
         if self.label:
             children.append(Text(content=self.label, key=f"{base}-label"))
@@ -221,6 +274,7 @@ class TextField(Component):
                 placeholder=self.placeholder,
                 on_change=_emit,
                 theme=self.theme,
+                semantics=control_name,
                 key=f"{base}-input",
             )
         )
@@ -296,12 +350,14 @@ class EmailField(Component):
             on_change(event.value)
 
         base = self.key or "email-field"
+        control_name = _control_semantics(self.label, self.semantics)
         field = Input(
             value=self.value,
             placeholder=self.placeholder,
             keyboard=KeyboardType.EMAIL,
             on_change=_emit,
             theme=self.theme,
+            semantics=control_name,
             key=f"{base}-input",
         )
         return _labelled_field(self.label, field, self.error, base, self.theme)
@@ -358,12 +414,14 @@ class PasswordField(Component):
             on_change(event.value)
 
         base = self.key or "password-field"
+        control_name = _control_semantics(self.label, self.semantics)
         field = Input(
             value=self.value,
             placeholder=self.placeholder,
             secure=True,
             on_change=_emit,
             theme=self.theme,
+            semantics=control_name,
             key=f"{base}-input",
         )
         return _labelled_field(self.label, field, self.error, base, self.theme)

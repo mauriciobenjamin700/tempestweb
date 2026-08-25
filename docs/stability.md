@@ -52,6 +52,14 @@ o painel de controles, uma lista com campo de texto, um formulário, uma casca d
 navegação com gaveta e uma tela de imagens. Auditar markup escrito à mão provaria
 que o exemplo do teste é acessível, não que o renderizador é.
 
+A cobertura se mede por **tipo de widget e por componente**, e o segundo eixo tinha
+um buraco: nove cenas e nenhuma usava os campos que são deste repo
+(`TextField`/`EmailField`/`PasswordField` e os dois formulários). A cena
+`login-form` parece usar e não usa — ela monta `EmailInput`/`PasswordInput` do core
+dentro de um `FormField`, que o renderizador nomeia. Resultado: o `PasswordField`
+entregou um controle anônimo (`label`, crítico) com o gate verde até a 0.113.0.
+`login_demo` fecha esse eixo.
+
 Regra que só pode ser afrouxada por escrito: uma regra do axe que não se aplica a
 uma cena entra em `KNOWN_EXCEPTIONS` **com o motivo** (hoje: as quatro regras de
 documento inteiro — `landmark-one-main`, `page-has-heading-one`, `region` — e

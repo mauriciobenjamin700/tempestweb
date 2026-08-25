@@ -631,7 +631,7 @@ no espírito do `mypy --strict`.
     resolvedores de estilo do core viaja em tabela gerada
     (`component-styles.gen.js`), do mesmo jeito que `widget-styles.gen.js` faz
     pelos widgets. Cada builder é fixado por uma matriz de props construída do
-    core real — **336 casos** — então drift de composição ou de estilo falha no
+    core real — **350 casos** — então drift de composição ou de estilo falha no
     teste. São 151 componentes, cada um com um **par `__dark`** (o eixo de modo
     que a [#106](https://github.com/mauriciobenjamin700/tempestweb/issues/106)
     trouxe: um port que esquece de repassar o tema para um filho falha na cor

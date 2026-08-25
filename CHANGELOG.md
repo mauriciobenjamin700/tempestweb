@@ -4,6 +4,76 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.113.0] — 2026-08-25
+
+### Fixed
+
+- **Os campos deste repo entregavam um controle anônimo, e o `LoginForm` levava a
+  violação para todo app que o usava.** Um campo desce para uma `Column` — uma
+  `<div>` **sem role** — em volta de um `Input`, e a legenda é um `Text` irmão, não
+  um `<label for=…>`. Nada associava os dois, então o nome acessível do controle era
+  o que o `placeholder` por acaso dizia. Medido com axe sobre a IR dos próprios
+  componentes:
+
+  | Caso | Antes | Por quê |
+  |---|---|---|
+  | `password_field_default` | `label` (**crítico**) | legenda "Senha", sem placeholder |
+  | `email_field_default` | limpo | o placeholder default nomeou por acidente |
+  | `login_form_default` | `label` (**crítico**) | o campo de senha dentro dele |
+  | `signup_form_default` | `label` (**crítico**) | os dois campos de senha |
+
+  Agora o campo **sempre** nomeia o controle: pelo `semantics` que a app passou, e
+  pela legenda visível quando ela não passou. Depois, os quatro casos ficam limpos.
+
+- **`semantics` era prop declarada que nenhum `render` lia.** Todo `Component`
+  declara `semantics` (vem da base), então nomear um campo compilava, passava no
+  `mypy` e não fazia nada — nem erro, nem aviso, nem nome. Auditado sobre
+  `tempestweb.components.__all__` antes da correção: **59 de 63 componentes
+  descartavam o nome**, e os 4 que o preservavam o preservavam porque o *core*
+  repassa. Os cinco que este repo é dono passam a lê-lo; os 54 restantes são
+  re-export do `tempest-core` e ficam registrados no guard, com o motivo — um
+  componente repassa o próprio `semantics` dentro do próprio `render`, o que é
+  release de lá.
+
+  Isso é o que libera **grade com uma linha de cabeçalho**: uma célula sem legenda
+  visível é o layout denso que vinte itens em oito colunas pedem, e até aqui ela era
+  um controle sem nome nenhum — quem usa leitor de tela ouvia "caixa de edição"
+  vinte vezes.
+
+  O nome vai para o `Input`, não para o wrapper: `aria-label` em elemento sem role é
+  atributo **proibido** (`aria-prohibited-attr`, `serious`) *e* deixa o controle
+  anônimo (`label`, `critical`) — os dois medidos, e o teste do wrapper nomeado fixa
+  esse par para o caminho errado não voltar.
+
+- **O ponto cego que deixou isso passar: nenhuma cena do gate de a11y usava os
+  campos deste repo.** Nove cenas, e a que se chama `login-form` monta
+  `EmailInput`/`PasswordInput` do **core** dentro de um `FormField`, que o
+  renderizador nomeia — então `TextField`, `EmailField`, `PasswordField`,
+  `LoginForm` e `SignupForm` nunca foram auditados. `login_demo` entra em
+  `tests/conformance/_a11y_scenes.py`, e verificado que morde: com a cena nova e o
+  componente antigo o gate reprova com `[critical] login_demo: label — Form
+  elements must have labels`; com a correção, passa.
+
+### Changed
+
+- `docs/tutorial/components.md` (PT + EN) ganha **Quem dá o nome ao campo**, com a
+  ordem (`semantics` → legenda), o HTML resultante e a nota de WCAG 2.5.3: um
+  `semantics` que não contém o texto da legenda deixa quem usa comando de voz sem
+  como chamar o campo.
+- `docs/stability.md` (PT + EN): a cobertura do gate passa a ser descrita por **tipo
+  de widget e por componente**, com o buraco do segundo eixo registrado.
+- `docs/advanced/transpile.md` (PT + EN): a matriz de paridade vai de 336 para
+  **350 casos** — seis pares novos (`*_named_*`), cada um com o twin `__dark`.
+- O port do Modo C acompanha (`client/transpile/components.js`): `controlSemantics`
+  é a mesma regra em JS, e a matriz prova que os dois modos produzem a mesma
+  árvore — inclusive o campo nomeado pela legenda.
+
+Verificado em Chrome real (Modo B, `tempestweb run`): as três células reportam
+`textbox "Quantidade do item 3"`, `textbox "Preço unitário do item 3"` e a nomeada
+pela app na árvore de acessibilidade, o wrapper não carrega nome nenhum, digitar
+tecla por tecla numa célula sem legenda mantém o valor (`85,40`) através do
+rebuild, e o console fica limpo.
+
 ## [0.112.0] — 2026-08-25
 
 ### Added

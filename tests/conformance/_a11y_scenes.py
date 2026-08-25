@@ -22,6 +22,14 @@ slider, the dropdown, the autocomplete, both pickers, the file picker and the ta
 bar. Adding the three screens that carry them found two more critical violations
 immediately, so a control that reports an event belongs in a scene: that is what
 makes the gate's silence mean something.
+
+Diversity by **component** is the same argument, and it had the same hole: nine
+scenes and not one used ``TextField``/``EmailField``/``PasswordField`` or the two
+forms built from them. ``login-form`` looks like it does and does not — it uses the
+core's ``EmailInput``/``PasswordInput`` inside a ``FormField``, which the renderer
+names. So the tempestweb-owned fields shipped an anonymous control (axe ``label``,
+critical, whenever the placeholder was empty) with a green gate. ``login_demo``,
+which uses ``LoginForm``, closes that.
 """
 
 from __future__ import annotations
@@ -51,6 +59,7 @@ SCENES: dict[str, str] = {
     "booking-form": "the pickers, the dropdown, the range slider, the file picker",
     "search-autocomplete": "a text field backed by a datalist",
     "tabs-profile": "a tab bar and the panel it switches",
+    "login_demo": "the tempestweb-native fields — the ones the gate never saw",
 }
 
 

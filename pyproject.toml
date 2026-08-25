@@ -1,6 +1,6 @@
 [project]
 name = "tempestweb"
-version = "0.107.0"
+version = "0.108.0"
 description = "Build web apps in typed Python — one tree, a DOM renderer, three execution modes (WASM + server + transpile)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -81,10 +81,22 @@ packages = ["tempestweb"]
 # installed from PyPI (it is the leaf renderer copied into every artifact).
 [tool.hatch.build.targets.wheel.force-include]
 "client" = "tempestweb/_client"
+# The golden fixtures ARE the wire contract (tempestweb.contract digests them), so
+# an installed wheel that lacks them cannot answer wire_shape_digest().
+"tests/fixtures/node_initial.json" = "tempestweb/_fixtures/node_initial.json"
+"tests/fixtures/patches_all_kinds.json" = "tempestweb/_fixtures/patches_all_kinds.json"
+"tests/fixtures/style_sample.json" = "tempestweb/_fixtures/style_sample.json"
 
 # The sdist also needs the client/ tree (it is outside the package dir).
 [tool.hatch.build.targets.sdist]
-include = ["tempestweb", "client", "README.md", "CHANGELOG.md", "pyproject.toml"]
+include = [
+  "tempestweb",
+  "client",
+  "tests/fixtures",
+  "README.md",
+  "CHANGELOG.md",
+  "pyproject.toml",
+]
 
 [tool.ruff]
 line-length = 88

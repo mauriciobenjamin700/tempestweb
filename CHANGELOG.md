@@ -4,6 +4,28 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.108.0] — 2026-08-25
+
+### Fixed
+
+- **`tempestweb.contract` não funcionava instalado do PyPI.** `wire_shape()` e
+  `wire_shape_digest()` — exportados no `__all__` do módulo — leem as golden
+  fixtures, e elas moram em `tests/fixtures/`, **fora** do diretório do pacote:
+  nenhuma delas entrava no wheel. O módulo importava sem erro (as duas constantes
+  são literais) e só então levantava `FileNotFoundError`, apontando para um
+  `site-packages/tests/fixtures/node_initial.json` que nunca existiu. Quem clonasse
+  o repo nunca via; quem instalasse do PyPI via na primeira chamada.
+
+  As três goldens passam a ser force-included no wheel sob `tempestweb/_fixtures/`,
+  e a resolução segue o padrão que o cliente JS já usava: pacote primeiro, checkout
+  de fonte como fallback. O sdist também passa a incluir `tests/fixtures`. Medido
+  no wheel instalado em venv limpo: `wire_shape_digest()` devolve o digest e ele
+  bate com `WIRE_SHAPE_DIGEST`.
+
+  `tests/unit/test_wire_contract_freeze.py` ganhou o guard: uma golden nova sem
+  entrada no `force-include` reprova ali, em vez de reprovar na máquina de quem
+  instalou.
+
 ## [0.107.0] — 2026-08-25
 
 ### Fixed

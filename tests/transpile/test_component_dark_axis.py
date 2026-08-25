@@ -13,8 +13,9 @@ by looking:
 
 The second kind used to be thirteen pairs across six components. Five of them —
 the tempestweb-owned fields and forms — gained theming in 0.100.0
-(tempestweb#158) and left the list, so what remains is ``Stepper``, which lives
-in tempest-core and cannot be fixed from this repo.
+(tempestweb#158) and left the list; ``Stepper``, the sixth, lived in tempest-core
+and left it in core 0.16.0. The list is empty now, which is the point of keeping
+the assertion: the next component born without a theme lands in it loudly.
 
 The second kind is where the #106 bug would hide if it came back: a component that
 *can* take a theme, drops it on the floor, and lands in the identical set looking

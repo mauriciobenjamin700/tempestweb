@@ -44,6 +44,7 @@ from tempest_core import (
     ThemeMode,
     Widget,
 )
+from tempest_core.components import Stepper
 
 # ---------------------------------------------------------------------------
 # State
@@ -57,10 +58,12 @@ class DarkModeState:
     Attributes:
         dark: Whether the reader asked for the dark theme.
         draft: The text typed into the sample field.
+        quantity: The stepper's value, kept here because it is controlled.
     """
 
     dark: bool = False
     draft: str = ""
+    quantity: int = 1
 
 
 def make_state() -> DarkModeState:
@@ -97,6 +100,14 @@ def view(app: App[DarkModeState]) -> Widget:
         """
         app.set_state(lambda state: setattr(state, "dark", dark))
         app.set_theme(Theme(mode=ThemeMode.DARK if dark else ThemeMode.LIGHT))
+
+    def step(value: int) -> None:
+        """Hold the stepper's clamped value.
+
+        Args:
+            value: The value the stepper reports, already inside its bounds.
+        """
+        app.set_state(lambda state: setattr(state, "quantity", value))
 
     def edit(event: TextChangeEvent) -> None:
         """Hold what the reader types, so the field is really controlled.
@@ -140,7 +151,7 @@ def view(app: App[DarkModeState]) -> Widget:
                 theme=theme,
                 children=[
                     Text(
-                        content="A card, a badge, a field and a button",
+                        content="A card, a badge, a field, a button and a stepper",
                         key="sample-title",
                         style=Style(font_weight=FontWeight.BOLD),
                     ),
@@ -168,6 +179,14 @@ def view(app: App[DarkModeState]) -> Widget:
                         key="sample-button",
                         label="Save",
                         on_click=lambda: None,
+                        theme=theme,
+                    ),
+                    Stepper(
+                        key="sample-stepper",
+                        value=app.state.quantity,
+                        min_value=0,
+                        max_value=9,
+                        on_change=step,
                         theme=theme,
                     ),
                 ],

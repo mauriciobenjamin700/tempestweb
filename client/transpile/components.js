@@ -40,7 +40,7 @@ import {
   modeTable,
   resolveWidgetStyle,
 } from "./widget-support.js";
-import { Border, MUTED, ON_SURFACE, SideBorder } from "./values.gen.js";
+import { Border, SideBorder } from "./values.gen.js";
 import {
   ALERT_STYLES,
   AVATAR_COLORS,
@@ -924,9 +924,15 @@ export function Rating({
  * Each button reports the value already clamped to `minValue`/`maxValue`, so the
  * app never has to re-check the bounds it declared.
  *
+ * Themed since core 0.16.0 (tempestweb#158): both buttons resolve from
+ * `variant`/`colorScheme`/`size` and the value reads the theme's `on_surface`
+ * role. Before that the port carried the same fixed dark constants the core did,
+ * so a stepper on a light app painted a dark-grey button.
+ *
  * @param {{value?: number, step?: number, minValue?: ?number,
- *          maxValue?: ?number, onChange?: ?Function, style?: ?Object,
- *          key?: ?string}} [args]
+ *          maxValue?: ?number, onChange?: ?Function, variant?: string,
+ *          colorScheme?: string, size?: string, style?: ?Object,
+ *          key?: ?string, theme?: ?Object}} [args]
  * @returns {import("../transport.js").Node}
  */
 export function Stepper({
@@ -935,6 +941,9 @@ export function Stepper({
   minValue = null,
   maxValue = null,
   onChange = null,
+  variant = "solid",
+  colorScheme = "neutral",
+  size = "md",
   style = null,
   key = null,
   theme = null,
@@ -949,27 +958,29 @@ export function Stepper({
     }
     return candidate;
   };
+  const resolved = mergeStyle(
+    resolveWidgetStyle("Button", variant, size, colorScheme, null, theme),
+    { font_size: 18.0 },
+  );
   const button = (label, delta, buttonKey) =>
     Button({
       label,
       key: buttonKey,
       onClick: onChange == null ? null : () => onChange(clamped(value + delta)),
-      style: Style({
-        padding: Edge.symmetric({ vertical: 8.0, horizontal: 16.0 }),
-        radius: 8.0,
-        background: MUTED,
-        color: ON_SURFACE,
-        font_size: 18.0,
-      }), theme });
+      style: resolved, theme });
   return Row({
     key: base,
-    style: mergeStyle({ gap: 10.0, align: "center" }, style),
+    style: mergeStyle({ gap: SPACING_STEPS.sm, align: "center" }, style),
     children: [
       button("-", -step, `${base}-down`),
       Text({
         content: String(value),
         key: `${base}-value`,
-        style: Style({ font_size: 18.0, font_weight: 700, color: ON_SURFACE }), theme }),
+        style: Style({
+          font_size: 18.0,
+          font_weight: 700,
+          color: colorRoles(theme).on_surface,
+        }), theme }),
       button("+", step, `${base}-up`),
     ], theme });
 }

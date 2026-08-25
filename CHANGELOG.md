@@ -4,6 +4,53 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.110.0] — 2026-08-25
+
+### Fixed
+
+- **O replay da fila offline com a aba fechada nunca funcionou: o worker usava um
+  `import()` dinâmico, que a spec proíbe**
+  ([#118](https://github.com/mauriciobenjamin700/tempestweb/issues/118)).
+  `replayFromSync` (`client/sw/sw.js`) alcançava `client/offline/{store,sync}.js`
+  com `await import(...)`. Nenhum service worker pode fazer isso — a spec proíbe
+  `import()` no `ServiceWorkerGlobalScope`
+  ([w3c/ServiceWorker#1356](https://github.com/w3c/ServiceWorker/issues/1356)) —
+  então **todo** `sync`/`periodicsync` estourava e caía no fallback de pingar
+  clientes abertos. Com a aba fechada não existe cliente para pingar: a fila ficava
+  parada, sem erro visível, e o Background Sync — a única coisa que drena a fila
+  sem aba — era decorativo.
+
+  O worker já é registrado como `{ type: "module" }`, então import **estático** é
+  legal; só o dinâmico não é. Os dois módulos passam a ser importados no topo, e o
+  build reescreve o especificador (`../offline/store.js` no repo →
+  `./client/offline/store.js` no artefato, onde o `sw.js` mora na raiz), recusando
+  o build se o import mudar de nome.
+
+  **Medido em Chrome real, A/B na mesma máquina, mesmo procedimento, duas origens
+  virgens:** duas mutações enfileiradas offline, aba fechada, rede de volta.
+
+  | Worker | Requests no servidor | Fila no IndexedDB |
+  |---|---|---|
+  | antigo (`import()` dinâmico) | **0** | **2 presas** |
+  | novo (import estático) | **2**, 1,01 s após fechar a aba e 3 ms após o reconnect | **vazia** |
+
+  Zero páginas da origem abertas nas duas medições. O `sync` real do Chrome
+  disparou sozinho no reconnect — a tag (`tw-offline-replay`) já era registrada
+  pelo `enqueue`.
+
+- **Dois guards, porque o teste em Node não podia pegar isto**
+  (`tests/unit/test_sw_static_imports.py`): `import()` **funciona** em Node, então
+  a suíte jsdom passava verde sobre um worker que o browser recusa. Um guard lê a
+  fonte do worker e reprova qualquer `import()`; o outro builda o artefato nos dois
+  modos estáticos e confere que o especificador foi reescrito **e** que o arquivo
+  apontado foi copiado. Verificado que morde: os quatro reprovam no `sw.js` antigo.
+
+### Changed
+
+- `docs/advanced/offline-sync.md` (PT + EN) e `docs/roadmap.md`: o item P2 de
+  "Background Sync com aba fechada" deixa de ser "verificação manual pendente" e
+  passa a registrar a medição.
+
 ## [0.109.0] — 2026-08-25
 
 ### Fixed

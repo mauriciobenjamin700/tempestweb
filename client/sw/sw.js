@@ -1,9 +1,15 @@
 // sw.js — tempestweb service worker.  PHASES P1 (precache + update), P2 (runtime
 // strategies + offline queue replay), P3 (WebPush handlers).
 //
-// Pure JS, no build step, no imports at runtime (a SW cannot use bare ES module
-// specifiers without { type: "module" } support across browsers, so this file is
-// self-contained and classic-worker-safe). It is also `node --check`-clean.
+// Pure JS, no build step. The worker is registered with { type: "module" }
+// (client/sw/register.js), so the two static imports below are legal — a
+// **dynamic** import() is not, on any worker type: the HTML spec forbids it on
+// ServiceWorkerGlobalScope (w3c/ServiceWorker#1356), which is why the queue
+// modules are pulled in statically here. It is also `node --check`-clean.
+//
+// The specifier is repo-relative so this file works unchanged under the node
+// tests; the build rewrites it to the artifact layout (sw.js sits at the root,
+// the client under ./client/) when it emits the worker.
 //
 // The build step (Trilho C) replaces the __PRECACHE_MANIFEST__ /
 // __CACHE_VERSION__ placeholders with the hashed asset list and a content hash.
@@ -16,9 +22,12 @@
 //
 // Files: client/sw/sw.js (this worker) + client/sw/register.js (registration).
 // The offline queue lives in client/offline/{store,sync}.js; on a Background /
-// Periodic Sync this worker drains it directly (dynamic import → drainOfflineQueue),
-// so the queue empties with the tab closed, and falls back to pinging open clients
-// if that import is unavailable (see replayFromSync).
+// Periodic Sync this worker drains it directly (drainOfflineQueue), so the queue
+// empties with the tab closed, and falls back to pinging open clients if the
+// drain itself fails (see replayFromSync).
+
+import { createOfflineStore } from "../offline/store.js";
+import { OfflineQueue } from "../offline/sync.js";
 
 /* global self, caches, clients, fetch, Response, Request, URL */
 
@@ -699,15 +708,21 @@ async function notifyClients(message) {
 /**
  * Drain the offline queue from a Background/Periodic Sync event (P2 §1).
  *
- * Dynamically imports the page's queue modules and drains IndexedDB directly, so
- * the queue empties even with no tab open. On success it pings any open client to
+ * Drains IndexedDB directly through the statically imported queue modules, so the
+ * queue empties even with no tab open. On success it pings any open client to
  * refresh its UI/count (OFFLINE_QUEUE_DRAINED) and to reconcile the read side
- * (OFFLINE_PULL — the page holds the auth token the worker lacks). If the import
- * or the drain fails
- * (e.g. the modules are unreachable — the SW ships only in the wasm/transpile
- * artifacts that serve /client/ — or IndexedDB is unavailable in this worker), it
- * degrades to the legacy behavior — asking an open client to replay
- * (REPLAY_OFFLINE_QUEUE) — so the queue is never stranded.
+ * (OFFLINE_PULL — the page holds the auth token the worker lacks). If the drain
+ * fails (e.g. IndexedDB is unavailable in this worker) it degrades to the legacy
+ * behavior — asking an open client to replay (REPLAY_OFFLINE_QUEUE) — so the queue
+ * is never stranded.
+ *
+ * The modules used to be pulled in with a **dynamic** import here, which no
+ * service worker may do: the spec forbids `import()` on
+ * ServiceWorkerGlobalScope, so every Background Sync threw and fell straight into
+ * the client-ping fallback — and with the tab closed there is no client to ping,
+ * so the queue silently stayed put. Measured in Chrome (tempestweb#118): the
+ * import raised `TypeError: import() is disallowed on ServiceWorkerGlobalScope`.
+ * The node tests could not see it, because dynamic import works there.
  *
  * Concurrency: the worker drain and the page's replayOnReconnect can fire at the
  * same time (the OfflineQueue single-flight guard is per-instance, not shared
@@ -721,7 +736,7 @@ async function notifyClients(message) {
  *
  * @param {Object} [deps]
  * @param {() => Promise<{createOfflineStore: Function, OfflineQueue: Function}>} [deps.loadModules]
- *        Resolve the queue modules (default: dynamic import of /client/offline/*).
+ *        Resolve the queue modules (default: the statically imported pair).
  * @param {(message: Object) => Promise<void>} [deps.notify]
  *        Post a message to open clients (default: notifyClients).
  * @param {(d: Object) => Promise<{sent:number, owners:number}>} [deps.drain]
@@ -729,15 +744,7 @@ async function notifyClients(message) {
  * @returns {Promise<void>}
  */
 async function replayFromSync(deps = {}) {
-  const loadModules =
-    deps.loadModules ??
-    (async () => {
-      const [store, sync] = await Promise.all([
-        import("/client/offline/store.js"),
-        import("/client/offline/sync.js"),
-      ]);
-      return { createOfflineStore: store.createOfflineStore, OfflineQueue: sync.OfflineQueue };
-    });
+  const loadModules = deps.loadModules ?? (async () => ({ createOfflineStore, OfflineQueue }));
   const notify = deps.notify ?? notifyClients;
   const drain = deps.drain ?? drainOfflineQueue;
   try {

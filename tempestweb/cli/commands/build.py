@@ -533,6 +533,43 @@ def _manifest_options(config: ProjectConfig) -> ManifestOptions:
     )
 
 
+#: The worker's imports, as written in the repo → as the artifact needs them. The
+#: source lives at ``client/sw/sw.js`` and imports its siblings relatively so the
+#: node tests load it unchanged; the emitted worker sits at the artifact root with
+#: the client under ``./client/``, so the same specifiers have to move up a level.
+#: A static specifier cannot be computed at runtime, and a service worker may not
+#: use a dynamic ``import()`` at all — the spec forbids it on
+#: ServiceWorkerGlobalScope (tempestweb#118) — so the rewrite happens here.
+_SW_IMPORT_REWRITES: tuple[tuple[str, str], ...] = (
+    ('from "../offline/store.js"', 'from "./client/offline/store.js"'),
+    ('from "../offline/sync.js"', 'from "./client/offline/sync.js"'),
+)
+
+
+def _rewrite_sw_imports(source: str) -> str:
+    """Point the worker's static imports at the artifact's client directory.
+
+    Args:
+        source: The ``client/sw/sw.js`` source, with repo-relative specifiers.
+
+    Returns:
+        The same source with every specifier rewritten for the artifact layout.
+
+    Raises:
+        BuildError: If a specifier is missing — the worker's imports moved and the
+            emitted worker would fail to load its queue modules at runtime.
+    """
+    for repo_specifier, artifact_specifier in _SW_IMPORT_REWRITES:
+        if repo_specifier not in source:
+            raise BuildError(
+                f"service worker no longer imports {repo_specifier} — the rewrite "
+                "table _SW_IMPORT_REWRITES is stale, and the emitted worker would "
+                "fail to load its queue modules"
+            )
+        source = source.replace(repo_specifier, artifact_specifier)
+    return source
+
+
 def _build_pwa(
     out: Path,
     client: Path,
@@ -591,7 +628,7 @@ def _build_pwa(
         raise BuildError(f"missing service worker sources under {client / 'sw'}")
 
     version = "tw-" + hashlib.sha1("|".join(precache).encode("utf-8")).hexdigest()[:12]
-    sw = sw_source.read_text(encoding="utf-8")
+    sw = _rewrite_sw_imports(sw_source.read_text(encoding="utf-8"))
     sw = sw.replace("__CACHE_VERSION__", version)
     # Replace the quoted placeholder with a JS string literal carrying the JSON
     # array, so the worker's ``JSON.parse(injected)`` yields the app-shell list.

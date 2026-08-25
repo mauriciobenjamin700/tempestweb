@@ -171,6 +171,7 @@ plugins:
             "Controls (fields, switches, pickers)": "Controles (campos, switches, pickers)"
             "Booking form (pickers)": "Formulário de reserva (pickers)"
             "Dark mode": "Modo escuro"
+            "Mode C component gallery": "Galeria de componentes em Modo C"
             "Drag, reorder, paginate": "Arrastar, reordenar, paginar"
             "PWA & offline": "PWA e offline"
             "Offline + backend sync": "Offline + sincronização com backend"
@@ -349,6 +350,7 @@ nav:
       - "Execution modes":
           - "Running Mode B (server)": examples/server-mode.md
           - "Mode C tour (transpile)": examples/transpile-tour.md
+      - "Mode C component gallery": examples/mode-c-components.md
   - Project:
       - "Stability & support": stability.md
       - Roadmap & design docs: design-docs.md

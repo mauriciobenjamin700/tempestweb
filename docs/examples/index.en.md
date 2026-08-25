@@ -185,6 +185,9 @@ They all run in **Modes A/B**.
 - **`login_demo`** — the ready-made login screen via the `LoginForm` component, no manual layout.
 - **`overlay_demo`** — the floating overlay layer: a `Dialog` above the tree, dismissible by id.
 - **`router_demo`** — URL-driven navigation: `view` renders the screen on top of `app.nav`.
+- **`camera_demo`** — `CameraPreview` reporting sampled frames and `QrScanner` decoding a code through the platform's own `BarcodeDetector` (needs a secure context; `localhost` counts).
+- **`reorder_demo`** — `ReorderableList`: dragging a row reports both positions, and moving it is the state's job.
+- **`responsive_demo`** — the same `view` in two layouts, decided by `app.media` (the client reports a snapshot on mount and on every resize).
 
 ---
 

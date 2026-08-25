@@ -57,6 +57,14 @@ class MockTransportA:
         """
         return None
 
+    async def send_theme(self, mode: str) -> None:
+        """Mark the theme mode — unused by this harness.
+
+        Args:
+            mode: The resolved theme mode (ignored).
+        """
+        return None
+
     async def recv_event(self) -> dict[str, Any]:
         """Await the next queued client event.
 
@@ -230,3 +238,11 @@ class MockTransportB:
     async def close(self) -> None:
         """Mark the transport closed."""
         self._closed = True
+
+    async def send_theme(self, mode: str) -> None:
+        """Mark the theme mode — unused by this harness.
+
+        Args:
+            mode: The resolved theme mode (ignored).
+        """
+        return None

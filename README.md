@@ -223,7 +223,8 @@ cookies/…), field validators and both declarative and imperative animation. Th
 `tempestweb build/dev --mode transpile` CLI emits a static, CDN-servable bundle
 that is a **first-class PWA — installable and offline out of the box** (manifest
 + cache-first service worker precaching the whole shell; customize via `[pwa]` in
-`tempestweb.toml`).
+`tempestweb.toml`, or turn either half off with `[pwa] enabled = false` when the
+app is behind a login and gains nothing from precache).
 
 See the canonical [`examples/transpile-tour`](examples/transpile-tour/app.py) —
 one app exercising the whole surface — and the guide

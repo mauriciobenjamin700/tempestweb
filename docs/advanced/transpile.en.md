@@ -503,6 +503,9 @@ display = "standalone"
 
 | Field | Type | Default | What it does |
 |---|---|---|---|
+| `enabled` | boolean | `true` | The default `manifest` and `service_worker` fall back to. |
+| `manifest` | boolean | `enabled` | Emits `manifest.webmanifest` and its `<link>`. |
+| `service_worker` | boolean | `enabled` | Emits and registers the cache-first worker. |
 | `name` | string | project name | Full name shown at install/splash. |
 | `short_name` | string | — | Short name for the home-screen icon. |
 | `description` | string | — | App description in the install prompt. |
@@ -520,9 +523,16 @@ display = "standalone"
 
 !!! note "Automatic in Mode C"
     You don't have to hand-write a service worker, manifest, or registration code:
-    `build --mode transpile` generates all of it. The `[pwa]` section only **tunes**
+    `build --mode transpile` generates all of it. The `[pwa]` section **tunes**
     the install metadata — offline behavior comes for free because the bundle is
     static.
+
+!!! tip "An app that does not want a PWA"
+    `enabled = false` turns the whole layer off; `manifest` and `service_worker`
+    turn off one half. Turning the worker off emits a teardown worker in place of
+    the caching one, so whoever already registered one is not stuck on the old
+    precache — the why is in
+    [PWA and offline](pwa.md#turning-the-pwa-off-enabled-manifest-service_worker).
 
 !!! tip "Update prompt"
     When you ship a new version the old service worker keeps serving until the tab
@@ -625,8 +635,11 @@ spirit of `mypy --strict`.
     core's style resolvers travels in a generated table
     (`component-styles.gen.js`), the same way `widget-styles.gen.js` does for the
     widgets. Every builder is pinned by a matrix of props built from the real core
-    — 185 cases — so a drift in composition or resolved style fails the test.
-    Thirty-four of them are the **`__keyed` twin**: the same component built with
+    — **336 cases** — so a drift in composition or resolved style fails the test.
+    That is 151 components, each with a **`__dark` twin** (the mode axis
+    [#106](https://github.com/mauriciobenjamin700/tempestweb/issues/106) brought:
+    a port that forgets to pass the theme down to a child fails on that child's
+    colour), plus thirty-four **`__keyed` twins**: the same component built with
     an explicit `key=`, because the unkeyed build hides the very derivation
     (`Accordion()` emits `accordion-header` whether or not the builder derives it,
     while `Accordion(key="faq-3")` emits `faq-3-header` only when it really does).

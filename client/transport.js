@@ -40,9 +40,9 @@
  * @property {(event: TWEvent) => void} sendEvent
  *           Send a user event back to the Python side.
  * @property {(() => void)} [requestResync]
- *        Ask the Python side to re-send the whole scene. Present on the Mode B
- *        transports; a renderer that cannot apply a batch calls it so the tree
- *        is rebuilt from a root replace instead of drifting.
+ *        Ask the Python side to re-send the whole scene. Implemented by every
+ *        transport (Mode A included); a renderer that cannot apply a batch calls
+ *        it so the tree is rebuilt from a root replace instead of drifting.
  * @property {((handler: (path: string) => void) => void)} [onNavigate]
  *           Optional (Mode B): register a callback fired when the app navigates
  *           imperatively, so the client can sync the browser URL (view → URL).

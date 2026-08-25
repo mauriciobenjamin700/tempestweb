@@ -260,12 +260,17 @@ bloco vai no `<head>`, antes de a folha base ser instalada no mount; como
 ela declara os mesmos nomes com a mesma especificidade, o seu vence por vir
 depois.
 
-!!! tip "Modo escuro sai de graça, e sai honesto"
-    Tema em `SYSTEM` emite o esquema claro no `:root` e o escuro dentro de
-    `@media (prefers-color-scheme: dark)`: a página segue a configuração de
-    quem lê. Tema fixado em `LIGHT` ou `DARK` emite um esquema só e nenhuma
-    media query — um tema fixado que ainda virasse com o sistema não estaria
-    fixado.
+!!! tip "Modo escuro sai de graça, pelo mesmo interruptor da folha"
+    Tema em `SYSTEM` emite o esquema claro no `:root` e o escuro sob
+    `:root[data-tw-theme="dark"]` — **o mesmo seletor** que a folha base usa,
+    então a paleta da app e os tokens da folha viram juntos, no modo que a app
+    resolveu. Tema fixado em `DARK` emite o esquema escuro nos **dois**
+    seletores: pinta antes de qualquer atributo chegar e continua ganhando da
+    folha depois que ele chega.
+
+    Nunca sai media query. Ver "Por que não `prefers-color-scheme`" adiante:
+    um widget não vê o SO, então escurecer a página pelo SO deixava árvore
+    clara em fundo escuro — e o lado inline é o que ganha.
 
 !!! info "Só o que a folha consome"
     `theme_css` emite as variáveis que a folha base lê, não os 39 papéis.
@@ -333,6 +338,148 @@ As duas pontas que o host cobre:
     estados que só a folha expressa (hover, foco) continuam na paleta declarada.
     Se a troca em runtime é o coração do seu app, declare `THEME` com a paleta que
     ele abre.
+
+## Modo escuro: passe o tema ao widget
+
+Um widget **estilizado** resolve as próprias cores do tema que ele carrega — do
+campo `theme` dele, não de um tema ambiente. É por isso que o idioma é uma linha:
+
+```python
+Button(label="Salvar", theme=app.theme, on_click=salvar)
+```
+
+Passe `app.theme` e a árvore inteira segue o `app.set_theme(...)`; deixe de fora
+e o widget resolve a paleta **clara**, mesmo que o app esteja em modo escuro.
+Vale igual nos três modos.
+
+```python
+from tempest_core import App, Card, Column, Text, Theme, ThemeMode, Widget
+
+
+def view(app: App[State]) -> Widget:
+    """Desenha um cartão que acompanha o tema do app."""
+    theme: Theme = app.theme
+    return Column(
+        key="body",
+        children=[
+            Card(
+                key="card",
+                theme=theme,
+                children=[Text(content="Segue o tema", key="label")],
+            ),
+        ],
+    )
+
+
+def escurecer(app: App[State]) -> None:
+    """Troca o tema do app, o que re-resolve todo widget que o recebeu."""
+    app.set_theme(Theme(mode=ThemeMode.DARK))
+```
+
+!!! note "Widget de layout não tem `theme`"
+    `Row`, `Column` e `Text` não carregam cor própria, então o core não lhes dá o
+    campo — passar `theme=` levanta `ValidationError` com o nome do campo. A cor
+    que eles mostram é a que herdam da caixa estilizada em volta.
+
+!!! tip "Componente propaga como o core propaga"
+    Um `EmailInput` **é** o campo: ele repassa o tema para o `Input` que constrói.
+    Um `SearchBar` **compõe** um campo e sobrepõe o estilo que resolveu, então o
+    campo interno mantém a paleta default — e o Modo C reproduz essa distinção
+    componente por componente, fixada por matriz de paridade nos dois modos.
+
+### Os componentes do tempestweb seguem o mesmo idioma
+
+`TextField`, `EmailField`, `PasswordField`, `LoginForm` e `SignupForm` (de
+`tempestweb.components`) recebem `theme` como qualquer widget, e repassam para
+tudo que constroem — o `Input` de cada campo, os campos de cada form, o botão de
+submit, e a cor do label e da linha de erro:
+
+```python
+from tempestweb.components import LoginForm
+
+LoginForm(
+    email=app.state.email,
+    password=app.state.password,
+    on_email_change=set_email,
+    on_password_change=set_password,
+    on_submit=entrar,
+    theme=app.theme,
+    key="login",
+)
+```
+
+!!! danger "Antes da 0.101.0 eles eram claros por construção"
+    Os cinco não declaravam `theme` e não repassavam nenhum, então um app escuro
+    recebia campo claro **sem nenhum aviso** — e o pior caso é fundo escuro (da
+    folha base) com texto escuro (inline), ou seja, ilegível. Se você seguia o
+    idioma `theme=app.theme` em cada widget, esses cinco eram os que ignoravam.
+
+!!! warning "`Stepper` continua sem `theme`"
+    Ele mora no **tempest-core**, que é outro repositório: dar tema a ele é um
+    release do core, não uma mudança aqui. Até lá, `Stepper` renderiza claro em
+    qualquer app. Rastreado na
+    [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158).
+    Um `SearchBar` ou um `TextField` **compõe** um campo e sobrepõe o estilo que
+    resolveu, então o campo interno mantém a paleta default — e o Modo C reproduz
+    essa distinção componente por componente, fixada por matriz de paridade nos
+    dois modos.
+
+!!! info "Modo C: as tabelas geradas têm eixo de modo desde a 0.99.0"
+    O Modo C não tem Python, então o estilo resolvido de cada widget viaja em
+    tabela gerada. Até a 0.98.0 essas tabelas eram geradas com o tema default:
+    todo widget e todo componente transpilado renderizava **claro**, e como o
+    estilo inline ganha do stylesheet, era a metade com precedência que falhava.
+    Agora a tabela carrega os dois modos e o builder escolhe por
+    `theme.is_dark()`.
+
+
+## A folha base segue o modo que você declara
+
+O `Style` que o core resolve viaja **inline** em cada widget, e inline ganha do
+stylesheet. Mas metade da tela não é inline: o fundo da página, a superfície de um
+campo, o `::placeholder`, todo estado de `:hover`/`:focus`, a superfície de um
+overlay. Isso é CSS — e o CSS não tinha eixo de modo, então um app escuro mostrava
+campo branco dentro de cartão escuro.
+
+Agora tem. O renderizador marca o documento com o modo resolvido:
+
+```html
+<html data-tw-theme="dark">
+```
+
+e a folha base redefine seus tokens sob esse seletor. Você não escreve nada para
+isso acontecer: no Modo B (e SSE) o servidor manda um envelope `theme`; no Modo A
+o runtime chama o callback direto; no Modo C o `set_theme` marca o documento em
+processo.
+
+!!! warning "Declarou escuro? Repasse `app.theme` aos widgets"
+    A marcação segue o **tema do app**; a cor de cada widget segue o `theme` que
+    **aquele widget** recebeu. Se você chama `app.set_theme(Theme(mode=DARK))` e
+    não repassa `theme=app.theme` aos widgets, a folha escurece e os widgets
+    continuam claros — medido: um `Input` sem `theme` fica com fundo escuro (folha)
+    e texto escuro (inline), ou seja, ilegível. Passe o tema; é a mesma regra do
+    core.
+
+!!! info "Por que não `prefers-color-scheme`"
+    Seria a resposta óbvia — e estaria errada. Um widget construído com
+    `Theme(mode=SYSTEM)` resolve **claro** no core: ele não vê o SO. Escurecer a
+    folha por causa do SO colocaria uma árvore clara numa página escura. Se você
+    quer seguir o SO, leia `app.media.platform_dark_mode` no seu `view` e chame
+    `set_theme` — aí as duas metades andam juntas.
+
+!!! check "Os pares da paleta têm gate de contraste"
+    A regra `color-contrast` do axe precisa de layout real, então o gate de a11y a
+    desliga e o job Lighthouse é sinal fraco — o que deixava uma paleta escura
+    ilegível passar sem ninguém notar. O que **não** precisa de layout é o par de
+    papéis: `--tw-on-surface` é, por definição, o que vai sobre `--tw-surface`.
+    `tests/client/theme-contrast.test.js` calcula os 12 pares que a folha promete,
+    nos dois modos, e reprova abaixo de AA. Par mais apertado hoje: `warning` sobre
+    `surface` no claro, **6,02:1** para um mínimo de 4,5.
+
+!!! note "O primeiro `light` não é enviado"
+    Os tokens da folha **são** a paleta clara, então marcar claro no mount gastaria
+    um frame para dizer o que o CSS já diz. Toda mudança posterior é enviada,
+    inclusive a volta ao claro.
 
 ## Indicadores de progresso
 

@@ -48,7 +48,7 @@ function tick() {
 
 // --- registry --------------------------------------------------------------
 
-test("EVENT_HANDLERS registers exactly the 14 streaming capabilities", () => {
+test("EVENT_HANDLERS registers exactly the 15 streaming capabilities", () => {
   assert.deepEqual(Object.keys(EVENT_HANDLERS).sort(), [
     "battery.watch",
     "gamepad.watch",
@@ -64,6 +64,7 @@ test("EVENT_HANDLERS registers exactly the 14 streaming capabilities", () => {
     "sync.watch",
     "tabs.receive",
     "visibility.watch",
+    "webaudio.levels",
   ]);
 });
 

@@ -173,6 +173,7 @@ from tempestweb.native.storage import (
 )
 from tempestweb.native.sync import SyncState, SyncSummary
 from tempestweb.native.usb import UsbDevice
+from tempestweb.native.webaudio import Level, SequenceResult, Step
 
 __all__ = [
     # capability namespaces (plan-facing: native.http.request, native.audio.play, ...)
@@ -261,7 +262,10 @@ __all__ = [
     "is_share_supported",
     "share",
     # geolocation (N3)
+    "Level",
     "Position",
+    "SequenceResult",
+    "Step",
     "get_position",
     # clipboard (N3)
     "ClipboardImage",

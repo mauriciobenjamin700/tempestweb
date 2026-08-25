@@ -800,5 +800,53 @@ export const native = Object.freeze({
         type: opts.type ?? "sine",
         volume: opts.volume ?? 1.0,
       }),
+    /**
+     * Schedule a whole phrase in one call (fire-and-forget).
+     *
+     * Steps may overlap — two with the same `start_ms` are a chord. The defaults
+     * mirror the Python `Step`, so the same phrase reads the same in both modes.
+     *
+     * @param {Array<{frequency:number, duration_ms?:number, start_ms?:number,
+     *                type?:string, gain?:number, attack_ms?:number,
+     *                release_ms?:number}>} steps
+     * @returns {Promise<{scheduled:number, ends_in_ms:number, blocked:boolean}>}
+     */
+    sequence: (steps) =>
+      call("webaudio.sequence", {
+        steps: (steps ?? []).map((step) => ({
+          frequency: step.frequency ?? 440.0,
+          duration_ms: step.duration_ms ?? 200,
+          start_ms: step.start_ms ?? 0,
+          type: step.type ?? "sine",
+          gain: step.gain ?? 0.5,
+          attack_ms: step.attack_ms ?? 5,
+          release_ms: step.release_ms ?? 40,
+        })),
+      }),
+    /**
+     * Stop every step still scheduled or sounding.
+     * @returns {Promise<{stopped:number}>}
+     */
+    stop: () => call("webaudio.stop", {}),
+    /**
+     * Stream loudness and a coarse spectrum.
+     *
+     * `source: "output"` meters the app's own synthesis — no microphone, no
+     * permission prompt.
+     *
+     * @param {(level:{rms:number, peak:number, bands:number[]}) => void} onEvent
+     * @param {{source?:string, interval_ms?:number, bands?:number}} [opts]
+     * @returns {() => void}  Teardown that stops the stream.
+     */
+    watch_levels: (onEvent, opts = {}) =>
+      stream(
+        "webaudio.levels",
+        {
+          source: opts.source ?? "output",
+          interval_ms: opts.interval_ms ?? 100,
+          bands: opts.bands ?? 8,
+        },
+        onEvent,
+      ),
   }),
 });

@@ -85,7 +85,7 @@ import { pipExit, pipRequest } from "./pip.js";
 import { pointerlockExit, pointerlockRequest } from "./pointerlock.js";
 import { serialIsSupported, serialRequest } from "./serial.js";
 import { usbIsSupported, usbRequest } from "./usb.js";
-import { webaudioTone } from "./webaudio.js";
+import { webaudioLevels, webaudioSequence, webaudioStop, webaudioTone } from "./webaudio.js";
 
 /**
  * @typedef {Object} NativeCall
@@ -231,6 +231,8 @@ export const HANDLERS = {
   "usb.is_supported": usbIsSupported,
   "usb.request": usbRequest,
   "webaudio.tone": webaudioTone,
+  "webaudio.sequence": webaudioSequence,
+  "webaudio.stop": webaudioStop,
 };
 
 /**
@@ -258,6 +260,7 @@ export const EVENT_HANDLERS = {
   "speech.listen": speechListen,
   "tabs.receive": tabsReceive,
   "visibility.watch": visibilityWatch,
+  "webaudio.levels": webaudioLevels,
 };
 
 /**

@@ -188,6 +188,7 @@ They all run in **Modes A/B**.
 - **`camera_demo`** — `CameraPreview` reporting sampled frames and `QrScanner` decoding a code through the platform's own `BarcodeDetector` (needs a secure context; `localhost` counts).
 - **`reorder_demo`** — `ReorderableList`: dragging a row reports both positions, and moving it is the state's job.
 - **`responsive_demo`** — the same `view` in two layouts, decided by `app.media` (the client reports a snapshot on mount and on every resize).
+- **`webaudio_demo`** — a whole phrase scheduled in one call (`native.webaudio.sequence`, notes with envelopes, a shared `start_ms` for a chord) and the analyser metering the synthesis bus itself (`watch_levels`, no microphone and no permission prompt).
 
 ---
 

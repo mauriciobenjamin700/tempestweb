@@ -188,6 +188,7 @@ Todos rodam nos **Modos A/B**.
 - **`camera_demo`** — `CameraPreview` reportando frames amostrados e `QrScanner` decodificando código pelo `BarcodeDetector` da plataforma (exige contexto seguro; `localhost` conta).
 - **`reorder_demo`** — `ReorderableList`: arrastar uma linha reporta as duas posições, e mover é trabalho do estado.
 - **`responsive_demo`** — a mesma `view` em dois layouts, decidida por `app.media` (o cliente reporta o snapshot no mount e a cada resize).
+- **`webaudio_demo`** — uma frase inteira agendada numa chamada (`native.webaudio.sequence`, notas com envelope, `start_ms` igual = acorde) e o analisador medindo o próprio barramento de síntese (`watch_levels`, sem microfone e sem prompt de permissão).
 
 ---
 

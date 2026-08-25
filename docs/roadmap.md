@@ -265,7 +265,7 @@ A/B/C); as só-Chromium expõem `is_supported()` + degradação graciosa.
 | T21 | **payment:** Payment Request API | ✅ (v0.50.0) |
 | T22 | **misc UI:** Picture-in-Picture · EyeDropper · Pointer Lock | ✅ (v0.50.0) |
 | T23 | **gamepad / midi:** Gamepad API (poll) · Web MIDI (`requestMIDIAccess`) | ✅ (v0.50.0 — gamepad poll+watch, MIDI send+messages) |
-| T24 | **webaudio:** Web Audio API — síntese/análise (`AudioContext`), além do play/stop atual | 🔶 (v0.50.0 — `tone`; grafo síntese/análise futuro) |
+| T24 | **webaudio:** Web Audio API — síntese/análise (`AudioContext`), além do play/stop atual | ✅ (v0.112.0 — `sequence` agenda a frase inteira numa chamada, cada passo com envelope, `start_ms` igual = acorde; `stop` corta sem fechar o contexto compartilhado; `levels` streama rms/peak/bands de um `AnalyserNode` sobre o barramento de síntese (`"output"`, sem microfone nem prompt) ou do microfone. **Medido em Chrome:** acorde de 700 ms → `rms 0.365→0.353`, `peak 0.852→0.719`, e `0.000` em t=720 ms quando o release acaba. Grafo de nós arbitrário fica **fora** de propósito: no Modo B poria a rede entre um oscilador e seu ganho) |
 
 ### Canal de eventos (pré-requisito das *(stream)*)
 

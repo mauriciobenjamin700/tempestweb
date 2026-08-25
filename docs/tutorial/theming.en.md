@@ -417,11 +417,14 @@ LoginForm(
     were following the `theme=app.theme` idiom on every widget, these five were
     the ones ignoring it.
 
-!!! warning "`Stepper` still has no `theme`"
-    It lives in **tempest-core**, a separate repository: giving it a theme is a
-    core release, not a change here. Until then, `Stepper` renders light in any
-    app. Tracked in
-    [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158).
+!!! check "`Stepper` takes a theme too, since `tempest-core` 0.16.0"
+    It was the sixth component of
+    [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158) and the
+    only one living in **tempest-core**, so it waited on a release there. It now
+    declares `theme`, `variant`, `color_scheme` and `size` like the rest of the
+    kit, and the value reads the theme's `ON_SURFACE` role. No component in the
+    parity matrix sits outside the dark axis any more — `LIGHT_ONLY_COMPONENTS` is
+    empty, and the guard stays for the next component born without a theme.
     A `SearchBar` or a `TextField` **composes** one and layers the style it
     resolved on top, so the inner field keeps the default palette — and Mode C
     reproduces that distinction component by component, pinned by a parity matrix

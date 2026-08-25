@@ -4,6 +4,36 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.109.0] — 2026-08-25
+
+### Fixed
+
+- **O sexto componente claro por construção fecha: `Stepper`**
+  ([#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158)). Cinco dos
+  seis saíram na 0.101.0; o `Stepper` mora no **tempest-core**, então precisava de
+  release lá. `tempest-core` 0.16.0 dá a ele `theme`, `variant`, `color_scheme`,
+  `size` e `media`, com os botões vindo de `resolve_variant` e o valor lendo o papel
+  `ON_SURFACE`. O pin sobe para `tempest-core>=0.16.0`.
+
+  No **Modo C** o componente é composição à mão, então o port em
+  `client/transpile/components.js` acompanha: as constantes fixas `MUTED` /
+  `ON_SURFACE` saem, o estilo dos botões vem de `resolveWidgetStyle("Button", ...)`,
+  o valor de `colorRoles(theme).on_surface` e o `gap` de `SPACING_STEPS.sm`. A
+  matriz de paridade foi regenerada do core real — 5 casos mudaram
+  (`stepper_default`, `stepper_bounded` e seus twins `__dark` / `__keyed`).
+
+- **`LIGHT_ONLY_COMPONENTS` fica vazia**, e é justamente por isso que a assertion
+  continua: o guard de `_dark_sample` reprova o **próximo** componente que nascer
+  sem tema, em vez de deixá-lo posar como cobertura de dark. Antes o `Stepper` era
+  a única entrada, e ela mascarava 13 pares `__dark` byte a byte iguais ao claro.
+
+### Changed
+
+- `examples/dark-mode` ganha um `Stepper` — o exemplo que existe para provar que a
+  cor vem do tema agora inclui o componente que não obedecia.
+- `docs/tutorial/theming.md` (PT + EN): o `!!! warning "Stepper continua sem theme"`
+  vira `!!! check`, com o que mudou e por que o guard fica.
+
 ## [0.108.0] — 2026-08-25
 
 ### Fixed

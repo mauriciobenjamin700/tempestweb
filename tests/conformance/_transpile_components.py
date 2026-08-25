@@ -589,12 +589,14 @@ def build_samples() -> dict[str, Any]:
 #: posing as coverage — and what makes a *new* unthemed component fail the
 #: generator instead of quietly joining them.
 #:
-#: The five tempestweb-owned ones (the two fields families and the two forms) left
-#: this list in 0.99.0 when they gained ``theme`` (tempestweb#158). ``Stepper`` is
-#: the one that stays, and not by choice: it lives in **tempest-core**, which is a
-#: separate repo — its ``model_fields`` carry no ``theme``, so giving it one means
-#: a core release, not a change here.
-LIGHT_ONLY_COMPONENTS: frozenset[str] = frozenset({"Stepper"})
+#: The list is **empty** since ``tempest-core`` 0.16.0: every component in the
+#: matrix takes a theme. The five tempestweb-owned ones (the two field families and
+#: the two forms) left in 0.99.0, and ``Stepper`` — the last one, and the only one
+#: that lived in the core repo — left when the core gave it ``theme`` /
+#: ``variant`` / ``color_scheme`` / ``size`` (tempestweb#158). Empty is not the same
+#: as unused: the assertion above still fires for a *new* unthemed component, which
+#: is the point.
+LIGHT_ONLY_COMPONENTS: frozenset[str] = frozenset()
 
 
 def _dark_sample(widget: Any) -> dict[str, Any]:  # noqa: ANN401 — any core component

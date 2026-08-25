@@ -414,11 +414,13 @@ LoginForm(
     folha base) com texto escuro (inline), ou seja, ilegível. Se você seguia o
     idioma `theme=app.theme` em cada widget, esses cinco eram os que ignoravam.
 
-!!! warning "`Stepper` continua sem `theme`"
-    Ele mora no **tempest-core**, que é outro repositório: dar tema a ele é um
-    release do core, não uma mudança aqui. Até lá, `Stepper` renderiza claro em
-    qualquer app. Rastreado na
-    [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158).
+!!! check "`Stepper` também aceita tema, desde `tempest-core` 0.16.0"
+    Ele era o sexto da [#158](https://github.com/mauriciobenjamin700/tempestweb/issues/158)
+    e o único que morava no **tempest-core**, então dependia de um release lá.
+    Agora declara `theme`, `variant`, `color_scheme` e `size` como o resto do kit,
+    e o valor lê o papel `ON_SURFACE` do tema. Nenhum componente da matriz de
+    paridade fica fora do eixo escuro — a lista `LIGHT_ONLY_COMPONENTS` ficou
+    vazia, e o guard continua lá para o próximo componente que nascer sem tema.
     Um `SearchBar` ou um `TextField` **compõe** um campo e sobrepõe o estilo que
     resolveu, então o campo interno mantém a paleta default — e o Modo C reproduz
     essa distinção componente por componente, fixada por matriz de paridade nos

@@ -271,6 +271,157 @@ expiração com folga.
     reusa `JWTUtils` do `tempest-fastapi-sdk`, e `server_decode_jwt` faz a
     verificação com segredo.
 
+## S8 — Observabilidade de servidor (Modo B)
+
+`create_app(..., metrics=True)` já respondia **quantas** sessões existem. Não
+respondia se elas estão lentas, onde o tempo é gasto, nem o que o servidor fez
+para o cliente que acabou de reclamar — e Modo B é o modo que se opera em
+produção.
+
+```python
+from tempestweb.observability import (
+    PatchMetrics,
+    ServerObservability,
+    create_logger,
+    json_log_sink,
+    otel_tracer,
+)
+from tempestweb.server import create_app
+
+app = create_app(
+    state_factory=lambda: 0,
+    view=view,
+    metrics=True,
+    observability=ServerObservability(
+        metrics=PatchMetrics(),
+        logger=create_logger(sinks=[json_log_sink], level="INFO"),
+        tracer=otel_tracer(),  # opcional: precisa de tempestweb[otel]
+    ),
+)
+```
+
+### Latência e throughput
+
+O histograma sai em `GET /metrics`, ao lado dos contadores de conexão:
+
+```text
+tempestweb_patch_seconds_bucket{le="0.005"} 40
+tempestweb_patch_seconds_sum 0.012
+tempestweb_patch_seconds_count 40
+tempestweb_patches_total 40
+```
+
+O que ele mede é a espera que o **cliente** sente: do evento chegar até os patches
+serem entregues ao transporte, **rebuild incluído**. Isso importa porque o rebuild
+é coalescido — ele roda depois do handler retornar. Cronometrar o handler daria um
+número que para antes do trabalho que o cliente está esperando (medido: rodadas com
+zero patches).
+
+!!! tip "O número bate com o do cliente"
+    Medido num app real de 40 linhas: cliente 0,62 ms de ida e volta, servidor 0,30
+    ms de tempo de patch — 49% da espera é servidor, o resto é WebSocket e
+    loopback. O valor do servidor é sempre **menor**; se ele encostar no do cliente,
+    a rede não é o problema.
+
+### Log estruturado
+
+Uma linha JSON por evento de ciclo de vida, com o `session_id` como **campo** —
+que é o ponto: junta com o span pela mesma chave.
+
+```json
+{"level": "INFO", "message": "session.open", "session_id": "s-7f60c8ba0980", "transport": "ws"}
+{"duration_s": 0.027, "level": "INFO", "message": "session.close", "reason": "closed", "session_id": "s-7f60c8ba0980", "transport": "ws"}
+```
+
+Sessão que morre de exceção fecha com `reason` sendo o nome da exceção, não
+`"closed"`.
+
+### Tracing
+
+Um span por sessão, um por dispatch e um por lote de patches, atrás de um adapter.
+`otel_tracer()` importa `opentelemetry` **dentro da função**: o default nunca
+toca a lib, e um app que não faz tracing não paga o import. Exporter e sampler
+ficam com o OpenTelemetry (env var ou setup de SDK que a app controla) —
+embrulhar isso seria uma segunda superfície de configuração, pior que a primeira.
+
+!!! note "Custo quando está desligado, medido"
+    Default (`observability=None`): o dispatch não toma relógio e não abre span.
+    Com métricas **e** log estruturado ligados, 200 cliques num app de 40 linhas
+    passaram de 0,665 ms para 0,689 ms de média — **+3,6%**. É o preço de saber o
+    que está acontecendo.
+
+## Performance: o que é medido, e como o gate não vira flake
+
+Três medidas, três lugares, porque elas têm custos muito diferentes de coletar.
+
+### O gate que trava o PR
+
+```bash
+uv run python benchmarks/perf_gate.py
+```
+
+`benchmarks/perf_gate.py` roda no CI e falha o job. O ponto difícil de um gate de
+perf não é medir — é **não ser flake**: runner compartilhado varia mais do que as
+regressões que valem pegar, então limite absoluto ou dispara com ruído (e é
+desligado na primeira semana) ou é tão frouxo que não pega nada. Por isso ele
+afirma só o que sobrevive a uma máquina lenta:
+
+| Afirmação | Por que ela aguenta ruído |
+|---|---|
+| dobrar as linhas custa no máximo ~2,6× | é **razão** entre duas medidas na mesma máquina, uma atrás da outra; `O(n²)` aparece perto de 4× |
+| uma linha alterada gera 2 patches | é correção, não tempo — e o jeito mais barato de fazer um diff parecer rápido é parar de estar certo |
+| custo calibrado dentro de 2,5× do baseline | o custo é dividido por um laço de calibração medido no mesmo processo, o que remove a velocidade da CPU — mas não a de memória/GC: o mesmo build custou 975,8, 1130,9 e 1206,9 unidades em três runners da CI contra um baseline de 667,7 medido em máquina de desenvolvimento, então este limite é tripwire grosso (pega uma duplicação), e a precisão fica nas razões de escala |
+| N sessões sustentam o throughput total de uma | o loop é single-threaded e o rebuild é CPU-bound, então o **total** fica plano e a fatia por sessão divide; queda no total é contenção, não carga |
+
+Mudança deliberada de custo: `--update-baseline` e justifique no PR. O baseline é
+versionado (`benchmarks/baseline.json`).
+
+### Throughput do Modo B
+
+```bash
+uv run python benchmarks/bench_ws_throughput.py --sessions 10 --events 100
+```
+
+Mede o loop em que um app Modo B vive: evento chega, handler muda estado, o core
+faz o diff, o transporte manda o lote. O transporte **conta** em vez de escrever
+num socket — o que está sob teste é o Python acima dele, e a rede só faz o número
+diminuir; este é o teto.
+
+O que a medição mostra: o total fica aproximadamente **constante** e a fatia por
+sessão divide. Ou seja, **Modo B satura em CPU no rebuild**, num único event loop.
+Escalar é mais processo (o Modo B é stateful por sessão, então cada processo
+precisa de afinidade de sessão), não mais threads.
+
+### Cold-start do Modo A
+
+```bash
+npm install --no-save playwright && npx playwright install chromium
+node benchmarks/bench_cold_start.mjs http://127.0.0.1:8000/
+```
+
+Roda em **job agendado** (`perf-cold-start.yml`), não em PR: um download de ~6 MB
+de Pyodide no caminho crítico de cada PR compra um número que ninguém lê naquele
+momento. Mede dois valores para a mesma página, e os dois interessam:
+
+- **cold** — sem service worker e sem cache: Pyodide e o core vêm da rede. É a
+  primeira visita.
+- **warm** — o precache do SW serve os dois. É toda visita seguinte.
+
+O relógio para quando a primeira árvore da app está na tela (o primeiro
+`[data-tw-key]`), que é a definição honesta de "o leitor pode usar" — esperar
+`load` pararia antes de o Pyodide começar.
+
+!!! tip "Medido, e o resultado é contra-intuitivo"
+    `examples/counter` em Chrome real, artefato buildado: **cold 2.394 ms com
+    14.593 KB** transferidos; **warm 2.354 ms com 8.751 KB**. O service worker
+    poupou **5,8 MB de rede e 40 ms de tempo** — 40% dos bytes e **1,7%** do
+    relógio.
+
+    A leitura importa mais que os números: no Modo A o custo dominante é o **boot
+    do Pyodide (CPU)**, não o download. Otimizar rede aí não move a agulha; quem
+    precisa de first-paint usa Modo B ou C, que é o que a doc de arquitetura já
+    dizia — agora com medida.
+
 ## Recap
 
 - A observabilidade usa o **padrão adapter**: troca o backend sem mudar o app.

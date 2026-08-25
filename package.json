@@ -4,9 +4,11 @@
   "type": "module",
   "description": "Pure-JS DOM renderer for tempestweb. No build step. jsdom only for tests.",
   "scripts": {
-    "test": "node --test \"tests/client/**/*.test.js\""
+    "test": "node --test \"tests/client/**/*.test.js\"",
+    "a11y": "node scripts/a11y-gate.mjs"
   },
   "devDependencies": {
+    "axe-core": "^4.13.0",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.0.1"
   }

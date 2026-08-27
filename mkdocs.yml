@@ -99,6 +99,7 @@ plugins:
             "Generate a client from OpenAPI": "Gerar um cliente a partir de OpenAPI"
             "Export CSV & XLSX": "Exportar CSV e XLSX"
             "Permissions in the view": "Permissões na view"
+            "Reading remote data": "Lendo dados remotos"
             "Tutorial — the Counter": "Tutorial — o Counter"
             "1. The view tree": "1. A árvore de view"
             "2. State and handlers": "2. Estado e handlers"
@@ -266,6 +267,7 @@ nav:
       - Routing & navigation: tutorial/routing.md
       - "Controls (fields, switches, pickers)": tutorial/controls.md
       - Long lists: tutorial/lists.md
+      - Reading remote data: tutorial/query.md
       - Responsive layout: tutorial/responsive.md
       - Overlays and modals: tutorial/overlays.md
       - Drag, reorder, paginate: tutorial/gestures.md
@@ -303,6 +305,7 @@ nav:
       - tempestweb.core: reference/core.md
       - tempestweb.export: reference/export.md
       - tempestweb.access: reference/access.md
+      - tempestweb.query: reference/query.md
   - Examples:
       - "Example gallery": examples/index.md
       - "To-do list": examples/todo.md

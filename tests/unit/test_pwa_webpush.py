@@ -523,7 +523,13 @@ def test_a_broken_store_does_not_cancel_delivery_to_the_live_endpoints() -> None
 
 
 def test_the_send_route_answers_200_when_pruning_fails() -> None:
-    """/webpush/send reports the batch instead of 500-ing on a broken store."""
+    """/webpush/send reports the batch instead of 500-ing on a broken store.
+
+    ``raise_server_exceptions=False`` on purpose: it makes the client behave
+    like a real server, turning an escaped exception into the **500** the
+    browser would see instead of re-raising it into the test. Measured against
+    the unprotected prune, that is exactly what came back.
+    """
     fastapi = pytest.importorskip("fastapi")
     testclient = pytest.importorskip("fastapi.testclient")
 
@@ -534,11 +540,13 @@ def test_the_send_route_answers_200_when_pruning_fails() -> None:
     svc = WebPushService(VAPID, store=store, sender=_dead_first_sender(attempted))
     app = fastapi.FastAPI()
     app.include_router(webpush_router(svc))
+    client = testclient.TestClient(app, raise_server_exceptions=False)
 
-    response = testclient.TestClient(app).post("/webpush/send", json={"title": "x"})
+    response = client.post("/webpush/send", json={"title": "x"})
 
-    assert response.status_code == 200
+    assert response.status_code == 200, "a broken store must not become a 500"
     assert response.json() == {"sent": 1, "total": 2}
+    assert attempted == ["https://push/dead", "https://push/live"]
 
 
 # ---------------------------------------------------------------------------

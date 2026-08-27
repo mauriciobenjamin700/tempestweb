@@ -223,7 +223,7 @@ uv run mkdocs serve            # preview local em http://127.0.0.1:8000
     [a versão EN](https://mauriciobenjamin700.github.io/tempestweb/en/) — nunca
     `localhost`.
 
-### Recap
+## Recap
 
 - **Usar:** `pip install tempestweb` (mais extras opcionais). Só precisa de Python.
 - **Contribuir:** `git clone` + `make setup` cria o venv e instala tudo

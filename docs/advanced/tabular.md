@@ -150,6 +150,82 @@ servida do bucket `tw-assets` do cache de assets.
     mesma URL são deduplicadas. Runtime sem Cache Storage degrada para a URL
     crua: cache frio é mais lento, não quebrado.
 
+## O que pesa não é o modelo — é o runtime
+
+!!! danger "Um modelo de 660 bytes, um runtime de 14 MB"
+    O `.onnx` de uma `LogisticRegression` de 30 features tem **660 bytes**. O
+    `onnxruntime-web` que o executa tem **13,96 MB** (3,58 MB gzip) no bundle
+    mais enxuto. O runtime é **21.000×** o modelo — e é ele que decide se
+    inferência tabular cabe no seu artefato, não o modelo.
+
+Export medido (`skl2onnx` com `zipmap=False`, `scikit-learn` sobre
+`load_breast_cancer` e `make_classification`):
+
+| Modelo | Features | `.onnx` | gzip |
+| --- | --- | --- | --- |
+| `LogisticRegression` | 30 | 660 B | 539 B |
+| `DecisionTreeClassifier(max_depth=8)` | 30 | 2.167 B | 812 B |
+| `GradientBoostingClassifier(n=100)` | 30 | 54.217 B | 7.700 B |
+| `RandomForestClassifier(n=100, d=8)` | 30 | 154.013 B | 20.192 B |
+| `LogisticRegression`, 3 classes | 120 | 2.259 B | 1.915 B |
+| `RandomForestClassifier(n=300, d=12)` | 120 | **14.292.489 B** | 1.623.887 B |
+
+Do lado do runtime, `onnxruntime-web` 1.29.0, medido pelo que o Chrome
+**realmente baixa**:
+
+| Bundle carregado por `[wasm].scripts` | JS | WebAssembly | total gzip |
+| --- | --- | --- | --- |
+| `ort.wasm.min.js` (só CPU) | 50.196 B | `ort-wasm-simd-threaded.wasm` — 13.961.845 B | **3,58 MB** |
+| `ort.min.js` (default do pacote) | 368.008 B | `…-threaded.jsep.wasm` — 27.797.172 B | **6,48 MB** |
+| `ort.all.min.js` | 819.591 B | `…-threaded.jsep.wasm` — 27.797.172 B | **6,64 MB** |
+
+!!! tip "Carregue `ort.wasm.min.js`, não `ort.min.js`"
+    O bundle default da 1.29.0 puxa o WebAssembly **jsep** (WebGPU + WebNN)
+    mesmo quando a sessão pede só `executionProviders: ["wasm"]` — foi medido
+    aqui, olhando a aba de rede. Trocar por `ort.wasm.min.js` economiza
+    **13,8 MB crus / 2,9 MB gzip** sem mudar uma linha de Python. É o que o
+    [`[wasm].scripts` das capacidades](capabilities.md#extras-de-build-do-modo-a-wasm)
+    já recomenda.
+
+Para dar escala, o mesmo `counter` do tutorial buildado nos dois modos, sem ML
+nenhum:
+
+| Artefato | cru | gzip |
+| --- | --- | --- |
+| Modo A `--offline` (Pyodide + stdlib + pydantic vendorados) | 15,6 MB | 8,4 MB |
+| Modo C (transpile) | 1,98 MB | 291 KB |
+
+Ou seja: `ort.wasm.min.js` **+43% no gzip** de um artefato Modo A offline, e
+**12× o artefato Modo C inteiro**.
+
+### Provedor: o default `["wasm"]`, com o número que o sustenta
+
+Inferência medida em Chrome real (`onnxruntime-web` 1.29.0, 50 execuções,
+mediana e p95, sessão já compilada):
+
+| Modelo | Linhas por execução | mediana | p95 |
+| --- | --- | --- | --- |
+| `LogisticRegression` 30f | 3 | **0,1 ms** | 0,3 ms |
+| `LogisticRegression` 30f | 1.000 | 0,1 ms | 0,3 ms |
+| `RandomForest` 100×d8 | 3 | 0,1 ms | 0,1 ms |
+| `RandomForest` 100×d8 | 1.000 | 3,4 ms | 3,7 ms |
+
+Criar a sessão custa 225 ms na primeira (o runtime WASM subindo junto) e
+2,1–8,3 ms nas seguintes.
+
+!!! info "WebGPU não foi medido aqui — e o default não depende disso"
+    O ambiente desta medição (WSL2, Chrome headless) expõe `navigator.gpu` mas
+    `requestAdapter()` devolve `null`, e o `onnxruntime-web` recusa com
+    `no available backend found. ERR: [webgpu] Failed to get GPU adapter` —
+    inclusive com `--enable-unsafe-swiftshader`. O que sustenta manter
+    `DEFAULT_PROVIDERS = ["wasm"]` é o outro lado da conta: a EP WebGPU **exige o
+    runtime jsep**, que custa 2,9 MB gzip a mais, para acelerar uma inferência
+    que já leva **0,1 ms**. Um ganho de 100% ali economiza 0,1 ms e paga com
+    megabytes.
+
+    `providers=` continua aceitando a ordem que você quiser — quem roda visão e
+    tabular na mesma página já baixou o jsep e pode experimentar sem custo novo.
+
 ## Erros nomeados
 
 | Situação | Erro |
@@ -163,7 +239,12 @@ servida do bucket `tw-assets` do cache de assets.
 
 ## Fora de escopo nesta versão
 
-- `CompactPredictor` e a ordem configurável de execution provider — follow-up.
+- `CompactPredictor` — um formato compacto que roda sem runtime de inferência
+  nenhum. A medição acima é o argumento a favor dele, e o follow-up é a
+  [issue #191](https://github.com/mauriciobenjamin700/tempestweb/issues/191):
+  o que pesa é o `onnxruntime-web`, não o `.onnx`.
+- A ordem de execution provider **já é configurável** por `providers=`; o que
+  ficou decidido é o default, `["wasm"]`, com o número acima.
 - Treinar no browser. Isto é inferência.
 
 ## Recap
@@ -174,4 +255,7 @@ servida do bucket `tw-assets` do cache de assets.
   numa execução só.
 - **`zipmap=False` no export é obrigatório**, e esquecer dá erro que diz isso.
 - Treinar e exportar é passo de build em venv descartável, nunca dependência.
-- Medido em Chrome real: idêntico ao sklearn até 6e-08.
+- Medido em Chrome real: idêntico ao sklearn até 6e-08, e **0,1 ms** por
+  inferência de 3 linhas.
+- **O runtime é que pesa**: 13,96 MB de `onnxruntime-web` para um modelo de
+  660 bytes. Carregue `ort.wasm.min.js` e economize 13,8 MB crus.

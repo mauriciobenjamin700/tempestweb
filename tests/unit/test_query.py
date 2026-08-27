@@ -379,9 +379,12 @@ async def test_the_optimistic_block_rolls_back_when_the_body_raises() -> None:
     cache = _cache()
     await cache.fetch(USERS.list(), Loader(value=ROWS))
 
-    with pytest.raises(RuntimeError, match="server said no"), cache.optimistic(
-        USERS.all(),
-        lambda rows: remove_by_id(rows, 1),  # type: ignore[arg-type]
+    with (
+        pytest.raises(RuntimeError, match="server said no"),
+        cache.optimistic(
+            USERS.all(),
+            lambda rows: remove_by_id(rows, 1),  # type: ignore[arg-type]
+        ),
     ):
         raise RuntimeError("server said no")
 

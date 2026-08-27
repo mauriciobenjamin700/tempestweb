@@ -4,6 +4,49 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.118.0] — 2026-08-27
+
+### Added
+
+- **`device.profile` — memória, núcleos e heap da máquina do usuário (#179).** O
+  framework sabia medir o servidor (`observability/`) e a si mesmo no CI
+  (`benchmarks/perf_gate.py`), e não sabia nada sobre a máquina em que a app
+  roda — que é quem decide se comprimir a foto mais, cachear menos, ou desistir
+  de rodar o modelo ONNX localmente.
+
+  **Escopo reduzido em relação à issue, de propósito.** A issue propunha
+  `DeviceProfile` com `connection`, `save_data` e `cache_bytes` — e os três já
+  existiam: conexão e `save_data` em `native.network.state()`
+  (`NetworkState.effective_type`/`save_data`) e bytes em
+  `native.quota.estimate()`. Pior: o nome proposto (`connection`) divergia do que
+  o `NetworkState` já usa, o que daria **dois nomes ao mesmo fato no contrato**.
+  Ficou só o que era genuinamente novo — `memory_gb`, `cores`, `heap_used_mb`,
+  `heap_limit_mb` — e a doc mostra a composição com as outras duas famílias.
+
+  **Todo campo é opcional, e o teste fixa o caminho em que tudo volta `None`.**
+  `navigator.deviceMemory` e `performance.memory` são só-Chromium; no Safari e no
+  Firefox a chamada funciona e responde `None` na maior parte. Uma app que lê
+  `None` como "aparelho fraco" degrada **todo iPhone** para o pior nível, que é o
+  oposto de adaptar. A doc abre com um `!!! danger` dizendo isso.
+
+  **Medido em Chrome 150:** `memory_gb=32`, `cores=12`, `heap_used_mb=2.5`,
+  `heap_limit_mb=4192`, com o caminho "nenhuma API disponível" devolvendo quatro
+  `None` e console limpo. A medição **corrigiu a doc**: eu havia escrito que o
+  Chromium capa `deviceMemory` em 8, e este Chrome respondeu 32 — o valor é
+  quantizado em potência de dois e o cap é escolha do browser, então a doc passa
+  a mandar comparar com `<=` contra um limite baixo em vez de testar um valor
+  exato.
+
+  Fingerprinting fica **fora** por escrito: os campos são grosseiros de propósito
+  e existem para escolher um nível de compressão, não para identificar ninguém.
+
+  `device.js` entrou em `_NATIVE_ASSETS` e `_native.py` foi regenerado — os dois
+  guards pegaram a falta antes de eu perceber.
+
+### Changed
+
+- `docs/roadmap.md`: Trilho R, fase R5 (device.profile) ✅.
+
 ## [0.117.0] — 2026-08-27
 
 ### Added

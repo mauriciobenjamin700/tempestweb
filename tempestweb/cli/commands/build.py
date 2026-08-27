@@ -125,6 +125,7 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "camera.js",
     "clipboard.js",
     "contacts.js",
+    "device.js",
     "cookies.js",
     "eyedropper.js",
     "file.js",

@@ -140,6 +140,46 @@ async def follow_network() -> None:
         app.set_state(lambda s: setattr(s, "online", net.online))
 ```
 
+### `device` — memory, cores and heap, for adaptive quality
+
+Describes the user's machine **coarsely**, so an app can decide whether to
+compress the photo harder, cache less, or give up on running the ONNX model
+locally.
+
+```python
+from tempestweb import native
+
+async def choose_quality() -> int:
+    profile = await native.device.profile()   # → DeviceProfile(memory_gb, cores, heap_used_mb, heap_limit_mb)
+    if profile.memory_gb is not None and profile.memory_gb <= 2:
+        return 60
+    network = await native.network.state()
+    if network.save_data or network.effective_type in {"slow-2g", "2g", "3g"}:
+        return 70
+    return 85
+```
+
+!!! danger "Every field is optional, and `None` does **not** mean "weak""
+    `navigator.deviceMemory` and `performance.memory` are Chromium-only. On Safari
+    and Firefox the call **succeeds** and answers `None` for most of it. An app
+    reading `None` as "weak device" degrades **every iPhone** to its worst quality
+    tier — the opposite of what adapting was for. Branch on a known value and let
+    the unknown fall through to your default.
+
+!!! info "Only hardware lives here"
+    Connection type is [`network`](#network--connection-conditions) and storage
+    usage is [`quota`](#quota--storage-usage-and-persistence). Repeating either
+    here would give one fact two names in the contract, and the two names would
+    drift.
+
+!!! warning "This is for adapting quality, not for identifying anyone"
+    The fields are coarse on purpose. Do not send this anywhere as an identifier.
+
+Measured on Chrome 150: `memory_gb=32`, `cores=12`, `heap_used_mb=2.5`,
+`heap_limit_mb=4192`. `memory_gb` is quantized to a power of two and the browser
+may cap it — compare with `<=` against a low threshold, not against an exact
+value.
+
 ### `visibility` — tab focused or hidden
 
 Know whether the page is `"visible"` or `"hidden"` — pause animations/polling when

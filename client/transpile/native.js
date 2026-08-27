@@ -151,6 +151,13 @@ export const native = Object.freeze({
     configure: (opts = {}) =>
       call("storage.configure", { codec: opts.codec ?? "json" }),
   }),
+  device: Object.freeze({
+    /**
+     * Coarse hardware facts, every field nullable.
+     * @returns {Promise<{memory_gb: ?number, cores: ?number, heap_used_mb: ?number, heap_limit_mb: ?number}>}
+     */
+    profile: () => call("device.profile", {}),
+  }),
   clipboard: Object.freeze({
     /** Read the clipboard text. @returns {Promise<string>} */
     read: () => call("clipboard.read", {}).then((r) => r.text),

@@ -84,8 +84,8 @@ class TokenAccess:
 
         Args:
             now: The current UNIX time in seconds. Passed in rather than read
-                from the clock so the caller owns the time source — Mode C
-                transpiles this, and a hidden clock read would not survive.
+                from the clock so the caller owns the time source, and so a test
+                pins expiry without freezing a clock.
             leeway_seconds: Treat the token as expired this many seconds early,
                 to absorb clock skew.
 

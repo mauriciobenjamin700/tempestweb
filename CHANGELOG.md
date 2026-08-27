@@ -44,7 +44,12 @@ versioning.
   forma inesperada contribui nada, token expirado **reporta** via
   `is_expired(now=...)`, e `NO_ACCESS` é um default de deslogado que responde
   `False` a tudo em vez de `AttributeError`. `is_expired` recebe `now` em vez de
-  ler o relógio: leitura escondida não atravessa o Modo C.
+  ler o relógio, para quem chama ser dono da fonte de tempo.
+
+  **Modos A e B**, fixado por teste: o Modo C serve um conjunto fechado de
+  módulos e recusa este import no build. Numa app Modo C o servidor manda junto o
+  que a tela pode desenhar — arranjo mais honesto, aliás, porque a decisão vem de
+  quem tem a chave.
 
   Receita em `docs/advanced/access.md` (PT + EN) abrindo com o `!!! danger` de
   que esconder botão não é autorização, com o par servidor/cliente escrito.

@@ -141,9 +141,9 @@ Expirar é estado comum, tratado com refresh — não é exceção. E um token *
 `exp` não expira: `is_expired` devolve `False`.
 
 !!! info "`now` é parâmetro, não relógio escondido"
-    `is_expired(now=...)` recebe o tempo em vez de ler `time.time()` por dentro.
-    O Modo C transpila esse código, e leitura de relógio escondida não
-    atravessa — além de o caller passar a poder testar sem congelar o relógio.
+    `is_expired(now=...)` recebe o tempo em vez de ler `time.time()` por dentro:
+    quem chama é dono da fonte de tempo, e um teste fixa a expiração sem congelar
+    relógio nenhum.
 
 ### Servidor que nomeia os claims de outro jeito
 
@@ -186,6 +186,22 @@ access = ACCESS.for_token(claims) if app.state.token else NO_ACCESS
 `NO_ACCESS` responde `False` a tudo. É melhor default que `None`, que
 levantaria `AttributeError` na primeira `view` que esquecesse de checar.
 
+## Modos A e B
+
+!!! warning "O Modo C recusa este import"
+    O Modo C transcreve o Python da sua app para JavaScript e serve um conjunto
+    fechado de módulos — `tempest_core`, `tempestweb.components` e
+    `tempestweb.native`. Uma app Modo C que importe `tempestweb.access` é
+    **recusada no build**, com erro nomeado:
+
+    ```text
+    app.py:5: import from 'tempestweb.access' is not supported
+    (only tempest_core, `tempestweb.components` and `tempestweb.native`)
+    ```
+
+    Numa app Modo C, o servidor manda junto o que a tela pode desenhar — o que,
+    aliás, é a forma mais honesta: a decisão vem de quem tem a chave.
+
 ## Fora de escopo
 
 - **Verificar assinatura de JWT no cliente.** No Modo A o segredo estaria no
@@ -203,3 +219,4 @@ levantaria `AttributeError` na primeira `view` que esquecesse de checar.
 - `unverified_access_from_token` **não** verifica assinatura, e o nome diz isso
   em toda chamada.
 - Nada disto é autorização. O servidor decide; isto desenha.
+- Modo A e Modo B. O Modo C recusa o import no build.

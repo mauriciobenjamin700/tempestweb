@@ -45,6 +45,12 @@ in the recipe.
 
     If the server does not enforce it, it is not enforced.
 
+!!! warning "Modes A and B only"
+    Mode C transpiles the app's own Python into JavaScript and serves a fixed set
+    of modules — ``tempest_core``, ``tempestweb.components`` and
+    ``tempestweb.native``. Importing this package from a Mode C app is refused at
+    build time with a named error.
+
 Import everything from this package level rather than from submodules.
 """
 

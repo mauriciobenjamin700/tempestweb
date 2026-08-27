@@ -142,8 +142,8 @@ token with **no** `exp` does not expire: `is_expired` returns `False`.
 
 !!! info "`now` is a parameter, not a hidden clock"
     `is_expired(now=...)` takes the time rather than reading `time.time()`
-    internally. Mode C transpiles this code, and a hidden clock read would not
-    survive — plus the caller can test it without freezing a clock.
+    internally: the caller owns the time source, and a test pins expiry without
+    freezing any clock.
 
 ### A server that names its claims differently
 
@@ -187,6 +187,23 @@ access = ACCESS.for_token(claims) if app.state.token else NO_ACCESS
 `NO_ACCESS` answers `False` to everything. A better default than `None`, which
 would raise `AttributeError` in the first view that forgot to check.
 
+## Modes A and B
+
+!!! warning "Mode C refuses this import"
+    Mode C transcribes your app's Python into JavaScript and serves a closed set
+    of modules — `tempest_core`, `tempestweb.components` and
+    `tempestweb.native`. A Mode C app importing `tempestweb.access` is
+    **refused at build time**, with a named error:
+
+    ```text
+    app.py:5: import from 'tempestweb.access' is not supported
+    (only tempest_core, `tempestweb.components` and `tempestweb.native`)
+    ```
+
+    In a Mode C app the server sends along what the screen may draw — which is
+    the more honest arrangement anyway: the decision comes from whoever holds the
+    key.
+
 ## Out of scope
 
 - **Verifying a JWT signature on the client.** In Mode A the secret would be in
@@ -204,3 +221,4 @@ would raise `AttributeError` in the first view that forgot to check.
 - `unverified_access_from_token` does **not** verify the signature, and the name
   says so at every call site.
 - None of this is authorization. The server decides; this draws.
+- Mode A and Mode B. Mode C refuses the import at build time.

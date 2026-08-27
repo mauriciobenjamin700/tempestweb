@@ -274,3 +274,29 @@ def test_for_token_end_to_end_from_a_real_looking_jwt() -> None:
     assert access.can("users:delete")
     assert access.can("audit:read")
     assert not access.can("billing:refund")
+
+
+def test_mode_c_refuses_the_import_with_a_named_error() -> None:
+    """The recipe says Modes A and B only; this is what makes that true.
+
+    Mode C serves a closed set of modules, so a Mode C app importing this
+    package is refused at build time. Pinned so the docs cannot drift: if Mode C
+    ever serves a JS port, this test fails and says to update the recipe.
+    """
+    from tempestweb.transpile import TranspileError, generate
+
+    source = (
+        "from dataclasses import dataclass, field\n"
+        "from tempest_core import App, Column, Text, Widget\n"
+        "from tempestweb.access import AccessControl\n"
+        "@dataclass\n"
+        "class State:\n"
+        "    roles: list[str] = field(default_factory=list)\n"
+        "def view(app: App[State]) -> Widget:\n"
+        '    return Column(key="b", children=[Text(key="t", value="hi")])\n'
+    )
+    with pytest.raises(TranspileError) as caught:
+        generate(source, filename="app.py")
+
+    assert "tempestweb.access" in str(caught.value)
+    assert "not supported" in str(caught.value)

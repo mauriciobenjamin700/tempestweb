@@ -4,6 +4,60 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.115.0] — 2026-08-27
+
+### Added
+
+- **`tempestweb.access` — `can()` e claims do token, para a `view` decidir o que
+  desenhar (#177).** O servidor já decidia o que uma requisição pode fazer; do
+  lado da tela não existia nada, então `if state.role == "admin"` se espalhava
+  pela `view` e a lista de permissões do JWT era lida com `json.loads` em algum
+  canto.
+
+  `AccessControl(roles={...})` guarda o mapa papel → permissão **uma vez**;
+  `for_roles`/`for_permissions`/`for_token` resolvem, e a `view` pergunta
+  `access.can("users:delete")`. O curinga é deliberadamente pequeno — um
+  separador e um curinga no fim, não um glob:
+
+  | Concedido | Pedido | |
+  |---|---|---|
+  | `users:*` | `users:delete` | ✅ |
+  | `users:*` | `audit:read` | ❌ outro prefixo |
+  | `users:*` | `users` | ❌ é outra permissão, não uma mais rasa |
+  | `users:read` | `users:*` | ❌ ler não é poder tudo |
+
+  **`unverified_access_from_token` não verifica assinatura, e o nome carrega
+  isso.** A issue pedia que fosse impossível confundir; o nome proposto
+  (`permissions_from_token`) soava autoritativo no autocomplete de quem não lê a
+  doc, então o `unverified_` entrou no identificador, para aparecer em toda
+  chamada e em todo code review. Um token com assinatura forjada **decodifica
+  normalmente** — recusar alguns sugeriria que os aceitos foram conferidos, e no
+  Modo A a chave estaria no browser junto com a app. Isso está fixado por teste,
+  para que "consertar" adicionando verificação reprove e explique.
+
+  Construído sobre o `decode_jwt` que já existia em `observability/auth.py`, em
+  vez de reimplementar base64url + parse — metade da superfície proposta pela
+  issue já estava no repo.
+
+  Falha de forma **fecha, não quebra**: papel desconhecido concede nada em vez de
+  levantar (o servidor pode ganhar um papel antes de a app modelá-lo), claim com
+  forma inesperada contribui nada, token expirado **reporta** via
+  `is_expired(now=...)`, e `NO_ACCESS` é um default de deslogado que responde
+  `False` a tudo em vez de `AttributeError`. `is_expired` recebe `now` em vez de
+  ler o relógio, para quem chama ser dono da fonte de tempo.
+
+  **Modos A e B**, fixado por teste: o Modo C serve um conjunto fechado de
+  módulos e recusa este import no build. Numa app Modo C o servidor manda junto o
+  que a tela pode desenhar — arranjo mais honesto, aliás, porque a decisão vem de
+  quem tem a chave.
+
+  Receita em `docs/advanced/access.md` (PT + EN) abrindo com o `!!! danger` de
+  que esconder botão não é autorização, com o par servidor/cliente escrito.
+
+### Changed
+
+- `docs/roadmap.md`: Trilho R, fase R2 (access) ✅.
+
 ## [0.114.0] — 2026-08-27
 
 ### Added

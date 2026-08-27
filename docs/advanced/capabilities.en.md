@@ -215,7 +215,7 @@ def view(app: App[State]) -> Widget:
     """Show the camera and read codes from it."""
 
     def framed(event: CameraFrameEvent) -> None:
-        # event.data is the frame's bytes as base64; event.width/height its size.
+        """Receive one sampled frame from the preview."""
         app.set_state(lambda state: setattr(state, "last", f"{event.width}x{event.height}"))
 
     def scanned(event: QrScanEvent) -> None:
@@ -235,9 +235,18 @@ def view(app: App[State]) -> Widget:
     )
 ```
 
+* **In the browser, `event.data` is a base64 JPEG** — not the raw RGB buffer the
+  core's docstring describes (that is the Android/tempestroid shape). Measured on
+  a 2560×1080 frame: **22,772 base64 characters**; the same frame as raw RGB would
+  be ~11 MB. Decode it with `base64.b64decode(event.data)` and a JPEG reader
+  (`pillow`, in Mode A), or hand the bytes straight to [`vision`](vision.en.md).
+  `event.width`/`height` are the frame's, and `rotation` is always `0` in the
+  browser: the `<video>` already delivers the image the right way up.
 * **`frame_interval_ms` is your network budget.** In Mode B every frame is a
   round trip with an image in it; 500ms is a choice, 30fps is a plan to saturate
   the connection. In Mode A the cost is local, but it is still CPU per frame.
+  Measured in real Chrome with `frame_interval_ms=250`: gaps of **242–264 ms**
+  (median 249) across 12 frames.
 * **`facing`** becomes `getUserMedia`'s `facingMode`: `back` → `environment`,
   `front` → `user`.
 * **A code that was read is not reported every tick.** It stays in frame for many

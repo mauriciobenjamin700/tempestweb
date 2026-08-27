@@ -17,7 +17,7 @@ cobrir".
 | geolocation real (concedida, negada, recuperação) | N3 | ✅ medido — 2026-08-23 |
 | clipboard real (escrita + conteúdo lido de volta) | N3 | ✅ medido — 2026-08-23 |
 | `storage` sobre IndexedDB, sobrevivendo a reload | N3 | ⏳ falta medir (wrapper testado em jsdom, que é um shim) |
-| captura de câmera real | N4 | ⏳ falta hardware ou Chrome com fake device |
+| captura de câmera real | N4 | ✅ medido — 2026-08-27 (câmera virtual do OBS, por CDP no Chrome do Windows) |
 | Background Sync com a aba fechada | P2 | ✅ medido — 2026-08-25 (**achou defeito**: #169) |
 | WebPush: handler → notificação, com a aba fechada | P3 | ✅ medido — 2026-08-25 |
 | WebPush: envio por push service real + `pushsubscriptionchange` | P3 | ⏳ falta par VAPID e endpoint de push alcançável |
@@ -168,27 +168,57 @@ Procedimento: gravar chaves, **recarregar a aba**, conferir que voltam; depois
 "persistiu". Enquanto isso não existir, N3 fica 🔶 mesmo com geo e clipboard
 medidos — a linha cobre três capacidades e só duas foram à prova.
 
-### captura de câmera real (N4)
+### captura de câmera real (N4) — medido 2026-08-27
 
-Este Chrome (o do harness) respondeu `NotFoundError: Requested device not found` a
-`getUserMedia({ video: true })` — não há device nem fake device. Duas saídas:
+O Chrome do harness (Linux, WSL2) não tem `/dev/video*`: `getUserMedia` responde
+`NotFoundError`, e a capacidade reporta `code=unavailable` — "Requested device not
+found" —, que é o caminho *sem device*, não o de permissão. Para o resto é preciso
+um browser com câmera de verdade, e uma **câmera virtual do OBS no Windows**
+serve: ela aparece como device real para o Chrome do Windows.
 
-```bash
-# 1) fake device: mede o caminho inteiro sem hardware
-chromium \
-  --use-fake-device-for-media-stream \
-  --use-fake-ui-for-media-stream \
-  http://127.0.0.1:8000/
+A ponte, sem instalar nada no Windows além do Chrome que já existe:
 
-# 2) device real (o que a issue pede de fato)
-uv run --frozen tempestweb run --mode server --path examples/photo-capture --port 8000
-# abrir num celular na mesma rede, por HTTPS (a câmera exige contexto seguro;
-# localhost conta, um IP na LAN não)
+```powershell
+# no Windows, com a Virtual Camera do OBS ligada
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" `
+  --remote-debugging-port=9222 --remote-allow-origins=* `
+  --user-data-dir="$env:TEMP\tw-cam"
 ```
 
-O que medir: a foto voltando **tipada** ao Python (`Photo` com bytes base64 e
-dimensões), o prompt de permissão negado (a app tem de dizer o motivo, não travar),
-e `CameraPreview.on_frame` recebendo frames no intervalo declarado.
+```bash
+# no WSL: sirva o artefato em 0.0.0.0 e dirija o Chrome do Windows por CDP
+python3 -m http.server 8821 --bind 0.0.0.0    # de dist/wasm
+node -e 'import("playwright-core").then(...)'  # chromium.connectOverCDP("http://127.0.0.1:9222")
+```
+
+Em WSL2 com rede **mirrored** o `127.0.0.1:9222` do WSL já alcança o Chrome do
+Windows; sem mirrored, um `netsh interface portproxy` resolve. A página tem de ser
+aberta em `http://localhost:<porta>` — `localhost` é contexto seguro e a câmera
+funciona; um IP de LAN não é, e o `getUserMedia` some.
+
+**Permissão sem prompt bloqueando**: conceder com
+`context.grantPermissions(["camera"], {origin})` **na mesma sessão** que dirige (a
+concessão morre no disconnect), e negar com
+`browser.newBrowserCDPSession()` + `Browser.setPermission({origin, permission:
+{name: "camera"}, setting: "denied"})` — o nome é `camera`, não `videoCapture`.
+
+Medido, com a OBS Virtual Camera (2560×1080 @ 60 fps):
+
+| O que | Resultado |
+| --- | --- |
+| `camera.capture()` | `Photo` tipado: `image/jpeg`, **2560×1080**, 22.772 chars de base64, `ref=blob:tw:1`, em **72 ms** |
+| `capture(include_bytes=False)` | `bytes_b64=0`, `ref=blob:tw:2`, dimensões intactas — os pixels ficam no cliente |
+| `CameraPreview.on_frame` (250 ms declarados) | 12 frames, gaps **[243, 250, 248, 248, 250, 264, 258, 249, 249, 242, 250]** |
+| Frame entregue | `2560x1080 rotation=0`, 22.772 chars — **JPEG**, não RGB cru |
+| Permissão negada (`Browser.setPermission`) | `capture` levanta `NativeError(code=permission_denied)`; o preview não monta `<video>`; o app reporta e **não trava** |
+| Sem device (o Chrome do WSL) | `code=unavailable`, "Requested device not found" |
+
+**O que a medição esclareceu:** o `CameraFrameEvent.data` do core é documentado
+como "base64 do buffer RGB cru H×W×3" — que é a forma do Android. No browser o
+cliente amostra o `<video>` num canvas e envia **JPEG** (22.772 chars contra os
+~11 MB que o RGB cru daria). Não é defeito do cliente (RGB cru a cada 250 ms seria
+impraticável), é uma diferença de plataforma que não estava escrita: agora está,
+em `docs/advanced/capabilities.md`.
 
 ### WebPush: envio por push service real e `pushsubscriptionchange` (P3)
 

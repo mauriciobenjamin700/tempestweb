@@ -213,7 +213,7 @@ def view(app: App[State]) -> Widget:
     """Show the camera and read codes from it."""
 
     def framed(event: CameraFrameEvent) -> None:
-        # event.data são os bytes do frame em base64; event.width/height, o tamanho.
+        """Recebe um frame amostrado do preview."""
         app.set_state(lambda state: setattr(state, "last", f"{event.width}x{event.height}"))
 
     def scanned(event: QrScanEvent) -> None:
@@ -233,9 +233,18 @@ def view(app: App[State]) -> Widget:
     )
 ```
 
+* **No browser, `event.data` é um JPEG em base64** — não o buffer RGB cru que a
+  docstring do core descreve (essa é a forma do Android/tempestroid). Medido num
+  frame 2560×1080: **22.772 caracteres** de base64; o RGB cru do mesmo frame
+  daria ~11 MB. Decodifique com `base64.b64decode(event.data)` e um leitor de
+  JPEG (`pillow`, no Modo A), ou passe os bytes direto para
+  [`vision`](vision.md). `event.width`/`height` são do frame, e `rotation` é
+  sempre `0` no browser: o `<video>` já entrega a imagem na orientação certa.
 * **`frame_interval_ms` é o seu orçamento de rede.** No Modo B cada frame é um
   round-trip com a imagem dentro; 500ms é uma escolha, 30fps é um plano de
   saturar a conexão. No Modo A o custo é local, mas ainda é CPU por frame.
+  Medido em Chrome real com `frame_interval_ms=250`: gaps de **242–264 ms**
+  (mediana 249) ao longo de 12 frames.
 * **`facing`** vira o `facingMode` do `getUserMedia`: `back` → `environment`,
   `front` → `user`.
 * **Um código lido não é reportado a cada tick.** Ele fica no enquadramento por

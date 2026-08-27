@@ -54,6 +54,85 @@ import {
 } from "./component-styles.gen.js";
 
 /**
+ * The base props a component carries onto the root it renders, as
+ * `[callerName, wireName]`. Mirrors `CARRIED_PROPS` in the core — the parity
+ * test pins that the two lists agree, because a name that drifts here drops a
+ * prop in Mode C alone and nothing else notices.
+ * @type {ReadonlyArray<[string, string]>}
+ */
+const BASE_PROPS = [
+  ["semantics", "semantics"],
+  ["focusable", "focusable"],
+  ["focusOrder", "focus_order"],
+  ["tag", "tag"],
+  ["attrs", "attrs"],
+];
+
+/**
+ * Whether a carried prop holds a value or is simply absent.
+ *
+ * `null`/`undefined` is absence, and so is the empty `attrs` object — its
+ * default is `{}`, and carrying that onto a root that already has attributes
+ * would erase them. `focusable: false` and `focusOrder: 0` are values.
+ *
+ * @param {*} value  The prop's value.
+ * @returns {boolean}
+ */
+function isSet(value) {
+  if (value == null) return false;
+  if (value instanceof Semantics) return true;
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return Object.keys(value).length > 0;
+  }
+  return value !== "";
+}
+
+/**
+ * Whether a node or any of its descendants already sets one carried prop.
+ *
+ * @param {import("../transport.js").Node} node  The subtree root.
+ * @param {string} wire  The prop's wire name.
+ * @returns {boolean}
+ */
+function subtreeSets(node, wire) {
+  if (isSet(node.props?.[wire])) return true;
+  return (node.children ?? []).some((child) => subtreeSets(child, wire));
+}
+
+/**
+ * Wrap a component builder so the caller's base props reach the tree it builds.
+ *
+ * A component is a function here, not a node: whatever the caller passes that
+ * the builder does not read would reach nothing at all — the same defect the
+ * core fixed in 0.17.0 for Modes A and B, and this is the Mode C half of it.
+ *
+ * The rule is the core's, so a screen built here and there announces the same
+ * thing: **the render owns what it touched**. A prop the built subtree already
+ * sets anywhere is left alone, which is what keeps a field correct — it names
+ * the `Input` a screen reader stops at, and a second copy on the role-less
+ * wrapper would announce the same control twice (`aria-prohibited-attr`).
+ *
+ * @template {(args?: Object) => import("../transport.js").Node} T
+ * @param {T} builder  The component builder.
+ * @returns {T}  The same builder, carrying the caller's base props.
+ */
+function carrying(builder) {
+  return /** @type {T} */ (
+    (args = {}) => {
+      const node = builder(args);
+      let carried = null;
+      for (const [caller, wire] of BASE_PROPS) {
+        const value = args[caller];
+        if (!isSet(value) || subtreeSets(node, wire)) continue;
+        carried = carried ?? { ...node.props };
+        carried[wire] = value;
+      }
+      return carried === null ? node : { ...node, props: carried };
+    }
+  );
+}
+
+/**
  * The legacy status tones `Banner`/`Badge` accept, which double as scheme names.
  * @type {ReadonlySet<string>}
  */
@@ -83,12 +162,12 @@ function resolveGap(gap) {
  *          align?: ?string, justify?: ?string, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function HStack({ children = [], gap = "md", align = "center", justify = null, key = null, theme = null } = {}) {
+export const HStack = carrying(function HStack({ children = [], gap = "md", align = "center", justify = null, key = null, theme = null } = {}) {
   return Row({
     key,
     children,
     style: Style({ gap: resolveGap(gap), align, justify }), theme });
-}
+});
 
 /**
  * `VStack` — a vertical stack (SwiftUI-style ergonomic Column).
@@ -101,12 +180,12 @@ export function HStack({ children = [], gap = "md", align = "center", justify = 
  *          align?: ?string, justify?: ?string, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function VStack({ children = [], gap = "md", align = null, justify = null, key = null, theme = null } = {}) {
+export const VStack = carrying(function VStack({ children = [], gap = "md", align = null, justify = null, key = null, theme = null } = {}) {
   return Column({
     key,
     children,
     style: Style({ gap: resolveGap(gap), align, justify }), theme });
-}
+});
 
 /**
  * Merge a caller's `style` over a resolved default: set fields win.
@@ -165,7 +244,7 @@ function surfaceStyle(variant, colorScheme, elevation, radiusStep, theme) {
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Card({
+export const Card = carrying(function Card({
   children = [],
   variant = "elevated",
   colorScheme = "neutral",
@@ -190,7 +269,7 @@ export function Card({
     key: base,
     style: mergeStyle(surfaceStyle(variant, colorScheme, elevation, radiusStep, theme), style),
     child: inner, theme });
-}
+});
 
 /**
  * `Divider` — a hairline rule across the available width.
@@ -199,14 +278,14 @@ export function Card({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Divider({ thickness = 1.0, colorScheme = null, style = null, key = null, theme = null } = {}) {
+export const Divider = carrying(function Divider({ thickness = 1.0, colorScheme = null, style = null, key = null, theme = null } = {}) {
   const height = typeof thickness === "string" ? SPACING_STEPS[thickness] ?? 0.0 : thickness;
   const tinted = colorScheme != null && colorScheme !== "neutral";
   const color = tinted ? colorRoles(theme)[colorScheme] : colorRoles(theme).outline_variant;
   return Container({
     key: key ?? "divider",
     style: mergeStyle({ height, background: color }, style), theme });
-}
+});
 
 /**
  * `Chip` — a compact pill, clickable when it carries `onClick`.
@@ -216,7 +295,7 @@ export function Divider({ thickness = 1.0, colorScheme = null, style = null, key
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Chip({
+export const Chip = carrying(function Chip({
   label = "",
   selected = false,
   onClick = null,
@@ -233,7 +312,7 @@ export function Chip({
     return Button({ label, onClick, key: key ?? "chip", style: merged, theme });
   }
   return Text({ content: label, key: key ?? "chip", style: merged, theme });
-}
+});
 
 /**
  * `SegmentedControl` — a row of segment buttons, the active one solid.
@@ -243,7 +322,7 @@ export function Chip({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function SegmentedControl({
+export const SegmentedControl = carrying(function SegmentedControl({
   options = [],
   selected = 0,
   onSelect = null,
@@ -270,7 +349,7 @@ export function SegmentedControl({
     background: colorRoles(theme).surface_variant,
   };
   return Row({ key: base, style: mergeStyle(strip, style), children, theme });
-}
+});
 
 /**
  * `AppBar` — a top bar: leading widget, growing title, trailing actions.
@@ -284,7 +363,7 @@ export function SegmentedControl({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function AppBar({
+export const AppBar = carrying(function AppBar({
   title = "",
   leading = null,
   actions = [],
@@ -320,7 +399,7 @@ export function AppBar({
     align: "center",
   };
   return Row({ key: base, style: mergeStyle(bar, style), children, theme });
-}
+});
 
 /**
  * `RadioGroup` — one button per option, the chosen one marked.
@@ -330,7 +409,7 @@ export function AppBar({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function RadioGroup({
+export const RadioGroup = carrying(function RadioGroup({
   options = [],
   selected = 0,
   onSelect = null,
@@ -362,7 +441,7 @@ export function RadioGroup({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.sm }, style),
     children, theme });
-}
+});
 
 /**
  * `Scaffold` — app bar, growing body and bottom bar stacked in a column.
@@ -373,7 +452,7 @@ export function RadioGroup({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Scaffold({
+export const Scaffold = carrying(function Scaffold({
   appBar = null,
   body = null,
   bottomBar = null,
@@ -398,7 +477,7 @@ export function Scaffold({
   }
   const shell = { gap: 0.0, background: colorRoles(theme).background };
   return Column({ key: base, style: mergeStyle(shell, style), children, theme });
-}
+});
 
 /**
  * `Surface` — the themed, un-padded box every higher-level surface builds on.
@@ -411,7 +490,7 @@ export function Scaffold({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Surface({
+export const Surface = carrying(function Surface({
   child = null,
   variant = "elevated",
   colorScheme = "neutral",
@@ -425,7 +504,7 @@ export function Surface({
     key: key ?? "surface",
     style: mergeStyle(surfaceStyle(variant, colorScheme, elevation, radiusStep, theme), style),
     child, theme });
-}
+});
 
 /**
  * `StyledContainer` — a `Container` whose padding is a spacing-token step.
@@ -437,13 +516,13 @@ export function Surface({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function StyledContainer({ child = null, padding = "md", style = null, key = null, theme = null } = {}) {
+export const StyledContainer = carrying(function StyledContainer({ child = null, padding = "md", style = null, key = null, theme = null } = {}) {
   const amount = typeof padding === "string" ? SPACING_STEPS[padding] ?? 0.0 : padding;
   return Container({
     key: key ?? "styled-container",
     style: mergeStyle({ padding: Edge.all(amount) }, style),
     child, theme });
-}
+});
 
 /**
  * `Grid` — children laid out in equal-width cells, `columns` per row.
@@ -455,7 +534,7 @@ export function StyledContainer({ child = null, padding = "md", style = null, ke
  *          gap?: number|string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key = null, theme = null } = {}) {
+export const Grid = carrying(function Grid({ children = [], columns = 2, gap = 8.0, style = null, key = null, theme = null } = {}) {
   const base = key ?? "grid";
   const perRow = Math.max(1, columns);
   const space = typeof gap === "string" ? SPACING_STEPS[gap] ?? 0.0 : gap;
@@ -478,7 +557,7 @@ export function Grid({ children = [], columns = 2, gap = 8.0, style = null, key 
     key: base,
     style: mergeStyle({ gap: space }, style),
     children: rows, theme });
-}
+});
 
 /**
  * A fixed-width lateral panel over a resolved surface — the `Sidebar`/`Drawer` body.
@@ -510,7 +589,7 @@ function lateralPanel(key, children, width, variant, colorScheme, elevation, sty
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Sidebar({
+export const Sidebar = carrying(function Sidebar({
   children = [],
   width = 240.0,
   variant = "elevated",
@@ -521,7 +600,7 @@ export function Sidebar({
   theme = null,
 } = {}) {
   return lateralPanel(key ?? "sidebar", children, width, variant, colorScheme, elevation, style, theme);
-}
+});
 
 /**
  * `Drawer` — a controlled lateral panel that shows its children when `open`.
@@ -534,7 +613,7 @@ export function Sidebar({
  *          elevation?: ?number, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Drawer({
+export const Drawer = carrying(function Drawer({
   open = false,
   children = [],
   width = 260.0,
@@ -549,7 +628,7 @@ export function Drawer({
     return Container({ key: key ?? "drawer", theme });
   }
   return lateralPanel(key ?? "drawer", children, width, variant, colorScheme, elevation, style, theme);
-}
+});
 
 /**
  * `Burger` — the hamburger menu button.
@@ -562,7 +641,7 @@ export function Drawer({
  *          size?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Burger({
+export const Burger = carrying(function Burger({
   onClick = null,
   variant = "ghost",
   colorScheme = "neutral",
@@ -580,7 +659,7 @@ export function Burger({
     size,
     key: key ?? "burger",
     style, theme });
-}
+});
 
 /**
  * `Header` — a flat page-header band: a title with an optional subtitle.
@@ -593,7 +672,7 @@ export function Burger({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Header({ title = "", subtitle = null, colorScheme = null, style = null, key = null, theme = null } = {}) {
+export const Header = carrying(function Header({ title = "", subtitle = null, colorScheme = null, style = null, key = null, theme = null } = {}) {
   const base = key ?? "header";
   const titleColor =
     colorScheme != null && colorScheme !== "neutral"
@@ -626,7 +705,7 @@ export function Header({ title = "", subtitle = null, colorScheme = null, style 
     background: colorRoles(theme).surface_variant,
   };
   return Column({ key: base, style: mergeStyle(chrome, style), children, theme });
-}
+});
 
 /**
  * `Footer` — a bottom bar holding arbitrary, centered content.
@@ -638,7 +717,7 @@ export function Header({ title = "", subtitle = null, colorScheme = null, style 
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Footer({
+export const Footer = carrying(function Footer({
   children = [],
   variant = "elevated",
   colorScheme = "neutral",
@@ -654,7 +733,7 @@ export function Footer({
     align: "center",
   };
   return Row({ key: key ?? "footer", style: mergeStyle(base, style), children, theme });
-}
+});
 
 /**
  * `NavBar` — a horizontal navigation bar with the active item as an accent pill.
@@ -668,7 +747,7 @@ export function Footer({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function NavBar({
+export const NavBar = carrying(function NavBar({
   items = [],
   active = 0,
   onSelect = null,
@@ -697,7 +776,7 @@ export function NavBar({
     justify: "center",
   };
   return Row({ key: base, style: mergeStyle(bar, style), children, theme });
-}
+});
 
 /**
  * `Breadcrumb` — a path trail of crumbs joined by a separator.
@@ -709,7 +788,7 @@ export function NavBar({
  *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Breadcrumb({
+export const Breadcrumb = carrying(function Breadcrumb({
   items = [],
   separator = "/",
   onSelect = null,
@@ -755,7 +834,7 @@ export function Breadcrumb({
     key: base,
     style: mergeStyle({ gap: 6.0, align: "center" }, style),
     children, theme });
-}
+});
 
 /**
  * `ListTile` — a list row: optional leading/trailing widgets around a title block.
@@ -769,7 +848,7 @@ export function Breadcrumb({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function ListTile({
+export const ListTile = carrying(function ListTile({
   title = "",
   subtitle = null,
   leading = null,
@@ -824,7 +903,7 @@ export function ListTile({
     padding: Edge.symmetric({ vertical: SPACING_STEPS.sm, horizontal: SPACING_STEPS.md }),
   };
   return Row({ key: base, style: mergeStyle(tile, style), children, theme });
-}
+});
 
 /**
  * `Avatar` — a round badge showing short initials.
@@ -836,7 +915,7 @@ export function ListTile({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", style = null, key = null, theme = null } = {}) {
+export const Avatar = carrying(function Avatar({ initials = "", size = 40.0, colorScheme = "primary", style = null, key = null, theme = null } = {}) {
   const base = key ?? "avatar";
   const pair = modeTable(AVATAR_COLORS, theme)[colorScheme] ?? modeTable(AVATAR_COLORS, theme).primary;
   const disc = {
@@ -853,7 +932,7 @@ export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", st
       content: initials,
       key: `${base}-text`,
       style: Style({ color: pair.color, font_weight: 700, text_align: "center" }), theme }), theme });
-}
+});
 
 /**
  * `Tag` — a read-only label: a `Chip` fixed to its static, low-emphasis form.
@@ -866,9 +945,9 @@ export function Avatar({ initials = "", size = 40.0, colorScheme = "primary", st
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Tag({ label = "", colorScheme = "primary", size = "md", style = null, key = null, theme = null } = {}) {
+export const Tag = carrying(function Tag({ label = "", colorScheme = "primary", size = "md", style = null, key = null, theme = null } = {}) {
   return Chip({ label, colorScheme, size, style, key, theme });
-}
+});
 
 /**
  * `Rating` — a row of stars showing, and optionally setting, a 1-based rating.
@@ -880,7 +959,7 @@ export function Tag({ label = "", colorScheme = "primary", size = "md", style = 
  *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Rating({
+export const Rating = carrying(function Rating({
   value = 0,
   maxStars = 5,
   onRate = null,
@@ -916,7 +995,7 @@ export function Rating({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
     children, theme });
-}
+});
 
 /**
  * `Stepper` — a numeric spinner: `-` decrement, current value, `+` increment.
@@ -935,7 +1014,7 @@ export function Rating({
  *          key?: ?string, theme?: ?Object}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Stepper({
+export const Stepper = carrying(function Stepper({
   value = 0,
   step = 1,
   minValue = null,
@@ -983,7 +1062,7 @@ export function Stepper({
         }), theme }),
       button("+", step, `${base}-up`),
     ], theme });
-}
+});
 
 /**
  * `SearchBar` — a search field: a controlled `Input` in a surface pill.
@@ -996,7 +1075,7 @@ export function Stepper({
  *          size?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function SearchBar({
+export const SearchBar = carrying(function SearchBar({
   value = "",
   placeholder = "Search",
   onChange = null,
@@ -1037,7 +1116,7 @@ export function SearchBar({
     padding: Edge.all(8.0),
   };
   return Row({ key: base, style: mergeStyle(box, style), children, theme });
-}
+});
 
 /**
  * Map the legacy `tone` prop onto a Material 3 color scheme.
@@ -1060,7 +1139,7 @@ function toneScheme(tone) {
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Banner({
+export const Banner = carrying(function Banner({
   message = "",
   tone = "info",
   colorScheme = null,
@@ -1084,7 +1163,7 @@ export function Banner({
   }
   const strip = { ...resolved, gap: 12.0, align: "center" };
   return Row({ key: base, style: mergeStyle(strip, style), children, theme });
-}
+});
 
 /**
  * `Alert` — a block status callout: optional glyph, title, body and dismiss.
@@ -1098,7 +1177,7 @@ export function Banner({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Alert({
+export const Alert = carrying(function Alert({
   title = "",
   body = null,
   glyph = null,
@@ -1146,7 +1225,7 @@ export function Alert({
   }
   const block = { ...resolved, gap: SPACING_STEPS.sm, align: "center" };
   return Row({ key: base, style: mergeStyle(block, style), children, theme });
-}
+});
 
 /**
  * `Badge` — a small inline status pill (a count or a short label).
@@ -1156,7 +1235,7 @@ export function Alert({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Badge({
+export const Badge = carrying(function Badge({
   label = "",
   tone = "error",
   colorScheme = null,
@@ -1172,7 +1251,7 @@ export function Badge({
     content: label,
     key: key ?? "badge",
     style: mergeStyle({ ...pill, text_align: "center" }, style), theme });
-}
+});
 
 /**
  * `EmptyState` — a centered placeholder: glyph, title, subtitle, action.
@@ -1182,7 +1261,7 @@ export function Badge({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function EmptyState({
+export const EmptyState = carrying(function EmptyState({
   title = "",
   subtitle = null,
   glyph = "○",
@@ -1225,7 +1304,7 @@ export function EmptyState({
     padding: Edge.all(SPACING_STEPS.lg),
   };
   return Column({ key: base, style: mergeStyle(frame, style), children, theme });
-}
+});
 
 /**
  * `Stat` — a labelled metric with a value and an optional trend delta.
@@ -1237,7 +1316,7 @@ export function EmptyState({
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Stat({ label = "", value = "", delta = null, deltaUp = true, style = null, key = null, theme = null } = {}) {
+export const Stat = carrying(function Stat({ label = "", value = "", delta = null, deltaUp = true, style = null, key = null, theme = null } = {}) {
   const base = key ?? "stat";
   const children = [
     Text({
@@ -1265,7 +1344,7 @@ export function Stat({ label = "", value = "", delta = null, deltaUp = true, sty
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
     children, theme });
-}
+});
 
 /**
  * One `ProgressStepper` cell: a numbered disc above its label.
@@ -1330,7 +1409,7 @@ function stepCell(index, label, current, colorScheme, base, theme) {
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function ProgressStepper({
+export const ProgressStepper = carrying(function ProgressStepper({
   steps = [],
   current = 0,
   colorScheme = "primary",
@@ -1360,7 +1439,7 @@ export function ProgressStepper({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs, align: "center" }, style),
     children, theme });
-}
+});
 
 /**
  * `MetricCard` — a dashboard metric inside a themed card.
@@ -1374,7 +1453,7 @@ export function ProgressStepper({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function MetricCard({
+export const MetricCard = carrying(function MetricCard({
   label = "",
   value = "",
   delta = null,
@@ -1407,7 +1486,7 @@ export function MetricCard({
     colorScheme,
     style,
     children: [body], theme });
-}
+});
 
 /**
  * `StatCard` — a compact preset of `MetricCard` (a `filled` card).
@@ -1418,7 +1497,7 @@ export function MetricCard({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function StatCard({
+export const StatCard = carrying(function StatCard({
   label = "",
   value = "",
   delta = null,
@@ -1440,7 +1519,7 @@ export function StatCard({
     trailing,
     style,
     key: key ?? "stat-card", theme });
-}
+});
 
 /**
  * Map a confidence score to a status color scheme.
@@ -1475,7 +1554,7 @@ export function confidence_scheme(conf, { high = 0.8, mid = 0.5 } = {}) {
  *          style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function ConfidenceBadge({
+export const ConfidenceBadge = carrying(function ConfidenceBadge({
   confidence = 0.0,
   label = "",
   high = 0.8,
@@ -1491,7 +1570,7 @@ export function ConfidenceBadge({
     colorScheme: confidence_scheme(confidence, { high, mid }),
     variant: "subtle",
     style, theme });
-}
+});
 
 /**
  * `Accordion` — a titled section whose body shows only when `open`.
@@ -1507,7 +1586,7 @@ export function ConfidenceBadge({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Accordion({
+export const Accordion = carrying(function Accordion({
   title = "",
   open = false,
   children = [],
@@ -1543,7 +1622,7 @@ export function Accordion({
     key: base,
     style: mergeStyle({ gap: SPACING_STEPS.xs }, style),
     children: [header, ...body], theme });
-}
+});
 
 /**
  * `Tabs` — a tab strip whose active tab carries an underline indicator.
@@ -1559,7 +1638,7 @@ export function Accordion({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function Tabs({
+export const Tabs = carrying(function Tabs({
   tabs = [],
   active = 0,
   onSelect = null,
@@ -1598,7 +1677,7 @@ export function Tabs({
     align: "stretch",
   };
   return Row({ key: base, style: mergeStyle(strip, style), children, theme });
-}
+});
 
 /**
  * The muted label shown above a labelled field.
@@ -1667,7 +1746,7 @@ function onValue(handler) {
  *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function EmailInput({
+export const EmailInput = carrying(function EmailInput({
   value = "",
   label = "E-mail",
   placeholder = "",
@@ -1694,7 +1773,7 @@ export function EmailInput({
     size,
     colorScheme, theme });
   return labelledField(label, field, error, base, style, theme);
-}
+});
 
 /**
  * `PasswordInput` — a labelled password field (secure, with the eye toggle).
@@ -1704,7 +1783,7 @@ export function EmailInput({
  *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function PasswordInput({
+export const PasswordInput = carrying(function PasswordInput({
   value = "",
   label = "Senha",
   placeholder = "Senha",
@@ -1730,7 +1809,7 @@ export function PasswordInput({
     size,
     colorScheme, theme });
   return labelledField(label, field, error, base, style, theme);
-}
+});
 
 /**
  * A labelled masked field — the shape `PhoneInput`/`CPFInput`/`CNPJInput` share.
@@ -1779,7 +1858,7 @@ function maskedField({
  *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function PhoneInput({
+export const PhoneInput = carrying(function PhoneInput({
   value = "",
   label = "Telefone",
   placeholder = "",
@@ -1807,7 +1886,7 @@ export function PhoneInput({
     style,
     key,
   }, theme);
-}
+});
 
 /**
  * `CPFInput` — a labelled CPF field, masked `999.999.999-99`.
@@ -1817,7 +1896,7 @@ export function PhoneInput({
  *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function CPFInput({
+export const CPFInput = carrying(function CPFInput({
   value = "",
   label = "CPF",
   placeholder = "",
@@ -1845,7 +1924,7 @@ export function CPFInput({
     style,
     key,
   }, theme);
-}
+});
 
 /**
  * `CNPJInput` — a labelled CNPJ field, masked `99.999.999/9999-99`.
@@ -1855,7 +1934,7 @@ export function CPFInput({
  *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function CNPJInput({
+export const CNPJInput = carrying(function CNPJInput({
   value = "",
   label = "CNPJ",
   placeholder = "",
@@ -1883,7 +1962,7 @@ export function CNPJInput({
     style,
     key,
   }, theme);
-}
+});
 
 /**
  * `AddressInput` — a grouped Brazilian address block of labelled fields.
@@ -1898,7 +1977,7 @@ export function CNPJInput({
  *          colorScheme?: string, style?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function AddressInput({
+export const AddressInput = carrying(function AddressInput({
   cep = "",
   street = "",
   number = "",
@@ -1958,7 +2037,7 @@ export function AddressInput({
     key: base,
     style: mergeStyle({ gap: 8.0 }, style),
     children, theme });
-}
+});
 
 /**
  * Decide what a field's control announces.
@@ -2030,7 +2109,7 @@ function tempestwebField(label, field, error, key, theme) {
  *          onChange?: ?Function, semantics?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function TextField({
+export const TextField = carrying(function TextField({
   value = "",
   label = "",
   placeholder = "",
@@ -2064,7 +2143,7 @@ export function TextField({
     key: base,
     style: Style({ gap: 4.0, padding: Edge.symmetric({ vertical: 4.0 }) }),
     children, theme });
-}
+});
 
 /**
  * `EmailField` — the tempestweb-native labelled e-mail field.
@@ -2077,7 +2156,7 @@ export function TextField({
  *          onChange?: ?Function, semantics?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function EmailField({
+export const EmailField = carrying(function EmailField({
   value = "",
   label = "E-mail",
   placeholder = "you@example.com",
@@ -2098,7 +2177,7 @@ export function EmailField({
     semantics: controlName,
     key: `${base}-input` });
   return tempestwebField(label, field, error, base, theme);
-}
+});
 
 /**
  * `PasswordField` — the tempestweb-native labelled secure field.
@@ -2107,7 +2186,7 @@ export function EmailField({
  *          onChange?: ?Function, semantics?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function PasswordField({
+export const PasswordField = carrying(function PasswordField({
   value = "",
   label = "Senha",
   placeholder = "",
@@ -2128,7 +2207,7 @@ export function PasswordField({
     semantics: controlName,
     key: `${base}-input` });
   return tempestwebField(label, field, error, base, theme);
-}
+});
 
 /**
  * `LoginForm` — a complete e-mail + password form with a submit button.
@@ -2144,7 +2223,7 @@ export function PasswordField({
  *          submitLabel?: string, semantics?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function LoginForm({
+export const LoginForm = carrying(function LoginForm({
   email = "",
   password = "",
   onEmailChange = null,
@@ -2180,7 +2259,7 @@ export function LoginForm({
     key: key ?? "login-form",
     style: Style({ gap: 12.0, padding: Edge.all(16) }),
     children, theme, semantics });
-}
+});
 
 /**
  * `SignupForm` — e-mail + password + confirm, with a submit button.
@@ -2193,7 +2272,7 @@ export function LoginForm({
  *          key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
-export function SignupForm({
+export const SignupForm = carrying(function SignupForm({
   email = "",
   password = "",
   confirm = "",
@@ -2238,7 +2317,7 @@ export function SignupForm({
     key: key ?? "signup-form",
     style: Style({ gap: 12.0, padding: Edge.all(16) }),
     children, theme, semantics });
-}
+});
 
 export {
   AddressInput as AddressField,

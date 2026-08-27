@@ -4,6 +4,51 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.121.0] — 2026-08-27
+
+### Fixed
+
+- **Em Modo C, a prop da base que a app punha num componente não chegava a nó
+  nenhum.** Nos Modos A e B quem resolve isso é o `build` do core, que passou a
+  carregar `semantics`, `focusable`, `focus_order`, `tag` e `attrs` para a raiz
+  que o componente renderizou (`tempest-core` 0.17.0, aberta a partir daqui). Em
+  Modo C **um componente é uma função**, não um nó que alguém expande: o builder
+  destrutura o que conhece e o resto some. Ou seja, a mesma tela ficava acessível
+  no browser e **muda na build transpilada de si mesma** — a divergência mais cara
+  de achar, porque os dois lados "funcionam".
+
+  Os 47 builders de `components.js` passam a carregar, por um decorator
+  (`carrying`) em vez de uma linha repetida 47 vezes, com a regra do core: **o
+  render é dono do que ele tocou.** Prop que a árvore construída já define em
+  qualquer nó fica intacta — é o que mantém um campo correto, porque ele põe o
+  nome no `Input` em que o leitor de tela para, e a cópia no wrapper sem role
+  anunciaria o mesmo controle duas vezes (`aria-prohibited-attr`).
+
+  Guards, os dois medidos mordendo:
+
+  | Onde | O quê |
+  | --- | --- |
+  | `tests/fixtures/transpile_component_samples.json` | seis **pares `__named`**, construídos do core real, com os dois ramos da regra (350 → **356 casos**) |
+  | `tests/client/component-carry.test.js` | sweep sobre **todos** os builders, mais o guard de drift contra o `CARRIED_PROPS` gerado do core |
+
+  Com o `carrying` neutralizado: `alert_title_only__named diverged from core` na
+  matriz, e `Accordion dropped attrs` no sweep.
+
+### Changed
+
+- **Piso `tempest-core>=0.17.1`.** É onde o carry existe (0.17.0) e onde
+  `focusable=False` e `focus_order=0` deixam de ser tratados como ausência
+  (0.17.1) — o Modo C espelha o comportamento corrigido, então rodar contra a
+  0.17.0 faria a matriz divergir nos dois falsy.
+- `client/transpile/values.gen.js` e `tempestweb/transpile/_served.py`
+  regenerados: o core exporta `CARRIED_PROPS`, e ele vira a lista canônica que o
+  cliente espelha em vez de redigitar.
+- O guard `test_ported_components_are_reachable_from_the_app_import` passa a
+  contar as duas formas de declaração (`export function` e `export const`), como
+  o gerador do manifesto sempre contou. Sem isso, um builder embrulhado é
+  reportado como inalcançável — e a régua estaria medindo a sintaxe, não o
+  alcance.
+
 ## [0.120.0] — 2026-08-27
 
 ### Added

@@ -579,6 +579,39 @@ KEYED_TWINS: tuple[str, ...] = (
 )
 
 
+#: One representative case per shape the carry has to get right, each built a
+#: second time with the base props a caller can set on any widget — under a
+#: ``__named`` name. The core carries them onto the root the component rendered
+#: (``tempest-core`` 0.17.0), *unless* the render already touched the prop, and
+#: Mode C builders are hand-authored functions that would otherwise drop them
+#: silently: a name that works in Modes A and B and vanishes in C is the exact
+#: divergence this fixture exists to catch.
+#:
+#: The two branches of the rule are both here: ``card_default`` and friends leave
+#: every one untouched, so all five land on the root, while ``text_field_default``
+#: routes the name to its own ``Input`` and must keep the wrapper anonymous —
+#: copying it there would announce one control twice.
+NAMED_TWINS: tuple[str, ...] = (
+    "card_default",
+    "alert_title_only",
+    "listtile_with_subtitle",
+    "scaffold_body_only",
+    "text_field_default",
+    "login_form_default",
+)
+
+#: The base props the ``__named`` twins carry, falsy ones included: ``focusable``
+#: is a node that does **not** take focus and ``focus_order=0`` puts it first, and
+#: both were dropped as absence until ``tempest-core`` 0.17.1.
+NAMED_PROPS: dict[str, Any] = {
+    "semantics": Semantics(label="Quantidade contratada"),
+    "focusable": False,
+    "focus_order": 0,
+    "tag": "section",
+    "attrs": {"data-probe": "1"},
+}
+
+
 def build_samples() -> dict[str, Any]:
     """Build each sample to its serialized IR (the component's own key dropped).
 
@@ -586,6 +619,11 @@ def build_samples() -> dict[str, Any]:
     style* the builder must reproduce, not the core's incidental keying. The wire
     serializer is the runtime's own, so a handler prop is ``null`` here exactly as
     it is on the wire — which is what the JS builders emit.
+
+    Every entry in :data:`NAMED_TWINS` is built again with :data:`NAMED_PROPS`,
+    under a ``__named`` name, pinning that the base props a caller sets on a
+    component reach the same node in both languages — and that a component which
+    routes one of them itself keeps its own routing.
 
     Every entry in :data:`KEYED_TWINS` is built a second time with an explicit
     ``key``, under a ``__keyed`` name. Only the root key is dropped, so the twin
@@ -621,6 +659,10 @@ def build_samples() -> dict[str, Any]:
         twin = serialize_node(build(cases[name].model_copy(update={"key": "k9"})))
         twin["key"] = None
         samples[f"{name}__keyed"] = twin
+    for name in NAMED_TWINS:
+        twin = serialize_node(build(cases[name].model_copy(update=NAMED_PROPS)))
+        twin["key"] = None
+        samples[f"{name}__named"] = twin
     return samples
 
 

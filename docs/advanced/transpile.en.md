@@ -635,7 +635,7 @@ spirit of `mypy --strict`.
     core's style resolvers travels in a generated table
     (`component-styles.gen.js`), the same way `widget-styles.gen.js` does for the
     widgets. Every builder is pinned by a matrix of props built from the real core
-    — **350 cases** — so a drift in composition or resolved style fails the test.
+    — **356 cases** — so a drift in composition or resolved style fails the test.
     That is 151 components, each with a **`__dark` twin** (the mode axis
     [#106](https://github.com/mauriciobenjamin700/tempestweb/issues/106) brought:
     a port that forgets to pass the theme down to a child fails on that child's
@@ -655,6 +655,29 @@ spirit of `mypy --strict`.
     of the `Input` that emits the event — and Mode C carries that derivation.
 
     `examples/mode-c-components` exercises the whole batch in one app.
+
+!!! check "A component carries the base props — here too"
+    Every widget declares `semantics`, `focusable`, `focus_order`, `tag` and
+    `attrs`. In Modes A and B the core's `build` carries them onto the root the
+    component rendered (`tempest-core` 0.17.0). In Mode C **a component is a
+    function**, not a node someone expands: a prop the builder does not read would
+    reach no node at all, and a screen that is accessible in the browser would go
+    mute in the transpiled build of itself.
+
+    Every builder in `components.js` now carries them, with the core's rule: **the
+    render owns what it touched**. A prop the built tree already sets on any node
+    is left alone — which is what keeps a field correct, because it puts the
+    accessible name on the `<input>` a screen reader stops at, and a second copy
+    on the role-less wrapper would announce the same control twice.
+
+    ```python
+    Card(semantics=Semantics(label="Totals"), tag="section", children=[total])
+    ```
+
+    In all three modes that `Card` comes out as a `<section>` announcing "Totals".
+    Pinned by six **`__named` twins** in the parity matrix (both branches of the
+    rule) and by a sweep over **every** builder in
+    `tests/client/component-carry.test.js`.
 
 !!! check "The forms a real app writes"
     The subset takes what a real app writes, not just the counter's minimum:

@@ -544,7 +544,7 @@ def _finish(
         return Prediction(score=float(scores[0]) if scores else 0.0)
 
     if model.link == "sigmoid":
-        positive = 1.0 / (1.0 + math.exp(-scores[0]))
+        positive = _sigmoid(float(scores[0]))
         probabilities = [1.0 - positive, positive]
     elif model.link == "softmax":
         largest = max(scores)
@@ -568,6 +568,30 @@ def _finish(
             for position, value in enumerate(probabilities)
         },
     )
+
+
+def _sigmoid(value: float) -> float:
+    """Map one raw score to a probability, saturating instead of overflowing.
+
+    Written the stable way, for the same reason the softmax beside it subtracts
+    the largest score: ``1 / (1 + exp(-x))`` raises ``OverflowError`` once ``x``
+    goes below about -709 in float64, and a score that far out is exactly what an
+    app that sends a feature in the wrong unit produces (grams where the model
+    was trained on kilograms reaches -908 on this repository's own fixture). The
+    honest answer there is a probability of zero, not a crash. So the branch that
+    would exponentiate a large positive number exponentiates a large negative one
+    instead, which underflows to 0.0 harmlessly.
+
+    Args:
+        value: The raw score of the positive class.
+
+    Returns:
+        The probability of the positive class, in ``[0.0, 1.0]``.
+    """
+    if value >= 0.0:
+        return 1.0 / (1.0 + math.exp(-value))
+    exponentiated = math.exp(value)
+    return exponentiated / (1.0 + exponentiated)
 
 
 def _as_float32(value: float) -> float:

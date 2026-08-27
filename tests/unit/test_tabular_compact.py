@@ -154,6 +154,46 @@ async def test_a_scaler_step_is_folded_rather_than_dropped() -> None:
 
 
 # --------------------------------------------------------------------------
+# The link function: saturating rather than raising
+# --------------------------------------------------------------------------
+
+
+#: A row of the fixture's six features with every value in the wrong unit — the
+#: mistake an app makes when it sends grams to a model trained on kilograms. Its
+#: raw score is -908.29, and negating it gives +952.45: both past the ±709 where
+#: ``math.exp`` overflows float64.
+WRONG_UNIT_ROW: dict[str, float] = {
+    "mean radius": 50.0,
+    "mean texture": 60.0,
+    "mean perimeter": 400.0,
+    "mean area": 4000.0,
+    "mean smoothness": 0.3,
+    "mean compactness": 1000.0,
+}
+
+
+@pytest.mark.asyncio
+async def test_a_score_far_off_the_scale_saturates_instead_of_overflowing() -> None:
+    """A wrong-unit row is a probability of 0 or 1, not an OverflowError.
+
+    ``1 / (1 + exp(-x))`` raises ``OverflowError: math range error`` below about
+    -709, so before the stable form this crashed rather than answering — while
+    the softmax beside it had subtracted the largest score all along.
+    """
+    predictor, _ = _predictor("linear_binary_sigmoid")
+
+    low = await predictor.predict(WRONG_UNIT_ROW)
+    high = await predictor.predict(
+        {name: -value for name, value in WRONG_UNIT_ROW.items()}
+    )
+
+    assert low.label == "0"
+    assert low.probabilities == {"0": 1.0, "1": 0.0}
+    assert high.label == "1"
+    assert high.probabilities == {"0": 0.0, "1": 1.0}
+
+
+# --------------------------------------------------------------------------
 # Loading: once, lazily, and only when there is a row to score
 # --------------------------------------------------------------------------
 

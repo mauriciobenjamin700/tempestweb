@@ -133,6 +133,8 @@ def test_every_moved_page_kept_its_old_url() -> None:
             "query",
             # Written for #180; new page, never had a published URL of its own.
             "storage-codec",
+            # Written for #178; new page, never had a published URL of its own.
+            "tabular",
         }
     )
     assert not unmapped, (

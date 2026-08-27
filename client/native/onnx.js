@@ -12,6 +12,7 @@
 // missing some kernels — e.g. Resize — under the WebGPU provider).
 
 import { CapabilityError } from "./index.js";
+import { ensureCached } from "../offline/asset-cache.js";
 
 /** @type {Map<string, any>} Compiled sessions keyed by their issued id. */
 const SESSIONS = new Map();
@@ -115,10 +116,13 @@ function fromOrtTensor(tensor) {
  */
 export async function onnxLoad(args, deps) {
   const ort = resolveOrt(deps);
+  const providers =
+    args.providers && args.providers.length ? args.providers : ["wasm"];
   let session;
   try {
-    session = await ort.InferenceSession.create(args.model_url, {
-      executionProviders: args.providers && args.providers.length ? args.providers : ["wasm"],
+    const source = args.cache === false ? args.model_url : await cachedModel(args, deps);
+    session = await ort.InferenceSession.create(source, {
+      executionProviders: providers,
     });
   } catch (err) {
     throw new CapabilityError("model_load", err && err.message);
@@ -159,7 +163,53 @@ export async function onnxRun(args, deps) {
 
   const outputs = {};
   for (const name of session.outputNames || Object.keys(results)) {
-    if (results[name]) outputs[name] = fromOrtTensor(results[name]);
+    const value = results[name];
+    if (!value) continue;
+    // A sklearn classifier exported with skl2onnx's DEFAULT settings emits
+    // `probabilities` as a seq(map(int64,float)) — the ZipMap node — which is not
+    // a tensor and cannot be read as one. onnxruntime's own message for that
+    // ("Reading data from non-tensor typed value is not supported") does not say
+    // what to do, so it is translated here into one that does.
+    if (!value.data || typeof value.type !== "string") {
+      throw new CapabilityError(
+        "unsupported_output",
+        `output "${name}" is not a tensor (it is a sequence or map). Re-export ` +
+          "the model without ZipMap: skl2onnx's " +
+          'to_onnx(..., options={id(model): {"zipmap": False}}).',
+      );
+    }
+    outputs[name] = fromOrtTensor(value);
   }
   return { outputs };
+}
+
+/**
+ * Fetch a model through the shared asset cache, so it downloads once.
+ *
+ * An ONNX model is the largest thing an app ships and it never changes between
+ * loads, so re-downloading it every session is the most expensive avoidable
+ * thing this capability does. The cache is the one already in
+ * `client/offline/asset-cache.js` — the same one the offline layer uses — rather
+ * than a second one written here, and `ensureCached` deduplicates concurrent
+ * loads of the same URL on top.
+ *
+ * Degrades to the plain URL: a runtime without Cache Storage (or a fetch that
+ * fails) hands onnxruntime the URL and lets it do what it did before. A cold
+ * cache is slower, not broken.
+ *
+ * @param {{model_url: string}} args
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {Promise<ArrayBuffer|string>} The model bytes, or the URL as a fallback.
+ */
+async function cachedModel(args, deps) {
+  try {
+    const response = await ensureCached(args.model_url, {
+      caches: deps && /** @type {any} */ (deps).caches,
+      fetch: deps && deps.fetch,
+    });
+    if (response && response.ok) return await response.arrayBuffer();
+  } catch {
+    // fall through — the URL still works, it just downloads again
+  }
+  return args.model_url;
 }

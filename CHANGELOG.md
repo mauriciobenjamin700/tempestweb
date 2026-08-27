@@ -4,6 +4,71 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.120.0] — 2026-08-27
+
+### Added
+
+- **`tempestweb.tabular` — inferência sklearn→ONNX no browser (#178).** O
+  framework tinha `vision/` para pixels e nada para dado **tabular** — o caso
+  mais comum de ML em app de negócio (score de risco, previsão de demanda,
+  classificação de lead), que por isso precisava chamar endpoint e quebrava o
+  offline-first.
+
+  **O manifesto é o que a issue chamou de valor real, e é.** Um modelo ONNX é uma
+  função de um vetor de floats **sem rótulo** para um número: a ordem carrega
+  todo o significado e nada no runtime confere. Uma app que manda `{"idade": 30}`
+  para um modelo treinado com `age` não falha — lê um zero e responde um número
+  plausível e errado. Com o manifesto:
+
+  ```text
+  MissingFeatureError: row is missing 1 feature(s): age; it carries instead: idade
+  ```
+
+  As duas metades juntas de propósito: `age` ausente e `idade` presente é **um**
+  typo, não dois. Manifesto sem feature ou com feature repetida é recusado —
+  duplicata torna a ordem ambígua, que é justamente o que ele existe para fixar.
+
+  **v1 estreita**, como combinado: `TabularPredictor` + manifesto + erros
+  nomeados. `CompactPredictor` e ordem configurável de provider ficam para
+  follow-up.
+
+  **Medido em Chrome 150 real**, com um `.onnx` de sklearn de verdade exportado
+  no venv descartável, comparado contra o que o mesmo modelo responde em Python:
+
+  | Linha | sklearn | Chrome → Python | delta |
+  |---|---|---|---|
+  | `income=2000 tenure=6` | `high` p=0,99999702 | `high` p=0,99999708 | 5,96e-08 |
+  | `income=9000 tenure=90` | `low` p=1,00000000 | `low` p=1,00000000 | 0 |
+  | `income=2500 tenure=12` | `low` p=0,66673243 | `low` p=0,66673243 | 0 |
+
+  Sem numpy: o tensor é montado com `struct` da stdlib. numpy é extra do
+  `vision`, e um pacote que empacota algumas dezenas de floats não deve arrastar
+  ele — nem os bounds dele — para a resolução de todo consumidor.
+
+### Fixed
+
+- **`onnx.load` agora passa pelo cache de assets que já existia.** Um modelo ONNX
+  é a maior coisa que uma app embarca e não muda entre cargas, e mesmo assim era
+  rebaixado toda sessão — para o `vision` também. Passa a usar
+  `client/offline/asset-cache.js`, que ainda deduplica cargas concorrentes da
+  mesma URL. Medido: segunda carga em **2,7 ms**, do bucket `tw-assets`. Runtime
+  sem Cache Storage degrada para a URL crua — cache frio é mais lento, não
+  quebrado.
+
+- **Export padrão do skl2onnx não rodava, e o erro não dizia o porquê.** O default
+  acrescenta um nó **ZipMap** e `probabilities` deixa de ser tensor, virando
+  `seq(map(int64,float))`. O `onnxruntime-web` respondia
+  `Reading data from non-tensor typed value is not supported`, que não diz o que
+  fazer. Achado medindo com um export real; agora `onnx.run` levanta
+  `unsupported_output` **nomeando a correção**
+  (`to_onnx(..., options={id(model): {"zipmap": False}})`), e a receita abre com
+  um `!!! danger` sobre isso. O modelo com ZipMap tinha 539 bytes; sem ele, 389 —
+  e passou a rodar.
+
+### Changed
+
+- `docs/roadmap.md`: Trilho R, fase R7 (tabular) ✅ — o trilho inteiro fecha.
+
 ## [0.119.0] — 2026-08-27
 
 ### Added

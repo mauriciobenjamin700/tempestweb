@@ -5,6 +5,7 @@
 // plain object the Python `HttpResponse` model validates.
 
 import { CapabilityError } from "./index.js";
+import { getBlob, isBlobRef } from "./blobs.js";
 
 /**
  * Normalize a `Headers`/object into a lower-cased plain object.
@@ -86,12 +87,15 @@ export async function httpRequest(args, deps) {
 export async function httpUpload(args, deps) {
   const g = /** @type {any} */ (globalThis);
   const XHR = g.XMLHttpRequest;
-  const body = JSON.stringify(args.file || {});
+  const { body, contentType } = uploadBody(args.file || {});
   if (!XHR) {
     if (!deps.fetch) throw new CapabilityError("unavailable", "no upload transport");
     const res = await deps.fetch(args.url, {
       method: "POST",
-      headers: { "content-type": "application/json", ...(args.headers || {}) },
+      headers: {
+        ...(contentType ? { "content-type": contentType } : {}),
+        ...(args.headers || {}),
+      },
       body,
     });
     return { progress: [], response: await readResponse(res) };
@@ -102,7 +106,10 @@ export async function httpUpload(args, deps) {
     const xhr = new XHR();
     xhr.open("POST", args.url, true);
     for (const [k, v] of Object.entries(args.headers || {})) xhr.setRequestHeader(k, v);
-    xhr.setRequestHeader("content-type", "application/json");
+    // A multipart body must NOT carry an explicit content-type: the browser
+    // writes one including the boundary it generated, and overwriting it makes
+    // the server unable to split the parts.
+    if (contentType) xhr.setRequestHeader("content-type", contentType);
     if (xhr.upload) {
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable && e.total > 0) progress.push(e.loaded / e.total);
@@ -123,4 +130,41 @@ export async function httpUpload(args, deps) {
     xhr.onerror = () => reject(new CapabilityError("network", "upload failed"));
     xhr.send(body);
   });
+}
+
+/**
+ * Build the request body for an upload, resolving a blob handle if there is one.
+ *
+ * A descriptor carrying `blob_id` names bytes the client is already holding
+ * (see native/blobs.js), so the upload sends **those bytes**, once, as multipart
+ * — instead of the JSON that merely mentions them. That is what makes
+ * `capture -> compress -> upload` never move the pixels through Python.
+ *
+ * A descriptor without a handle keeps the previous behaviour exactly: a JSON body
+ * carrying base64.
+ *
+ * @param {Object} file  The file descriptor.
+ * @returns {{body: *, contentType: ?string}} The body to send, and the
+ *          content-type to set — null for multipart, where the browser must
+ *          write its own boundary.
+ */
+function uploadBody(file) {
+  const ref = file && file.blob_id;
+  if (isBlobRef(ref)) {
+    const blob = getBlob(ref);
+    if (!blob) {
+      throw new CapabilityError("not_found", `the blob handle ${ref} is gone`);
+    }
+    const g = /** @type {any} */ (globalThis);
+    if (typeof g.FormData === "function") {
+      const form = new g.FormData();
+      form.append("file", blob, file.name || "upload");
+      for (const [key, value] of Object.entries(file)) {
+        if (key !== "blob_id" && typeof value === "string") form.append(key, value);
+      }
+      return { body: form, contentType: null };
+    }
+    return { body: blob, contentType: blob.type || "application/octet-stream" };
+  }
+  return { body: JSON.stringify(file || {}), contentType: "application/json" };
 }

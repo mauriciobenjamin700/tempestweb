@@ -4,6 +4,58 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.119.0] — 2026-08-27
+
+### Added
+
+- **`imaging` — comprimir, miniaturar e transformar antes do upload (#174).**
+  Entre `camera.capture()` e `http.upload()` não havia nada: a app capturava uma
+  foto de 4 MB e subia 4 MB, ou reescrevia compressão com canvas na mão, num
+  framework cuja proposta é não escrever JS.
+
+  **Os pixels ficam no browser.** Toda função recebe e devolve um **handle**
+  opaco para bytes que o cliente segura, e a issue deixava essa decisão em
+  aberto. A alternativa — mandar os bytes — é absurda no Modo B: comprimir uma
+  foto de 4 MB subiria 5,3 MB de base64 ao servidor e baixaria outros 5,3 MB, só
+  para encolher. Com handle são ~40 bytes. `camera.capture(include_bytes=False)`
+  estende isso à primeira travessia e `as_upload(nome)` à última — o servidor
+  recebe os bytes, o Python nunca.
+
+  De quebra, isso **implementa o `blob_id`** que o `http.upload` já documentava e
+  não resolvia: um descritor com handle agora sobe os bytes de verdade, como
+  multipart, em vez do JSON que apenas os mencionava.
+
+  **A busca de qualidade é binária e limitada.** Tamanho codificado não é linear
+  em qualidade, então uma escada fixa ou estoura o orçamento ou joga fora
+  qualidade que cabia. `CompressedImage` reporta onde parou: qual qualidade,
+  quantos encodes gastou e se cumpriu o orçamento.
+
+  **Medido em Chrome 150**, foto de 4000×3000 com estrutura: 871,5 KB → **124,8 KB**
+  (−85,7%) em **5 encodes**, qualidade **0,91**, `within_budget=True`, 545 ms.
+  Miniaturas de 96 e 256 px saíram com 4,9 KB e 29,7 KB. E o caminho que a issue
+  exigia: com 9,4 MB de ruído puro contra 200 KB, parou em **5 encodes** com
+  `within_budget=False` e o menor que conseguiu — respondeu em vez de travar.
+
+  **Opção com nome errado levanta.** `CompressOptions` e `TransformOptions` são
+  `extra="forbid"`: `compress(photo, maxWidth=1600)` levanta em vez de ignorar em
+  silêncio, porque o silêncio subiria a foto em tamanho original e ninguém
+  saberia. Os modelos de payload (`CompressedImage`, `Thumbnail`, …) fazem o
+  oposto e ignoram campo desconhecido, senão cliente novo quebraria Python
+  antigo.
+
+  Handle é limitado e o mais antigo é descartado, para uma tela de captura
+  rodando uma hora não acumular todo frame; endereçar um vencido levanta
+  `NativeError("not_found")`.
+
+  `blobs.js` e `imaging.js` entraram em `_NATIVE_ASSETS`, e `_native.py` foi
+  regenerado.
+
+### Changed
+
+- **`camera.capture` ganha `include_bytes`** e `Photo` ganha `ref`. Aditivo: o
+  default mantém o comportamento de hoje byte a byte.
+- `docs/roadmap.md`: Trilho R, fase R6 (imaging) ✅.
+
 ## [0.118.0] — 2026-08-27
 
 ### Added

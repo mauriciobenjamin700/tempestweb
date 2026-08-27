@@ -151,6 +151,21 @@ export const native = Object.freeze({
     configure: (opts = {}) =>
       call("storage.configure", { codec: opts.codec ?? "json" }),
   }),
+  imaging: Object.freeze({
+    /** Shrink to a byte budget by searching quality. @returns {Promise<Object>} */
+    compress: (source, opts = {}) => call("imaging.compress", { source, ...opts }),
+    /** Render previews at several sizes. @returns {Promise<Object>} */
+    thumbnails: (source, sizes, opts = {}) =>
+      call("imaging.thumbnails", { source, sizes, ...opts }),
+    /** Resize, rotate, crop and flip in one pass. @returns {Promise<Object>} */
+    transform: (source, opts = {}) => call("imaging.transform", { source, ...opts }),
+    /** Type, size and dimensions, without moving the bytes. @returns {Promise<Object>} */
+    info: (source) => call("imaging.info", { source }),
+    /** Pull the bytes back — the escape hatch. @returns {Promise<Object>} */
+    read: (source) => call("imaging.read", { source }),
+    /** Release one handle, or all of them. @returns {Promise<Object>} */
+    release: (source, opts = {}) => call("imaging.release", { source, ...opts }),
+  }),
   device: Object.freeze({
     /**
      * Coarse hardware facts, every field nullable.

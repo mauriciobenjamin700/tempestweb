@@ -140,6 +140,81 @@ async def follow_network() -> None:
         app.set_state(lambda s: setattr(s, "online", net.online))
 ```
 
+### `imaging` — compress, thumbnail and transform before upload
+
+Between `camera.capture()` and `http.upload()` there was nothing: an app captured
+a 4 MB photo and uploaded 4 MB, or rewrote canvas compression by hand.
+
+```python
+from tempestweb import native
+
+async def upload_photo() -> None:
+    photo = await native.camera.capture(include_bytes=False)
+    small = await native.imaging.compress(photo, max_kb=200, max_width=1600)
+    print(small.size_kb, small.quality, small.attempts, small.within_budget)
+    await native.http.upload("/api/photos", small.as_upload("photo.jpg"))
+```
+
+!!! info "The pixels stay in the browser"
+    Every function here takes and returns an opaque **handle** to bytes the client
+    is holding. Python addresses the image by name; the image never crosses the
+    bridge:
+
+    ```text
+    Mode B, a 4 MB photo, compressing it:
+
+      bytes:  client →5.3MB→ server →5.3MB→ client   (10.6 MB of network)
+      handle: client →"blob:tw:7"→ server →"blob:tw:7"→ client   (~40 bytes)
+    ```
+
+    `camera.capture(include_bytes=False)` extends that to the first crossing, and
+    `small.as_upload(name)` to the last — the server gets the bytes, Python never
+    does.
+
+**Measured on Chrome 150**, a 4000×3000 structured photo (gradient + shapes):
+
+| | |
+| --- | --- |
+| original | **871.5 KB** |
+| after `compress(max_kb=200, max_width=1600)` | **124.8 KB** (−85.7%) |
+| quality chosen | **0.91** |
+| encodes spent | **5** |
+| `within_budget` | **True** |
+| time | **545 ms** |
+| thumbnails 96 / 256 px | **4.9 KB** / **29.7 KB** |
+
+!!! warning "An impossible budget **answers**; it does not hang"
+    The quality search is binary and **bounded** by `steps` (6 by default).
+    Measured with 9.4 MB of pure noise against a 200 KB budget: it stopped after 5
+    encodes with `within_budget=False` and `size_kb=573.9` — the smallest it
+    managed. A too-large image the app can decide about beats an endless spinner.
+
+    **Check `within_budget`.**
+
+Four capabilities, plus two for housekeeping:
+
+| Call | Answers |
+| --- | --- |
+| `compress(source, max_kb=, max_width=, ...)` | `CompressedImage(ref, size_kb, quality, attempts, within_budget, …)` |
+| `thumbnails(source, [96, 256])` | `list[Thumbnail]`, in the order asked |
+| `transform(source, width=, rotate=, crop=, flip_horizontal=)` | `ProcessedImage` — all in one pass |
+| `info(source)` | `ImageInfo(mime_type, width, height, size_kb)`, without re-encoding |
+| `read(source)` | `ImageBytes` — the **escape hatch**, moves the whole image |
+| `release(source)` / `release(all=True)` | frees a handle |
+
+!!! danger "A misspelled option **raises**"
+    `CompressOptions` and `TransformOptions` are `extra="forbid"`:
+    `compress(photo, maxWidth=1600)` raises instead of being silently ignored —
+    the silence would upload the photo at full size and nobody would know.
+    `CompressedImage`, `Thumbnail` and friends **ignore** unknown fields, or a
+    newer client would break an older Python.
+
+!!! note "Handles are bounded, and an expired one is a named error"
+    The client holds a few dozen blobs and drops the oldest, so a capture screen
+    running for an hour does not accumulate every frame. Addressing an expired
+    handle raises `NativeError("not_found")` — recover by capturing again, not by
+    retrying.
+
 ### `device` — memory, cores and heap, for adaptive quality
 
 Describes the user's machine **coarsely**, so an app can decide whether to

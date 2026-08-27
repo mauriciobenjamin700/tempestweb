@@ -143,6 +143,16 @@ NATIVE_MEMBERS: Mapping[str, frozenset[str]] = {
             "watch",
         }
     ),
+    "imaging": frozenset(
+        {
+            "compress",
+            "info",
+            "read",
+            "release",
+            "thumbnails",
+            "transform",
+        }
+    ),
     "install": frozenset(
         {
             "prompt",
@@ -544,6 +554,7 @@ NATIVE_GROUPS: frozenset[str] = frozenset(
         "hid",
         "http",
         "idle",
+        "imaging",
         "install",
         "midi",
         "network",

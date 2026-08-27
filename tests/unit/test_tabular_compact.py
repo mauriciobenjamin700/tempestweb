@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import json
 import struct
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -85,6 +86,32 @@ def _predictor(name: str, **kwargs: Any) -> tuple[CompactPredictor, ModelBridge]
     bridge = ModelBridge(_model_bytes(name))
     install_bridge(bridge)
     return CompactPredictor(f"/models/{name}.tmc", **kwargs), bridge
+
+
+def _rewritten(name: str, mutate: Callable[[dict[str, Any]], None]) -> bytes:
+    """Rebuild a fixture with a mutated JSON header, byte offsets intact.
+
+    The header is space-padded so the first section starts on an 8-byte boundary,
+    so the rewrite is padded back to the original length: every section stays
+    where it was, and the only thing that changed is what the header *claims*.
+    That is the shape of the file this reader has to refuse — a real export whose
+    header no longer describes its own bytes.
+
+    Args:
+        name: The fixture to start from.
+        mutate: Edits the decoded header in place.
+
+    Returns:
+        The rewritten file's bytes.
+    """
+    data = bytearray(_model_bytes(name))
+    (length,) = struct.unpack_from("<I", data, 4)
+    header: dict[str, Any] = json.loads(data[8 : 8 + length].decode("utf-8"))
+    mutate(header)
+    encoded = json.dumps(header, separators=(",", ":")).encode("utf-8")
+    assert len(encoded) <= length, "the mutated header no longer fits its padding"
+    data[8 : 8 + length] = encoded + b" " * (length - len(encoded))
+    return bytes(data)
 
 
 # --------------------------------------------------------------------------
@@ -281,16 +308,11 @@ def test_bytes_that_are_not_a_compact_model_are_refused_by_name() -> None:
 
 
 def test_a_file_from_another_version_of_the_format_is_refused() -> None:
-    data = bytearray(_model_bytes("linear_binary_sigmoid"))
-    (length,) = struct.unpack_from("<I", data, 4)
-    header = json.loads(data[8 : 8 + length].decode("utf-8"))
-    header["schema_version"] = COMPACT_SCHEMA_VERSION + 1
-    rewritten = json.dumps(header, separators=(",", ":")).encode("utf-8")
-    rewritten += b" " * (length - len(rewritten))
-    data[8 : 8 + length] = rewritten
+    def bump(header: dict[str, Any]) -> None:
+        header["schema_version"] = COMPACT_SCHEMA_VERSION + 1
 
     with pytest.raises(CompactFormatError) as raised:
-        parse(bytes(data))
+        parse(_rewritten("linear_binary_sigmoid", bump))
 
     assert str(COMPACT_SCHEMA_VERSION) in str(raised.value)
 
@@ -302,6 +324,116 @@ def test_a_truncated_file_names_the_section_that_ran_out() -> None:
         parse(data[: len(data) - 64])
 
     assert "past the end of the file" in str(raised.value)
+
+
+def test_a_file_cut_off_inside_its_own_prefix_is_refused_by_name() -> None:
+    """Four bytes is the magic and nothing else — a truncated download.
+
+    ``struct.unpack_from`` ran before any length check, so this escaped the named
+    error block as ``struct.error: unpack_from requires a buffer of at least 8
+    bytes`` while ``parse(b"")`` said "not a compact model file" correctly.
+    """
+    with pytest.raises(CompactFormatError) as raised:
+        parse(b"TMC1")
+
+    assert "truncated" in str(raised.value)
+    assert "8" in str(raised.value)
+
+
+def test_a_header_that_contradicts_its_own_coefficients_is_refused() -> None:
+    """n_features is stated in the header and again by the length of ``coef``.
+
+    Nothing crossed the two, so a header declaring 3 features over a 6-feature
+    model scored the first three coefficients against three values and answered
+    ``0`` p=0.9999536 in place of p=0.9911187 — the silently wrong prediction the
+    manifest exists to prevent, arriving from the other side.
+    """
+
+    def shrink(header: dict[str, Any]) -> None:
+        header["n_features"] = 3
+
+    with pytest.raises(CompactFormatError) as raised:
+        parse(_rewritten("linear_binary_sigmoid", shrink))
+
+    message = str(raised.value)
+    assert "LogisticRegression" in message
+    assert "6" in message and "3" in message
+
+
+def test_a_header_that_contradicts_its_own_intercepts_is_refused() -> None:
+    def widen(header: dict[str, Any]) -> None:
+        header["n_outputs"] = 2
+        header["n_features"] = 3
+
+    with pytest.raises(CompactFormatError) as raised:
+        parse(_rewritten("linear_binary_sigmoid", widen))
+
+    assert "intercept" in str(raised.value)
+
+
+def test_a_tree_offset_that_does_not_match_n_trees_is_refused() -> None:
+    """The declared tree count and the real one used to be two numbers.
+
+    ``n_trees`` was read, documented and never checked; the loop used
+    ``len(tree_offset) - 1`` instead. A ``tree_offset`` truncated to 3 scored 2 of
+    the 12 declared trees and answered ``setosa`` p=1.0 without a word, and one of
+    length 0 made the count ``-1``: no tree scored, the average divided by ``-1``,
+    and the answer was ``score=-0.0`` with a label on it.
+    """
+
+    def truncate(header: dict[str, Any]) -> None:
+        for section in header["sections"]:
+            if section["name"] == "tree_offset":
+                section["length"] = 3
+
+    with pytest.raises(CompactFormatError) as raised:
+        parse(_rewritten("forest_classifier_normalize", truncate))
+
+    message = str(raised.value)
+    assert "n_trees=12" in message
+    assert "3" in message
+
+
+def test_an_ensemble_of_no_trees_is_refused_rather_than_scored() -> None:
+    def empty(header: dict[str, Any]) -> None:
+        header["n_trees"] = 0
+        for section in header["sections"]:
+            if section["name"] == "tree_offset":
+                section["length"] = 0
+
+    with pytest.raises(CompactFormatError) as raised:
+        parse(_rewritten("forest_classifier_normalize", empty))
+
+    assert "n_trees=0" in str(raised.value)
+
+
+def test_a_multi_output_regression_is_refused_rather_than_losing_columns() -> None:
+    """``identity`` answers ``scores[0]``, so a second column would vanish.
+
+    ``DecisionTreeRegressor`` fits multi-output targets and is on the list this
+    reader claims to cover, so the file is writable; this reader answers one score
+    per row. Dropping the rest quietly is worse than refusing the file.
+    """
+
+    def widen(header: dict[str, Any]) -> None:
+        header["n_outputs"] = 2
+
+    with pytest.raises(CompactFormatError) as raised:
+        parse(_rewritten("tree_regressor_identity", widen))
+
+    message = str(raised.value)
+    assert "regression" in message
+    assert "n_outputs=2" in message
+
+
+def test_a_model_that_scores_nothing_is_refused() -> None:
+    def blank(header: dict[str, Any]) -> None:
+        header["n_outputs"] = 0
+
+    with pytest.raises(CompactFormatError) as raised:
+        parse(_rewritten("linear_multiclass_softmax", blank))
+
+    assert "n_outputs=0" in str(raised.value)
 
 
 def test_the_magic_is_the_one_the_writer_documents() -> None:

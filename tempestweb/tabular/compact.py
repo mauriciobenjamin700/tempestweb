@@ -162,8 +162,9 @@ class CompactModel:
             return self.sections[name]
         except KeyError:
             raise CompactFormatError(
-                f"a {self.kind} model needs the {name!r} section; "
-                f"this file carries: {', '.join(sorted(self.sections)) or 'none'}"
+                f"a {self.estimator or self.kind} compact model needs the "
+                f"{name!r} section; this file carries: "
+                f"{', '.join(sorted(self.sections)) or 'none'}"
             ) from None
 
 
@@ -178,12 +179,18 @@ def parse(data: bytes) -> CompactModel:
 
     Raises:
         CompactFormatError: If the magic bytes, the layout version, the
-            ``kind``/``link``, or a section's length do not hold.
+            ``kind``/``link``, a section's length, or any number the header
+            states about its own shape does not hold.
     """
     if data[: len(COMPACT_MAGIC)] != COMPACT_MAGIC:
         raise CompactFormatError(
             "not a compact model file (magic was "
             f"{data[: len(COMPACT_MAGIC)]!r}, expected {COMPACT_MAGIC!r})"
+        )
+    if len(data) < _PREFIX_LENGTH:
+        raise CompactFormatError(
+            f"the compact file is truncated: {len(data)} bytes, and the magic "
+            f"plus the header length take {_PREFIX_LENGTH}"
         )
     (length,) = struct.unpack_from("<I", data, len(COMPACT_MAGIC))
     try:
@@ -217,7 +224,7 @@ def parse(data: bytes) -> CompactModel:
 
     sections = _sections(data, header, _PREFIX_LENGTH + length)
     preprocess = header.get("preprocess") or {}
-    return CompactModel(
+    model = CompactModel(
         kind=kind,
         task=str(header.get("task", "")),
         link=link,
@@ -232,6 +239,8 @@ def parse(data: bytes) -> CompactModel:
         scale=tuple(float(value) for value in preprocess.get("scale", ())),
         sections=sections,
     )
+    _validate(model)
+    return model
 
 
 class CompactPredictor:
@@ -373,6 +382,92 @@ class CompactPredictor:
         return [_finish(model, manifest, row_scores) for row_scores in scores]
 
 
+def _validate(model: CompactModel) -> None:
+    """Cross-check the numbers the header states against the bytes beside them.
+
+    A compact model declares its shape twice — ``n_features``, ``n_outputs`` and
+    ``n_trees`` in the header, and the length of every section after it — and a
+    file whose two halves disagree does not fail: it **predicts**, on whatever
+    the indexing happens to reach. Measured on this repository's own fixtures:
+
+    * a ``tree_offset`` of length 0 made ``len(offsets) - 1`` equal ``-1``, so
+      ``range(-1)`` scored no tree at all and the average divided by ``-1``,
+      answering ``score=-0.0`` with a label;
+    * a ``tree_offset`` truncated to 3 scored 2 of the 12 trees the header
+      declared and answered ``setosa`` p=1.0 without a word;
+    * a regression exported with two output columns answered on column 0 and
+      dropped the other, which is a plausible number for half a model.
+
+    So every number is crossed once, here, and a file that disagrees is refused
+    rather than scored — the reason :class:`CompactFormatError` exists.
+
+    Args:
+        model: The freshly parsed model.
+
+    Raises:
+        CompactFormatError: If the declared shape disagrees with the sections,
+            or the file asks for arithmetic this reader would have to guess at.
+    """
+    origin = f"this {model.estimator or model.kind} compact model"
+    if model.n_outputs < 1:
+        raise CompactFormatError(
+            f"{origin} declares n_outputs={model.n_outputs}; a model that scores "
+            "nothing cannot be read, and answering 0.0 would look like a score"
+        )
+    if model.task == "regression" and model.n_outputs != 1:
+        raise CompactFormatError(
+            f"{origin} is a regression with n_outputs={model.n_outputs}; this "
+            "reader answers one score per row, so a multi-output regression is "
+            "refused rather than silently reduced to its first column — export it "
+            "with export_sklearn_to_onnx and use TabularPredictor"
+        )
+
+    for name, values in (("offset", model.offset), ("scale", model.scale)):
+        if values and len(values) != model.n_features:
+            raise CompactFormatError(
+                f"{origin} folds a scaler whose {name!r} covers {len(values)} of "
+                f"the {model.n_features} features it declares; a scaler that does "
+                "not cover the row would be applied to part of it"
+            )
+    if bool(model.offset) != bool(model.scale):
+        present, absent = ("offset", "scale") if model.offset else ("scale", "offset")
+        raise CompactFormatError(
+            f"{origin} folds a scaler with {present!r} but no {absent!r}; the two "
+            "are one transform, and half of it is not the transform"
+        )
+
+    if model.kind == "linear":
+        expected = model.n_features * model.n_outputs
+        coefficients = model.section("coef")
+        if len(coefficients) != expected:
+            raise CompactFormatError(
+                f"{origin} carries {len(coefficients)} coefficients, and the "
+                f"n_features={model.n_features} × n_outputs={model.n_outputs} it "
+                f"declares needs {expected}"
+            )
+        intercepts = model.section("intercept")
+        if len(intercepts) != model.n_outputs:
+            raise CompactFormatError(
+                f"{origin} carries {len(intercepts)} intercepts, and the "
+                f"n_outputs={model.n_outputs} it declares needs {model.n_outputs}"
+            )
+        return
+
+    if model.n_trees < 1:
+        raise CompactFormatError(
+            f"{origin} is a tree ensemble with n_trees={model.n_trees}; an "
+            "ensemble of no trees has no score to average, and answering 0.0 "
+            "would look like one"
+        )
+    offsets = model.section("tree_offset")
+    if len(offsets) != model.n_trees + 1:
+        raise CompactFormatError(
+            f"{origin} declares n_trees={model.n_trees}, which needs a "
+            f"'tree_offset' of {model.n_trees + 1} values; this one carries "
+            f"{len(offsets)}, so {len(offsets) - 1} trees would have been scored"
+        )
+
+
 def _sections(
     data: bytes, header: Mapping[str, Any], start: int
 ) -> dict[str, Sequence[float]]:
@@ -492,6 +587,11 @@ def _score_trees(model: CompactModel, vector: Sequence[float]) -> list[float]:
     entry holds ``-1 - slot``, so the sign tells leaf from split and the value
     finds its own row in ``leaf_value``.
 
+    The tree count comes from ``tree_offset``, and :func:`_validate` has already
+    crossed its length against the ``n_trees`` the header declares — so the
+    average below divides by a number the file agreed to twice, never by the
+    ``-1`` an empty ``tree_offset`` used to produce.
+
     Args:
         model: The parsed model.
         vector: The preprocessed row.
@@ -524,7 +624,7 @@ def _score_trees(model: CompactModel, vector: Sequence[float]) -> list[float]:
         base = slot * outputs
         for output in range(outputs):
             totals[output] += leaves[base + output]
-    return [total / trees for total in totals] if trees else totals
+    return [total / trees for total in totals]
 
 
 def _finish(
@@ -541,7 +641,7 @@ def _finish(
         The :class:`~tempestweb.tabular.Prediction`.
     """
     if model.link == "identity":
-        return Prediction(score=float(scores[0]) if scores else 0.0)
+        return Prediction(score=float(scores[0]))
 
     if model.link == "sigmoid":
         positive = _sigmoid(float(scores[0]))

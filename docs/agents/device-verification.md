@@ -175,8 +175,9 @@ virava no-op enquanto respondia `supported=True`.
 Persistência sozinha **não pega isso**: o `localStorage` também sobrevive a
 reload. O que pega é olhar em qual backend o valor caiu.
 
-Depois da correção (`store` injetado no `browserDeps()`, mesmo fallback
-preservado), o mesmo app:
+Depois da correção (`store` injetado no `browserDeps()`, com o fallback de
+`localStorage` alcançável também quando o IndexedDB existe e não abre), o mesmo
+app:
 
 | Passo | Medido |
 | --- | --- |

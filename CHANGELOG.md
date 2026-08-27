@@ -4,6 +4,70 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.122.0] — 2026-08-27
+
+### Added
+
+- **`CompactPredictor` — inferência tabular sem runtime de inferência nenhum
+  (#191).** A #178 entregou `TabularPredictor` sobre ONNX, e a #191 pediu medir
+  antes de portar o resto. Medido: o `.onnx` de uma `LogisticRegression` de 30
+  features tem **660 bytes**, e o `onnxruntime-web` que o executa tem **13,96 MB**
+  (3,58 MB gzip) no bundle mais enxuto — **+43% no gzip** de um artefato Modo A
+  offline e **12× o artefato Modo C inteiro**. Para um app cujo único modelo é
+  tabular, o runtime **é** o download.
+
+  Então este leitor dispensa o runtime em vez do modelo: um modelo linear é um
+  produto escalar, uma árvore é uma cadeia de comparações, e ambos cabem em
+  Python de stdlib (`struct`, `array`, `math`). `CompactPredictor` tem a mesma
+  API do `TabularPredictor` — `predict(row)` / `predict_many(rows)`, linha em
+  qualquer ordem, mesma `Prediction` — e lê o formato `.tmc`/`TMC1` escrito pelo
+  `tempest_fastapi_sdk.modelops.export_sklearn_to_compact`, **que verifica os
+  bytes contra as predições do próprio scikit-learn e recusa escrever um arquivo
+  que discorde**.
+
+  **O arquivo é o manifesto.** O export grava `feature_names` e `classes` dentro
+  do `.tmc`, então não há segundo arquivo para manter em sincronia; `manifest=`
+  fica só para sobrescrever um export sem nomes. Cobre modelo linear, árvore e
+  floresta, mais `Pipeline` com `StandardScaler`/`MinMaxScaler` (o escalador é
+  dobrado no header, nunca ignorado). Gradient boosting o exportador recusa — é
+  outro leitor — e o caminho continua sendo o `TabularPredictor`.
+
+  **A paridade é medida contra o sklearn, não contra nós mesmos:** os seis `.tmc`
+  da suíte são escritos pelo publicador do formato, e ao lado deles fica o que o
+  scikit-learn respondeu para as mesmas linhas
+  (`tests/conformance/_compact_models.py` regenera os dois). Isso pega a
+  armadilha real: `sklearn.tree` converte a entrada para float32 antes de
+  percorrer, então um limiar 5.099999904632568 e uma entrada 5.1 comparam
+  **iguais** e vão para a esquerda — comparar em float64 muda o rótulo de uma
+  linha numa árvore.
+
+  Medido em Chrome real (artefato Modo A, sem `onnxruntime-web` em lugar nenhum):
+  forest de 12 árvores respondeu `setosa` p=1,00000000 e o linear `0`
+  p=0,99111871, contra 0,9911187022504708 do sklearn; **6,3 ms** do frio à
+  primeira predição; p95 de **0,2 ms** por linha; 1.000 linhas de uma vez em
+  **51,8 ms**; e **um request por modelo** ao longo de 200 predições.
+- **Capacidade nativa `compact.load`**, que traz os bytes do `.tmc` pelo mesmo
+  cache de assets que o `onnx.load` usa — o modelo baixa uma vez por versão, não
+  uma por sessão, e um runtime sem Cache Storage cai para o fetch cru.
+
+### Fixed
+
+- **O artefato Modo A não levava oito subpacotes que uma app importa pelo
+  nome.** `tempestweb.tabular`, `.vision`, `.query`, `.access`, `.export`,
+  `.presets`, `.pwa` e `.observability` estavam fora do
+  `_WASM_PACKAGE_PARTS`, então qualquer app Modo A que importasse um deles
+  morria no boot com `No module named` — enquanto a suíte inteira ficava verde,
+  porque o processo de teste tem o pacote instalado e o browser só tem o zip. Foi
+  achado rodando um artefato de verdade numa aba, não pelo gate.
+
+  O guard existente provava que o subconjunto era **fechado** sob os próprios
+  imports; o novo
+  (`test_every_app_facing_subpackage_is_bundled`) inverte a pergunta: todo
+  subpacote que não é server-side (`server`, `cli`, `devserver`) nem
+  build-time (`transpile`) tem que estar no bundle, ou ser excluído de propósito
+  com o motivo escrito. Custo medido: o `tempestweb-pkg.zip` do artefato foi de
+  360.758 para 468.407 bytes — 107 KB contra um Pyodide de 15,6 MB.
+
 ## [0.121.0] — 2026-08-27
 
 ### Fixed

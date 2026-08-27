@@ -47,7 +47,15 @@ Import everything from this package level rather than from submodules.
 
 from __future__ import annotations
 
+from tempestweb.tabular.compact import (
+    COMPACT_MAGIC,
+    COMPACT_SCHEMA_VERSION,
+    CompactModel,
+    CompactPredictor,
+    parse,
+)
 from tempestweb.tabular.errors import (
+    CompactFormatError,
     ManifestError,
     MissingFeatureError,
     PredictionError,
@@ -72,6 +80,8 @@ from tempestweb.tabular.predictor import (
 
 __all__ = [
     "TabularPredictor",
+    "CompactPredictor",
+    "CompactModel",
     "Prediction",
     "FeatureManifest",
     "manifest_from_dict",
@@ -81,6 +91,10 @@ __all__ = [
     "MissingFeatureError",
     "UnknownFeatureError",
     "PredictionError",
+    "CompactFormatError",
+    "COMPACT_MAGIC",
+    "COMPACT_SCHEMA_VERSION",
+    "parse",
     "DEFAULT_PROVIDERS",
     "FLOAT32",
     "FEATURES_KEY",

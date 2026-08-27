@@ -124,6 +124,7 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "bluetooth.js",
     "camera.js",
     "clipboard.js",
+    "compact.js",
     "contacts.js",
     "blobs.js",
     "device.js",
@@ -197,6 +198,19 @@ _WASM_PACKAGE_PARTS: tuple[str, ...] = (
     "transports",
     "native",
     "components",
+    # Feature packages an app imports directly. Left out, every one of them was a
+    # boot-time `No module named 'tempestweb.tabular'` in a real tab while the
+    # whole suite stayed green — the test process has the package installed, the
+    # browser only has this zip. They are pure Python and cost kilobytes against
+    # a Pyodide runtime measured in megabytes.
+    "access",
+    "export",
+    "observability",
+    "presets",
+    "pwa",
+    "query",
+    "tabular",
+    "vision",
     # The theme → CSS emitter. Mode B puts those custom properties in the page
     # head at render time; Mode A's page is static, so the app's palette can only
     # reach the sheet from inside the browser — which means this module has to be

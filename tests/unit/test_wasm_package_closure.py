@@ -1,4 +1,4 @@
-"""The Mode A bundle must be import-closed.
+"""The Mode A bundle must be import-closed — and must carry what apps import.
 
 ``tempestweb build --mode wasm`` zips a *subset* of the package into the
 artifact: the browser needs ``runtime``/``transports``/``native``/``components``
@@ -12,6 +12,14 @@ This walks the bundled files and asserts every module-level ``tempestweb.X``
 import names a part that is bundled too. Imports inside a function are ignored:
 those are the lazy, optional paths (a server-only helper) that never run in the
 browser.
+
+Closure alone was not enough. The subset was closed and still shipped **nothing
+an app imports by name**: `tempestweb.tabular`, `.vision`, `.query`, `.access`
+and `.export` were all absent, so a Mode A artifact using any of them died on
+`No module named` at boot — found by running one in a tab, not by the suite. So
+`test_every_app_facing_subpackage_is_bundled` inverts the question: everything
+that is not server-side or build-time has to be in the bundle, and a new package
+has to be classified on purpose rather than forgotten.
 """
 
 from __future__ import annotations
@@ -84,3 +92,30 @@ def test_the_bundle_lists_only_real_parts() -> None:
     """Every declared part exists, so a rename cannot silently drop one."""
     for part in _WASM_PACKAGE_PARTS:
         assert (PACKAGE_ROOT / part).exists(), f"{part} is declared but absent"
+
+
+#: Subpackages that must never enter the browser bundle, and why. The server and
+#: devserver stacks need FastAPI/Starlette/uvicorn (absent in Pyodide, and useless
+#: in a tab); the CLI is the tool that *writes* artifacts; the transpiler is a
+#: build-time compiler whose output is what runs.
+_NOT_IN_THE_BROWSER: frozenset[str] = frozenset(
+    {"cli", "devserver", "server", "transpile"}
+)
+
+
+def test_every_app_facing_subpackage_is_bundled() -> None:
+    """A package an app can import must be in the artifact, or excluded on purpose."""
+    bundled = _bundled_parts()
+    absent = [
+        directory.name
+        for directory in sorted(PACKAGE_ROOT.iterdir())
+        if directory.is_dir()
+        and (directory / "__init__.py").exists()
+        and directory.name not in _NOT_IN_THE_BROWSER
+        and directory.name not in bundled
+    ]
+    assert absent == [], (
+        "these subpackages ship to PyPI but not into the Mode A artifact, so an "
+        f"app that imports one dies at boot with `No module named`: {absent}. "
+        "Bundle them, or add them to _NOT_IN_THE_BROWSER with the reason."
+    )

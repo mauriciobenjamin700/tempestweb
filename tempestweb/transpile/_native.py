@@ -540,6 +540,7 @@ NATIVE_GROUPS: frozenset[str] = frozenset(
         "bridges",
         "camera",
         "clipboard",
+        "compact",
         "contacts",
         "contract",
         "cookies",

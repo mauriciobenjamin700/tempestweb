@@ -293,7 +293,7 @@ def test_mode_c_refuses_the_import_with_a_named_error() -> None:
         "class State:\n"
         "    roles: list[str] = field(default_factory=list)\n"
         "def view(app: App[State]) -> Widget:\n"
-        '    return Column(key="b", children=[Text(key="t", value="hi")])\n'
+        '    return Column(key="b", children=[Text(key="t", content="hi")])\n'
     )
     with pytest.raises(TranspileError) as caught:
         generate(source, filename="app.py")

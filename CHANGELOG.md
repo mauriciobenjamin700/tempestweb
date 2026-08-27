@@ -4,6 +4,66 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.116.0] — 2026-08-27
+
+### Added
+
+- **`tempestweb.query` — o lado da leitura do dado remoto (#175).** O framework
+  tinha as duas pontas difíceis — `native.http` (retry + idempotência),
+  `native.offline` (fila durável) e `native.sync` (delta-sync por watermark) — e
+  nada no meio. Não havia onde guardar a resposta de um `GET` com chave,
+  invalidar quando uma mutação entra, paginar, ou aplicar uma mudança antes de o
+  servidor concordar. Cada app escrevia isso como `dict` dentro do próprio
+  `State`, e a parte que sempre saía errada era a invalidação.
+
+  **A chave é tupla, então prefixo é comparação e não convenção.** `keys("users")`
+  faz `("users",)`, `("users", "list", "page=1")`, `("users", "detail", "7")`, e
+  `invalidate(USERS.all())` alcança as três. Parâmetro é ordenado antes de entrar
+  na chave, senão a mesma query escrita de dois jeitos cacheia duas vezes e a
+  segunda escrita nunca invalida a primeira. E o prefixo é **por segmento**:
+  `("users",)` não é prefixo de `("users-archive",)`, que é justamente o que um
+  `startswith` sobre strings juntadas erra — em silêncio.
+
+  **`invalidate` mantém o valor; `drop` remove.** Stale não é vazio: a tela segue
+  mostrando a última resposta boa enquanto o refetch está no ar.
+
+  **Leituras concorrentes da mesma chave viram uma requisição** (single-flight).
+  Uma tela com três widgets lendo a mesma query disparava três requisições
+  idênticas.
+
+  **O rollback que faltava no desenho da issue.** O `done-when` pedia "otimista
+  aplicado **e revertido**", mas a superfície proposta só oferecia `patch` +
+  `invalidate` — e invalidar é ida à rede, não desfazer: deixa a mudança errada
+  na tela até o refetch chegar, e offline não faz nada. Aqui `patch` devolve um
+  rollback que restaura **exatamente** as entradas que substituiu, e
+  `optimistic(...)` é o bloco que não deixa esquecer dele. O patch alcança um
+  **prefixo**, porque um rename tem que chegar em toda página cacheada onde a
+  linha aparece; e é atômico, porque duas entradas mostrando duas verdades
+  diferentes é pior que nenhuma mudança.
+
+  **As duas formas de paginar**, tipadas, com `is_offset_page`/`is_cursor_page`
+  para distinguir e `empty_offset_page()` para o estado antes da primeira
+  resposta. Payload malformado renderiza vazio em vez de levantar — listagem
+  vazia é recuperável, exceção no caminho de renderizar é tela branca.
+
+  **Persistência sobre o store que já existe.** `persist`/`restore` falam com um
+  `QueryStorage` — Protocol que o `native.storage` satisfaz como está, verificado
+  sob `mypy --strict` — então `client/offline/store.js` não foi duplicado e o
+  módulo continua rodando sem browser. Valor não-JSON-able é **pulado e contado**,
+  não fatal. Entrada volta **fresca**: revivê-la velha mandaria a tela de boot
+  direto para a rede, que é o que persistir queria evitar.
+
+  Relógio é injetado (`QueryCache(clock=...)`), em milissegundos e monotônico —
+  um relógio de parede que anda para trás faria toda entrada parecer fresca para
+  sempre.
+
+  **Modos A e B**, fixado por teste. Tutorial em `docs/tutorial/query.md`
+  (PT + EN) com programa completo por passo.
+
+### Changed
+
+- `docs/roadmap.md`: Trilho R, fase R3 (query) ✅.
+
 ## [0.115.0] — 2026-08-27
 
 ### Added

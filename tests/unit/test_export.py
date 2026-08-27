@@ -414,3 +414,38 @@ def test_column_references_follow_the_spreadsheet_alphabet(
 def test_mime_types_are_the_ones_file_save_expects() -> None:
     assert CSV_MIME_TYPE == "text/csv"
     assert XLSX_MIME_TYPE.endswith("spreadsheetml.sheet")
+
+
+# --------------------------------------------------------------------------
+# Mode support — pinned, because the docs claim it
+# --------------------------------------------------------------------------
+
+
+def test_mode_c_refuses_the_import_with_a_named_error() -> None:
+    """The recipe says Modes A and B only; this is what makes that true.
+
+    Mode C transcribes the app's Python into JavaScript and serves a closed set
+    of modules. Importing this package from a Mode C app is refused at build
+    time — and the refusal names the module, so the reader is not left guessing.
+
+    Pinned so the docs cannot drift back to "runs in all three modes": if Mode C
+    ever serves a JS port of this package, this test fails and says to update the
+    recipe.
+    """
+    from tempestweb.transpile import TranspileError, generate
+
+    source = (
+        "from dataclasses import dataclass, field\n"
+        "from tempest_core import App, Column, Text, Widget\n"
+        "from tempestweb.export import Column as C, to_csv\n"
+        "@dataclass\n"
+        "class State:\n"
+        "    rows: list[str] = field(default_factory=list)\n"
+        "def view(app: App[State]) -> Widget:\n"
+        '    return Column(key="b", children=[Text(key="t", value="hi")])\n'
+    )
+    with pytest.raises(TranspileError) as caught:
+        generate(source, filename="app.py")
+
+    assert "tempestweb.export" in str(caught.value)
+    assert "not supported" in str(caught.value)

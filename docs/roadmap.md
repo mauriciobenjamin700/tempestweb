@@ -287,7 +287,7 @@ ficou deliberadamente de fora.
 
 | Fase | Escopo | Status |
 |---|---|---|
-| R1 | **export:** `Column` + `to_csv`/`to_xlsx` em Python puro, para o `native.file.save` entregar. Cobre os quatro erros clássicos de encoder à mão — separador dentro do campo, aspas no texto, BOM ausente (Excel lê `João` como `JoÃ£o`) e data de XLSX escrita como número cru. Zero dependência: XLSX é `zipfile` + `xml.etree`, e o teste **abre a planilha de volta** para provar que a célula de data é data, não número parecido. Origem: `src/utils/{csv,xlsx}.ts` | ✅ (v0.114.0 — #176) |
+| R1 | **export:** `Column` + `to_csv`/`to_xlsx` em Python puro, para o `native.file.save` entregar. Cobre os quatro erros clássicos de encoder à mão — separador dentro do campo, aspas no texto, BOM ausente (Excel lê `João` como `JoÃ£o`) e data de XLSX escrita como número cru. Zero dependência: XLSX é `zipfile` + `xml.etree`, e o teste **abre a planilha de volta** para provar que a célula de data é data, não número parecido. **Modos A e B** — o Modo C serve um conjunto fechado de módulos e recusa o import no build. Origem: `src/utils/{csv,xlsx}.ts` | ✅ (v0.114.0 — #176) |
 | R2 | **access:** `AccessControl.can()` + leitura de claims do token, para a `view` decidir o que desenhar. Origem: `src/access/` | ⏳ (#177) |
 | R3 | **query:** cache com chave hierárquica, invalidação por prefixo, paginação offset/cursor e mutação otimista com rollback. Origem: `src/query/` | ⏳ (#175) |
 | R4 | **offline (codec):** compressão opcional no store, **medida antes de decidir**. Origem: `src/utils/compressed-storage.ts` | ⏳ (#180) |

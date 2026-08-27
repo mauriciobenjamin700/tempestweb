@@ -73,10 +73,23 @@ Notice what you did **not** write: the comma in `Recife, PE` went inside quotes,
 the quotes around `"A"` were doubled, and the `﻿` up front is the BOM that
 makes Excel read `João` correctly.
 
-!!! info "This runs in all three modes"
-    Generating bytes is pure Python — nothing here touches the browser. `to_csv`
-    and `to_xlsx` behave identically in Mode A (WASM), Mode B (server) and Mode C
-    (transpile). Only the delivery, `file.save`, is a native capability.
+!!! warning "Mode A and Mode B — Mode C refuses"
+    Generating bytes is pure Python: nothing here touches the browser, and
+    `to_csv`/`to_xlsx` behave identically in Mode A (WASM) and Mode B (server).
+    Only the delivery, `file.save`, is a native capability.
+
+    **Mode C** is another story. It transcribes your app's Python into JavaScript
+    and serves a closed set of modules — `tempest_core`, `tempestweb.components`
+    and `tempestweb.native`. Importing this package from a Mode C app is
+    **refused at build time**, with a named error:
+
+    ```text
+    app.py:5: import from 'tempestweb.export' is not supported
+    (only tempest_core, `tempestweb.components` and `tempestweb.native`)
+    ```
+
+    A Mode C app that needs to export asks the server for the file; the server
+    generates it with this same module and answers the bytes.
 
 ## `Column`: where it comes from, what it says, how it looks
 
@@ -225,7 +238,9 @@ a header row, and cells typed as text, number, boolean and date. `zipfile` and
   `delimiter=";"` when the destination is Excel in a non-English locale.
 - `to_xlsx(rows, columns, sheet=...)` returns **bytes** of a real workbook, with
   dates that are dates.
-- Both are pure Python: they run in all three modes and install nothing.
+- Both are pure Python: they run in Mode A and Mode B, and install nothing.
+  Mode C refuses the import at build time — there, the server generates and
+  answers.
 - Deliver with
   [`native.file.save(name, data, mime_type=...)`](native-reference.md).
 - A missing field and an invalid sheet name **raise** — instead of exporting

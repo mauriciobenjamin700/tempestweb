@@ -40,7 +40,10 @@ versioning.
   `[ ] : * ? / \`, apóstrofo nas pontas, `History`) levanta `SheetNameError`
   antes de a pasta virar "conteúdo ilegível".
 
-  Roda nos três modos — gerar bytes não toca o browser. Receita em
+  **Modos A e B.** Gerar bytes não toca o browser, mas o Modo C serve um conjunto
+  fechado de módulos (`tempest_core`, `tempestweb.components`,
+  `tempestweb.native`) e **recusa este import no build**, com erro nomeado — app
+  Modo C que precisa exportar pede o arquivo ao servidor. Receita em
   `docs/advanced/export.md` (PT + EN), com o aviso de que Excel em pt-BR espera
   `;` como separador e empilha um arquivo separado por vírgula numa coluna só.
 

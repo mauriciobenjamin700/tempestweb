@@ -72,10 +72,23 @@ Repare no que você **não** escreveu: a vírgula de `Recife, PE` foi para dentr
 de aspas, as aspas de `"A"` foram dobradas, e o `﻿` na frente é o BOM que
 faz o Excel ler `João` certo.
 
-!!! info "Isso roda nos três modos"
-    Gerar bytes é Python puro — nada aqui toca o browser. `to_csv` e `to_xlsx`
-    funcionam igual no Modo A (WASM), no Modo B (servidor) e no Modo C
-    (transpile). Só a entrega, o `file.save`, é capacidade nativa.
+!!! warning "Modo A e Modo B — o Modo C recusa"
+    Gerar bytes é Python puro: nada aqui toca o browser, e `to_csv`/`to_xlsx`
+    funcionam igual no Modo A (WASM) e no Modo B (servidor). Só a entrega, o
+    `file.save`, é capacidade nativa.
+
+    O **Modo C** é outra história. Ele transcreve o Python da sua app para
+    JavaScript e serve um conjunto fechado de módulos — `tempest_core`,
+    `tempestweb.components` e `tempestweb.native`. Importar este pacote numa app
+    Modo C é **recusado no build**, com erro nomeado:
+
+    ```text
+    app.py:5: import from 'tempestweb.export' is not supported
+    (only tempest_core, `tempestweb.components` and `tempestweb.native`)
+    ```
+
+    App Modo C que precisa exportar pede o arquivo ao servidor, que gera com
+    este mesmo módulo e responde os bytes.
 
 ## `Column`: de onde vem, o que diz, como aparece
 
@@ -224,7 +237,8 @@ uma planilha, um cabeçalho, e células de texto, número, booleano e data.
   `delimiter=";"` quando o destino é Excel em pt-BR.
 - `to_xlsx(rows, columns, sheet=...)` devolve **bytes** de uma planilha real,
   com data que é data.
-- Os dois são Python puro: rodam nos três modos e não instalam nada.
+- Os dois são Python puro: rodam no Modo A e no Modo B, e não instalam nada.
+  O Modo C recusa o import no build — nele, o servidor gera e responde.
 - Entregue com
   [`native.file.save(nome, dados, mime_type=...)`](native-reference.md).
 - Campo inexistente e nome de aba inválido **levantam** — em vez de exportar

@@ -7,8 +7,15 @@ separator inside a field, a quote inside the text, the missing UTF-8 BOM that
 makes Excel read ``João`` as ``JoÃ£o``, and an XLSX date written as a bare
 number.
 
-This is byte generation, so it needs **no browser**: it runs in Python, in all
-three modes, and the ``file.save`` that already exists delivers the result.
+This is byte generation, so it needs **no browser**: it runs in Python, and the
+``file.save`` that already exists delivers the result.
+
+!!! warning "Modes A and B only"
+    Mode C transpiles the app's own Python into JavaScript and serves a fixed set
+    of modules — ``tempest_core``, ``tempestweb.components`` and
+    ``tempestweb.native``. Importing this package from a Mode C app is refused at
+    build time with a named error. A Mode C app exports by asking the server for
+    the file.
 
 Example:
     ```python

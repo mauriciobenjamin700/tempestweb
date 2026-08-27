@@ -84,6 +84,11 @@ NATIVE_MEMBERS: Mapping[str, frozenset[str]] = {
             "set",
         }
     ),
+    "device": frozenset(
+        {
+            "profile",
+        }
+    ),
     "eyedropper": frozenset(
         {
             "open",
@@ -528,6 +533,7 @@ NATIVE_GROUPS: frozenset[str] = frozenset(
         "contacts",
         "contract",
         "cookies",
+        "device",
         "dispatch",
         "eyedropper",
         "file",

@@ -143,6 +143,45 @@ async def follow_network() -> None:
         app.set_state(lambda s: setattr(s, "online", net.online))
 ```
 
+### `device` — memória, núcleos e heap, para qualidade adaptativa
+
+Descreve **grosseiramente** a máquina do usuário, para a app decidir se comprime
+a foto mais, cacheia menos, ou desiste de rodar o modelo ONNX localmente.
+
+```python
+from tempestweb import native
+
+async def choose_quality() -> int:
+    profile = await native.device.profile()   # → DeviceProfile(memory_gb, cores, heap_used_mb, heap_limit_mb)
+    if profile.memory_gb is not None and profile.memory_gb <= 2:
+        return 60
+    network = await native.network.state()
+    if network.save_data or network.effective_type in {"slow-2g", "2g", "3g"}:
+        return 70
+    return 85
+```
+
+!!! danger "Todo campo é opcional, e `None` **não** quer dizer "fraco""
+    `navigator.deviceMemory` e `performance.memory` são só-Chromium. No Safari e
+    no Firefox a chamada **funciona** e responde `None` na maior parte. Uma app
+    que lê `None` como "aparelho fraco" degrada **todo iPhone** para o pior nível
+    de qualidade — o oposto do que adaptar queria. Ramifique sobre valor
+    conhecido e deixe o desconhecido cair no seu default.
+
+!!! info "Só hardware mora aqui"
+    Tipo de conexão é [`network`](#network--condições-de-conexão) e uso de
+    armazenamento é [`quota`](#quota--uso-e-persistência-de-armazenamento). Repetir
+    os dois aqui daria dois nomes ao mesmo fato no contrato, e os dois nomes
+    driftariam.
+
+!!! warning "Isto é para adaptar qualidade, não para identificar ninguém"
+    Os campos são grosseiros de propósito. Não mande isto a lugar nenhum como
+    identificador.
+
+Medido em Chrome 150: `memory_gb=32`, `cores=12`, `heap_used_mb=2.5`,
+`heap_limit_mb=4192`. O `memory_gb` é quantizado em potência de dois e o browser
+pode capar — compare com `<=` contra um limite baixo, não com um valor exato.
+
 ### `visibility` — aba em foco ou oculta
 
 Saiba se a página está `"visible"` ou `"hidden"` — pause animações/polling quando

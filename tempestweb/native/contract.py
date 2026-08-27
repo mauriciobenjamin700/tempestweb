@@ -114,6 +114,7 @@ CAPABILITIES: tuple[Capability, ...] = (
     _cap("midi.messages", mode_c=True, streaming=True),
     _cap("midi.request_access", mode_c=True),
     _cap("midi.send", mode_c=True),
+    _cap("device.profile", mode_c=True),
     _cap("network.state", mode_c=True),
     _cap("network.watch", mode_c=True, streaming=True),
     _cap("nfc.is_supported", mode_c=True),

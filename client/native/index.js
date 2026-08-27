@@ -36,6 +36,7 @@ import {
 } from "./orientation.js";
 import { quotaEstimate, quotaPersist, quotaPersisted } from "./quota.js";
 import { networkState, networkWatch } from "./network.js";
+import { deviceProfile } from "./device.js";
 import {
   storageConfigure,
   storageGet,
@@ -171,6 +172,7 @@ export const HANDLERS = {
   "storage.list": storageList,
   "storage.remove": storageRemove,
   "storage.configure": storageConfigure,
+  "device.profile": deviceProfile,
   "cookies.get": cookiesGet,
   "cookies.set": cookiesSet,
   "cookies.remove": cookiesRemove,

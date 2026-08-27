@@ -4,6 +4,56 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.114.0] — 2026-08-27
+
+### Added
+
+- **`tempestweb.export` — CSV e XLSX gerados em Python, para o `native.file.save`
+  entregar (#176).** `native.file.save` já entregava bytes ao usuário; nada
+  produzia esses bytes, então toda app com uma `DataTable` e um botão "Exportar"
+  escrevia o encoder à mão — e encoder à mão erra nos mesmos quatro lugares:
+
+  | O dado | O que quebrava |
+  |---|---|
+  | `Recife, PE` | a vírgula virava separador: a linha ganhava uma coluna |
+  | `Ana "A" Silva` | as aspas quebravam quem fosse ler |
+  | `João` | sem BOM, o Excel abria como `JoÃ£o` |
+  | `date(2026, 8, 27)` num XLSX | virava o número `46265` |
+
+  `Column(campo, cabeçalho, format=...)` lê o valor de um `dict` **ou** de um
+  objeto — a mesma lista de colunas serve para o payload da API e para a
+  `@dataclass` do estado. `to_csv` delega a citação ao `csv` da stdlib e liga o
+  BOM por default; `to_xlsx` monta a pasta de trabalho com `zipfile` +
+  `xml.etree`, **sem dependência nova**.
+
+  O quarto erro é o que exigiu trabalho de verdade: o Excel **não tem tipo
+  data**. Uma célula de data é um número — dias desde 1899-12-30 — que só parece
+  data por causa de um *number format* guardado no `styles.xml`. Encoder à mão
+  acerta o número e esquece o formato, e o defeito só aparece quando alguém abre
+  o arquivo. O módulo carrega os dois `numFmt`, e o teste **abre a planilha de
+  volta** (descompacta, resolve os relacionamentos, confere o tipo da célula)
+  para que "gerou bytes" nunca passe por "gerou uma planilha".
+
+  Erro de desenvolvedor levanta em vez de exportar algo silenciosamente errado:
+  `Column("nmae", …)` levanta `ColumnFieldError` nomeando o campo que faltou e
+  os que existem, e um nome de aba que o Excel recusa (>31 caracteres,
+  `[ ] : * ? / \`, apóstrofo nas pontas, `History`) levanta `SheetNameError`
+  antes de a pasta virar "conteúdo ilegível".
+
+  **Modos A e B.** Gerar bytes não toca o browser, mas o Modo C serve um conjunto
+  fechado de módulos (`tempest_core`, `tempestweb.components`,
+  `tempestweb.native`) e **recusa este import no build**, com erro nomeado — app
+  Modo C que precisa exportar pede o arquivo ao servidor. Receita em
+  `docs/advanced/export.md` (PT + EN), com o aviso de que Excel em pt-BR espera
+  `;` como separador e empilha um arquivo separado por vírgula numa coluna só.
+
+### Changed
+
+- **`docs/roadmap.md` ganha o Trilho R**, rastreando a adoção do
+  `tempest-react-sdk` fase a fase (R1 export ✅, R2–R7 pendentes), com o que fica
+  deliberadamente de fora registrado: provider, contexto e hook não atravessam,
+  porque aqui o estado é Python.
+
 ## [0.113.0] — 2026-08-25
 
 ### Fixed

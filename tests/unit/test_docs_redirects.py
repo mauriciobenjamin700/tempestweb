@@ -125,6 +125,8 @@ def test_every_moved_page_kept_its_old_url() -> None:
             "gestures",
             # Written for #143; never had a published URL of its own.
             "controls",
+            # Written for #176; new page, never had a published URL of its own.
+            "export",
         }
     )
     assert not unmapped, (

@@ -278,6 +278,29 @@ A/B/C); as só-Chromium expõem `is_supported()` + degradação graciosa.
     os streams), depois Tier 2 e Tier 3 por demanda. As só-Chromium (Tier 3) sempre
     entram com `is_supported()` + fallback.
 
+## Trilho R — adoção do `tempest-react-sdk`
+
+O `tempest-react-sdk` resolveu, em React, problemas que este framework também
+tem. O que vale trazer é a **lógica**, nunca o hook: aqui o estado é Python, e um
+`useX` não tem para onde ir. Cada fase abaixo nomeia o módulo de origem e o que
+ficou deliberadamente de fora.
+
+| Fase | Escopo | Status |
+|---|---|---|
+| R1 | **export:** `Column` + `to_csv`/`to_xlsx` em Python puro, para o `native.file.save` entregar. Cobre os quatro erros clássicos de encoder à mão — separador dentro do campo, aspas no texto, BOM ausente (Excel lê `João` como `JoÃ£o`) e data de XLSX escrita como número cru. Zero dependência: XLSX é `zipfile` + `xml.etree`, e o teste **abre a planilha de volta** para provar que a célula de data é data, não número parecido. **Modos A e B** — o Modo C serve um conjunto fechado de módulos e recusa o import no build. Origem: `src/utils/{csv,xlsx}.ts` | ✅ (v0.114.0 — #176) |
+| R2 | **access:** `AccessControl.can()` + leitura de claims do token, para a `view` decidir o que desenhar. Origem: `src/access/` | ⏳ (#177) |
+| R3 | **query:** cache com chave hierárquica, invalidação por prefixo, paginação offset/cursor e mutação otimista com rollback. Origem: `src/query/` | ⏳ (#175) |
+| R4 | **offline (codec):** compressão opcional no store, **medida antes de decidir**. Origem: `src/utils/compressed-storage.ts` | ⏳ (#180) |
+| R5 | **device.profile:** memória, núcleos e heap da máquina do usuário, para qualidade adaptativa. Conexão e cota **não** entram: já são `native.network.state` e `native.quota.estimate`. Origem: `src/perf/` | ⏳ (#179) |
+| R6 | **imaging:** comprimir, miniaturar e transformar imagem antes do upload, endereçando o blob por handle em vez de reenviar os bytes. Origem: `src/imaging/` | ⏳ (#174) |
+| R7 | **tabular:** inferência sklearn→ONNX no browser, irmã do `vision/`, com manifesto de features. Origem: `src/tabular/` | ⏳ (#178) |
+
+!!! note "O que nunca vem junto"
+    Provider, contexto e hook (`useCan`, `usePaginatedQuery`, `useImagePreview`,
+    `useTabularPredictor`) ficam de fora por construção: o estado vive no `State`
+    da app, e a `view` lê dele. Trazer o ciclo de vida de componente React seria
+    importar a solução de um problema que este framework não tem.
+
 ## Pós-convergência
 
 | Fase | Escopo | Status |

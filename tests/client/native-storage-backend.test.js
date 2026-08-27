@@ -60,6 +60,10 @@ function rawRecord(name) {
 // store pointing at a database no assertion can see.
 globalThis.indexedDB = new IDBFactory();
 
+// Read at load, before the migration case installs one: a value that lands
+// anywhere in this process can only have landed in IndexedDB.
+const HAD_LOCAL_STORAGE = globalThis.localStorage !== undefined;
+
 test("browserDeps: hands the storage capability an IndexedDB store", async () => {
   const deps = browserDeps();
   assert.ok(deps.store, "browserDeps must carry a store, or storage falls back");
@@ -120,12 +124,44 @@ test("storage: the deflate codec reaches the store the writes go to", async () =
 
 test("Mode C reaches the same backend, keeping no store of its own", async () => {
   assert.equal(
-    globalThis.localStorage,
-    undefined,
+    HAD_LOCAL_STORAGE,
+    false,
     "no localStorage in this process, so a stored value can only be in IndexedDB",
   );
   await native.storage.put("mode-c", "through-the-facade");
   assert.equal(await native.storage.get("mode-c"), "through-the-facade");
   assert.equal(await rawRecord("mode-c"), "through-the-facade");
   assert.deepEqual(await native.storage.list_keys(), (await createIdbKv().keys()).sort());
+});
+
+test("the documented migration recipe moves a legacy localStorage value in", async () => {
+  const legacy = new Map([
+    ["notes", "written by 0.122.0"],
+    ["draft", "also written by 0.122.0"],
+  ]);
+  globalThis.localStorage = /** @type {*} */ ({
+    getItem: (name) => (legacy.has(name) ? legacy.get(name) : null),
+    setItem: (name, value) => legacy.set(name, String(value)),
+    removeItem: (name) => legacy.delete(name),
+  });
+
+  const MARK = "tw.storage.migrated.v1";
+  const LEGACY = ["notes", "draft", "never-written"];
+
+  if (!localStorage.getItem(MARK)) {
+    let allOk = true;
+    for (const name of LEGACY) {
+      const content = localStorage.getItem(name);
+      if (content === null) continue;
+      const written = await dispatch(call("storage.put", { name, content }, `migrate-${name}`));
+      allOk = allOk && written.ok;
+    }
+    if (allOk) localStorage.setItem(MARK, "1");
+  }
+
+  assert.equal(await rawRecord("notes"), "written by 0.122.0", "the value must reach IndexedDB");
+  assert.equal(await rawRecord("draft"), "also written by 0.122.0");
+  assert.equal(await rawRecord("never-written"), undefined, "an absent key is skipped");
+  assert.equal(legacy.get(MARK), "1", "the mark stops the next boot from redoing it");
+  assert.equal(legacy.get("notes"), "written by 0.122.0", "the original is left in place");
 });

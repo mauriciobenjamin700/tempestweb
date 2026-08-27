@@ -93,6 +93,47 @@ chamada chega na Web API, não o seu código.
     capacidades de **stream** (consumidas com `async for`) têm um tutorial próprio:
     o [Canal de eventos nativo](native-events.md). 🚀
 
+!!! warning "Migração: o que a ≤0.122.0 gravou ficou no `localStorage`"
+    Até a **0.122.0** o `native.storage` dos Modos A e B caía no `localStorage` —
+    era o defeito que a 0.123.0 corrigiu. Da **0.123.0** em diante a leitura vai
+    ao IndexedDB, então esse conteúdo antigo fica **órfão**: não é apagado, mas
+    ninguém mais o lê, e a sua app volta a ver um store vazio.
+
+    App nova não faz nada. App já publicada migra **uma vez**, na página do
+    artefato, antes do boot — lendo o `localStorage` e reescrevendo por
+    `storage.put`:
+
+    ```html
+    <script type="module">
+      import { dispatch } from "./client/native/index.js";
+
+      const MARCA = "tw.storage.migrated.v1";
+      const LEGADO = ["notes", "draft", "cache"];  // as chaves da SUA app
+
+      if (!localStorage.getItem(MARCA)) {
+        let tudo_ok = true;
+        for (const name of LEGADO) {
+          const content = localStorage.getItem(name);
+          if (content === null) continue;
+          const escrita = await dispatch({
+            kind: "native_call",
+            call_id: `migrate-${name}`,
+            capability: "storage.put",
+            args: { name, content },
+          });
+          tudo_ok = tudo_ok && escrita.ok;
+        }
+        if (tudo_ok) localStorage.setItem(MARCA, "1");
+      }
+    </script>
+    ```
+
+    Liste as chaves **da sua app**: `Object.keys(localStorage)` varre também o que
+    não é seu. E **não apague o original** — num perfil onde o IndexedDB não abre a
+    capacidade continua gravando no próprio `localStorage`, o `put` reescreve a
+    mesma chave, e um `removeItem` depois apagaria o dado que você acabou de
+    salvar. A marca é o que evita reprocessar a cada boot.
+
 ## Exemplo: HTTP tipado com retry
 
 O `native.http` (N0) é a base do replay offline. Uma requisição com retry e

@@ -60,11 +60,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from tempestweb.native import compact as native_compact
-from tempestweb.tabular.errors import (
-    CompactFormatError,
-    ManifestError,
-    PredictionError,
-)
+from tempestweb.native import http as native_http
+from tempestweb.tabular.errors import CompactFormatError, ManifestError
 from tempestweb.tabular.manifest import (
     FeatureManifest,
     manifest_from_dict,
@@ -110,12 +107,16 @@ class CompactModel:
         link: How raw scores become probabilities (``"softmax"``, ``"sigmoid"``,
             ``"normalize"``) or stay as they are (``"identity"``).
         classes: Class labels in score-column order. Empty for a regressor.
-        class_type: How scikit-learn typed those labels (``"int"``, ``"float"``
-            or ``"str"``), recorded by the exporter.
         n_features: Values expected per row.
         n_outputs: Score columns per row.
         n_trees: Trees in the ensemble; ``0`` for a linear model.
-        estimator: Class name of the exported estimator, for messages.
+        estimator: Class name of the exported estimator, which names the model
+            in every :class:`CompactFormatError` this reader raises — the most
+            useful thing in the header for whoever is debugging the file. The
+            exporter also records ``class_type``; this reader does not read it,
+            because :attr:`classes` arrives already stringified and
+            :attr:`~tempestweb.tabular.Prediction.label` is a ``str``, so there
+            is nothing for it to influence.
         feature_names: The column order the model was trained on, when the
             export recorded it.
         offset: Per-feature offset of a folded scaler, empty when there is none.
@@ -127,7 +128,6 @@ class CompactModel:
     task: str
     link: str
     classes: tuple[str, ...] = ()
-    class_type: str = "str"
     n_features: int = 0
     n_outputs: int = 0
     n_trees: int = 0
@@ -233,7 +233,6 @@ def parse(data: bytes) -> CompactModel:
         task=str(header.get("task", "")),
         link=link,
         classes=tuple(str(value) for value in header.get("classes", ())),
-        class_type=str(header.get("class_type", "str")),
         n_features=int(header.get("n_features", 0)),
         n_outputs=int(header.get("n_outputs", 0)),
         n_trees=int(header.get("n_trees", 0)),
@@ -317,8 +316,6 @@ class CompactPredictor:
         elif isinstance(source, FeatureManifest):
             self._manifest = source
         elif isinstance(source, str):
-            from tempestweb.native import http as native_http
-
             response = await native_http.request("GET", source)
             self._manifest = manifest_from_json(response.text)
         else:
@@ -339,18 +336,16 @@ class CompactPredictor:
             The :class:`~tempestweb.tabular.Prediction`.
 
         Raises:
+            ManifestError: If the manifest orders a different number of features
+                than the model expects.
             MissingFeatureError: If the row lacks a declared feature.
             UnknownFeatureError: If ``strict`` and the row carries an undeclared
                 one.
             CompactFormatError: If the file is not a compact model this reader
                 understands.
-            PredictionError: If the model answers no rows.
             NativeError: If the download fails.
         """
-        predictions = await self.predict_many([row], strict=strict)
-        if not predictions:
-            raise PredictionError("the model answered no rows")
-        return predictions[0]
+        return (await self.predict_many([row], strict=strict))[0]
 
     async def predict_many(
         self,

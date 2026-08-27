@@ -34,6 +34,7 @@ from tempestweb.tabular import (
     CompactFormatError,
     CompactPredictor,
     FeatureManifest,
+    ManifestError,
     MissingFeatureError,
     UnknownFeatureError,
     parse,
@@ -281,6 +282,39 @@ async def test_a_renamed_feature_raises_naming_both_halves() -> None:
 
     assert declared in str(raised.value)
     assert "typo" in str(raised.value)
+
+
+@pytest.mark.asyncio
+async def test_a_manifest_of_the_wrong_size_is_refused_naming_both_numbers() -> None:
+    """The override manifest is the other side of the mismatch, and was unchecked.
+
+    Nothing crossed ``len(manifest.features)`` against ``n_features``, and
+    ``_score_linear`` indexes ``coef`` in strides of ``n_features`` without
+    looking at its length. Measured: a 3-feature manifest over the 6-feature
+    fixture answered ``0`` p=0.9999536 in place of p=0.9911187, no error; a
+    7-feature one let ``IndexError: array index out of range`` escape the public
+    API anonymously.
+    """
+    expected = EXPECTATIONS["linear_binary_sigmoid"]
+    features = expected["features"]
+    row = expected["rows"][0]
+
+    short, _ = _predictor(
+        "linear_binary_sigmoid",
+        manifest=FeatureManifest(features=tuple(features[:3]), classes=("0", "1")),
+    )
+    with pytest.raises(ManifestError) as raised:
+        await short.predict({name: row[name] for name in features[:3]})
+    message = str(raised.value)
+    assert "3" in message and "6" in message
+    assert "LogisticRegression" in message
+
+    long, _ = _predictor(
+        "linear_binary_sigmoid",
+        manifest=FeatureManifest(features=(*features, "extra"), classes=("0", "1")),
+    )
+    with pytest.raises(ManifestError):
+        await long.predict(dict(row) | {"extra": 1.0})
 
 
 @pytest.mark.asyncio

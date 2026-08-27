@@ -60,7 +60,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from tempestweb.native import compact as native_compact
-from tempestweb.tabular.errors import CompactFormatError, PredictionError
+from tempestweb.tabular.errors import (
+    CompactFormatError,
+    ManifestError,
+    PredictionError,
+)
 from tempestweb.tabular.manifest import (
     FeatureManifest,
     manifest_from_dict,
@@ -366,6 +370,9 @@ class CompactPredictor:
             scoring nothing is valid.
 
         Raises:
+            ManifestError: If the manifest orders a different number of features
+                than the model expects — the mismatch the manifest exists to
+                catch, arriving from the manifest's own side.
             MissingFeatureError: If a row lacks a declared feature.
             UnknownFeatureError: If ``strict`` and a row carries an undeclared
                 one.
@@ -377,6 +384,13 @@ class CompactPredictor:
             return []
         manifest = await self.manifest()
         model = await self.load()
+        if len(manifest.features) != model.n_features:
+            raise ManifestError(
+                f"the manifest orders {len(manifest.features)} features and this "
+                f"{model.estimator or model.kind} model expects "
+                f"{model.n_features}; a row ordered by a manifest of the wrong "
+                "size still scores, it just scores the wrong coefficients"
+            )
         vectors = [manifest.vector(row, strict=strict) for row in rows]
         scores = [_score(model, _preprocess(model, vector)) for vector in vectors]
         return [_finish(model, manifest, row_scores) for row_scores in scores]

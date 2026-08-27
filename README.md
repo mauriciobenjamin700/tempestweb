@@ -7,7 +7,7 @@ docs site (PT-BR default + EN-US), deployed to GitHub Pages. A linear
 [Advanced Guide](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/capabilities/),
 and a generated
 [API reference](https://mauriciobenjamin700.github.io/tempestweb/en/reference/presets/)
-covering all 14 subpackages.
+covering every subpackage.
 
 > Build web apps in **typed Python**. One declarative widget tree, a **DOM**
 > renderer, and **three execution modes** that share 100% of the application code:
@@ -291,6 +291,64 @@ result objects are ort-vision-sdk's, unchanged; only the model run crosses the
 (async) bridge, so construction and `predict` are awaited. See the
 [Computer vision guide](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/vision/).
 
+## Data on the screen (`query` · `export` · `access`)
+
+Three pure-Python layers between the widgets and the network — no browser needed,
+no dependency added.
+
+```python
+from tempestweb.query import QueryCache, keys, offset_page, upsert_by_id
+
+USERS, CACHE = keys("users"), QueryCache()
+
+response = await CACHE.fetch(USERS.list(page=1), lambda: native.http.request("GET", "/api/users?page=1"))
+page = offset_page(response.json)
+
+with CACHE.optimistic(USERS.all(), lambda rows: upsert_by_id(rows, edited)):
+    await native.http.request("PATCH", "/api/users/7", json=edited)   # rolls back if this raises
+```
+
+`query` keeps the **read** side: keys are tuples, so invalidation is by prefix
+(`CACHE.invalidate(USERS.all())` reaches every cached page), concurrent reads of
+one key collapse into one request, and the optimistic block restores exactly what
+it replaced — no round trip to undo something the server never accepted.
+
+`export` turns rows into CSV/XLSX **bytes** for `native.file.save`, closing the
+four holes a hand-rolled encoder always leaves — separator inside a field, quote
+inside the text, the missing BOM, and an XLSX date written as a bare number.
+`access` holds the role → permission map so the `view` can ask
+`access.can("users:delete")` instead of spreading `if state.role == "admin"`.
+
+> :warning: `access` is **not** authorization. Hiding a button stops nobody from
+> calling the endpoint behind it — the server decides, with the signing key.
+
+See the [Reading remote data](https://mauriciobenjamin700.github.io/tempestweb/en/tutorial/query/),
+[Export](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/export/) and
+[Permissions](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/access/) guides.
+
+## Tabular inference (ONNX)
+
+```python
+from tempestweb.tabular import TabularPredictor
+
+PREDICTOR = TabularPredictor("/models/risk.onnx", manifest="/models/risk.json")
+prediction = await PREDICTOR.predict({"age": 30, "income": 3200.0, "tenure_months": 18})
+print(prediction.score, prediction.label, prediction.probabilities)
+```
+
+The sibling of `vision`, for the commonest kind of ML in a business app: a risk
+score, a demand forecast, a lead classification — running **in the browser**, so
+it still works offline.
+
+The **manifest** is the point. An ONNX model is a function from an unlabelled
+vector of floats to a number, so the order carries all the meaning and nothing in
+the runtime checks it: a row written `{"idade": 30}` for a model trained on `age`
+reads a zero and answers a plausible, wrong score. With a manifest that becomes
+`MissingFeatureError`, naming the feature that is missing **and** the one that was
+sent instead. Training and export are a build step in a throwaway venv
+(`uvx --with skl2onnx …`), never a runtime dependency. See the
+[Tabular guide](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/tabular/).
+
 ## Deploy (server mode)
 
 ```bash
@@ -316,16 +374,24 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 
 | Path | What |
 |---|---|
+| Path | What |
+|---|---|
 | `tempest-core` (dependency) | Renderer-agnostic engine — IR/reconciler/state/style/widgets (`import tempest_core`), extracted from tempestroid. |
-| `tempestweb/tutorial/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library — 54 Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
+| `tempestweb/components/` | Native fields + forms (EmailField, PasswordField, LoginForm, …) plus the re-exported tempest-core library of Material 3 components (Card, DataTable, Tabs, Drawer, Alert, BarChart/LineChart, …). |
+| `tempestweb/presets/` | Ready-made screens built from data — panel, dashboard, listing, form, login. |
 | `tempestweb/transports/` | The one seam between modes (`base.py` Protocol, `wasm.py`, `websocket.py`, `sse.py`). |
 | `tempestweb/html/` | Static SSR leaf renderer — `render_to_html` / `render_document` / `style_to_css` (Python port of `client/style.js`). |
-| `tempestweb/advanced/transpile/` | **Mode C:** `ast`-based Python→JS compiler for the app layer. Paired with the native runtime in `client/transpile/` (`diff.js` · `widgets.js` · `runtime.js`). |
+| `tempestweb/transpile/` | **Mode C:** `ast`-based Python→JS compiler for the app layer. Paired with the native runtime in `client/transpile/` (`diff.js` · `widgets.js` · `runtime.js`). |
 | `tempestweb/server/` | FastAPI + WebSocket/SSE host (Mode B). |
-| `tempestweb/native/` | Web API capability adapters (Tracks N + T) — core (http, audio, share, geo, clipboard, storage, camera) plus Tier 1-3 web-platform parity (vibration, wakelock, fullscreen, network, sensors, bluetooth, usb, midi, …) and a streaming event channel (T-EV) consumed with `async for`. |
-| `tempestweb/advanced/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
-| `tempestweb/advanced/pwa/` | Web App Manifest + icon emitter (Track P). |
-| `tempestweb/tutorial/cli/` | `tempestweb new/dev/build/run/sync/gen`. |
+| `tempestweb/native/` | Web API capability adapters (Tracks N + T) — core (http, audio, share, geo, clipboard, storage, camera) plus web-platform parity (vibration, wakelock, fullscreen, network, sensors, bluetooth, usb, midi, …), image processing (`imaging`), device profile (`device`), and a streaming event channel (T-EV) consumed with `async for`. |
+| `tempestweb/query/` | The read side of remote data — keyed cache, prefix invalidation, single-flight, pagination, optimistic updates with an exact rollback. |
+| `tempestweb/access/` | Role → permission map and unverified token claims, so the `view` can decide what to draw. **Not** authorization. |
+| `tempestweb/export/` | CSV and XLSX bytes generated in Python, for `native.file.save` to deliver. No dependency. |
+| `tempestweb/vision/` | Classification, detection and segmentation over ONNX in the browser. Needs the `[vision]` extra. |
+| `tempestweb/tabular/` | sklearn→ONNX inference over a row of numbers, with a feature manifest that stops a silently wrong prediction. |
+| `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
+| `tempestweb/pwa/` | Web App Manifest + icon emitter (Track P). |
+| `tempestweb/cli/` | `tempestweb new/dev/build/run/sync/gen`. |
 | `client/` | Pure-JS DOM renderer (incl. Canvas draw-command execution for charts), Style→CSS, event capture; `pwa/` `sw/` `offline/` `push/` `native/` subdirs. |
 | `tests/fixtures/` | Golden wire-format fixtures derived from the core. |
 

@@ -155,19 +155,36 @@ modos.
     [**Modo C — transpile**](advanced/transpile.md) — bundle estático, SEO ·
     [**SSR estático**](advanced/ssr.md)
 
+-   :material-database: __Dado e modelo__
+
+    ---
+
+    [**Lendo dados remotos**](tutorial/query.md) — cache com chave, invalidação
+    por prefixo e mudança otimista que desfaz sem ir à rede ·
+    [**Exportar CSV e XLSX**](advanced/export.md) — os bytes que o `file.save`
+    entrega, sem dependência ·
+    [**Permissões na view**](advanced/access.md) — `can()` para decidir o que
+    desenhar (e por que isso **não** é autorização) ·
+    [**Visão computacional**](advanced/vision.md) — classificar, detectar,
+    segmentar ·
+    [**Inferência tabular**](advanced/tabular.md) — sklearn no browser, com o
+    manifesto que impede a predição silenciosamente errada ·
+    [**Comprimir o store**](advanced/storage-codec.md) — medido antes de ligar
+
 -   :material-book-open-variant: __Consultar__
 
     ---
 
-    [**Referência de API**](reference/presets.md) — assinatura de tudo, nos 14
-    subpacotes ·
+    [**Referência de API**](reference/presets.md) — assinatura de tudo, em todos
+    os subpacotes ·
     [**Capacidades nativas**](advanced/capabilities.md) e sua
     [**referência**](advanced/native-reference.md) ·
     [**Canal de eventos**](advanced/native-events.md) ·
-    [**Visão computacional**](advanced/vision.md) ·
     [**Cliente a partir de OpenAPI**](advanced/openapi.md) ·
-    [**Contrato de fronteira**](advanced/wire-contract.md) ·
-    [**Galeria de exemplos**](examples/index.md) — 46 apps rodáveis ·
+    [**Contrato de fronteira**](advanced/wire-contract.md) —
+    [`transports`](reference/transports.md) e [`html`](reference/html.md) ·
+    [**Servidor (Modo B)**](reference/server.md) ·
+    [**Galeria de exemplos**](examples/index.md) — apps rodáveis, um por receita ·
     [**Quando dá errado**](troubleshooting.md) — diagnóstico por sintoma ·
     [**FAQ**](faq.md) ·
     [**Estabilidade**](stability.md) ·

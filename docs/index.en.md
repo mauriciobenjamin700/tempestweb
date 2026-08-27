@@ -154,19 +154,36 @@ renderer is the **same** across all three modes.
     [**Mode C — transpile**](advanced/transpile.md) — static bundle, SEO ·
     [**Static SSR**](advanced/ssr.md)
 
+-   :material-database: __Data and models__
+
+    ---
+
+    [**Reading remote data**](tutorial/query.md) — a keyed cache, prefix
+    invalidation, and an optimistic change that undoes without a round trip ·
+    [**Export CSV and XLSX**](advanced/export.md) — the bytes `file.save`
+    delivers, with no dependency ·
+    [**Permissions in the view**](advanced/access.md) — `can()` to decide what to
+    draw (and why that is **not** authorization) ·
+    [**Computer vision**](advanced/vision.md) — classify, detect, segment ·
+    [**Tabular inference**](advanced/tabular.md) — sklearn in the browser, with
+    the manifest that stops a silently wrong prediction ·
+    [**Compressing the store**](advanced/storage-codec.md) — measured before
+    turning it on
+
 -   :material-book-open-variant: __Look it up__
 
     ---
 
-    [**API reference**](reference/presets.md) — every signature, across all 14
-    subpackages ·
+    [**API reference**](reference/presets.md) — every signature, across every
+    subpackage ·
     [**Native capabilities**](advanced/capabilities.md) and their
     [**reference**](advanced/native-reference.md) ·
     [**Event channel**](advanced/native-events.md) ·
-    [**Computer vision**](advanced/vision.md) ·
     [**Client from OpenAPI**](advanced/openapi.md) ·
-    [**Wire contract**](advanced/wire-contract.md) ·
-    [**Example gallery**](examples/index.md) — 46 runnable apps ·
+    [**Wire contract**](advanced/wire-contract.md) —
+    [`transports`](reference/transports.md) and [`html`](reference/html.md) ·
+    [**Server (Mode B)**](reference/server.md) ·
+    [**Example gallery**](examples/index.md) — runnable apps, one per recipe ·
     [**When it goes wrong**](troubleshooting.md) — diagnosis by symptom ·
     [**FAQ**](faq.md) ·
     [**Stability**](stability.md) ·

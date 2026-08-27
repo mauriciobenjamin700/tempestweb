@@ -18,9 +18,10 @@ cobrir".
 | clipboard real (escrita + conteúdo lido de volta) | N3 | ✅ medido — 2026-08-23 |
 | `storage` sobre IndexedDB, sobrevivendo a reload | N3 | ⏳ falta medir (wrapper testado em jsdom, que é um shim) |
 | captura de câmera real | N4 | ⏳ falta hardware ou Chrome com fake device |
-| Background Sync com a aba fechada | P2 | ⏳ falta device + browser com a permissão |
-| WebPush com a aba fechada + `pushsubscriptionchange` | P3 | ⏳ falta push service e par VAPID de teste |
-| Web Audio além de `tone` (grafo de síntese/análise) | T24 | ➖ não é verificação: é feature futura |
+| Background Sync com a aba fechada | P2 | ✅ medido — 2026-08-25 (**achou defeito**: #169) |
+| WebPush: handler → notificação, com a aba fechada | P3 | ✅ medido — 2026-08-25 |
+| WebPush: envio por push service real + `pushsubscriptionchange` | P3 | ⏳ falta par VAPID e endpoint de push alcançável |
+| Web Audio além de `tone` (grafo de síntese/análise) | T24 | ✅ entregue e medido — v0.112.0, registro no `docs/roadmap.md` |
 
 ## O que foi medido
 
@@ -91,6 +92,65 @@ UI mudou de mensagem.
     **leitura**. Uma medição de negação precisa de um app que **lê** o clipboard;
     o exemplo atual só escreve e compartilha.
 
+### Background Sync com a aba fechada (P2) ✅
+
+Medido na 0.110.0, em duas origens virgens, mesmo procedimento — e a medição
+**achou defeito**, corrigido em
+[#169](https://github.com/mauriciobenjamin700/tempestweb/pull/169).
+
+O `replayFromSync` alcançava `client/offline/{store,sync}.js` com `await import(...)`,
+e nenhum service worker pode fazer isso:
+
+```text
+TypeError: import() is disallowed on ServiceWorkerGlobalScope by the HTML specification.
+```
+
+([w3c/ServiceWorker#1356](https://github.com/w3c/ServiceWorker/issues/1356).) Todo
+`sync`/`periodicsync` estourava e caía no fallback que pinga clientes abertos — e com
+a aba fechada não existe cliente para pingar. A fila ficava parada, **em silêncio**.
+
+Procedimento: app aberto → rede **offline** → duas notas enfileiradas (`Pending: 2`,
+**0** requests no servidor) → aba **fechada** → rede de volta.
+
+| Worker | Requests após fechar a aba | Fila no IndexedDB |
+|---|---|---|
+| antigo (`import()` dinâmico) | **0** | **2 presas** |
+| novo (import estático) | **2** | **vazia** |
+
+```text
+aba fechada   1787668388.034
+rede de volta 1787668389.042
+POST /api/log 1787668389.045   +1,011 s após fechar, +0,003 s após o reconnect
+POST /api/log 1787668389.047   +1,013 s após fechar, +0,005 s após o reconnect
+```
+
+Zero páginas da origem abertas nas duas medições, `Idempotency-Key` distintas, corpo
+correto. **Nenhum dispatch sintético**: o `sync` do Chrome disparou sozinho no
+reconnect, porque a tag (`tw-offline-replay`) já era registrada pelo `enqueue`.
+
+Guards em `tests/unit/test_sw_static_imports.py` — a suíte em Node **não** podia
+pegar isto, porque `import()` funciona lá. Verificado que mordem: os quatro reprovam
+contra o `sw.js` antigo.
+
+!!! note "A corrida SW-drain × replay-da-página segue coberta só por idempotência"
+    A medição prova que o drain do worker acontece com a aba fechada. Ela **não**
+    observou a corrida com um replay de página simultâneo — para isso é preciso
+    reabrir a aba no exato instante do reconnect. O double-send continua seguro por
+    `Idempotency-Key`, que é o que a torna aceitável.
+
+### WebPush: handler → notificação, com a aba fechada (P3) ✅
+
+Mesma origem, permissão de notificação concedida, **0** páginas da origem abertas,
+push entregue por CDP (`ServiceWorker.deliverPushMessage`): o handler recebeu o
+payload intacto e chamou `showNotification` com título e corpo corretos.
+
+```json
+{"title":"Fila sincronizada","body":"2 mutações enviadas","tag":"tw-test"}
+```
+
+Isso mede **push → notificação dentro do worker, com a aba fechada**. O que
+deliberadamente **não** cobre está na seção seguinte.
+
 ## O que falta, e o que exatamente rodar
 
 ### `storage` sobre IndexedDB (N3)
@@ -130,35 +190,28 @@ O que medir: a foto voltando **tipada** ao Python (`Photo` com bytes base64 e
 dimensões), o prompt de permissão negado (a app tem de dizer o motivo, não travar),
 e `CameraPreview.on_frame` recebendo frames no intervalo declarado.
 
-### Background Sync com a aba fechada (P2)
-
-```bash
-uv run --frozen tempestweb run --mode server --path examples/offline-queue --port 8000
-```
-
-Procedimento: enfileirar itens offline → **fechar a aba** (não só perder o foco) →
-voltar a rede → reabrir e conferir que a fila drenou **uma vez**. O ponto da
-medição é a corrida entre o drain do SW e o replay da página: hoje ela é coberta só
-por idempotência (double-send seguro), e o que falta saber é se ela acontece.
-
-Precisa de Chrome com `chrome://flags` de Background Sync ativo e de uma rede que
-se possa cortar de verdade (o DevTools offline não dispara `sync`).
-
-### WebPush com a aba fechada e `pushsubscriptionchange` (P3)
+### WebPush: envio por push service real e `pushsubscriptionchange` (P3)
 
 ```bash
 uv run --frozen python examples/webpush-server/server.py   # precisa de par VAPID
 uv run --frozen tempestweb run --mode server --path examples/pwa-webpush --port 8000
 ```
 
-O que falta: um par VAPID de teste e um push service alcançável. Medir: notificação
-chegando com a **aba fechada**, o clique abrindo o deep link certo, e a rotação de
-chave disparando `pushsubscriptionchange` com re-subscribe.
+O caminho de dentro do worker já foi medido (seção acima). O que falta é o que só um
+push service real exerce: um par VAPID de teste e um endpoint alcançável (FCM).
+Medir o round-trip completo — `pywebpush` → push service → worker → notificação com a
+**aba fechada** —, o clique abrindo o deep link certo, e a rotação de chave
+disparando `pushsubscriptionchange` com re-subscribe.
 
-### Web Audio além de `tone` (T24)
+`ServiceWorker.deliverPushMessage` por CDP **não** substitui isto: ele injeta o
+payload direto no worker, pulando exatamente a parte que pode falhar em produção
+(assinatura VAPID, `410 Gone`, expiração de subscription).
 
-Não é verificação pendente: o grafo de síntese/análise (`AudioContext`) está
-marcado como **futuro** no roadmap. Sai daqui quando existir.
+### Web Audio além de `tone` (T24) — resolvido
+
+Deixou de ser pendência: o grafo de síntese/análise saiu na **v0.112.0**
+(`sequence`/`stop`/`levels`), com a medição em Chrome registrada na linha T24 do
+`docs/roadmap.md`. Fica aqui só como ponteiro.
 
 ## Como registrar a próxima medição
 
@@ -169,3 +222,32 @@ marcado como **futuro** no roadmap. Sai daqui quando existir.
    [#118](https://github.com/mauriciobenjamin700/tempestweb/issues/118).
 4. Passou? Suba o item de 🔶 para ✅ no `docs/roadmap.md` **com a data e o que foi
    medido**, e atualize o placar acima. A tabela é o registro.
+
+### Receita para medir service worker com a aba fechada
+
+Foi o que tornou a medição do Background Sync possível, e é reutilizável:
+
+1. **Servidor que registra evidência**, não `http.server` puro: subclasse com
+   `do_POST`/`do_PUT` que responde 200 e escreve uma linha JSON por request. Uma
+   linha gravada **sem página aberta** é a prova de que o worker agiu sozinho.
+2. **Playwright dirigindo o browser**: `context.setOffline(true/false)` para o
+   offline, `page.close()` para fechar de verdade (não só perder o foco), e
+   `context.pages()` para provar que não sobrou página da origem.
+3. **`context.serviceWorkers().find(w => w.url().includes(porta)).evaluate(fn)`**
+   roda **dentro do worker**, sem página. É como se lê o IndexedDB do outbox e se
+   instrumenta `showNotification`. Foi este passo que devolveu o `TypeError` do
+   `import()` — nada no lado da página o mostrava.
+4. **CDP para o que só o browser faz**: `ServiceWorker.dispatchSyncEvent` e
+   `ServiceWorker.deliverPushMessage`, a partir de uma página `about:blank` de
+   âncora (`ServiceWorker.enable` não existe em sessão de browser, só de página).
+
+!!! danger "Uma porta nova por **build**, não só por execução"
+    O service worker da origem continua servindo o precache anterior, então medir
+    num artefato rebuildado numa porta reusada mede **o build antigo** — e o sintoma
+    parece bug de runtime. Já custou um issue inválido
+    ([#171](https://github.com/mauriciobenjamin700/tempestweb/issues/171)).
+
+!!! tip "Dispatch sintético é o último recurso"
+    O `sync` do Chrome dispara sozinho no reconnect quando a tag foi registrada pelo
+    `enqueue`. Uma medição que **precisa** de dispatch sintético para acontecer está
+    provando menos do que parece — anote qual dos dois foi.

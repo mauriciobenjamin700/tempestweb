@@ -97,9 +97,13 @@ def test_the_bundle_lists_only_real_parts() -> None:
 #: Subpackages that must never enter the browser bundle, and why. The server and
 #: devserver stacks need FastAPI/Starlette/uvicorn (absent in Pyodide, and useless
 #: in a tab); the CLI is the tool that *writes* artifacts; the transpiler is a
-#: build-time compiler whose output is what runs.
+#: build-time compiler whose output is what runs; ``pwa`` is the build-time
+#: *emitter* the CLI calls to write ``manifest.webmanifest`` and the icons —
+#: ``vendor_pyodide`` even downloads over ``urllib.request`` — and its only
+#: importers are ``cli/commands/build.py`` and one example's build script, so the
+#: 9,384 bytes it added to every Mode A artifact were code the browser never runs.
 _NOT_IN_THE_BROWSER: frozenset[str] = frozenset(
-    {"cli", "devserver", "server", "transpile"}
+    {"cli", "devserver", "pwa", "server", "transpile"}
 )
 
 

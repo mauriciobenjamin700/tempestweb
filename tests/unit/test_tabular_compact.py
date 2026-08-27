@@ -63,10 +63,7 @@ class ModelBridge:
         self.calls.append(envelope)
         return {
             "ok": True,
-            "value": {
-                "bytes": base64.b64encode(self.data).decode("ascii"),
-                "size": len(self.data),
-            },
+            "value": {"data_base64": base64.b64encode(self.data).decode("ascii")},
         }
 
 

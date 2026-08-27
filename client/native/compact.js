@@ -13,7 +13,9 @@
 //
 // Base64 is the wire form every binary payload here uses (see `Tensor` in
 // native/onnx.js), so the reader decodes with `base64.b64decode` and no new
-// convention enters the bridge.
+// convention enters the bridge. The key is `data_base64` for the same reason:
+// the suffix is what stops a consumer from reading the string as raw bytes, and
+// it is the name the other 36 payloads on this bridge already use.
 
 import { CapabilityError } from "./index.js";
 import { ensureCached } from "../offline/asset-cache.js";
@@ -39,7 +41,7 @@ function toBase64(buffer) {
  *
  * @param {{model_url: string}} args
  * @param {import("./index.js").NativeDeps} deps
- * @returns {Promise<{bytes: string, size: number}>} The model as base64 plus its byte length.
+ * @returns {Promise<{data_base64: string}>} The model's bytes, base64-encoded.
  * @throws {CapabilityError} model_load — when the model cannot be downloaded.
  */
 export async function compactLoad(args, deps) {
@@ -70,5 +72,5 @@ export async function compactLoad(args, deps) {
   }
 
   const buffer = await response.arrayBuffer();
-  return { bytes: toBase64(buffer), size: buffer.byteLength };
+  return { data_base64: toBase64(buffer) };
 }

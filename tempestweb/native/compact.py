@@ -6,9 +6,11 @@ model of 660 bytes, so for an app whose only model is tabular the runtime *is*
 the download. The reader lives in :mod:`tempestweb.tabular.compact`; this
 capability exists only because Python in the browser cannot fetch.
 
-``compact.load`` ``{model_url}`` → ``{bytes, size}``, the bytes base64-encoded,
-fetched through the same asset cache ``onnx.load`` uses — so a model downloads
-once per version rather than once per session.
+``compact.load`` ``{model_url}`` → ``{data_base64}``, fetched through the same
+asset cache ``onnx.load`` uses — so a model downloads once per version rather
+than once per session. The key is the one every binary payload on this bridge
+uses (``Tensor``, ``camera``, ``file``, ``imaging``): the ``_base64`` suffix is
+what stops a consumer from reading the string as raw bytes.
 """
 
 from __future__ import annotations
@@ -35,4 +37,4 @@ async def load(model_url: str) -> bytes:
         BrowserUnavailableError: If called with no native bridge installed.
     """
     value = await send_native_call("compact.load", {"model_url": model_url})
-    return base64.b64decode(str(value.get("bytes", "")))
+    return base64.b64decode(str(value.get("data_base64", "")))

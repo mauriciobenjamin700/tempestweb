@@ -63,11 +63,19 @@ test("compact.load: hands the model over as base64", async () => {
   });
 
   assert.equal(res.ok, true);
-  assert.equal(res.value.size, bytes.length);
   assert.deepEqual(
-    Array.from(Buffer.from(res.value.bytes, "base64")),
+    Array.from(Buffer.from(res.value.data_base64, "base64")),
     Array.from(bytes),
   );
+});
+
+test("compact.load: names its payload data_base64, like every binary payload here", async () => {
+  const res = await dispatch(call("compact.load", { model_url: "/models/risk.tmc" }), {
+    caches: fakeCaches(),
+    fetch: async () => response(modelBytes()),
+  });
+
+  assert.deepEqual(Object.keys(res.value), ["data_base64"]);
 });
 
 test("compact.load: serves a cached model without fetching again", async () => {
@@ -83,7 +91,7 @@ test("compact.load: serves a cached model without fetching again", async () => {
 
   assert.equal(res.ok, true);
   assert.equal(fetched, 0);
-  assert.equal(res.value.size, bytes.length);
+  assert.equal(Buffer.from(res.value.data_base64, "base64").length, bytes.length);
 });
 
 test("compact.load: a runtime with no Cache Storage still gets the model", async () => {
@@ -94,7 +102,7 @@ test("compact.load: a runtime with no Cache Storage still gets the model", async
   });
 
   assert.equal(res.ok, true);
-  assert.equal(res.value.size, bytes.length);
+  assert.equal(Buffer.from(res.value.data_base64, "base64").length, bytes.length);
 });
 
 test("compact.load: a failed download reports model_load, not a blank model", async () => {

@@ -4,6 +4,44 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.124.0] — 2026-08-27
+
+### Fixed
+
+- **A limpeza de `410 Gone` do WebPush nunca rodou em produção (#118).** A
+  verificação em device da linha P3 pedia o round-trip por um push service real,
+  e ele foi medido contra o **FCM**, com a aba fechada: subscribe devolve
+  `https://fcm.googleapis.com/fcm/send/…`, `pywebpush` responde **201** em ~1,0 s
+  e o worker mostra a notificação com **zero páginas abertas**. Chave VAPID
+  trocada responde **403**; subscription cancelada responde **410 Gone**.
+
+  E o `410` não chegava a lugar nenhum. `WebPushService.send` captura o
+  `WebPushError` **deste módulo**, e o sender real — `pywebpush.webpush` —
+  levanta o `WebPushException` **dele**. Toda falha real caía no ramo genérico
+  com `status_code=None` e `gone=False`, então a poda de endpoint morto que o
+  docstring promete só acontecia contra os senders fake que os testes injetam:
+  eles levantavam a exceção certa, e por isso o ramo estava "coberto". Sintoma
+  medido: depois de um `unsubscribe()` no browser, todo envio respondia
+  `{"sent":0,"total":1}` — para sempre, com o endpoint morto no store.
+
+  `_default_sender` passa a traduzir: o `WebPushException` do `pywebpush` vira
+  `WebPushError` com o status da resposta do push service. Medido depois da
+  correção, mesmo endpoint morto: primeiro envio `{"sent":0,"total":1}`, segundo
+  `{"sent":0,"total":0}` — podado. `SendOutcome.status_code` de um envio
+  aceito passa a vir da resposta em vez da constante `201`.
+- **`POST /webpush/subscribe` respondia 500 a um corpo sem `endpoint`.** O
+  `ValueError` do store escapava sem tratamento; agora é **400** nomeando o campo
+  que falta — erro do chamador responde como erro do chamador.
+
+### Changed
+
+- `docs/roadmap.md` (P3) e `docs/agents/device-verification.md` registram a
+  medição: os três status do FCM, o defeito que ela achou, e o
+  `pushsubscriptionchange` exercitado **no worker real** (evento sintético,
+  `pushManager.subscribe()` e re-POST reais) — re-subscreve com a chave da
+  `oldSubscription`, ganha endpoint novo e re-POSTa `/webpush/subscribe` com
+  **200**, aba fechada.
+
 ## [0.123.0] — 2026-08-27
 
 ### Fixed

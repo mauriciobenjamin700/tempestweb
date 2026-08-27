@@ -239,23 +239,52 @@ WebPushSender = Callable[..., Any]
 
 
 def _default_sender() -> WebPushSender:
-    """Resolve the real ``pywebpush.webpush`` callable, lazily.
+    """Resolve a sender over ``pywebpush``, translating its failures.
+
+    ``pywebpush`` raises its own ``WebPushException``, carrying the push
+    service's response; :class:`WebPushService` reads :class:`WebPushError` and
+    its ``status_code``. Without the translation every real failure landed in the
+    generic branch with ``status_code=None``, so **the 410-Gone pruning this
+    module promises never ran in production** — only against the fake senders
+    tests inject. Measured against FCM on 2026-08-27: an unsubscribed endpoint
+    answers ``410 Gone`` and the dead subscription stayed in the store forever.
 
     Returns:
-        The ``pywebpush.webpush`` function.
+        A callable with ``pywebpush.webpush``'s signature that raises
+        :class:`WebPushError` on failure.
 
     Raises:
         RuntimeError: If ``pywebpush`` is not installed.
     """
     try:
+        from pywebpush import WebPushException
         from pywebpush import webpush as _webpush
     except ImportError as exc:  # pragma: no cover - exercised via mock in tests
         raise RuntimeError(
             "pywebpush is required to send WebPush; install "
             'tempest-fastapi-sdk[webpush] or "pywebpush".'
         ) from exc
-    sender: WebPushSender = _webpush
-    return sender
+
+    def send(**kwargs: Any) -> Any:  # noqa: ANN401 - pywebpush's own signature
+        """Send one push, raising :class:`WebPushError` when it fails.
+
+        Args:
+            **kwargs (Any): Forwarded verbatim to ``pywebpush.webpush``.
+
+        Returns:
+            Whatever ``pywebpush.webpush`` returned (a ``requests`` response).
+
+        Raises:
+            WebPushError: When the push service rejected the message, carrying
+                its HTTP status when the exception reports one.
+        """
+        try:
+            return _webpush(**kwargs)
+        except WebPushException as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            raise WebPushError(str(exc), status_code=status) from exc
+
+    return send
 
 
 class WebPushError(Exception):
@@ -351,7 +380,7 @@ class WebPushService:
 
         sender = self._resolve_sender()
         try:
-            sender(
+            response = sender(
                 subscription_info=subscription,
                 data=json.dumps(payload),
                 vapid_private_key=self.vapid.private_key,
@@ -370,7 +399,11 @@ class WebPushService:
             )
         except Exception as exc:  # noqa: BLE001 - report any sender failure
             return SendOutcome(endpoint=endpoint, ok=False, error=str(exc))
-        return SendOutcome(endpoint=endpoint, ok=True, status_code=201)
+        return SendOutcome(
+            endpoint=endpoint,
+            ok=True,
+            status_code=getattr(response, "status_code", None) or 201,
+        )
 
     def send_to_owner(self, owner: str, payload: dict[str, Any]) -> list[SendOutcome]:
         """Send a push to every subscription an owner has.
@@ -433,7 +466,7 @@ def webpush_router(
         RuntimeError: If FastAPI is not installed.
     """
     try:
-        from fastapi import APIRouter, Body
+        from fastapi import APIRouter, Body, HTTPException
     except ImportError as exc:  # pragma: no cover - server extra always ships it
         raise RuntimeError(
             "FastAPI is required for webpush_router; install "
@@ -451,8 +484,20 @@ def webpush_router(
     async def subscribe(
         subscription: SubscriptionInfo = Body(...),  # noqa: B008 - FastAPI param
     ) -> dict[str, bool]:
-        """Persist a browser push subscription under the router's owner."""
-        service.add_subscription(owner, subscription)
+        """Persist a browser push subscription under the router's owner.
+
+        A body without an ``endpoint`` is the caller's mistake, so it answers
+        **400** naming it. It used to reach the store's ``ValueError`` uncaught
+        and come back as a 500 with a traceback — measured while wiring a probe
+        that posted the wrong shape.
+
+        Raises:
+            HTTPException: 400, when the body carries no push endpoint.
+        """
+        try:
+            service.add_subscription(owner, subscription)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"ok": True}
 
     @router.post("/unsubscribe")

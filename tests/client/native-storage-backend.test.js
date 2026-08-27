@@ -26,6 +26,7 @@ import { IDBFactory } from "fake-indexeddb";
 
 import { browserDeps, dispatch } from "../../client/native/index.js";
 import { createIdbKv, setKvCodec } from "../../client/native/idb-kv.js";
+import { native } from "../../client/transpile/native.js";
 
 /** Build a native_call envelope. */
 function call(capability, args = {}, callId = "c1") {
@@ -115,4 +116,16 @@ test("storage: the deflate codec reaches the store the writes go to", async () =
   } finally {
     setKvCodec("json");
   }
+});
+
+test("Mode C reaches the same backend, keeping no store of its own", async () => {
+  assert.equal(
+    globalThis.localStorage,
+    undefined,
+    "no localStorage in this process, so a stored value can only be in IndexedDB",
+  );
+  await native.storage.put("mode-c", "through-the-facade");
+  assert.equal(await native.storage.get("mode-c"), "through-the-facade");
+  assert.equal(await rawRecord("mode-c"), "through-the-facade");
+  assert.deepEqual(await native.storage.list_keys(), (await createIdbKv().keys()).sort());
 });

@@ -56,6 +56,7 @@ import { cookiesAll, cookiesGet, cookiesRemove, cookiesSet } from "./cookies.js"
 import { cameraCapture } from "./camera.js";
 import { onnxLoad, onnxRun } from "./onnx.js";
 import { compactLoad } from "./compact.js";
+import { createIdbKv } from "./idb-kv.js";
 import { fileSave, filePick } from "./file.js";
 import { installState, installPrompt } from "./install.js";
 import {
@@ -298,9 +299,33 @@ const _subscriptions = new Map();
  * Resolve the live browser globals as the default dependency set.
  * @returns {NativeDeps}
  */
+/**
+ * The IndexedDB-backed key/value store the `storage` capability persists into,
+ * or null where IndexedDB is absent (jsdom, a locked-down profile) — there
+ * `native/storage.js` falls back to localStorage on its own.
+ *
+ * Built once: `browserDeps()` runs on **every** dispatch, and opening the
+ * database per call would pay the open on every read.
+ *
+ * @type {?import("./idb-kv.js").KeyValueStore|undefined}
+ */
+let _kvStore;
+
+/**
+ * Resolve the shared IndexedDB key/value store, creating it on first use.
+ *
+ * @returns {?import("./idb-kv.js").KeyValueStore} The store, or null when the
+ *          runtime has no IndexedDB.
+ */
+function kvStore() {
+  if (_kvStore === undefined) _kvStore = createIdbKv();
+  return _kvStore;
+}
+
 export function browserDeps() {
   const g = /** @type {any} */ (globalThis);
   return {
+    store: kvStore() || undefined,
     fetch: g.fetch ? g.fetch.bind(g) : undefined,
     navigator: g.navigator,
     Notification: g.Notification,

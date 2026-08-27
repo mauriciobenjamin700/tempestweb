@@ -4,6 +4,48 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.123.0] — 2026-08-27
+
+### Fixed
+
+- **`native.storage` prometia IndexedDB e gravava no `localStorage` (#118).** A
+  verificação em device da linha N3 pedia medir persistência num browser real,
+  já que o `indexedDB` do jsdom é um shim. Medido num artefato Modo A buildado,
+  e o defeito não era persistência — era **o backend**:
+
+  ```text
+  indexedDB.databases() → []
+  localStorage          → note (18 chars), bulk (142.890 chars, crus)
+  storage.configure(codec="deflate") → active=deflate supported=True
+  ```
+
+  `client/native/storage.js` prefere `deps.store` e cai para `localStorage`
+  quando não recebe um. Nada injetava esse store: o `browserDeps()` de
+  `client/native/index.js` não o listava, então **só o Modo C** — que monta o
+  seu em `client/transpile/native.js` — usava IndexedDB. Modos A e B ficavam com
+  o `localStorage`: teto de ~5 MB, escrita **síncrona** na main thread,
+  invisível para o service worker. E o codec `deflate` da #180, que configura o
+  store de IndexedDB, virava no-op enquanto `configure` respondia
+  `supported=True` — o pior tipo de resposta, a que parece certa.
+
+  Persistência sozinha não pega isso: o `localStorage` também sobrevive ao
+  reload. Foi preciso olhar **onde** o valor caiu.
+
+  `browserDeps()` passa a construir o store uma vez, preguiçosamente, e a
+  entregá-lo em todo dispatch; onde não há IndexedDB (jsdom, perfil bloqueado) o
+  fallback de `localStorage` continua exatamente como estava. Medido depois da
+  correção, mesmo app: `indexedDB.databases()` → `["tempestweb@1"]`,
+  `localStorage` **vazio**, `bulk` de 142.890 caracteres em **10.276 bytes**
+  deflated, `note` e `bulk` de volta intactos após reload, `keys=[]` e object
+  store vazio depois do `remove()`, e quota reportada de **10.738.498.004
+  bytes** contra os ~5 MB do `localStorage`.
+
+  `tests/client/native-storage-backend.test.js` fixa a fiação: que
+  `browserDeps()` carrega um store, que ele é construído uma vez, que uma
+  escrita pelos deps default aterrissa no IndexedDB, que o `deflate` chega ao
+  store onde as escritas vão (envelope `$twcodec` e bytes comprimidos), e que um
+  runtime sem IndexedDB continua gravando pelo `localStorage`.
+
 ## [0.122.0] — 2026-08-27
 
 ### Added

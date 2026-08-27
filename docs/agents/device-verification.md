@@ -16,7 +16,7 @@ cobrir".
 |---|---|---|
 | geolocation real (concedida, negada, recuperação) | N3 | ✅ medido — 2026-08-23 |
 | clipboard real (escrita + conteúdo lido de volta) | N3 | ✅ medido — 2026-08-23 |
-| `storage` sobre IndexedDB, sobrevivendo a reload | N3 | ⏳ falta medir (wrapper testado em jsdom, que é um shim) |
+| `storage` sobre IndexedDB, sobrevivendo a reload | N3 | ✅ medido — 2026-08-27 (**achou defeito**: caía em `localStorage` nos Modos A e B) |
 | captura de câmera real | N4 | ⏳ falta hardware ou Chrome com fake device |
 | Background Sync com a aba fechada | P2 | ✅ medido — 2026-08-25 (**achou defeito**: #169) |
 | WebPush: handler → notificação, com a aba fechada | P3 | ✅ medido — 2026-08-25 |
@@ -153,20 +153,43 @@ deliberadamente **não** cobre está na seção seguinte.
 
 ## O que falta, e o que exatamente rodar
 
-### `storage` sobre IndexedDB (N3)
+### `storage` sobre IndexedDB (N3) — medido 2026-08-27
 
-O wrapper tem teste, mas em jsdom — e o `indexedDB` de jsdom é um shim: ele não
-prova persistência, que é a única coisa que essa camada promete. O que falta é
-medir num browser real:
+**Achou defeito, e não era persistência.** Um app Modo A buildado gravou duas
+chaves e o que o browser mostrou foi:
 
-```bash
-uv run --frozen tempestweb run --mode server --path examples/offline-queue --port 8282
+```text
+indexedDB.databases() → []
+localStorage          → note (18 chars), bulk (142.890 chars, crus)
+storage.configure(codec="deflate") → active=deflate supported=True
 ```
 
-Procedimento: gravar chaves, **recarregar a aba**, conferir que voltam; depois
-`storage.clear()` e conferir que não voltam. Anotar os valores lidos, não
-"persistiu". Enquanto isso não existir, N3 fica 🔶 mesmo com geo e clipboard
-medidos — a linha cobre três capacidades e só duas foram à prova.
+`native/storage.js` prefere `deps.store` (IndexedDB) e cai para `localStorage`
+quando não recebe um — e **nada injetava esse store**: o `browserDeps()` de
+`client/native/index.js` não o listava, então só o Modo C (que monta o seu em
+`client/transpile/native.js`) usava IndexedDB. Modos A e B ficavam com o
+`localStorage`: ~5 MB de teto, escrita **síncrona** na main thread, invisível
+para o service worker — e o codec `deflate`, que configura o store de IndexedDB,
+virava no-op enquanto respondia `supported=True`.
+
+Persistência sozinha **não pega isso**: o `localStorage` também sobrevive a
+reload. O que pega é olhar em qual backend o valor caiu.
+
+Depois da correção (`store` injetado no `browserDeps()`, mesmo fallback
+preservado), o mesmo app:
+
+| Passo | Medido |
+| --- | --- |
+| Escrita | `indexedDB.databases()` → `["tempestweb@1"]`, `localStorage` **vazio** |
+| `bulk`, 142.890 caracteres | envelope `$twcodec=deflate`, **10.276 bytes** no disco |
+| Reload | `note=persisted-value-42`, `bulk` `intact=True`, `keys=['bulk','note']` |
+| `remove()` de tudo | `note=<not_found>`, `keys=[]`, object store vazio |
+| Quota (`navigator.storage.estimate`) | **10.738.498.004 bytes** |
+
+Procedimento, se for repetir: buildar um app que grave, ler no console
+`indexedDB.databases()` **e** `Object.keys(localStorage)` — a pergunta é *onde
+caiu*, não *se voltou* —, recarregar, ler de volta, limpar. E limpar service
+worker e caches antes de medir, ou a página serve o precache do build anterior.
 
 ### captura de câmera real (N4)
 

@@ -181,6 +181,45 @@ async def test_a_scaler_step_is_folded_rather_than_dropped() -> None:
     assert any(value != 1.0 for value in model.scale)
 
 
+def test_a_scaler_with_only_half_the_transform_is_refused() -> None:
+    """``offset`` and ``scale`` are one transform, and half of it is not it.
+
+    ``_preprocess`` asked only ``if not model.scale``, so a header whose
+    ``scale`` is empty and whose ``offset`` carries every mean — what a
+    ``StandardScaler(with_std=False)`` export looks like — returned the raw row
+    and scored on unscaled features. On this fixture that raw score is
+    -8270.60 against the -14011.04 the folded scaler produces, and the
+    documentation says the scaler is folded, **never ignored**.
+    """
+
+    def unpair(header: dict[str, Any]) -> None:
+        header["preprocess"]["scale"] = []
+
+    with pytest.raises(CompactFormatError) as raised:
+        parse(_rewritten("pipeline_scaler_linear", unpair))
+
+    assert "scale" in str(raised.value)
+
+
+def test_a_scaler_that_does_not_cover_every_feature_is_refused() -> None:
+    """A short scaler used to shorten the row itself, silently.
+
+    The zip over ``vector``/``offset``/``scale`` was ``strict=False``, so arrays
+    of 3 entries against a 6-feature model produced a 3-value row: measured,
+    ``1`` p=0.6134 in place of ``0`` p=0.9967.
+    """
+
+    def shorten(header: dict[str, Any]) -> None:
+        header["preprocess"]["offset"] = header["preprocess"]["offset"][:3]
+        header["preprocess"]["scale"] = header["preprocess"]["scale"][:3]
+
+    with pytest.raises(CompactFormatError) as raised:
+        parse(_rewritten("pipeline_scaler_linear", shorten))
+
+    message = str(raised.value)
+    assert "3" in message and "6" in message
+
+
 # --------------------------------------------------------------------------
 # The link function: saturating rather than raising
 # --------------------------------------------------------------------------

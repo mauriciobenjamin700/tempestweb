@@ -529,18 +529,33 @@ def _sections(
 def _preprocess(model: CompactModel, vector: Sequence[float]) -> list[float]:
     """Apply the scaler the exporter folded into the header, if any.
 
+    ``offset`` and ``scale`` are one transform, so the question is whether
+    *either* is present — asking only about ``scale`` dropped the centring of a
+    ``StandardScaler(with_std=False)`` export, whose ``scale`` is all ones and
+    whose ``offset`` carries every mean, and scored the raw row instead. The zip
+    is ``strict`` for the same reason: a shorter ``scale`` used to shorten the
+    *row* without a word, and a 6-feature model scored on 3 values answers a
+    different label. :func:`_validate` has already refused a header whose arrays
+    do not cover every feature, so ``strict`` here is the assertion that they
+    still line up.
+
     Args:
         model: The parsed model.
         vector: The row, ordered by the manifest.
 
     Returns:
         The row the model's own arithmetic expects.
+
+    Raises:
+        ValueError: If the row and the scaler's arrays are of different lengths —
+            unreachable through :func:`parse`, which crosses both against
+            ``n_features``.
     """
-    if not model.scale:
+    if not (model.offset or model.scale):
         return list(vector)
     return [
         (value - offset) / (scale or 1.0)
-        for value, offset, scale in zip(vector, model.offset, model.scale, strict=False)
+        for value, offset, scale in zip(vector, model.offset, model.scale, strict=True)
     ]
 
 

@@ -4,6 +4,64 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.117.0] — 2026-08-27
+
+### Added
+
+- **Codec opcional no store, medido antes de existir (#180).** A issue pedia a
+  medição **antes** do código, e a medição mudou a resposta: **o IndexedDB já
+  comprime o que guarda.** Um catálogo de 977 KB chega ao disco como **222 KB**
+  sem codec nenhum — o LevelDB por baixo espremeu 4,4× sozinho. Então o codec não
+  compete com texto cru; compete com o storage. A economia real é o que sobra:
+
+  | Payload | Sem codec | Com codec | Economia real |
+  |---|---|---|---|
+  | catálogo, 5.000 itens | 222,1 KB | 122,1 KB | **−45,0%** |
+  | histórico repetitivo | 64,1 KB | 22,6 KB | **−64,8%** |
+  | ruído base64 | 126,5 KB | 95,0 KB | −24,9% |
+
+  Com a CPU throttlada 6×, o custo é **+12,4 ms por leitura** e **+75,8 ms por
+  escrita** em 1 MB, subindo para **+33,8 ms / +295,1 ms** em 4 MB. O medo escrito
+  na issue era "40 ms por leitura para economizar 3%"; a leitura não é o problema,
+  a escrita é.
+
+  Conclusão: paga para quem guarda dezenas de MB de coleção repetitiva, não paga
+  para quem guarda rascunho e fila. Logo **default `"json"`, opt-in explícito**:
+
+  ```python
+  await native.storage.configure(codec="deflate")
+  ```
+
+  **Divergência da issue, deliberada.** Ela propunha a API em
+  `native.offline.configure(...)` e, no mesmo texto, colocava a fila de mutações
+  **fora de escopo** — ou seja, a API proposta comprimiria justamente o que ela
+  excluiu, e deixaria a coleção grande de fora. O codec entrou onde a coleção
+  grande de fato mora: o `native.storage`, sobre o KV do IndexedDB — que é também
+  onde o `tempestweb.query` persiste.
+
+  **Ligar e desligar não apaga nada, e isso é o que torna a opção segura:**
+  decodificar está sempre ligado, só codificar é opt-in. Um valor guardado carrega
+  o nome do codec que o escreveu, então o leitor nunca consulta a configuração
+  atual. Medido em Chrome real com um catálogo de 565 KB: registro escrito antes
+  do codec continua legível com ele ligado, e registro comprimido continua legível
+  com ele desligado.
+
+  **`configure` nunca levanta por falta de suporte.** `CompressionStream` só
+  chegou no Safari 16.4; abaixo disso a chamada responde
+  `active="json", supported=False` e o store segue funcionando. Store que não
+  comprime ainda é store; exceção ali seria tela morta num device real. Envelope
+  de codec desconhecido e bytes corrompidos viram **cache miss**, não exceção.
+
+  `codec.js` entrou em `_OFFLINE_ASSETS` — módulo de `client/` fora da lista
+  simplesmente não existe no app buildado, e nada falha alto.
+
+  Receita com a tabela inteira em `docs/advanced/storage-codec.md` (PT + EN),
+  aberta por um `!!! danger` mandando medir a própria carga.
+
+### Changed
+
+- `docs/roadmap.md`: Trilho R, fase R4 (offline codec) ✅.
+
 ## [0.116.0] — 2026-08-27
 
 ### Added

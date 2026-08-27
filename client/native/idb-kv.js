@@ -11,8 +11,40 @@
 // promises. `createIdbKv` returns null when IndexedDB is unavailable, so the
 // caller can fall back to localStorage cleanly.
 
+import { CODEC_JSON, decodeValue, encodeValue, resolveCodec } from "../offline/codec.js";
+
 const DB_NAME = "tempestweb";
 const STORE = "kv";
+
+/**
+ * The codec new writes use. Reads never consult it — an envelope carries its own
+ * codec name, so a value written under one setting stays readable under another.
+ *
+ * @type {string}
+ */
+let _codec = CODEC_JSON;
+
+/**
+ * Choose the codec new writes use.
+ *
+ * @param {string} codec  A name from {@link CODECS}. One this runtime cannot run
+ *        (`deflate` on Safari below 16.4) resolves to `json` rather than
+ *        throwing, so a store that cannot compress is still a working store.
+ * @returns {string} The codec that will actually be used.
+ */
+export function setKvCodec(codec) {
+  _codec = resolveCodec(codec);
+  return _codec;
+}
+
+/**
+ * Report the codec new writes are using.
+ *
+ * @returns {string} The active codec name.
+ */
+export function getKvCodec() {
+  return _codec;
+}
 
 /**
  * Wrap an IndexedDB request in a promise.
@@ -77,11 +109,14 @@ export function createIdbKv(idb = /** @type {any} */ (globalThis).indexedDB) {
     /** @param {string} name @returns {Promise<?string>} */
     async get(name) {
       const value = await withStore("readonly", (store) => promisify(store.get(name)));
-      return value === undefined ? null : value;
+      return decodeValue(value);
     },
     /** @param {string} name @param {string} content @returns {Promise<void>} */
     async put(name, content) {
-      await withStore("readwrite", (store) => promisify(store.put(content, name)));
+      // Encoding happens BEFORE the transaction opens: awaiting a non-IDB
+      // promise inside one lets it auto-commit, and the write is lost.
+      const stored = await encodeValue(content, _codec);
+      await withStore("readwrite", (store) => promisify(store.put(stored, name)));
     },
     /** @param {string} name @returns {Promise<void>} */
     async remove(name) {

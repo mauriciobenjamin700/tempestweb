@@ -161,6 +161,7 @@ CAPABILITIES: tuple[Capability, ...] = (
     _cap("speech.listen", mode_c=True, streaming=True),
     _cap("speech.speak", mode_c=True),
     _cap("speech.voices", mode_c=True),
+    _cap("storage.configure", mode_c=True),
     _cap("storage.get", mode_c=True),
     _cap("storage.list", mode_c=True),
     _cap("storage.put", mode_c=True),

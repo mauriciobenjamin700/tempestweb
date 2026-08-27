@@ -100,6 +100,7 @@ plugins:
             "Export CSV & XLSX": "Exportar CSV e XLSX"
             "Permissions in the view": "Permissões na view"
             "Reading remote data": "Lendo dados remotos"
+            "Compressing the store": "Comprimir o store"
             "Tutorial — the Counter": "Tutorial — o Counter"
             "1. The view tree": "1. A árvore de view"
             "2. State and handlers": "2. Estado e handlers"
@@ -288,6 +289,7 @@ nav:
       - Generate a client from OpenAPI: advanced/openapi.md
       - "Export CSV & XLSX": advanced/export.md
       - "Permissions in the view": advanced/access.md
+      - "Compressing the store": advanced/storage-codec.md
   - API reference:
       - tempestweb.presets: reference/presets.md
       - tempestweb.components: reference/components.md

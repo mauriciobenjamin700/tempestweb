@@ -144,6 +144,12 @@ export const native = Object.freeze({
     remove: (name) => call("storage.remove", { name }),
     /** List every stored key. @returns {Promise<string[]>} */
     list_keys: () => call("storage.list", {}).then((r) => r.keys),
+    /**
+     * Choose the codec new writes use. Off by default; measure before enabling.
+     * @returns {Promise<{requested: string, active: string, supported: boolean}>}
+     */
+    configure: (opts = {}) =>
+      call("storage.configure", { codec: opts.codec ?? "json" }),
   }),
   clipboard: Object.freeze({
     /** Read the clipboard text. @returns {Promise<string>} */

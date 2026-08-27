@@ -251,6 +251,7 @@ NATIVE_MEMBERS: Mapping[str, frozenset[str]] = {
     ),
     "storage": frozenset(
         {
+            "configure",
             "get",
             "list_keys",
             "put",

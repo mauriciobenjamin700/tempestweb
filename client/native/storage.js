@@ -6,6 +6,8 @@
 // capability still works in plain pages and under jsdom.
 
 import { CapabilityError } from "./index.js";
+import { CODEC_JSON, isCodecSupported } from "../offline/codec.js";
+import { setKvCodec } from "./idb-kv.js";
 
 /**
  * @typedef {Object} KeyValueStore
@@ -100,4 +102,30 @@ export async function storageRemove(args, deps) {
 export async function storageList(_args, deps) {
   const keys = await resolveStore(deps).keys();
   return { keys: Array.isArray(keys) ? keys : [] };
+}
+
+/**
+ * Choose the codec new writes use, and report what will actually run.
+ *
+ * The compression measurement that decided this is in `client/offline/codec.js`:
+ * IndexedDB already compresses, so a codec here saves 45-65% of what is left,
+ * not the 87% the raw ratio suggests, and it costs a weak device ~76 ms to write
+ * a megabyte. Hence opt-in.
+ *
+ * Two things are deliberate. First, an unsupported codec resolves to `json`
+ * instead of throwing — a store that cannot compress is still a working store,
+ * and `active` reports what happened. Second, this only affects the IndexedDB
+ * backend: the `localStorage` fallback holds strings and cannot hold bytes, so
+ * it reports `active: "json"` whatever was asked.
+ *
+ * @param {{codec?: string}} args
+ * @param {import("./index.js").NativeDeps} deps
+ * @returns {Promise<{requested: string, active: string, supported: boolean}>}
+ */
+export async function storageConfigure(args, deps) {
+  const requested = (args && args.codec) || CODEC_JSON;
+  const supported = isCodecSupported(requested);
+  const apply = (deps && /** @type {any} */ (deps).setKvCodec) || setKvCodec;
+  const active = apply(requested);
+  return { requested, active, supported };
 }

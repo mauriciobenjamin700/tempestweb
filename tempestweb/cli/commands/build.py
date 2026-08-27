@@ -175,6 +175,7 @@ _OFFLINE_ASSETS: tuple[str, ...] = (
     "sync-status.js",
     "sw-bridge.js",
     "asset-cache.js",
+    "codec.js",
 )
 
 # Subpackages of ``tempestweb`` the Mode A runtime needs in the browser. The

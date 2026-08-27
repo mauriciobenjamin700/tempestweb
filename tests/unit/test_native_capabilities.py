@@ -190,6 +190,7 @@ async def test_camera_capture_returns_photo_with_bytes() -> None:
         "facing": "user",
         "quality": 0.5,
         "mime_type": "image/jpeg",
+        "include_bytes": True,
     }
 
 

@@ -5,6 +5,7 @@
 // stream tracks are always stopped before returning.
 
 import { CapabilityError } from "./index.js";
+import { fromBase64, putBlob } from "./blobs.js";
 
 /**
  * Strip the `data:<mime>;base64,` prefix from a canvas data URL.
@@ -62,11 +63,18 @@ export async function cameraCapture(args, deps) {
     if (ctx) ctx.drawImage(video, 0, 0, width, height);
     const mime = args.mime_type || "image/jpeg";
     const dataUrl = canvas.toDataURL(mime, typeof args.quality === "number" ? args.quality : 0.85);
+    const base64 = stripDataUrl(dataUrl);
+    // The blob is registered either way: `imaging.*` addresses the photo by
+    // handle, so the pixels never cross the bridge again. `include_bytes: false`
+    // additionally keeps them from crossing the FIRST time, which is what an app
+    // that only compresses and uploads wants.
+    const blob = fromBase64(base64, mime);
     return {
       mime_type: mime,
       width,
       height,
-      data_base64: stripDataUrl(dataUrl),
+      ref: blob ? putBlob(blob) : "",
+      data_base64: args.include_bytes === false ? "" : base64,
     };
   } finally {
     for (const track of stream.getTracks ? stream.getTracks() : []) {

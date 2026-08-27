@@ -38,6 +38,14 @@ import { quotaEstimate, quotaPersist, quotaPersisted } from "./quota.js";
 import { networkState, networkWatch } from "./network.js";
 import { deviceProfile } from "./device.js";
 import {
+  imagingCompress,
+  imagingInfo,
+  imagingRead,
+  imagingRelease,
+  imagingThumbnails,
+  imagingTransform,
+} from "./imaging.js";
+import {
   storageConfigure,
   storageGet,
   storageList,
@@ -173,6 +181,12 @@ export const HANDLERS = {
   "storage.remove": storageRemove,
   "storage.configure": storageConfigure,
   "device.profile": deviceProfile,
+  "imaging.compress": imagingCompress,
+  "imaging.thumbnails": imagingThumbnails,
+  "imaging.transform": imagingTransform,
+  "imaging.info": imagingInfo,
+  "imaging.read": imagingRead,
+  "imaging.release": imagingRelease,
   "cookies.get": cookiesGet,
   "cookies.set": cookiesSet,
   "cookies.remove": cookiesRemove,

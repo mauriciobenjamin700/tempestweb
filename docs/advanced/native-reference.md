@@ -143,6 +143,80 @@ async def follow_network() -> None:
         app.set_state(lambda s: setattr(s, "online", net.online))
 ```
 
+### `imaging` — comprimir, miniaturar e transformar antes do upload
+
+Entre `camera.capture()` e `http.upload()` não havia nada: a app capturava uma
+foto de 4 MB e subia 4 MB, ou reescrevia compressão com canvas na mão.
+
+```python
+from tempestweb import native
+
+async def upload_photo() -> None:
+    photo = await native.camera.capture(include_bytes=False)
+    small = await native.imaging.compress(photo, max_kb=200, max_width=1600)
+    print(small.size_kb, small.quality, small.attempts, small.within_budget)
+    await native.http.upload("/api/fotos", small.as_upload("foto.jpg"))
+```
+
+!!! info "Os pixels ficam no browser"
+    Toda função aqui recebe e devolve um **handle** opaco para bytes que o cliente
+    está segurando. O Python endereça a imagem pelo nome; a imagem não atravessa
+    a ponte:
+
+    ```text
+    Modo B, foto de 4 MB, comprimindo:
+
+      bytes:  cliente →5,3MB→ servidor →5,3MB→ cliente   (10,6 MB de rede)
+      handle: cliente →"blob:tw:7"→ servidor →"blob:tw:7"→ cliente   (~40 bytes)
+    ```
+
+    `camera.capture(include_bytes=False)` estende isso à primeira travessia, e
+    `small.as_upload(nome)` à última — o servidor recebe os bytes, o Python nunca.
+
+**Medido em Chrome 150**, foto de 4000×3000 com estrutura (gradiente + formas):
+
+| | |
+| --- | --- |
+| original | **871,5 KB** |
+| depois de `compress(max_kb=200, max_width=1600)` | **124,8 KB** (−85,7%) |
+| qualidade escolhida | **0,91** |
+| encodes gastos | **5** |
+| `within_budget` | **True** |
+| tempo | **545 ms** |
+| miniaturas 96 / 256 px | **4,9 KB** / **29,7 KB** |
+
+!!! warning "Orçamento impossível **responde**, não trava"
+    A busca de qualidade é binária e **limitada** por `steps` (6 por default).
+    Medido com ruído puro de 9,4 MB e orçamento de 200 KB: parou em 5 encodes com
+    `within_budget=False` e `size_kb=573,9` — o menor que conseguiu. Uma imagem
+    grande demais que a app decide o que fazer vale mais que um spinner infinito.
+
+    **Cheque o `within_budget`.**
+
+Quatro capacidades, mais duas de manutenção:
+
+| Chamada | Devolve |
+| --- | --- |
+| `compress(source, max_kb=, max_width=, ...)` | `CompressedImage(ref, size_kb, quality, attempts, within_budget, …)` |
+| `thumbnails(source, [96, 256])` | `list[Thumbnail]`, na ordem pedida |
+| `transform(source, width=, rotate=, crop=, flip_horizontal=)` | `ProcessedImage` — tudo numa passada só |
+| `info(source)` | `ImageInfo(mime_type, width, height, size_kb)`, sem re-encodar |
+| `read(source)` | `ImageBytes` — a **saída de emergência**, move a imagem inteira |
+| `release(source)` / `release(all=True)` | libera handle |
+
+!!! danger "Opção com nome errado **levanta**"
+    `CompressOptions` e `TransformOptions` são `extra="forbid"`:
+    `compress(photo, maxWidth=1600)` levanta em vez de ignorar em silêncio — o
+    silêncio subiria a foto em tamanho original e ninguém saberia. Já
+    `CompressedImage`, `Thumbnail` e afins **ignoram** campo desconhecido, senão
+    um cliente novo quebraria um Python antigo.
+
+!!! note "Handle é limitado, e handle vencido é erro nomeado"
+    O cliente segura algumas dezenas de blobs e descarta o mais antigo, para uma
+    tela de captura rodando uma hora não acumular todo frame. Endereçar um handle
+    vencido levanta `NativeError("not_found")` — recupere capturando de novo, não
+    tentando de novo.
+
 ### `device` — memória, núcleos e heap, para qualidade adaptativa
 
 Descreve **grosseiramente** a máquina do usuário, para a app decidir se comprime

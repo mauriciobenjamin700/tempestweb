@@ -29,6 +29,12 @@ class Photo(BaseModel):
         width: Frame width in pixels.
         height: Frame height in pixels.
         data_base64: The image bytes, base64-encoded (JSON-safe over the wire).
+            Empty when the capture asked not to carry them — see ``ref``.
+        ref: An opaque handle to the same bytes, still held by the client. Hand
+            it to :mod:`tempestweb.native.imaging` to compress or transform the
+            photo **without moving the pixels across the bridge**, and to
+            :func:`tempestweb.native.http.upload` to send them straight to the
+            server.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -37,6 +43,7 @@ class Photo(BaseModel):
     width: int = 0
     height: int = 0
     data_base64: str = Field(default="", repr=False)
+    ref: str = ""
 
     def to_bytes(self) -> bytes:
         """Decode the photo to raw bytes.
@@ -52,6 +59,7 @@ async def capture(
     facing: str = "environment",
     quality: float = 0.85,
     mime_type: str = "image/jpeg",
+    include_bytes: bool = True,
 ) -> Photo:
     """Capture a single photo from the device camera.
 
@@ -59,6 +67,11 @@ async def capture(
         facing: Preferred camera (``"environment"`` rear, ``"user"`` front).
         quality: Encoding quality in ``[0.0, 1.0]`` for lossy formats.
         mime_type: The desired output image MIME type.
+        include_bytes: Whether to carry the image bytes back to Python. Pass
+            ``False`` when the photo is only going to be compressed and uploaded:
+            the bytes then never cross the bridge at all, and
+            :attr:`Photo.ref` addresses them where they already are. A 4 MB photo
+            crosses as ~5.3 MB of base64, which in Mode B is a network trip.
 
     Returns:
         The captured :class:`Photo`.
@@ -72,6 +85,11 @@ async def capture(
     clamped = max(0.0, min(1.0, quality))
     value = await send_native_call(
         "camera.capture",
-        {"facing": facing, "quality": clamped, "mime_type": mime_type},
+        {
+            "facing": facing,
+            "quality": clamped,
+            "mime_type": mime_type,
+            "include_bytes": include_bytes,
+        },
     )
     return Photo.model_validate(value)

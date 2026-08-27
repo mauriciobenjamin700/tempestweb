@@ -14,7 +14,11 @@
 // codec configures the IndexedDB store, so on localStorage `storage.configure`
 // answered `active=deflate supported=True` and stored the value raw.
 //
-// So these pin the wiring itself.
+// So these pin the wiring itself, in a process where IndexedDB works. The two
+// runtimes that do not get one have their own files, because `browserDeps()`
+// caches its store for the life of the module: `native-storage-fallback.test.js`
+// (no `indexedDB`) and `native-storage-blocked.test.js` (an `indexedDB` that
+// will not open).
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -85,7 +89,12 @@ test("storage: a value written through the default deps lands in IndexedDB", asy
 test("storage: the deflate codec reaches the store the writes go to", async () => {
   const configured = await dispatch(call("storage.configure", { codec: "deflate" }));
   assert.equal(configured.ok, true);
-  if (!configured.value.supported) return;
+  assert.equal(
+    configured.value.supported,
+    true,
+    "Node 18+ ships CompressionStream; a skip here would hide the assertions below",
+  );
+  assert.equal(configured.value.active, "deflate");
 
   try {
     const bulk = "repetition ".repeat(4000);
@@ -105,30 +114,5 @@ test("storage: the deflate codec reaches the store the writes go to", async () =
     );
   } finally {
     setKvCodec("json");
-  }
-});
-
-test("storage: a runtime with no IndexedDB still stores, through localStorage", async () => {
-  const previousLocal = globalThis.localStorage;
-  const map = new Map();
-  globalThis.localStorage = {
-    get length() {
-      return map.size;
-    },
-    key: (index) => [...map.keys()][index] ?? null,
-    getItem: (name) => (map.has(name) ? map.get(name) : null),
-    setItem: (name, value) => map.set(name, String(value)),
-    removeItem: (name) => map.delete(name),
-  };
-  try {
-    const deps = browserDeps();
-    const written = await dispatch(
-      call("storage.put", { name: "note", content: "fallback" }),
-      { ...deps, store: undefined },
-    );
-    assert.equal(written.ok, true);
-    assert.equal(map.get("note"), "fallback");
-  } finally {
-    globalThis.localStorage = previousLocal;
   }
 });

@@ -97,6 +97,7 @@ plugins:
             "When it goes wrong": "Quando dá errado"
             FAQ: "Perguntas frequentes"
             "Generate a client from OpenAPI": "Gerar um cliente a partir de OpenAPI"
+            "Export CSV & XLSX": "Exportar CSV e XLSX"
             "Tutorial — the Counter": "Tutorial — o Counter"
             "1. The view tree": "1. A árvore de view"
             "2. State and handlers": "2. Estado e handlers"
@@ -282,6 +283,7 @@ nav:
       - "Security (Mode B)": advanced/security.md
       - "Deploy to production": advanced/deploy.md
       - Generate a client from OpenAPI: advanced/openapi.md
+      - "Export CSV & XLSX": advanced/export.md
   - API reference:
       - tempestweb.presets: reference/presets.md
       - tempestweb.components: reference/components.md
@@ -297,6 +299,7 @@ nav:
       - tempestweb.cli: reference/cli.md
       - tempestweb.devserver: reference/devserver.md
       - tempestweb.core: reference/core.md
+      - tempestweb.export: reference/export.md
   - Examples:
       - "Example gallery": examples/index.md
       - "To-do list": examples/todo.md

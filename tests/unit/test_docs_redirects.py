@@ -131,6 +131,8 @@ def test_every_moved_page_kept_its_old_url() -> None:
             "access",
             # Written for #175; new page, never had a published URL of its own.
             "query",
+            # Written for #180; new page, never had a published URL of its own.
+            "storage-codec",
         }
     )
     assert not unmapped, (

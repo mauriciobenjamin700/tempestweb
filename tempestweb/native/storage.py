@@ -23,9 +23,15 @@ Conventions match the codebase rules:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from tempestweb.native.dispatch import send_native_call
 
 __all__ = [
+    "CODEC_DEFLATE",
+    "CODEC_JSON",
+    "StorageCodec",
+    "configure",
     "delete_file",
     "get",
     "list_files",
@@ -35,6 +41,70 @@ __all__ = [
     "remove",
     "write_file",
 ]
+
+
+#: Values are stored as they are. The default, and the only codec every browser
+#: has.
+CODEC_JSON = "json"
+
+#: Values are deflated before storage. Needs ``CompressionStream``, which shipped
+#: in Safari 16.4 — below that, :func:`configure` reports ``supported=False`` and
+#: the store stays on :data:`CODEC_JSON` rather than failing.
+CODEC_DEFLATE = "deflate"
+
+
+@dataclass(frozen=True)
+class StorageCodec:
+    """What :func:`configure` settled on.
+
+    Attributes:
+        requested: The codec the app asked for.
+        active: The codec new writes will actually use. Differs from
+            ``requested`` when the browser cannot run it.
+        supported: Whether this browser can run the requested codec.
+    """
+
+    requested: str
+    active: str
+    supported: bool
+
+
+async def configure(*, codec: str = CODEC_JSON) -> StorageCodec:
+    """Choose the codec new writes use, and report what will actually run.
+
+    **Measure before turning this on.** IndexedDB already compresses what it
+    stores, so a codec here competes with the storage layer, not with raw text.
+    Measured in Chrome 150: a 977 KB catalogue lands as **222 KB** on disk with
+    no codec at all, and the codec takes it to **122 KB** — a real saving of 45%,
+    not the 87% the compression ratio suggests. On a weak device (CPU throttled
+    6x) that costs **+12 ms per read** and **+76 ms per write** at a megabyte,
+    rising to **+34 ms / +295 ms** at four. The full table is in the recipe.
+
+    So: worth it for an app holding tens of megabytes of repetitive collection,
+    and not worth it for a queue of drafts. Hence off by default.
+
+    Reads never consult this setting — a stored value carries the codec that
+    wrote it, so turning the codec on does not orphan what is already stored, and
+    turning it off does not orphan what was written while it was on.
+
+    Args:
+        codec: :data:`CODEC_JSON` (the default) or :data:`CODEC_DEFLATE`.
+
+    Returns:
+        A :class:`StorageCodec` saying what was asked for and what will run. An
+        unsupported codec is **not** an error: ``active`` falls back to
+        :data:`CODEC_JSON`, because a store that cannot compress is still a
+        working store while an exception here is a dead screen.
+
+    Raises:
+        BrowserUnavailableError: If called with no native bridge installed.
+    """
+    value = await send_native_call("storage.configure", {"codec": codec})
+    return StorageCodec(
+        requested=str(value.get("requested", codec)),
+        active=str(value.get("active", CODEC_JSON)),
+        supported=bool(value.get("supported", False)),
+    )
 
 
 async def put(name: str, content: str) -> None:

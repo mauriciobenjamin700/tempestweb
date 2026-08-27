@@ -36,7 +36,13 @@ import {
 } from "./orientation.js";
 import { quotaEstimate, quotaPersist, quotaPersisted } from "./quota.js";
 import { networkState, networkWatch } from "./network.js";
-import { storageGet, storageList, storagePut, storageRemove } from "./storage.js";
+import {
+  storageConfigure,
+  storageGet,
+  storageList,
+  storagePut,
+  storageRemove,
+} from "./storage.js";
 import { cookiesAll, cookiesGet, cookiesRemove, cookiesSet } from "./cookies.js";
 import { cameraCapture } from "./camera.js";
 import { onnxLoad, onnxRun } from "./onnx.js";
@@ -164,6 +170,7 @@ export const HANDLERS = {
   "storage.get": storageGet,
   "storage.list": storageList,
   "storage.remove": storageRemove,
+  "storage.configure": storageConfigure,
   "cookies.get": cookiesGet,
   "cookies.set": cookiesSet,
   "cookies.remove": cookiesRemove,

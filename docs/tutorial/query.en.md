@@ -225,8 +225,8 @@ await restore(cache, native.storage)   # on boot
 await persist(cache, native.storage)   # when the screen is done
 ```
 
-The storage is the `native.storage` that already exists, over the owner-scoped
-IndexedDB store in `client/offline/store.js` — **nothing was reimplemented**. The
+The storage is the `native.storage` that already exists, over the IndexedDB
+key/value store in `client/native/idb-kv.js` — **nothing was reimplemented**. The
 parameter is a `QueryStorage`, which that module satisfies as it stands; a test
 passes a dictionary-backed fake.
 

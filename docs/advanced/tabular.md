@@ -348,8 +348,17 @@ Artefato Modo A, Pyodide, sem `onnxruntime-web` em lugar nenhum — um
     float64, e o regressor de árvore 0,980769 contra 0,541667.
 
 !!! warning "Modos A e B"
-    O leitor é Python. Modo C serve um conjunto fechado de módulos e recusa o
-    import no build, com a mensagem dizendo qual modo tem a capacidade.
+    O leitor é Python, e o Modo C serve um conjunto fechado de módulos: ele
+    **recusa o import no build**, nomeando os módulos que aceita.
+
+    ```
+    app.py:7: import from 'tempestweb.tabular' is not supported
+    (only tempest_core, `tempestweb.components` and `tempestweb.native`)
+    ```
+
+    A mensagem não diz qual modo tem a capacidade — quem faz isso é a recusa de
+    **capability** (`native.*`), não a de pacote. Para inferência tabular no Modo
+    C, o caminho é chamar uma API do servidor.
 
 ## Erros nomeados
 
@@ -361,6 +370,17 @@ Artefato Modo A, Pyodide, sem `onnxruntime-web` em lugar nenhum — um
 | Valor que não é número | `ValueError` nomeando a feature |
 | Modelo respondeu algo ilegível | `PredictionError` |
 | Export com ZipMap | `NativeError("unsupported_output")` dizendo como reexportar |
+| `.tmc` que este leitor não entende | `CompactFormatError`, nomeando o estimador do header |
+| Manifesto com número de features diferente do modelo | `ManifestError`, com os dois números |
+
+O `CompactFormatError` é o que recusa um `.tmc` em vez de predizer sobre ele:
+magic errado, versão de layout que este leitor não implementa, seção que o header
+prometeu e o arquivo não carrega, `kind`/`link` fora do formato — e todo número
+que o header declara sobre a própria forma, cruzado com os bytes ao lado
+(`coef == n_features × n_outputs`, `intercept == n_outputs`,
+`tree_offset == n_trees + 1`, `offset` e `scale` cobrindo cada feature,
+`n_outputs == 1` para regressão). Header que discorda das próprias seções não
+falhava: ele **predizia**, sobre o que a indexação alcançasse.
 
 ## Fora de escopo nesta versão
 

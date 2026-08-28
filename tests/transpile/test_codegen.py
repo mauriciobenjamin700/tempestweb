@@ -73,6 +73,26 @@ def test_unsupported_import_raises_with_location() -> None:
     assert "app.py:1:" in str(exc.value)
 
 
+def test_a_python_only_package_is_refused_naming_the_modules_it_serves() -> None:
+    """The package refusal lists the allowed modules; it does **not** name a mode.
+
+    Naming the mode is what the *capability* refusal does
+    (``test_a_capability_the_facade_lacks_says_which_mode_has_it``), and the
+    tabular guide quoted this message as if it did the same. The docs now quote it
+    verbatim, so this pins the wording on the compiler's side.
+    """
+    with pytest.raises(TranspileError) as exc:
+        transpile_source(
+            "from tempestweb.tabular import CompactPredictor\n", filename="app.py"
+        )
+    message = str(exc.value)
+    assert "app.py:1: import from 'tempestweb.tabular' is not supported" in message
+    assert (
+        "only tempest_core, `tempestweb.components` and `tempestweb.native`" in message
+    )
+    assert "Mode A" not in message and "Mode B" not in message
+
+
 def test_arithmetic_operators() -> None:
     """`*`, `/`, `%` transpile (parenthesized) alongside `+`/`-`."""
     js = gen("def f(a, b):\n    return a * b % 2\n")

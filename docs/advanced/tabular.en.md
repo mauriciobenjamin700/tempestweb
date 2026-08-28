@@ -349,8 +349,17 @@ A Mode A artifact, Pyodide, with no `onnxruntime-web` anywhere — a 12-tree
     0.541667.
 
 !!! warning "Modes A and B"
-    The reader is Python. Mode C serves a fixed set of modules and refuses the
-    import at build time, with a message naming the mode that has the capability.
+    The reader is Python, and Mode C serves a fixed set of modules: it **refuses
+    the import at build time**, naming the modules it accepts.
+
+    ```
+    app.py:7: import from 'tempestweb.tabular' is not supported
+    (only tempest_core, `tempestweb.components` and `tempestweb.native`)
+    ```
+
+    The message does not name the mode that has the capability — that is what the
+    **capability** refusal (`native.*`) does, not the package one. For tabular
+    inference in Mode C, the route is a call to your server.
 
 ## Named errors
 
@@ -362,6 +371,17 @@ A Mode A artifact, Pyodide, with no `onnxruntime-web` anywhere — a 12-tree
 | A value that is not a number | `ValueError` naming the feature |
 | The model answered something unreadable | `PredictionError` |
 | Export with ZipMap | `NativeError("unsupported_output")` saying how to re-export |
+| A `.tmc` this reader does not understand | `CompactFormatError`, naming the header's estimator |
+| A manifest whose feature count is not the model's | `ManifestError`, with both numbers |
+
+`CompactFormatError` is what refuses a `.tmc` instead of predicting on it: wrong
+magic, a layout version this reader does not implement, a section the header
+promised and the file does not carry, a `kind`/`link` outside the format — and
+every number the header states about its own shape, crossed against the bytes
+beside it (`coef == n_features × n_outputs`, `intercept == n_outputs`,
+`tree_offset == n_trees + 1`, `offset` and `scale` covering every feature,
+`n_outputs == 1` for a regression). A header that disagreed with its own sections
+did not fail: it **predicted**, on whatever the indexing reached.
 
 ## Out of scope in this version
 

@@ -14,6 +14,14 @@ write a file that disagrees with the estimator — and beside them sits what
 for. The rest keep the failure modes named: a file from another version of the
 format refused rather than guessed at, a missing feature caught before the dot
 product, a scaler folded rather than ignored.
+
+The float32 narrowing that motivates all of this was, for one release, claimed
+and not measured: every row of every fixture routed the same way in float64, so
+the whole suite passed with ``_as_float32`` replaced by the identity. Each tree
+fixture now carries a last row that sits exactly on a split threshold
+(``_float32_boundary_row`` in the generator), and on it the two precisions
+disagree about the **label** — so the matrix fails without the narrowing, which
+is what it was always supposed to do.
 """
 
 from __future__ import annotations
@@ -21,7 +29,7 @@ from __future__ import annotations
 import base64
 import json
 import struct
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -167,6 +175,63 @@ async def test_the_file_carries_its_own_manifest() -> None:
 
     assert list(manifest.features) == expected["features"]
     assert list(manifest.classes) == expected["classes"]
+
+
+def _narrowed(row: Mapping[str, float]) -> dict[str, float]:
+    """Narrow every value in a row to the float32 scikit-learn would compare.
+
+    Args:
+        row: The row to narrow.
+
+    Returns:
+        The same row with each value rounded to float32 precision.
+    """
+    return {
+        name: float(struct.unpack("<f", struct.pack("<f", value))[0])
+        for name, value in row.items()
+    }
+
+
+@pytest.mark.parametrize(
+    "name", ["forest_classifier_normalize", "tree_regressor_identity"]
+)
+@pytest.mark.asyncio
+async def test_a_row_on_a_split_boundary_answers_as_its_narrowed_twin(
+    name: str,
+) -> None:
+    """The float32 narrowing, stated as something a row can disagree about.
+
+    Each tree fixture's last row sits one float64 step above a split threshold
+    that float32 represents exactly, so narrowing it lands **on** the threshold.
+    ``sklearn.tree`` narrows before traversing, so both rows go left and answer
+    the same; routing in float64 sends only the boundary row right, and measured
+    on these fixtures that is not a rounding difference but a different answer:
+    the forest says ``versicolor`` p=0.666667 narrowed (which is what scikit-learn
+    answered) against ``virginica`` p=0.833333 wide, and the tree regressor
+    0.980769 against 0.541667.
+
+    Stated this way the property needs no access to the reader's internals — and
+    it fails both if the narrowing goes away and if a refit ever leaves the
+    fixture without a boundary row to stand on.
+    """
+    expected = EXPECTATIONS[name]
+    boundary = expected["rows"][-1]
+    assert boundary != _narrowed(boundary), (
+        "the last fixture row no longer sits on a float32 boundary, so nothing "
+        "here measures the narrowing any more — regenerate the fixtures"
+    )
+    predictor, _ = _predictor(name)
+
+    on_boundary = await predictor.predict(boundary)
+    narrowed = await predictor.predict(_narrowed(boundary))
+
+    assert on_boundary == narrowed
+    if expected["task"] == "regression":
+        assert on_boundary.score == pytest.approx(
+            float(expected["labels"][-1]), abs=1e-4
+        )
+    else:
+        assert on_boundary.label == expected["labels"][-1]
 
 
 @pytest.mark.asyncio

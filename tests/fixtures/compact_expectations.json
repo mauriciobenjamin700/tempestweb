@@ -19,7 +19,8 @@
       "versicolor",
       "versicolor",
       "virginica",
-      "virginica"
+      "virginica",
+      "versicolor"
     ],
     "max_abs_diff": 0.0,
     "probabilities": [
@@ -52,6 +53,11 @@
         0.0,
         0.0,
         1.0
+      ],
+      [
+        0.0,
+        0.6666666666666666,
+        0.3333333333333333
       ]
     ],
     "rows": [
@@ -90,6 +96,12 @@
         "petal width (cm)": 1.8,
         "sepal length (cm)": 7.2,
         "sepal width (cm)": 3.2
+      },
+      {
+        "petal length (cm)": 4.750000000000001,
+        "petal width (cm)": 1.7500000000000002,
+        "sepal length (cm)": 6.599999904632569,
+        "sepal width (cm)": 2.4500000476837163
       }
     ],
     "size_bytes": 4764,
@@ -490,9 +502,10 @@
       "0.0",
       "0.84375",
       "0.1111111111111111",
-      "0.84375"
+      "0.84375",
+      "0.9807692307692307"
     ],
-    "max_abs_diff": 8.278422947149977e-10,
+    "max_abs_diff": 1.3754917982389259e-08,
     "probabilities": [],
     "rows": [
       {
@@ -542,6 +555,14 @@
         "mean radius": 12.45,
         "mean smoothness": 0.1278,
         "mean texture": 15.7
+      },
+      {
+        "mean area": 562.5499877929689,
+        "mean compactness": 0.10515999794006349,
+        "mean perimeter": 122.8,
+        "mean radius": 17.99,
+        "mean smoothness": 0.1184,
+        "mean texture": 19.610000610351566
       }
     ],
     "size_bytes": 1188,

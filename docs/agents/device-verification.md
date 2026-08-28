@@ -92,6 +92,97 @@ UI mudou de mensagem.
     **leitura**. Uma medição de negação precisa de um app que **lê** o clipboard;
     o exemplo atual só escreve e compartilha.
 
+### `storage` sobre IndexedDB (N3) ✅ — medido 2026-08-27
+
+**Achou defeito, e não era persistência.** Um app Modo A buildado gravou duas
+chaves e o que o browser mostrou foi:
+
+```text
+indexedDB.databases() → []
+localStorage          → note (18 chars), bulk (142.890 chars, crus)
+storage.configure(codec="deflate") → active=deflate supported=True
+```
+
+`native/storage.js` prefere `deps.store` (IndexedDB) e cai para `localStorage`
+quando não recebe um — e **nada injetava esse store**: o `browserDeps()` de
+`client/native/index.js` não o listava, então só o Modo C (que monta o seu em
+`client/transpile/native.js`) usava IndexedDB. Modos A e B ficavam com o
+`localStorage`: ~5 MB de teto, escrita **síncrona** na main thread, invisível
+para o service worker — e o codec `deflate`, que configura o store de IndexedDB,
+virava no-op enquanto respondia `supported=True`.
+
+Persistência sozinha **não pega isso**: o `localStorage` também sobrevive a
+reload. O que pega é olhar em qual backend o valor caiu.
+
+Depois da correção (`store` injetado no `browserDeps()`, com o fallback de
+`localStorage` alcançável também quando o IndexedDB existe e não abre), o mesmo
+app:
+
+| Passo | Medido |
+| --- | --- |
+| Escrita | `indexedDB.databases()` → `["tempestweb@1"]`, `localStorage` **vazio** |
+| `bulk`, 142.890 caracteres | envelope `$twcodec=deflate`, **10.276 bytes** no disco |
+| Reload | `note=persisted-value-42`, `bulk` `intact=True`, `keys=['bulk','note']` |
+| `remove()` de tudo | `note=<not_found>`, `keys=[]`, object store vazio |
+| Quota (`navigator.storage.estimate`) | **10.738.498.004 bytes** |
+
+Procedimento, se for repetir: buildar um app que grave, ler no console
+`indexedDB.databases()` **e** `Object.keys(localStorage)` — a pergunta é *onde
+caiu*, não *se voltou* —, recarregar, ler de volta, limpar. E limpar service
+worker e caches antes de medir, ou a página serve o precache do build anterior.
+
+### captura de câmera real (N4) ✅ — medido 2026-08-27
+
+O Chrome do harness (Linux, WSL2) não tem `/dev/video*`: `getUserMedia` responde
+`NotFoundError`, e a capacidade reporta `code=unavailable` — "Requested device not
+found" —, que é o caminho *sem device*, não o de permissão. Para o resto é preciso
+um browser com câmera de verdade, e uma **câmera virtual do OBS no Windows**
+serve: ela aparece como device real para o Chrome do Windows.
+
+A ponte, sem instalar nada no Windows além do Chrome que já existe:
+
+```powershell
+# no Windows, com a Virtual Camera do OBS ligada
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" `
+  --remote-debugging-port=9222 --remote-allow-origins=* `
+  --user-data-dir="$env:TEMP\tw-cam"
+```
+
+```bash
+# no WSL: sirva o artefato em 0.0.0.0 e dirija o Chrome do Windows por CDP
+python3 -m http.server 8821 --bind 0.0.0.0    # de dist/wasm
+node -e 'import("playwright-core").then(...)'  # chromium.connectOverCDP("http://127.0.0.1:9222")
+```
+
+Em WSL2 com rede **mirrored** o `127.0.0.1:9222` do WSL já alcança o Chrome do
+Windows; sem mirrored, um `netsh interface portproxy` resolve. A página tem de ser
+aberta em `http://localhost:<porta>` — `localhost` é contexto seguro e a câmera
+funciona; um IP de LAN não é, e o `getUserMedia` some.
+
+**Permissão sem prompt bloqueando**: conceder com
+`context.grantPermissions(["camera"], {origin})` **na mesma sessão** que dirige (a
+concessão morre no disconnect), e negar com
+`browser.newBrowserCDPSession()` + `Browser.setPermission({origin, permission:
+{name: "camera"}, setting: "denied"})` — o nome é `camera`, não `videoCapture`.
+
+Medido, com a OBS Virtual Camera (2560×1080 @ 60 fps):
+
+| O que | Resultado |
+| --- | --- |
+| `camera.capture()` | `Photo` tipado: `image/jpeg`, **2560×1080**, 22.772 chars de base64, `ref=blob:tw:1`, em **72 ms** |
+| `capture(include_bytes=False)` | `bytes_b64=0`, `ref=blob:tw:2`, dimensões intactas — os pixels ficam no cliente |
+| `CameraPreview.on_frame` (250 ms declarados) | 12 frames, gaps **[243, 250, 248, 248, 250, 264, 258, 249, 249, 242, 250]** |
+| Frame entregue | `2560x1080 rotation=0`, 22.772 chars — **JPEG**, não RGB cru |
+| Permissão negada (`Browser.setPermission`) | `capture` levanta `NativeError(code=permission_denied)`; o preview não monta `<video>`; o app reporta e **não trava** |
+| Sem device (o Chrome do WSL) | `code=unavailable`, "Requested device not found" |
+
+**O que a medição esclareceu:** o `CameraFrameEvent.data` do core é documentado
+como "base64 do buffer RGB cru H×W×3" — que é a forma do Android. No browser o
+cliente amostra o `<video>` num canvas e envia **JPEG** (22.772 chars contra os
+~11 MB que o RGB cru daria). Não é defeito do cliente (RGB cru a cada 250 ms seria
+impraticável), é uma diferença de plataforma que não estava escrita: agora está,
+em `docs/advanced/capabilities.md`.
+
 ### Background Sync com a aba fechada (P2) ✅
 
 Medido na 0.110.0, em duas origens virgens, mesmo procedimento — e a medição
@@ -151,100 +242,7 @@ payload intacto e chamou `showNotification` com título e corpo corretos.
 Isso mede **push → notificação dentro do worker, com a aba fechada**. O que
 deliberadamente **não** cobre está na seção seguinte.
 
-## O que falta, e o que exatamente rodar
-
-### `storage` sobre IndexedDB (N3) — medido 2026-08-27
-
-**Achou defeito, e não era persistência.** Um app Modo A buildado gravou duas
-chaves e o que o browser mostrou foi:
-
-```text
-indexedDB.databases() → []
-localStorage          → note (18 chars), bulk (142.890 chars, crus)
-storage.configure(codec="deflate") → active=deflate supported=True
-```
-
-`native/storage.js` prefere `deps.store` (IndexedDB) e cai para `localStorage`
-quando não recebe um — e **nada injetava esse store**: o `browserDeps()` de
-`client/native/index.js` não o listava, então só o Modo C (que monta o seu em
-`client/transpile/native.js`) usava IndexedDB. Modos A e B ficavam com o
-`localStorage`: ~5 MB de teto, escrita **síncrona** na main thread, invisível
-para o service worker — e o codec `deflate`, que configura o store de IndexedDB,
-virava no-op enquanto respondia `supported=True`.
-
-Persistência sozinha **não pega isso**: o `localStorage` também sobrevive a
-reload. O que pega é olhar em qual backend o valor caiu.
-
-Depois da correção (`store` injetado no `browserDeps()`, com o fallback de
-`localStorage` alcançável também quando o IndexedDB existe e não abre), o mesmo
-app:
-
-| Passo | Medido |
-| --- | --- |
-| Escrita | `indexedDB.databases()` → `["tempestweb@1"]`, `localStorage` **vazio** |
-| `bulk`, 142.890 caracteres | envelope `$twcodec=deflate`, **10.276 bytes** no disco |
-| Reload | `note=persisted-value-42`, `bulk` `intact=True`, `keys=['bulk','note']` |
-| `remove()` de tudo | `note=<not_found>`, `keys=[]`, object store vazio |
-| Quota (`navigator.storage.estimate`) | **10.738.498.004 bytes** |
-
-Procedimento, se for repetir: buildar um app que grave, ler no console
-`indexedDB.databases()` **e** `Object.keys(localStorage)` — a pergunta é *onde
-caiu*, não *se voltou* —, recarregar, ler de volta, limpar. E limpar service
-worker e caches antes de medir, ou a página serve o precache do build anterior.
-
-### captura de câmera real (N4) — medido 2026-08-27
-
-O Chrome do harness (Linux, WSL2) não tem `/dev/video*`: `getUserMedia` responde
-`NotFoundError`, e a capacidade reporta `code=unavailable` — "Requested device not
-found" —, que é o caminho *sem device*, não o de permissão. Para o resto é preciso
-um browser com câmera de verdade, e uma **câmera virtual do OBS no Windows**
-serve: ela aparece como device real para o Chrome do Windows.
-
-A ponte, sem instalar nada no Windows além do Chrome que já existe:
-
-```powershell
-# no Windows, com a Virtual Camera do OBS ligada
-& "C:\Program Files\Google\Chrome\Application\chrome.exe" `
-  --remote-debugging-port=9222 --remote-allow-origins=* `
-  --user-data-dir="$env:TEMP\tw-cam"
-```
-
-```bash
-# no WSL: sirva o artefato em 0.0.0.0 e dirija o Chrome do Windows por CDP
-python3 -m http.server 8821 --bind 0.0.0.0    # de dist/wasm
-node -e 'import("playwright-core").then(...)'  # chromium.connectOverCDP("http://127.0.0.1:9222")
-```
-
-Em WSL2 com rede **mirrored** o `127.0.0.1:9222` do WSL já alcança o Chrome do
-Windows; sem mirrored, um `netsh interface portproxy` resolve. A página tem de ser
-aberta em `http://localhost:<porta>` — `localhost` é contexto seguro e a câmera
-funciona; um IP de LAN não é, e o `getUserMedia` some.
-
-**Permissão sem prompt bloqueando**: conceder com
-`context.grantPermissions(["camera"], {origin})` **na mesma sessão** que dirige (a
-concessão morre no disconnect), e negar com
-`browser.newBrowserCDPSession()` + `Browser.setPermission({origin, permission:
-{name: "camera"}, setting: "denied"})` — o nome é `camera`, não `videoCapture`.
-
-Medido, com a OBS Virtual Camera (2560×1080 @ 60 fps):
-
-| O que | Resultado |
-| --- | --- |
-| `camera.capture()` | `Photo` tipado: `image/jpeg`, **2560×1080**, 22.772 chars de base64, `ref=blob:tw:1`, em **72 ms** |
-| `capture(include_bytes=False)` | `bytes_b64=0`, `ref=blob:tw:2`, dimensões intactas — os pixels ficam no cliente |
-| `CameraPreview.on_frame` (250 ms declarados) | 12 frames, gaps **[243, 250, 248, 248, 250, 264, 258, 249, 249, 242, 250]** |
-| Frame entregue | `2560x1080 rotation=0`, 22.772 chars — **JPEG**, não RGB cru |
-| Permissão negada (`Browser.setPermission`) | `capture` levanta `NativeError(code=permission_denied)`; o preview não monta `<video>`; o app reporta e **não trava** |
-| Sem device (o Chrome do WSL) | `code=unavailable`, "Requested device not found" |
-
-**O que a medição esclareceu:** o `CameraFrameEvent.data` do core é documentado
-como "base64 do buffer RGB cru H×W×3" — que é a forma do Android. No browser o
-cliente amostra o `<video>` num canvas e envia **JPEG** (22.772 chars contra os
-~11 MB que o RGB cru daria). Não é defeito do cliente (RGB cru a cada 250 ms seria
-impraticável), é uma diferença de plataforma que não estava escrita: agora está,
-em `docs/advanced/capabilities.md`.
-
-### WebPush: envio por push service real e `pushsubscriptionchange` (P3) — medido 2026-08-27
+### WebPush: envio por push service real e `pushsubscriptionchange` (P3) ✅ — medido 2026-08-27
 
 **Dá para medir aqui**: o Chrome deste harness assina no FCM. Receita, em ordem:
 
@@ -293,11 +291,26 @@ reais.
 injeta o payload direto no worker, pulando exatamente a parte que falhou aqui
 (assinatura VAPID, `410 Gone`, expiração de subscription).
 
-### Web Audio além de `tone` (T24) — resolvido
+### Web Audio além de `tone` (T24) ✅ — resolvido na v0.112.0
 
 Deixou de ser pendência: o grafo de síntese/análise saiu na **v0.112.0**
 (`sequence`/`stop`/`levels`), com a medição em Chrome registrada na linha T24 do
 `docs/roadmap.md`. Fica aqui só como ponteiro.
+
+## O que falta
+
+**Nada device-dependente.** O placar está 8/8 ✅: todo item que a
+[#118](https://github.com/mauriciobenjamin700/tempestweb/issues/118) listava como
+🔶 foi exercitado em browser/device real, e quatro dessas medições acharam defeito
+que o gate verde não pegava. Este arquivo virou registro, não fila de trabalho.
+
+Duas pendências sobreviveram, e **nenhuma das duas é medição de device** — são
+gates que dependem de permissão do usuário ou de infra de CI:
+
+| Pendência | Roadmap | Por que não está aqui |
+| --- | --- | --- |
+| **Periodic Sync** disparando sozinho | P2 (🔶) | A API é permission-gated: o Chrome só concede a sites com engajamento suficiente, então não há como forçar o disparo num harness. O `sync` normal (o que a offline queue usa) está medido acima |
+| **Lighthouse PWA ao vivo** | P4 | O job existe no CI; falta rodar a auditoria de verdade contra um artefato servido. É gate de build, não hardware |
 
 ## Como registrar a próxima medição
 

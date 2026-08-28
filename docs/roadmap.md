@@ -1,50 +1,78 @@
 # Roadmap e fases
 
-!!! info "Estado atual — atualizado em 2026-07-11"
-    Tracks **Trilhos 0/W/A/B/P/N/O/E/S + Trilho T mesclados na `main`** com gate
-    verde (ruff/format/mypy ✓ · pytest 831 pass/1 skip · jsdom 439 pass). Última
-    versão publicada no PyPI: **tempestweb 0.49.0**; o **Trilho T** (paridade de
-    capacidades com a plataforma web — Tiers 1–3 + canal de eventos nativo T-EV com
-    12 capacidades de stream) chega na **0.50.0**. Legenda de status: **✅** mesclado e com gate verde ·
-    **🔶** implementado mas pendente de **verificação real** (browser/device — ver
-    `docs/agents/reports/NOTES-T*.md`) · **⬜** não iniciado. Os dois modos rodam um
-    app fim-a-fim ao vivo (counter por WS e Pyodide no browser), Trilho E está ✅ ao
-    vivo (7/7) e o core já é o pacote `tempest-core` (o `_core/` vendorado foi
-    removido). Pendências de alto nível: **Trilho 0 fase 2** (tempestroid passar a
-    depender do `tempest-core` + conformância Qt↔Compose) — bloqueada no repo
-    tempestroid; e a **verificação ao vivo device-dependente** dos itens 🔶
-    (Background Sync com aba fechada, WebPush aba-fechada, geo/clipboard/câmera
-    reais), que não dá para automatizar em unit/jsdom.
+!!! info "Estado atual — atualizado em 2026-08-27"
+    **Todos os trilhos** — 0/W/A/B/P/N/O/S/T/R e a pós-convergência (C/D/E) —
+    estão mesclados na `main` com gate verde: ruff + format ✓ (386 arquivos) ·
+    mypy `--strict` ✓ (156 arquivos, zero issue) · **pytest 2013 pass / 14 skip** ·
+    **jsdom 894 pass / 0 fail** · `mkdocs build --strict` zero warning. Os números
+    foram medidos nesta linha da `main` e se reproduzem com `make check` mais o
+    `mkdocs build --strict` — não confie neles de memória, rode. O mesmo
+    `examples/counter/app.py` roda ao vivo nos **três** modos (Pyodide no browser,
+    WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
+    publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-!!! danger "Lacuna de integração descoberta na verificação (2026-06-11)"
-    Os **engines** de ambos os modos existem e passam unit/jsdom, mas a **costura
-    CLI ↔ engine nunca foi feita** — `tempestweb build`/`run`/`dev` emitiam
-    entrypoints **stub**: o `server.py` do Modo B jogava `NotImplementedError("B0...")`,
-    o `bootstrap.js` do Modo A joga `throw "A3: Pyodide bootstrap..."`, e **não
-    existe loader Pyodide** (`loadPyodide`). Cada track validou só os próprios
-    testes contra stubs (MANIFEST: "integração no merge") — a integração T5↔T2/T3
-    ficou pendente.
+    **Versão do repo: 0.124.0**, ainda **não publicada**. Última publicada no
+    PyPI: **tempestweb 0.121.0**. As três que estão à frente do PyPI:
+    **0.122.0** — `CompactPredictor` lê `.tmc` em Python de stdlib, entregando
+    inferência tabular sem os 13,96 MB do `onnxruntime-web`, e o artefato Modo A
+    passa a levar os sete subpacotes que uma app importa pelo nome;
+    **0.123.0** — o `storage` dos Modos A e B grava de verdade no IndexedDB (caía
+    no `localStorage` em silêncio, com o codec respondendo `supported=True` sem
+    comprimir nada); **0.124.0** — a poda de subscription do WebPush por
+    `410`/`404` chega ao serviço, com `timeout` no envio e o `pywebpush` fora do
+    event loop.
 
-    **Modo B — RESOLVIDO** (branch `feat/integrate-server-cli`, 2026-06-11):
-    `build --mode server` emite `server.py` real (via `create_app`) + `index.html`
-    que monta o cliente por WebSocket; `tempestweb run --mode server` sobe uvicorn
-    de verdade. **Verificado ao vivo no browser (Playwright):** counter renderiza por
-    WS e +/- atualizam a contagem pelo round-trip evento → WS → reconcílio → patch →
-    DOM. Junto: fix de serialização (`Style` Pydantic agora lowerado no path de
-    runtime) + `mount()` com node inicial diferido pro Modo B.
+    Legenda de status: **✅** mesclado e com gate verde · **🔶** implementado mas
+    pendente de **verificação real** (browser/device — ver
+    `docs/agents/device-verification.md` e `docs/agents/reports/NOTES-T*.md`) ·
+    **⬜** não iniciado. **Toda fase de todo trilho abaixo está ✅, com uma
+    exceção: P2 fica 🔶** — e não pelo Background Sync, que foi medido em Chrome
+    com a aba fechada na 0.110.0, mas pelo **Periodic Sync**, que é
+    permission-gated (o Chrome não concede a um harness). Nada está ⬜.
 
-    **Modo A — RESOLVIDO** (branch `feat/integrate-wasm-cli`, 2026-06-11):
-    `build --mode wasm` emite `bootstrap.js` real que carrega Pyodide v314 +
-    `pydantic` (`loadPackage`), desempacota o pacote `tempestweb` (`_core`/`runtime`/
-    `transports`/`native`) + `app.py` na FS virtual e monta o cliente por bridge
-    in-process. **Verificado ao vivo (Playwright):** counter roda Python no browser,
-    +/- atualizam por reconciliação in-process, zero-network — **de-risk A0 provado,
-    não só pesquisado**. Junto: refactor que torna o import do Modo A livre de
-    Starlette (`transports/__init__` lazy nos transportes Modo B).
+    As duas pendências de alto nível que este bloco carregava fecharam.
+    **Trilho 0 fase 2:** o tempestroid também pina o `tempest-core`, com suíte de
+    conformância Qt↔Compose própria (verificado 2026-08-23). **Verificação ao vivo
+    device-dependente:** o placar de `docs/agents/device-verification.md` está
+    **8/8 ✅** — geolocation, clipboard, `storage`, câmera (câmera virtual do OBS
+    dirigida por CDP), Background Sync com a aba fechada, WebPush no worker,
+    WebPush contra o **FCM real** e Web Audio. Quatro dessas medições **acharam
+    defeito** que o gate verde não pegava, e três delas viraram as 0.122.0 →
+    0.124.0. Resíduo conhecido: a auditoria **Lighthouse PWA ao vivo** (P4), que é
+    gate de CI, não hardware.
 
-    Ambos os modos agora rodam um app fim-a-fim. `A2` (handler async com `await`
-    ao vivo), Trilho 0 fase 1 (`tempest-core` adotado, `_core/` removido) e Trilho
-    E (7/7 ao vivo) já fecharam — resta só o Trilho 0 fase 2 no repo tempestroid.
+!!! note "Histórico — a lacuna CLI ↔ engine (junho de 2026, fechada)"
+    Fica registrado porque a **causa** ainda é uma armadilha viva deste repo, não
+    porque o defeito exista: em 2026-06-11 os **engines** dos dois modos passavam
+    unit/jsdom e a **costura CLI ↔ engine nunca havia sido feita**.
+    `tempestweb build`/`run`/`dev` emitiam entrypoints **stub** — o `server.py` do
+    Modo B levantava `NotImplementedError("B0...")`, o `bootstrap.js` do Modo A
+    fazia `throw "A3: Pyodide bootstrap..."` e não existia loader Pyodide. Cada
+    track havia validado só os próprios testes, contra stubs (MANIFEST:
+    "integração no merge"), então **suíte verde inteira e nenhum app rodando** era
+    um estado alcançável. É o mesmo padrão que voltou depois no `storage` caindo
+    no `localStorage` e no `410 Gone` que só existia contra sender fake: teste que
+    exercita o dublê, não a costura.
+
+    **Modo B, resolvido** (`feat/integrate-server-cli`): `build --mode server`
+    passou a emitir `server.py` real (via `create_app`) + `index.html` que monta o
+    cliente por WebSocket, e `tempestweb run --mode server` a subir uvicorn de
+    verdade. Verificado no browser: o counter renderizou por WS e +/- atualizaram
+    a contagem pelo round-trip evento → WS → reconcílio → patch → DOM. Junto veio
+    o fix de serialização (`Style` Pydantic lowerado no path de runtime) e o
+    `mount()` com node inicial diferido para o Modo B.
+
+    **Modo A, resolvido** (`feat/integrate-wasm-cli`): `build --mode wasm` passou
+    a emitir `bootstrap.js` real, que carrega Pyodide + `pydantic`
+    (`loadPackage`), desempacota o pacote `tempestweb` + `app.py` na FS virtual e
+    monta o cliente por bridge in-process. Verificado no browser: Python rodando
+    na aba, +/- por reconciliação in-process, zero-network — **de-risk A0 provado,
+    não só pesquisado**. Junto veio o refactor que deixou o import do Modo A livre
+    de Starlette (`transports/__init__` lazy nos transportes de Modo B).
+
+    O que era pendência ao lado disto também fechou: `A2` (handler async com
+    `await` ao vivo), Trilho 0 fase 1 e fase 2, e o Trilho E (7/7 ao vivo). O
+    estado de hoje está no bloco acima.
 
 O desenvolvimento segue um pré-requisito, trilhos compartilhados e dois trilhos de
 execução. **Trilho 0** extrai o `tempest-core` do tempestroid. **Trilho W** é o
@@ -177,17 +205,21 @@ backend sem tocar a app) herdado do `tempest-react-sdk`. Servidor reusa o
 
 ## Trilho S — segurança & produção (hardening rumo ao profissional)
 
-!!! success "Estado (atualizado 2026-07-11) — produção-ready"
-    Os modos **estáticos** (A/WASM e C/transpile) são **produção-ready** (bundles
-    de CDN, superfície de servidor ~zero). O **Modo B (servidor)** agora se
-    endurece via `create_app(..., security=SecurityConfig(...), metrics=...)`:
-    auth gate, CORS + `Origin` no WS, `max_connections`/`max_message_bytes`/
-    rate-limit por IP, headers de segurança, verificação de JWT, `/health` e
-    `/metrics` — com deploy de referência (Docker + nginx TLS/WS + sticky). O
-    núcleo (**S0/S1/S2/S3/S5/S6/S11 ✅**) está fechado; roda profissional.
-    Os 🔶 restantes são **enhancements, não bloqueadores**: S4 backend de sessão
-    Redis (sticky-sessions cobre multi-instância hoje), S8 tracing OTel
-    (`/metrics` cobre o básico), S9/S10 gates de CI (perf/axe).
+!!! success "Estado — produção-ready, S0 a S11 fechados"
+    Os modos **estáticos** (A/WASM e C/transpile) são **produção-ready** por
+    construção: bundle de CDN, superfície de servidor ~zero. O **Modo B
+    (servidor)** se endurece via `create_app(..., security=SecurityConfig(...),
+    metrics=...)`: auth gate, CORS + checagem de `Origin` no upgrade do WS,
+    `max_connections`/`max_message_bytes`/rate-limit por IP, headers de segurança,
+    verificação de JWT, `/health` e `/metrics` — com deploy de referência (Docker
+    + nginx TLS/WS + sticky, gerado por `tempestweb deploy`).
+
+    **As doze fases (S0–S11) estão ✅**, incluindo as quatro que este bloco listava
+    como 🔶 e como "enhancement": S4 ganhou o `RedisSessionRouter` (roteia o
+    inbound do SSE por pub/sub, dispensa sticky), S8 ganhou log estruturado por
+    sessão + tracing OTel por adapter, e S9/S10 viraram gates de CI que travam o
+    merge — gate de perf, `docs/stability.md`, matriz de browsers, baseline de
+    a11y medido por axe-core e o wire-contract congelado em `tempestweb.contract`.
 
 | ID | Escopo | Status |
 |---|---|---|

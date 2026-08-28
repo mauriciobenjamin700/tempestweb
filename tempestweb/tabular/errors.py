@@ -15,6 +15,7 @@ from collections.abc import Iterable
 
 __all__ = [
     "TabularError",
+    "CompactFormatError",
     "ManifestError",
     "MissingFeatureError",
     "UnknownFeatureError",
@@ -85,3 +86,15 @@ class UnknownFeatureError(TabularError):
 
 class PredictionError(TabularError):
     """The model ran but its output could not be read as a prediction."""
+
+
+class CompactFormatError(TabularError):
+    """The bytes are not a compact model this reader understands.
+
+    Raised for wrong magic bytes, a layout version this reader does not
+    implement, a section the header promised and the file does not hold, or a
+    ``kind``/``link`` outside the format. Every one of them means the file was
+    written by something other than
+    ``tempest_fastapi_sdk.modelops.export_sklearn_to_compact`` at the version
+    this reader was built against — guessing past that would predict on garbage.
+    """

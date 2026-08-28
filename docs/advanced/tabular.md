@@ -226,6 +226,140 @@ Criar a sessão custa 225 ms na primeira (o runtime WASM subindo junto) e
     `providers=` continua aceitando a ordem que você quiser — quem roda visão e
     tabular na mesma página já baixou o jsep e pode experimentar sem custo novo.
 
+## Sem runtime nenhum: `CompactPredictor`
+
+Se o runtime é o que pesa, a saída é não ter runtime. Um modelo **linear** é um
+produto escalar; uma **árvore** é uma cadeia de comparações. Nada disso precisa
+de WebAssembly, e é exatamente o que o `CompactPredictor` lê — em Python de
+stdlib (`struct`, `array`, `math`), dentro do Pyodide.
+
+```python
+from tempestweb.tabular import CompactPredictor
+
+PREDICTOR = CompactPredictor("./models/risk.tmc")
+
+
+async def score(row: dict[str, float]) -> float:
+    """Devolve a probabilidade da classe prevista."""
+    prediction = await PREDICTOR.predict(row)
+    return prediction.score
+```
+
+Mesma API do `TabularPredictor`: `predict(row)` / `predict_many(rows)`, linha em
+qualquer ordem, mesma `Prediction` de volta.
+
+Para o `.tmc` entrar no artefato (e no precache do service worker), declare-o
+em `[wasm].assets`:
+
+```toml
+[wasm]
+assets = ["models/*.tmc"]
+```
+
+!!! tip "O arquivo já é o manifesto"
+    O export grava `feature_names` e `classes` **dentro** do `.tmc`, então não há
+    segundo arquivo para manter em sincronia. `manifest=` existe só para
+    sobrescrever um export que não recebeu os nomes.
+
+### O export: um passo de build, com o escritor que verifica
+
+O `.tmc` é escrito pelo `tempest-fastapi-sdk`, que **compara os bytes contra as
+predições do próprio scikit-learn e se recusa a escrever um arquivo que
+discorde**:
+
+```bash
+uvx --with scikit-learn --with tempest-fastapi-sdk python export_compact.py
+```
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+from tempest_fastapi_sdk.modelops import export_sklearn_to_compact
+
+model = RandomForestClassifier(n_estimators=12, max_depth=5).fit(X, y)
+export = export_sklearn_to_compact(model, X_test, "dist/risk.tmc", feature_names=list(X.columns))
+print(export.kind, export.size_bytes, export.verified)   # tree_ensemble 4764 True
+```
+
+!!! warning "É uma troca, não um substituto"
+    ONNX cobre **todo** estimador; isto cobre **modelo linear e ensemble de
+    árvore** — as duas famílias cuja aritmética cabe aqui. Gradient boosting soma
+    contribuições cruas através de um estimador inicial: é outro leitor, e o
+    exportador **recusa** em vez de escrever algo que este leria errado. Para
+    esses, o caminho é o `TabularPredictor`.
+
+    Cada estimador abaixo tem uma fixture na suíte, escrita pelo publicador do
+    formato e comparada com o que o **scikit-learn** respondeu para as mesmas
+    linhas. A lista é exatamente o que está medido — nem um nome a mais:
+
+    | Estimador | Fixture | Link |
+    | --- | --- | --- |
+    | `LogisticRegression` (binário) | `linear_binary_sigmoid` | `sigmoid` |
+    | `LogisticRegression` (multiclasse) | `linear_multiclass_softmax` | `softmax` |
+    | `LinearRegression` | `linear_regression_identity` | `identity` |
+    | `Ridge` | `ridge_regression_identity` | `identity` |
+    | `SGDClassifier` | `sgd_classifier_sigmoid` | `sigmoid` |
+    | `LinearSVC` | `linear_svc_sigmoid` | `sigmoid` |
+    | `Perceptron` | `perceptron_sigmoid` | `sigmoid` |
+    | `DecisionTreeRegressor` | `tree_regressor_identity` | `identity` |
+    | `RandomForestClassifier` | `forest_classifier_normalize` | `normalize` |
+    | `ExtraTreesClassifier` | `extratrees_classifier_normalize` | `normalize` |
+    | `Pipeline` + `StandardScaler` | `pipeline_scaler_linear` | `sigmoid` |
+    | `Pipeline` + `MinMaxScaler` | `pipeline_minmax_linear` | `sigmoid` |
+
+    O escalador é **dobrado** no header, nunca ignorado: o leitor faz
+    `(valor - offset) / escala`, e é nesse par que o exportador escreve
+    `mean_`/`scale_` do `StandardScaler` e `data_min_`/`data_range_` do
+    `MinMaxScaler` — o que é a transformação para o `feature_range` default.
+    Quem quiser outro `feature_range` está fora do medido, e o exportador recusa
+    escrever qualquer arquivo cujas predições discordem do estimador.
+
+    O irmão de cada estimador dessas famílias (`RidgeClassifier`, `SGDRegressor`,
+    `LinearSVR`, `DecisionTreeClassifier`, `RandomForestRegressor`,
+    `ExtraTreesRegressor`, `ExtraTree*`) usa a mesma aritmética e é aceito pelo
+    exportador; quem decide caso a caso é ele, comparando os bytes contra o
+    scikit-learn antes de escrever.
+
+### Medido em Chrome real
+
+Artefato Modo A, Pyodide, sem `onnxruntime-web` em lugar nenhum — um
+`RandomForest` de 12 árvores (4.764 B) e uma `LogisticRegression` de 6 features
+(460 B):
+
+| Medida | Resultado |
+| --- | --- |
+| Predição do forest | `setosa` p=**1,00000000** (sklearn: `setosa`, 1,0) |
+| Predição do linear | `0` p=**0,99111871** (sklearn: 0,9911187022504708) |
+| Frio: download + parse + 1 linha | **6,3 ms** |
+| Forest, por linha (100 execuções) | mediana ~0,0 ms · p95 **0,2 ms** |
+| Linear, por linha (100 execuções) | mediana ~0,0 ms · p95 **0,1 ms** |
+| Forest, 1.000 linhas de uma vez | **51,8 ms** |
+| Requests dos modelos, com 200 predições | **1 por modelo** |
+
+!!! check "A paridade é medida contra o sklearn, não contra nós mesmos"
+    Os doze `.tmc` da suíte são escritos pelo **publicador do formato** e ao lado
+    deles fica o que o **scikit-learn** respondeu para as mesmas linhas
+    (`tests/fixtures/compact/`). A armadilha que isso pega: `sklearn.tree`
+    converte a entrada para float32 antes de percorrer, então um limiar e uma
+    entrada um passo de float64 acima dele comparam **iguais** e vão para a
+    esquerda. Comparar em float64 manda a linha para a direita — e não é
+    arredondamento: cada fixture de árvore carrega uma **linha de fronteira**
+    exatamente sobre um limiar, e nela o forest responde `versicolor` p=0,666667
+    em float32 (o que o sklearn respondeu) contra `virginica` p=0,833333 em
+    float64, e o regressor de árvore 0,980769 contra 0,541667.
+
+!!! warning "Modos A e B"
+    O leitor é Python, e o Modo C serve um conjunto fechado de módulos: ele
+    **recusa o import no build**, nomeando os módulos que aceita.
+
+    ```
+    app.py:7: import from 'tempestweb.tabular' is not supported
+    (only tempest_core, `tempestweb.components` and `tempestweb.native`)
+    ```
+
+    A mensagem não diz qual modo tem a capacidade — quem faz isso é a recusa de
+    **capability** (`native.*`), não a de pacote. Para inferência tabular no Modo
+    C, o caminho é chamar uma API do servidor.
+
 ## Erros nomeados
 
 | Situação | Erro |
@@ -236,15 +370,24 @@ Criar a sessão custa 225 ms na primeira (o runtime WASM subindo junto) e
 | Valor que não é número | `ValueError` nomeando a feature |
 | Modelo respondeu algo ilegível | `PredictionError` |
 | Export com ZipMap | `NativeError("unsupported_output")` dizendo como reexportar |
+| `.tmc` que este leitor não entende | `CompactFormatError`, nomeando o estimador do header |
+| Manifesto com número de features diferente do modelo | `ManifestError`, com os dois números |
+
+O `CompactFormatError` é o que recusa um `.tmc` em vez de predizer sobre ele:
+magic errado, versão de layout que este leitor não implementa, seção que o header
+prometeu e o arquivo não carrega, `kind`/`link` fora do formato — e todo número
+que o header declara sobre a própria forma, cruzado com os bytes ao lado
+(`coef == n_features × n_outputs`, `intercept == n_outputs`,
+`tree_offset == n_trees + 1`, `offset` e `scale` cobrindo cada feature,
+`n_outputs == 1` para regressão). Header que discorda das próprias seções não
+falhava: ele **predizia**, sobre o que a indexação alcançasse.
 
 ## Fora de escopo nesta versão
 
-- `CompactPredictor` — um formato compacto que roda sem runtime de inferência
-  nenhum. A medição acima é o argumento a favor dele, e o follow-up é a
-  [issue #191](https://github.com/mauriciobenjamin700/tempestweb/issues/191):
-  o que pesa é o `onnxruntime-web`, não o `.onnx`.
-- A ordem de execution provider **já é configurável** por `providers=`; o que
-  ficou decidido é o default, `["wasm"]`, com o número acima.
+- Gradient boosting no `CompactPredictor` — o exportador recusa, e o caminho é o
+  `TabularPredictor`.
+- Modo C: o leitor compacto é Python, então segue Modos A e B como o
+  `TabularPredictor`.
 - Treinar no browser. Isto é inferência.
 
 ## Recap
@@ -259,3 +402,6 @@ Criar a sessão custa 225 ms na primeira (o runtime WASM subindo junto) e
   inferência de 3 linhas.
 - **O runtime é que pesa**: 13,96 MB de `onnxruntime-web` para um modelo de
   660 bytes. Carregue `ort.wasm.min.js` e economize 13,8 MB crus.
+- **`CompactPredictor` dispensa o runtime** para modelo linear e ensemble de
+  árvore: 6,3 ms do frio à primeira predição, p95 de 0,2 ms por linha, e o
+  `.tmc` carrega o próprio manifesto.

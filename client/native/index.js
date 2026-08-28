@@ -55,6 +55,7 @@ import {
 import { cookiesAll, cookiesGet, cookiesRemove, cookiesSet } from "./cookies.js";
 import { cameraCapture } from "./camera.js";
 import { onnxLoad, onnxRun } from "./onnx.js";
+import { compactLoad } from "./compact.js";
 import { fileSave, filePick } from "./file.js";
 import { installState, installPrompt } from "./install.js";
 import {
@@ -194,6 +195,7 @@ export const HANDLERS = {
   "camera.capture": cameraCapture,
   "onnx.load": onnxLoad,
   "onnx.run": onnxRun,
+  "compact.load": compactLoad,
   "file.save": fileSave,
   "file.pick": filePick,
   "install.state": installState,

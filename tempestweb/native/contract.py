@@ -84,6 +84,7 @@ CAPABILITIES: tuple[Capability, ...] = (
     _cap("clipboard.read_image", mode_c=True),
     _cap("clipboard.write", mode_c=True),
     _cap("clipboard.write_image", mode_c=True),
+    _cap("compact.load"),
     _cap("contacts.is_supported", mode_c=True),
     _cap("contacts.select", mode_c=True),
     _cap("cookies.all", mode_c=True),

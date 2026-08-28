@@ -124,6 +124,7 @@ _NATIVE_ASSETS: tuple[str, ...] = (
     "bluetooth.js",
     "camera.js",
     "clipboard.js",
+    "compact.js",
     "contacts.js",
     "blobs.js",
     "device.js",
@@ -197,6 +198,30 @@ _WASM_PACKAGE_PARTS: tuple[str, ...] = (
     "transports",
     "native",
     "components",
+    # Feature packages an app imports directly. Left out, every one of them was a
+    # boot-time `No module named 'tempestweb.tabular'` in a real tab while the
+    # whole suite stayed green — the test process has the package installed, the
+    # browser only has this zip. They are pure Python and cost kilobytes against
+    # a Pyodide runtime measured in megabytes.
+    #
+    # ``pwa`` is deliberately absent: it is the *build-time* emitter this very
+    # module calls (``emit_icons``/``write_manifest``/``vendor_pyodide``, the last
+    # over ``urllib.request``, which Pyodide cannot use anyway). Its only
+    # importers are this file and an example's build script, so bundling it put
+    # 9,384 bytes of code the browser never executes into every Mode A artifact.
+    #
+    # ``vision`` is here even though it cannot import on Pyodide's baseline: its
+    # ``tasks``/``backend`` modules need ``ort_vision_sdk`` and ``numpy``, which
+    # an app declares under ``[wasm] packages``. The package has to travel for
+    # that app to have anything to import — see the importability guard in
+    # ``tests/unit/test_wasm_package_closure.py``.
+    "access",
+    "export",
+    "observability",
+    "presets",
+    "query",
+    "tabular",
+    "vision",
     # The theme → CSS emitter. Mode B puts those custom properties in the page
     # head at render time; Mode A's page is static, so the app's palette can only
     # reach the sheet from inside the browser — which means this module has to be

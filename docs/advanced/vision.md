@@ -42,6 +42,26 @@ O extra puxa o [`ort-vision-sdk`](https://pypi.org/project/ort-vision-sdk/) e o
 `numpy`. No Modo A (WASM), coloque o `.onnx` junto do bundle e referencie por um
 caminho same-origin (ex.: `"./models/yolov8n.onnx"`).
 
+!!! warning "No Modo A, `numpy` é requisito declarado — não vem de graça"
+    O `tempestweb/vision/` **viaja** no zip do artefato Modo A, mas ele importa
+    `ort_vision_sdk` e `numpy` no nível do módulo, e o bootstrap do Pyodide só
+    carrega `["pydantic", *packages]`. Sem declarar, `import tempestweb.vision`
+    morre no boot com `ModuleNotFoundError: No module named 'numpy'` — medido, com
+    o pacote presente no zip. Então declare:
+
+    ```toml
+    [wasm]
+    packages = ["numpy"]
+    assets = ["models/*.onnx"]
+    ```
+
+    `numpy` é um pacote que o Pyodide publica, então `loadPackage` o resolve. O
+    `ort_vision_sdk` **não** é: ele precisa estar alcançável no runtime (wheel
+    pura instalada por `micropip`, ou vendorizada em `[wasm].modules`), e é a
+    parte que o build não consegue conferir para você. Quem só quer inferência
+    tabular no browser não paga nada disso — veja o
+    [`CompactPredictor`](tabular.md), que dispensa o runtime de inferência.
+
 ---
 
 ## Detecção — o fluxo completo

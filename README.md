@@ -326,7 +326,7 @@ See the [Reading remote data](https://mauriciobenjamin700.github.io/tempestweb/e
 [Export](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/export/) and
 [Permissions](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/access/) guides.
 
-## Tabular inference (ONNX)
+## Tabular inference (ONNX, or no runtime at all)
 
 ```python
 from tempestweb.tabular import TabularPredictor
@@ -346,7 +346,30 @@ the runtime checks it: a row written `{"idade": 30}` for a model trained on `age
 reads a zero and answers a plausible, wrong score. With a manifest that becomes
 `MissingFeatureError`, naming the feature that is missing **and** the one that was
 sent instead. Training and export are a build step in a throwaway venv
-(`uvx --with skl2onnx …`), never a runtime dependency. See the
+(`uvx --with skl2onnx …`), never a runtime dependency.
+
+**For a linear model or a tree ensemble, drop the runtime instead of the model.**
+`onnxruntime-web` is 13.96 MB of WebAssembly (3.58 MB gzipped) against a 660-byte
+`LogisticRegression` — for an app whose only model is tabular, the runtime *is*
+the download. `CompactPredictor` reads the `.tmc` format in stdlib Python
+(`struct`, `array`, `math`), because a linear model is a dot product and a tree is
+a chain of comparisons:
+
+```python
+from tempestweb.tabular import CompactPredictor
+
+PREDICTOR = CompactPredictor("/models/risk.tmc")          # the file is the manifest
+prediction = await PREDICTOR.predict({"age": 30, "income": 3200.0})
+```
+
+The `.tmc` is written by `tempest_fastapi_sdk.modelops.export_sklearn_to_compact`,
+which verifies the bytes against scikit-learn's own predictions and refuses to
+write a file that disagrees, and it records `feature_names` and `classes` in its
+own header — so there is no second file to keep in sync. The bytes reach Python
+through the `compact.load` capability, over the same asset cache `onnx.load` uses.
+Measured in real Chrome with no `onnxruntime-web` anywhere: 6.3 ms from cold to
+the first prediction, a 0.2 ms p95 per row. Gradient boosting is a different
+reader and the exporter refuses it — that one stays on `TabularPredictor`. See the
 [Tabular guide](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/tabular/).
 
 ## Deploy (server mode)
@@ -388,7 +411,7 @@ make check          # ruff + mypy + pytest + JS (jsdom) tests
 | `tempestweb/access/` | Role → permission map and unverified token claims, so the `view` can decide what to draw. **Not** authorization. |
 | `tempestweb/export/` | CSV and XLSX bytes generated in Python, for `native.file.save` to deliver. No dependency. |
 | `tempestweb/vision/` | Classification, detection and segmentation over ONNX in the browser. Needs the `[vision]` extra. |
-| `tempestweb/tabular/` | sklearn→ONNX inference over a row of numbers, with a feature manifest that stops a silently wrong prediction. |
+| `tempestweb/tabular/` | Inference over a row of numbers, with a feature manifest that stops a silently wrong prediction: `TabularPredictor` over sklearn→ONNX, and `CompactPredictor` reading `.tmc` in stdlib Python with **no inference runtime**. |
 | `tempestweb/observability/` | Telemetry, logger, error boundary, feature flags, auth — adapter pattern (Track O). |
 | `tempestweb/pwa/` | Web App Manifest + icon emitter (Track P). |
 | `tempestweb/cli/` | `tempestweb new/dev/build/run/sync/gen`. |

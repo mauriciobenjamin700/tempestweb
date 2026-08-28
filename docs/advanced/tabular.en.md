@@ -227,6 +227,140 @@ it) and 2.1–8.3 ms afterwards.
     and tabular on the same page has already downloaded jsep and can experiment
     at no new cost.
 
+## No runtime at all: `CompactPredictor`
+
+If the runtime is what weighs, the way out is to have no runtime. A **linear**
+model is a dot product; a **tree** is a chain of comparisons. Neither needs
+WebAssembly, and that is exactly what `CompactPredictor` reads — in stdlib
+Python (`struct`, `array`, `math`), inside Pyodide.
+
+```python
+from tempestweb.tabular import CompactPredictor
+
+PREDICTOR = CompactPredictor("./models/risk.tmc")
+
+
+async def score(row: dict[str, float]) -> float:
+    """Return the predicted class's probability."""
+    prediction = await PREDICTOR.predict(row)
+    return prediction.score
+```
+
+Same API as `TabularPredictor`: `predict(row)` / `predict_many(rows)`, the row in
+any order, the same `Prediction` back.
+
+To get the `.tmc` into the artifact (and into the service worker's precache),
+declare it under `[wasm].assets`:
+
+```toml
+[wasm]
+assets = ["models/*.tmc"]
+```
+
+!!! tip "The file is already the manifest"
+    The export records `feature_names` and `classes` **inside** the `.tmc`, so
+    there is no second file to keep in sync. `manifest=` is there only to
+    override an export that was given no names.
+
+### The export: a build step, with a writer that verifies
+
+The `.tmc` is written by `tempest-fastapi-sdk`, which **compares the bytes
+against scikit-learn's own predictions and refuses to write a file that
+disagrees**:
+
+```bash
+uvx --with scikit-learn --with tempest-fastapi-sdk python export_compact.py
+```
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+from tempest_fastapi_sdk.modelops import export_sklearn_to_compact
+
+model = RandomForestClassifier(n_estimators=12, max_depth=5).fit(X, y)
+export = export_sklearn_to_compact(model, X_test, "dist/risk.tmc", feature_names=list(X.columns))
+print(export.kind, export.size_bytes, export.verified)   # tree_ensemble 4764 True
+```
+
+!!! warning "It is a trade, not a replacement"
+    ONNX covers **every** estimator; this covers **linear models and tree
+    ensembles** — the two families whose arithmetic fits here. Gradient boosting
+    sums raw contributions through an init estimator: that is a different reader,
+    and the exporter **refuses** rather than writing something this would
+    misread. For those, the route is `TabularPredictor`.
+
+    Every estimator below has a fixture in the suite, written by the format's
+    publisher and compared against what **scikit-learn** answered for the same
+    rows. The list is exactly what is measured — not one name more:
+
+    | Estimator | Fixture | Link |
+    | --- | --- | --- |
+    | `LogisticRegression` (binary) | `linear_binary_sigmoid` | `sigmoid` |
+    | `LogisticRegression` (multiclass) | `linear_multiclass_softmax` | `softmax` |
+    | `LinearRegression` | `linear_regression_identity` | `identity` |
+    | `Ridge` | `ridge_regression_identity` | `identity` |
+    | `SGDClassifier` | `sgd_classifier_sigmoid` | `sigmoid` |
+    | `LinearSVC` | `linear_svc_sigmoid` | `sigmoid` |
+    | `Perceptron` | `perceptron_sigmoid` | `sigmoid` |
+    | `DecisionTreeRegressor` | `tree_regressor_identity` | `identity` |
+    | `RandomForestClassifier` | `forest_classifier_normalize` | `normalize` |
+    | `ExtraTreesClassifier` | `extratrees_classifier_normalize` | `normalize` |
+    | `Pipeline` + `StandardScaler` | `pipeline_scaler_linear` | `sigmoid` |
+    | `Pipeline` + `MinMaxScaler` | `pipeline_minmax_linear` | `sigmoid` |
+
+    The scaler is **folded** into the header, never ignored: the reader computes
+    `(value - offset) / scale`, and that pair is where the exporter writes
+    `StandardScaler`'s `mean_`/`scale_` and `MinMaxScaler`'s
+    `data_min_`/`data_range_` — which is the transform for the default
+    `feature_range`. Another `feature_range` is outside what is measured, and the
+    exporter refuses to write any file whose predictions disagree with the
+    estimator.
+
+    Each family sibling (`RidgeClassifier`, `SGDRegressor`, `LinearSVR`,
+    `DecisionTreeClassifier`, `RandomForestRegressor`, `ExtraTreesRegressor`,
+    `ExtraTree*`) runs the same arithmetic and the exporter accepts it; the
+    exporter is what decides case by case, comparing the bytes against
+    scikit-learn before writing.
+
+### Measured in real Chrome
+
+A Mode A artifact, Pyodide, with no `onnxruntime-web` anywhere — a 12-tree
+`RandomForest` (4,764 B) and a 6-feature `LogisticRegression` (460 B):
+
+| Measure | Result |
+| --- | --- |
+| Forest prediction | `setosa` p=**1.00000000** (sklearn: `setosa`, 1.0) |
+| Linear prediction | `0` p=**0.99111871** (sklearn: 0.9911187022504708) |
+| Cold: download + parse + 1 row | **6.3 ms** |
+| Forest, per row (100 runs) | median ~0.0 ms · p95 **0.2 ms** |
+| Linear, per row (100 runs) | median ~0.0 ms · p95 **0.1 ms** |
+| Forest, 1,000 rows at once | **51.8 ms** |
+| Model requests across 200 predictions | **1 per model** |
+
+!!! check "Parity is measured against sklearn, not against ourselves"
+    The suite's twelve `.tmc` files are written by the **format's publisher**, and
+    beside them sits what **scikit-learn** answered for the same rows
+    (`tests/fixtures/compact/`). The trap that catches: `sklearn.tree` casts its
+    input to float32 before traversing, so a threshold and an input one float64
+    step above it compare **equal** and go left. Comparing in float64 sends that
+    row right instead — and it is not rounding: every tree fixture carries a
+    **boundary row** sitting exactly on a threshold, and on it the forest answers
+    `versicolor` p=0.666667 in float32 (which is what sklearn answered) against
+    `virginica` p=0.833333 in float64, and the tree regressor 0.980769 against
+    0.541667.
+
+!!! warning "Modes A and B"
+    The reader is Python, and Mode C serves a fixed set of modules: it **refuses
+    the import at build time**, naming the modules it accepts.
+
+    ```
+    app.py:7: import from 'tempestweb.tabular' is not supported
+    (only tempest_core, `tempestweb.components` and `tempestweb.native`)
+    ```
+
+    The message does not name the mode that has the capability — that is what the
+    **capability** refusal (`native.*`) does, not the package one. For tabular
+    inference in Mode C, the route is a call to your server.
+
 ## Named errors
 
 | Situation | Error |
@@ -237,15 +371,24 @@ it) and 2.1–8.3 ms afterwards.
 | A value that is not a number | `ValueError` naming the feature |
 | The model answered something unreadable | `PredictionError` |
 | Export with ZipMap | `NativeError("unsupported_output")` saying how to re-export |
+| A `.tmc` this reader does not understand | `CompactFormatError`, naming the header's estimator |
+| A manifest whose feature count is not the model's | `ManifestError`, with both numbers |
+
+`CompactFormatError` is what refuses a `.tmc` instead of predicting on it: wrong
+magic, a layout version this reader does not implement, a section the header
+promised and the file does not carry, a `kind`/`link` outside the format — and
+every number the header states about its own shape, crossed against the bytes
+beside it (`coef == n_features × n_outputs`, `intercept == n_outputs`,
+`tree_offset == n_trees + 1`, `offset` and `scale` covering every feature,
+`n_outputs == 1` for a regression). A header that disagreed with its own sections
+did not fail: it **predicted**, on whatever the indexing reached.
 
 ## Out of scope in this version
 
-- `CompactPredictor` — a compact format that runs with no inference runtime at
-  all. The measurement above is the case for it, tracked in
-  [issue #191](https://github.com/mauriciobenjamin700/tempestweb/issues/191):
-  what weighs is `onnxruntime-web`, not the `.onnx`.
-- Execution-provider order **is already configurable** via `providers=`; what
-  the measurement settled is the default, `["wasm"]`.
+- Gradient boosting in `CompactPredictor` — the exporter refuses it, and the
+  route is `TabularPredictor`.
+- Mode C: the compact reader is Python, so it follows `TabularPredictor` into
+  Modes A and B only.
 - Training in the browser. This is inference.
 
 ## Recap
@@ -261,3 +404,6 @@ it) and 2.1–8.3 ms afterwards.
   per 3-row inference.
 - **The runtime is what weighs**: 13.96 MB of `onnxruntime-web` for a 660-byte
   model. Load `ort.wasm.min.js` and save 13.8 MB raw.
+- **`CompactPredictor` drops the runtime** for linear models and tree ensembles:
+  6.3 ms from cold to first prediction, a 0.2 ms p95 per row, and the `.tmc`
+  carries its own manifest.

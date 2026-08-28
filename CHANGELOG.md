@@ -4,6 +4,109 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.124.0] — 2026-08-27
+
+### Fixed
+
+- **A limpeza de `410 Gone` do WebPush nunca rodou em produção (#118).** A
+  verificação em device da linha P3 pedia o round-trip por um push service real,
+  e ele foi medido contra o **FCM**, com a aba fechada: subscribe devolve
+  `https://fcm.googleapis.com/fcm/send/…`, `pywebpush` responde **201** em ~1,0 s
+  e o worker mostra a notificação com **zero páginas abertas**. Chave VAPID
+  trocada responde **403**; subscription cancelada responde **410 Gone**.
+
+  E o `410` não chegava a lugar nenhum. `WebPushService.send` captura o
+  `WebPushError` **deste módulo**, e o sender real — `pywebpush.webpush` —
+  levanta o `WebPushException` **dele**. Toda falha real caía no ramo genérico
+  com `status_code=None` e `gone=False`, então a poda de endpoint morto que o
+  docstring promete só acontecia contra os senders fake que os testes injetam:
+  eles levantavam a exceção certa, e por isso o ramo estava "coberto". Sintoma
+  medido: depois de um `unsubscribe()` no browser, todo envio respondia
+  `{"sent":0,"total":1}` — para sempre, com o endpoint morto no store.
+
+  `_default_sender` passa a traduzir: o `WebPushException` do `pywebpush` vira
+  `WebPushError` com o status da resposta do push service. Medido depois da
+  correção, mesmo endpoint morto: primeiro envio `{"sent":0,"total":1}`, segundo
+  `{"sent":0,"total":0}` — podado.
+- **E a poda, alcançável em produção pela primeira vez, rodava desprotegida.**
+  `remove()` é implementado pelo host (SQLAlchemy, Redis) e pode levantar numa
+  conexão caída; a chamada estava direto no ramo do 410, sem isolamento. Medido
+  com um store que levanta `OperationalError` no `remove()`, duas assinaturas e a
+  morta primeiro: a exceção subia por `send` → `send_to_owner`, `POST
+  /webpush/send` respondia **500** e o endpoint **vivo do mesmo lote nunca era
+  tentado**. Ou seja: fazer o 410 chegar trocaria "linha morta no store" por
+  "entrega perdida para quem está vivo". A poda virou
+  `WebPushService._prune_dead_endpoint`, isolada: o `SendOutcome` volta com
+  `gone=True` de todo jeito e o vivo recebe. É o único lugar do módulo onde
+  engolir exceção é correto — o endpoint está morto de fato, e o dado que importa
+  já está no outcome — e a docstring registra o porquê.
+- **`POST /webpush/send` travava o event loop do Modo B.** `pywebpush.webpush`
+  posta com `requests` (bloqueante) e declara `timeout: float | None = None`,
+  repassando esse `None` ao `requests.post` — o fallback
+  `kwargs.pop("timeout", 10000)` do `WebPusher.send` nunca se aplica, porque a
+  chave está sempre presente. Logo não havia timeout **nenhum**: um endpoint que
+  aceita o TCP e não responde pendurava o envio. E a rota `async` chamava o
+  fan-out inline, no mesmo loop que serve o stream de patches por WebSocket.
+  Medido com um sender de 1 s e três assinaturas: a requisição levava 3,00 s e um
+  heartbeat de 10 ms no mesmo loop recebia **zero** ticks — toda app conectada
+  congelada pelo envio inteiro. Duas metades corrigidas: `WebPushService` ganha
+  `timeout` (keyword-only, default **10 s** — o FCM respondeu em ~1,0 s na
+  medição, 10x de folga) repassado ao sender, e a rota chama o envio por
+  `run_in_threadpool`. Medido depois: mesma requisição em 3,01 s, heartbeat com
+  **296 ticks** e atraso máximo de **0,01 s**.
+- **`SendOutcome.status_code` fabricava `201` num envio que ninguém confirmou.**
+  O campo promete "o status HTTP do push service (quando conhecido)", mas o
+  fallback `or 201` inventava um: um sender que devolve `None` (o `fake_sender`
+  dos próprios testes) e `pywebpush.webpush(curl=True)`, que devolve `str`,
+  produziam `ok=True, status_code=201`. Agora o status é lido da resposta e fica
+  `None` quando não há resposta para ler — `200`/`201`/`202` num envio aceito.
+  De quebra, **o teste que cobria isso não podia falhar**: alimentava o fake com
+  `201` e afirmava `201`, exatamente a constante do código pré-fix. Ele passa a
+  usar `202` (status real — o `pywebpush` só levanta acima de 202) e reprova
+  contra o estado anterior, junto dos outros.
+- **`POST /webpush/unsubscribe` removia por endpoint sem escopo de owner.** Dois
+  roteadores sobre o mesmo serviço é a forma que a própria assinatura oferece
+  (`webpush_router(svc, owner="alice", prefix="/webpush/alice")` e o mesmo para
+  `"bob"`), e o store é indexado só por endpoint: `POST
+  /webpush/alice/unsubscribe` carregando o endpoint do bob respondia
+  `{"removed": true}` e apagava a assinatura **do bob**. A rota passa a conferir
+  `store.list_for(owner)` antes de remover — endpoint que este owner não tem
+  responde `{"removed": false}`, a mesma resposta de um já removido, então a rota
+  também não revela que outro owner o guarda. O `SubscriptionStore` Protocol
+  segue intocado (`remove(endpoint)`): mudar a interface quebraria host que já a
+  implementa. A poda por 410/404 continua **sem** escopo, e isso é correto — ali
+  o push service disse que o endpoint está morto, logo está morto para todo
+  owner.
+- **Corpo sem `endpoint` no `/unsubscribe` respondia `{"removed": false}` calado**
+  — a mesma resposta de "essa assinatura já não existia", enquanto `/subscribe`
+  já respondia 400 ao mesmo corpo malformado. Agora as duas respondem **400**
+  nomeando o campo.
+- **`POST /webpush/subscribe` respondia 500 a um corpo sem `endpoint`.** O
+  `ValueError` do store escapava sem tratamento; agora é **400** nomeando o campo
+  que falta — erro do chamador responde como erro do chamador.
+
+### Changed
+
+- **Superfície pública do WebPush:** `WebPushService.__init__` ganha
+  `timeout: float = 10.0` (keyword-only), `SendOutcome.status_code` passa a poder
+  ser `None`, `POST {prefix}/unsubscribe` responde **400** a corpo sem `endpoint`
+  e só remove o que o `owner` do roteador tem. `docs/examples/webpush-server.md`
+  e `.en.md` acompanham nas duas línguas: a tabela de endpoints com as respostas
+  de erro, o `timeout` na explicação peça-por-peça, o envio fora do event loop, a
+  poda cobrindo `410` **e** `404` (com o risco conhecido de agrupar: um proxy
+  respondendo o próprio 404 por caminho errado apaga um inscrito vivo), o `403`
+  que não poda, e o `status_code` real em vez da constante.
+- O docstring do módulo passa a registrar o racional de tratar `404` como
+  endpoint morto, e um teste (`test_a_404_prunes_like_a_410`) fixa a decisão — a
+  medição em device só exercitou `201`/`403`/`410`, então o `404` estava
+  agrupado por acidente.
+- `docs/roadmap.md` (P3) e `docs/agents/device-verification.md` registram a
+  medição: os três status do FCM, o defeito que ela achou, e o
+  `pushsubscriptionchange` exercitado **no worker real** (evento sintético,
+  `pushManager.subscribe()` e re-POST reais) — re-subscreve com a chave da
+  `oldSubscription`, ganha endpoint novo e re-POSTa `/webpush/subscribe` com
+  **200**, aba fechada.
+
 ## [0.123.0] — 2026-08-27
 
 ### Fixed

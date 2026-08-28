@@ -20,7 +20,7 @@ cobrir".
 | captura de câmera real | N4 | ✅ medido — 2026-08-27 (câmera virtual do OBS, por CDP no Chrome do Windows) |
 | Background Sync com a aba fechada | P2 | ✅ medido — 2026-08-25 (**achou defeito**: #169) |
 | WebPush: handler → notificação, com a aba fechada | P3 | ✅ medido — 2026-08-25 |
-| WebPush: envio por push service real + `pushsubscriptionchange` | P3 | ⏳ falta par VAPID e endpoint de push alcançável |
+| WebPush: envio por push service real + `pushsubscriptionchange` | P3 | ✅ medido — 2026-08-27 (**achou defeito**: o `410 Gone` nunca podava) |
 | Web Audio além de `tone` (grafo de síntese/análise) | T24 | ✅ entregue e medido — v0.112.0, registro no `docs/roadmap.md` |
 
 ## O que foi medido
@@ -244,21 +244,53 @@ cliente amostra o `<video>` num canvas e envia **JPEG** (22.772 chars contra os
 impraticável), é uma diferença de plataforma que não estava escrita: agora está,
 em `docs/advanced/capabilities.md`.
 
-### WebPush: envio por push service real e `pushsubscriptionchange` (P3)
+### WebPush: envio por push service real e `pushsubscriptionchange` (P3) — medido 2026-08-27
+
+**Dá para medir aqui**: o Chrome deste harness assina no FCM. Receita, em ordem:
 
 ```bash
-uv run --frozen python examples/webpush-server/server.py   # precisa de par VAPID
-uv run --frozen tempestweb run --mode server --path examples/pwa-webpush --port 8000
+eval "$(uv run --frozen tempestweb vapid --env)"          # par VAPID de teste
+uv run --frozen python -m uvicorn server:app \
+  --app-dir examples/webpush-server --port 8810           # VAPID + subscribe + send
 ```
 
-O caminho de dentro do worker já foi medido (seção acima). O que falta é o que só um
-push service real exerce: um par VAPID de teste e um endpoint alcançável (FCM).
-Medir o round-trip completo — `pywebpush` → push service → worker → notificação com a
-**aba fechada** —, o clique abrindo o deep link certo, e a rotação de chave
-disparando `pushsubscriptionchange` com re-subscribe.
+No browser, por `mcp__playwright__browser_run_code_unsafe`:
+`context.grantPermissions(["notifications"], {origin})`, clicar em **Enable
+notifications**, ler o endpoint com `reg.pushManager.getSubscription()`. Um
+endpoint `https://fcm.googleapis.com/fcm/send/…` é a prova de que o push service
+é real. Depois: página de âncora `about:blank`, `page.close()`, `POST
+/webpush/send` do shell, e ler a notificação **de dentro do worker** com
+`context.serviceWorkers().find(...).evaluate(() =>
+self.registration.getNotifications())`.
 
-`ServiceWorker.deliverPushMessage` por CDP **não** substitui isto: ele injeta o
-payload direto no worker, pulando exatamente a parte que pode falhar em produção
+Medido, com **zero páginas abertas**:
+
+| Caso | Resultado |
+| --- | --- |
+| Chave VAPID correta | **201** em ~1,0 s; notificação mostrada pelo worker |
+| Chave VAPID rotacionada | **403** — "the VAPID credentials in the authorization header do not correspond…" |
+| Subscription cancelada (`unsubscribe()`) | **410 Gone** — "push subscription has unsubscribed or expired" |
+
+**O defeito que isso achou:** o `410` nunca chegava ao `SendOutcome`. O serviço
+capturava o `WebPushError` **próprio**, e o `pywebpush` levanta o
+`WebPushException` **dele** — então toda falha real caía no ramo genérico, sem
+status, e a poda de endpoint morto que o módulo promete nunca rodou em produção:
+só contra os senders fake dos testes, que levantavam a exceção certa. Sintoma
+medido: `{"sent":0,"total":1}` para sempre. Depois da correção, o `total` cai
+sozinho para 0.
+
+**`pushsubscriptionchange`**: o evento real é o browser que dispara, na hora
+dele. O que dá para medir é o handler, **no worker real** — servir um artefato
+buildado (que traz o `sw.js` do framework) por um app que também monta o
+`webpush_router`, e de dentro do worker: cancelar a subscription, montar
+`new Event("pushsubscriptionchange")` com `oldSubscription` e um `waitUntil` que
+resolve, e despachar. Medido: re-subscreve com a chave da `oldSubscription`,
+ganha **endpoint novo** e re-POSTa `/webpush/subscribe` — **200** no log do
+servidor, com a aba fechada. O evento é sintético; a `subscribe()` e o POST são
+reais.
+
+`ServiceWorker.deliverPushMessage` por CDP **não** substitui o round-trip: ele
+injeta o payload direto no worker, pulando exatamente a parte que falhou aqui
 (assinatura VAPID, `410 Gone`, expiração de subscription).
 
 ### Web Audio além de `tone` (T24) — resolvido

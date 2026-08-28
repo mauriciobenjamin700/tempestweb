@@ -15,8 +15,25 @@ Endpoints a host app wires (the framework does not dictate the schema):
     POST   /webpush/subscribe   -> WebPushService.add_subscription
     DELETE /webpush/my          -> WebPushService.remove_subscription
 
-Dead endpoints (HTTP 410 Gone from the push service) are pruned automatically on
-send.
+**Dead endpoints (HTTP 410 Gone and 404 Not Found) are pruned from the store on
+send.** 410 is the push service reporting a cancelled subscription — measured
+against FCM on 2026-08-27, right after an ``unsubscribe()`` in the browser. 404
+is grouped with it because a push service answers 404 for a subscription it no
+longer knows, and keeping such a row makes every later send retry an endpoint
+that can never be delivered to again. The known risk of the grouping: a proxy or
+a rewrite in front of the endpoint answering **its own** 404 (wrong path, not a
+dead subscription) makes the prune drop a live subscriber, who then has to
+subscribe again. The trade is deliberate — a stale row costs every send forever,
+a re-subscribe costs one prompt — and it is pinned by test, not left to
+accident.
+
+A **403 is not a dead endpoint** (it is the push service refusing the VAPID
+signature) and is never pruned: measured against FCM with a rotated key, the
+subscription was still good.
+
+Pruning by 410/404 is deliberately **not** scoped to an owner: the endpoint is
+dead for everybody who holds it. Removal driven by a *request* is scoped — see
+``webpush_router``'s ``/unsubscribe``.
 """
 
 from __future__ import annotations
@@ -221,7 +238,10 @@ class SendOutcome:
     Attributes:
         endpoint: The target push endpoint.
         ok: Whether the push was accepted.
-        status_code: The push service HTTP status (when known).
+        status_code: The push service HTTP status (when known), and ``None`` when
+            it is not: a sender that returns no response object at all (an
+            injected fake) or a ``str`` (``pywebpush.webpush(curl=True)``) leaves
+            it unset rather than reporting a status nobody answered.
         gone: Whether the endpoint is dead (HTTP 410/404) and was pruned.
         error: A human-readable error when ``ok`` is False.
     """
@@ -238,24 +258,72 @@ class SendOutcome:
 WebPushSender = Callable[..., Any]
 
 
-def _default_sender() -> WebPushSender:
-    """Resolve the real ``pywebpush.webpush`` callable, lazily.
+def _status_of(response: Any) -> int | None:  # noqa: ANN401 - any sender's return
+    """Read the push service HTTP status off whatever a sender handed back.
+
+    There is no status to report unless the object carries one: an injected fake
+    may return nothing, and ``pywebpush.webpush(curl=True)`` returns the request
+    as a ``str``. Defaulting those to ``201`` (what this module used to do)
+    fabricated a status the push service never answered, which contradicts
+    :attr:`SendOutcome.status_code`'s own contract.
+
+    Args:
+        response: The sender's return value, or an exception's ``response``.
 
     Returns:
-        The ``pywebpush.webpush`` function.
+        The integer HTTP status, or None when the object exposes none.
+    """
+    status = getattr(response, "status_code", None)
+    return status if isinstance(status, int) else None
+
+
+def _default_sender() -> WebPushSender:
+    """Resolve a sender over ``pywebpush``, translating its failures.
+
+    ``pywebpush`` raises its own ``WebPushException``, carrying the push
+    service's response; :class:`WebPushService` reads :class:`WebPushError` and
+    its ``status_code``. Without the translation every real failure landed in the
+    generic branch with ``status_code=None``, so **the 410-Gone pruning this
+    module promises never ran in production** — only against the fake senders
+    tests inject. Measured against FCM on 2026-08-27: an unsubscribed endpoint
+    answers ``410 Gone`` and the dead subscription stayed in the store forever.
+
+    Returns:
+        A callable with ``pywebpush.webpush``'s signature that raises
+        :class:`WebPushError` on failure.
 
     Raises:
         RuntimeError: If ``pywebpush`` is not installed.
     """
     try:
+        from pywebpush import WebPushException
         from pywebpush import webpush as _webpush
     except ImportError as exc:  # pragma: no cover - exercised via mock in tests
         raise RuntimeError(
             "pywebpush is required to send WebPush; install "
             'tempest-fastapi-sdk[webpush] or "pywebpush".'
         ) from exc
-    sender: WebPushSender = _webpush
-    return sender
+
+    def send(**kwargs: Any) -> Any:  # noqa: ANN401 - pywebpush's own signature
+        """Send one push, raising :class:`WebPushError` when it fails.
+
+        Args:
+            **kwargs (Any): Forwarded verbatim to ``pywebpush.webpush``.
+
+        Returns:
+            Whatever ``pywebpush.webpush`` returned (a ``requests`` response).
+
+        Raises:
+            WebPushError: When the push service rejected the message, carrying
+                its HTTP status when the exception reports one.
+        """
+        try:
+            return _webpush(**kwargs)
+        except WebPushException as exc:
+            status = _status_of(getattr(exc, "response", None))
+            raise WebPushError(str(exc), status_code=status) from exc
+
+    return send
 
 
 class WebPushError(Exception):
@@ -284,6 +352,15 @@ class WebPushService:
         store: The subscription store (defaults to in-memory).
         sender: The push sender callable (defaults to ``pywebpush.webpush``,
             resolved lazily on first send; injected in tests).
+        timeout: Per-send HTTP timeout in seconds, forwarded to the sender.
+            ``pywebpush.webpush`` declares ``timeout: float | None = None`` and
+            passes that ``None`` down to ``requests.post``, so its own
+            ``kwargs.pop("timeout", 10000)`` fallback never applies and an
+            unbounded send is the default — a push endpoint that accepts the TCP
+            connection and then never answers hangs the caller forever. **10
+            seconds** is the default here: FCM answered in ~1.0 s in the device
+            measurement, so it leaves 10x headroom for a slow service while
+            bounding the worst case to something a request can absorb.
     """
 
     def __init__(
@@ -291,11 +368,43 @@ class WebPushService:
         vapid: VapidConfig,
         store: SubscriptionStore | None = None,
         sender: WebPushSender | None = None,
+        *,
+        timeout: float = 10.0,
     ) -> None:
         """Initialize the service."""
         self.vapid = vapid
         self.store: SubscriptionStore = store or InMemorySubscriptionStore()
+        self.timeout = timeout
         self._sender = sender
+
+    def _prune_dead_endpoint(self, endpoint: str) -> bool:
+        """Drop a dead endpoint from the store, never failing the send batch.
+
+        This is the one place in this module where an exception is swallowed, and
+        here that is the correct answer: the push service already said the
+        endpoint is dead (410/404), and the fact the caller needs is already in
+        :attr:`SendOutcome.gone` — whether the row actually went away changes
+        nothing about *this* delivery.
+
+        The store is host-supplied (SQLAlchemy, Redis), so its ``remove`` can
+        raise on a dropped connection. Letting that propagate cancelled delivery
+        to every **live** subscription queued behind the dead one in the same
+        ``send_to_owner``/``broadcast`` batch, and answered ``POST
+        {prefix}/send`` with a 500. Measured with a store raising on
+        ``remove()`` and the dead endpoint first of two: the live endpoint was
+        never even attempted.
+
+        Args:
+            endpoint: The push endpoint URL to remove.
+
+        Returns:
+            True when the store removed a subscription; False when it held none
+            or the store itself failed.
+        """
+        try:
+            return self.store.remove(endpoint)
+        except Exception:  # noqa: BLE001 - a broken store must not stop delivery
+            return False
 
     def _resolve_sender(self) -> WebPushSender:
         """Return the configured sender, resolving the default lazily.
@@ -333,15 +442,23 @@ class WebPushService:
         """Send one VAPID-signed push to a single subscription.
 
         A dead endpoint (HTTP 410/404) is pruned from the store and reported with
-        ``gone=True``. Sending is a no-op success-free outcome when VAPID is
-        disabled (no private key), so dev environments degrade cleanly.
+        ``gone=True``; a store that fails while pruning is ignored, so one dead
+        endpoint cannot cancel delivery to the live ones. Sending is a no-op
+        success-free outcome when VAPID is disabled (no private key), so dev
+        environments degrade cleanly.
+
+        The call **blocks** (``pywebpush`` posts with ``requests``) and is
+        bounded by ``self.timeout``. An ``async`` caller must run it off the
+        loop; ``webpush_router``'s ``/send`` route goes through
+        ``run_in_threadpool`` for exactly that reason.
 
         Args:
             subscription: The target subscription JSON (needs ``endpoint``).
             payload: The JSON-able notification payload (title/body/data/...).
 
         Returns:
-            The send outcome.
+            The send outcome, carrying the status the push service answered (or
+            None when the sender exposes no response).
         """
         endpoint = str(subscription.get("endpoint", ""))
         if not self.vapid.enabled:
@@ -351,16 +468,17 @@ class WebPushService:
 
         sender = self._resolve_sender()
         try:
-            sender(
+            response = sender(
                 subscription_info=subscription,
                 data=json.dumps(payload),
                 vapid_private_key=self.vapid.private_key,
                 vapid_claims={"sub": self.vapid.subject},
+                timeout=self.timeout,
             )
         except WebPushError as exc:
             gone = exc.status_code in (404, 410)
             if gone:
-                self.store.remove(endpoint)
+                self._prune_dead_endpoint(endpoint)
             return SendOutcome(
                 endpoint=endpoint,
                 ok=False,
@@ -370,7 +488,7 @@ class WebPushService:
             )
         except Exception as exc:  # noqa: BLE001 - report any sender failure
             return SendOutcome(endpoint=endpoint, ok=False, error=str(exc))
-        return SendOutcome(endpoint=endpoint, ok=True, status_code=201)
+        return SendOutcome(endpoint=endpoint, ok=True, status_code=_status_of(response))
 
     def send_to_owner(self, owner: str, payload: dict[str, Any]) -> list[SendOutcome]:
         """Send a push to every subscription an owner has.
@@ -413,9 +531,12 @@ def webpush_router(
       to subscribe with.
     - ``POST {prefix}/subscribe`` (body: the browser subscription JSON) → stores
       it under ``owner``.
-    - ``POST {prefix}/unsubscribe`` (body: ``{"endpoint": ...}``) → removes it.
+    - ``POST {prefix}/unsubscribe`` (body: ``{"endpoint": ...}``) → removes it,
+      **only when this ``owner`` holds it**; a body with no ``endpoint`` answers
+      400, like ``/subscribe`` already did.
     - ``POST {prefix}/send`` (body: the notification payload) → pushes to every
-      subscription of ``owner``; returns ``{"sent", "total"}``.
+      subscription of ``owner``; returns ``{"sent", "total"}``. The blocking
+      send runs in a worker thread, so it never stalls the event loop.
 
     A single fixed ``owner`` keeps the default multi-tenant-free; an app with
     real users wires its own routes around the same :class:`WebPushService`,
@@ -433,7 +554,8 @@ def webpush_router(
         RuntimeError: If FastAPI is not installed.
     """
     try:
-        from fastapi import APIRouter, Body
+        from fastapi import APIRouter, Body, HTTPException
+        from starlette.concurrency import run_in_threadpool
     except ImportError as exc:  # pragma: no cover - server extra always ships it
         raise RuntimeError(
             "FastAPI is required for webpush_router; install "
@@ -451,24 +573,75 @@ def webpush_router(
     async def subscribe(
         subscription: SubscriptionInfo = Body(...),  # noqa: B008 - FastAPI param
     ) -> dict[str, bool]:
-        """Persist a browser push subscription under the router's owner."""
-        service.add_subscription(owner, subscription)
+        """Persist a browser push subscription under the router's owner.
+
+        A body without an ``endpoint`` is the caller's mistake, so it answers
+        **400** naming it. It used to reach the store's ``ValueError`` uncaught
+        and come back as a 500 with a traceback — measured while wiring a probe
+        that posted the wrong shape.
+
+        Raises:
+            HTTPException: 400, when the body carries no push endpoint.
+        """
+        try:
+            service.add_subscription(owner, subscription)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"ok": True}
 
     @router.post("/unsubscribe")
     async def unsubscribe(
         body: dict[str, Any] = Body(...),  # noqa: B008 - FastAPI param
     ) -> dict[str, bool]:
-        """Remove a subscription by its endpoint."""
-        removed = service.remove_subscription(str(body.get("endpoint", "")))
-        return {"removed": removed}
+        """Remove one of **this owner's** subscriptions, by endpoint.
+
+        The scope is the point. The store is keyed by endpoint alone, and the
+        signature invites two routers over one service
+        (``webpush_router(svc, owner="alice", prefix="/webpush/alice")`` and the
+        same for ``"bob"``), so an unscoped remove let
+        ``POST /webpush/alice/unsubscribe`` carrying **bob's** endpoint delete
+        bob's subscription and answer ``{"removed": true}``. An endpoint this
+        owner does not hold now answers ``{"removed": false}`` — the same answer
+        as one already gone, so the route never reveals that somebody else holds
+        it.
+
+        Pruning a dead endpoint inside :meth:`WebPushService.send` stays
+        unscoped, and that is correct: there the push service itself reported the
+        endpoint dead, so it is dead for every owner.
+
+        Raises:
+            HTTPException: 400, when the body carries no push endpoint. It used
+                to fall through to ``remove("")`` and answer
+                ``{"removed": false}`` in silence, while ``/subscribe`` already
+                answered 400 to the very same malformed body.
+        """
+        endpoint = str(body.get("endpoint") or "")
+        if not endpoint:
+            raise HTTPException(status_code=400, detail="body must include an endpoint")
+        held = any(
+            str(sub.get("endpoint", "")) == endpoint
+            for sub in service.store.list_for(owner)
+        )
+        if not held:
+            return {"removed": False}
+        return {"removed": service.remove_subscription(endpoint)}
 
     @router.post("/send")
     async def send(
         payload: dict[str, Any] = Body(...),  # noqa: B008 - FastAPI param
     ) -> dict[str, int]:
-        """Push a notification payload to every subscription of the owner."""
-        outcomes = service.send_to_owner(owner, payload)
+        """Push a notification payload to every subscription of the owner.
+
+        The fan-out runs in a worker thread because it **blocks**:
+        ``pywebpush`` posts with ``requests``, and this is an ``async`` route on
+        the same event loop that streams patches over WebSocket/SSE. Measured
+        with a sender sleeping 1 s and three subscriptions: called inline the
+        request took 3.00 s and a 10 ms heartbeat on the same loop got **zero**
+        ticks — every connected app frozen for the whole fan-out. Through
+        ``run_in_threadpool`` the same request takes 3.01 s and the heartbeat
+        keeps ticking (296 ticks, worst lateness 0.01 s).
+        """
+        outcomes = await run_in_threadpool(service.send_to_owner, owner, payload)
         return {"sent": sum(1 for o in outcomes if o.ok), "total": len(outcomes)}
 
     return router

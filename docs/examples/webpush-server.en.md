@@ -122,9 +122,25 @@ app and you get four JSON endpoints for free:
 | Method | Route | Body | Response |
 |---|---|---|---|
 | `GET` | `/webpush/vapid-public-key` | — | `{"public_key": ...}` |
-| `POST` | `/webpush/subscribe` | the browser subscription | `{"ok": true}` |
-| `POST` | `/webpush/unsubscribe` | `{"endpoint": ...}` | `{"removed": true}` |
+| `POST` | `/webpush/subscribe` | the browser subscription | `{"ok": true}`, or **400** without `endpoint` |
+| `POST` | `/webpush/unsubscribe` | `{"endpoint": ...}` | `{"removed": true}` / `{"removed": false}`, or **400** without `endpoint` |
 | `POST` | `/webpush/send` | payload (`{"title","body"}`) | `{"sent": N, "total": M}` |
+
+!!! info "A malformed body answers 400, and removal is scoped to the `owner`"
+    Two router rules worth knowing before you write the client:
+
+    - **A body with no `endpoint` is the caller's mistake.** Both `subscribe` and
+      `unsubscribe` answer **400** naming the missing field. `unsubscribe` used
+      to answer `{"removed": false}` to an empty body — the same answer as "that
+      subscription was already gone", so the client bug stayed invisible.
+    - **`unsubscribe` only removes what the router's `owner` holds.** The store
+      is keyed by `endpoint` alone, and the signature invites two routers over
+      one service (`webpush_router(SERVICE, owner="alice",
+      prefix="/webpush/alice")` and the same for `"bob"`): unscoped, a
+      `POST /webpush/alice/unsubscribe` carrying bob's endpoint deleted **bob's**
+      subscription and answered `{"removed": true}`. An endpoint this `owner`
+      does not hold now answers `{"removed": false}` — the same answer as one
+      already gone, so the route never reveals that another `owner` holds it.
 
 Here's the complete app — copy and run it:
 
@@ -166,8 +182,23 @@ Piece by piece:
 - `WebPushService(vapid, store=...)` ties the VAPID config to a subscription
   store. `InMemorySubscriptionStore` covers dev and tests; in production you supply
   your own (SQLAlchemy, Redis…) implementing the `SubscriptionStore` protocol.
+- `WebPushService(vapid, ..., timeout=10.0)` bounds **each HTTP send**, in
+  seconds. The **10 s** default is deliberate: `pywebpush` declares
+  `timeout=None` and forwards that `None` to `requests.post`, so without a value
+  here an endpoint that accepts the TCP connection and never answers hangs the
+  send forever. Tune it for your push service — FCM answered in ~1.0 s in the
+  device measurement, which leaves 10x of headroom.
 - `webpush_router(SERVICE)` builds the router and `include_router` plugs it into
   the app.
+
+!!! tip "`POST /webpush/send` does not block the event loop 💡"
+    The `pywebpush` send is **blocking** (it posts with `requests`), and the
+    route is `async` on the same loop that serves the WebSocket patch stream.
+    That is why the router runs the fan-out in a worker thread. Measured with a
+    1 s sender and three subscriptions: called inline, the request took 3.00 s
+    and a 10 ms heartbeat on the same loop got **zero** ticks — every connected
+    app frozen for the whole send. Off the loop, the same 3.01 s request and a
+    heartbeat with 296 ticks, worst lateness 0.01 s.
 
 !!! tip "An empty private key disables sending 💡"
     If `VAPID_PRIVATE_KEY` is empty, `VapidConfig.enabled` is `False` and every
@@ -242,8 +273,25 @@ curl -X POST http://127.0.0.1:8000/webpush/send \
 ```
 
 `sent` is how many the push service accepted; `total` is how many subscriptions
-the `owner` had. Dead endpoints (the push service replies `410 Gone`) are pruned
-from the store automatically on send.
+the `owner` had. A dead endpoint — the push service replies `410 Gone` **or**
+`404 Not Found` — is pruned from the store on that very send, so the next send
+does not even try it.
+
+!!! warning "What counts as a dead endpoint (and what does not)"
+    Only `410` and `404`. A **`403`** is the push service refusing the *VAPID
+    signature*, not the user's subscription: measured against FCM with a rotated
+    key, the subscription was still good, and pruning it would drop a live
+    subscriber over a server-side key mistake.
+
+    Grouping `404` with `410` carries a known risk: a proxy or a rewrite in front
+    of the endpoint answering **its own** 404 (wrong path, not a dead
+    subscription) makes the prune drop a live subscriber, who then has to
+    subscribe again. The trade is deliberate — a stale row costs every send
+    forever, a re-subscribe costs one prompt.
+
+    And a store that fails **while** pruning (the database connection dropped)
+    does not cancel the batch: the dead endpoint is reported with `gone=True` and
+    the **live** subscriptions of the same `send_to_owner` still get their push.
 
 ??? note "Sending from inside your own code"
     The router is a thin shell over `WebPushService`. From anywhere in your app —
@@ -258,6 +306,13 @@ from the store automatically on send.
     `send_to_owner` returns a list of `SendOutcome` (one per subscription, `[]`
     when the owner has none). There's also `broadcast(payload)` to reach **every**
     stored subscription, and `send(subscription, payload)` for a single one.
+
+    `outcome.status_code` is the status the push service **answered**: `200`,
+    `201` or `202` on an accepted send, `410`/`404`/`403` on a rejection, and
+    `None` when there was no response to read — an injected sender that returns
+    nothing, or `pywebpush.webpush(curl=True)`, which returns a `str`. It is no
+    longer the constant `201`: an accepted send used to report `201` even when
+    nobody had answered that.
 
 ---
 
@@ -315,11 +370,14 @@ In this guide you:
   `generate_vapid_keys()` underneath).
 - ✅ Mounted the `webpush_router` on a FastAPI app with `app.include_router(...)`.
 - ✅ Learned the four endpoints: `vapid-public-key`, `subscribe`, `unsubscribe`
-  and `send`.
+  (scoped to the `owner`, **400** without `endpoint`) and `send`.
 - ✅ Subscribed the browser against the public key and sent the subscription for
   the server to store.
 - ✅ Fired a notification with `POST /webpush/send` (and saw `send_to_owner` /
-  `broadcast` on the service).
+  `broadcast` on the service, running off the event loop).
+- ✅ Read what a send reports: `status_code` is the real status (or `None` when
+  there is no response), `410`/`404` prune the dead subscription, `403` does
+  **not**, and `timeout=` bounds each send.
 - ✅ Understood that the private key is a secret, that an empty key disables
   sending, and that real delivery needs HTTPS + permission + (iOS) the app
   installed.

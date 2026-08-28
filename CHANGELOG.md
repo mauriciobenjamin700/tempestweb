@@ -146,7 +146,8 @@ versioning.
   `idb-kv.js` abre e fecha o banco em cada operação — medidos 10
   `indexedDB.open()` para 10 operações com o store construído uma vez. Segurar
   conexão aberta bloquearia `versionchange`, então isso fica registrado como
-  candidata a issue em `NOTES-118-storage.md`, não implementado aqui.
+  candidata a issue em `docs/agents/reports/NOTES-118-storage.md`, não
+  implementado aqui.
 
   `tests/client/native-storage-backend.test.js` fixa a fiação: que
   `browserDeps()` carrega um store, que ele é construído uma vez, que uma
@@ -249,7 +250,7 @@ versioning.
   dois logins no mesmo device) compartilham um keyspace, `storage.list_keys()`
   devolve as chaves de todos e o `remove()` de um alcança o dado do outro —
   prefixe a chave se isso importar. Escopo por owner fica aberto na #118, com a
-  consequência descrita em `NOTES-118-storage.md`.
+  consequência descrita em `docs/agents/reports/NOTES-118-storage.md`.
 
 - **O Modo C perdeu o segundo store de IndexedDB.** `client/transpile/native.js`
   mantinha `_store`/`idbStore()` e duas atribuições `deps.store = store` que

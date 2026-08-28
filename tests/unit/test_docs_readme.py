@@ -37,12 +37,19 @@ PACKAGE_PATH = re.compile(r"`(tempestweb/[a-z_][a-z_/]*)`")
 #: A number followed by a word naming something we ship. These age the moment
 #: the thing is added, and nothing rebuilds the sentence that carries them.
 #:
+#: The fuzzy forms count too, and all three had already shipped stale here: a
+#: modifier between the number and the noun (``46 single-concept demos`` when the
+#: gallery held 60), a tilde (``all ~64 widgets`` when ``buildable_widgets()``
+#: returned 75) and an open-ended suffix (``the 40-plus examples``). A hedge is
+#: still a number a reader takes literally, and none of them self-update.
+#:
 #: ``Material 3`` is excluded by the lookbehind: the 3 there belongs to the
 #: design system's name, not to a count of anything in this repo.
 COUNTED = re.compile(
-    r"(?<!Material )\b(\d+)\s*\n?\s*(subpacotes|subpackages|apps rodáveis"
+    r"(?<!Material )\b~?(\d+)(?:-plus)?\s*\n?\s*(?:[\w-]+\s+){0,2}"
+    r"(subpacotes|subpackages|apps rodáveis"
     r"|runnable apps|capacidades nativas|native capabilities|componentes"
-    r"|components)\b",
+    r"|components|widgets|demos|exemplos|examples)\b",
     re.I,
 )
 

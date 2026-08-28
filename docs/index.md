@@ -225,8 +225,8 @@ inglês, async-first. Cliente: **JavaScript puro** — sem TypeScript, sem
 framework, sem passo de build.
 
 !!! note "Estado do projeto"
-    Os três modos estão **funcionais hoje** — o counter e os mais de 40 exemplos
-    da galeria rodam e passam no gate completo. Os planos de design vivos continuam
+    Os três modos estão **funcionais hoje** — o counter e todos os exemplos da
+    galeria rodam e passam no gate completo. Os planos de design vivos continuam
     versionados no repositório: [plan.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/plan.md),
     [roadmap.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md)
     e [contract.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md).

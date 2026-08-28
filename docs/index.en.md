@@ -224,8 +224,8 @@ English, async-first. Client: **plain JavaScript** — no TypeScript, no
 framework, no build step.
 
 !!! note "Project status"
-    All three modes are **functional today** — the counter and the 40-plus
-    examples in the gallery build, render, and pass the full gate. The living
+    All three modes are **functional today** — the counter and every example in
+    the gallery build, render, and pass the full gate. The living
     design docs are still
     versioned in the repository: [plan.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/plan.md),
     [roadmap.md](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/roadmap.md)

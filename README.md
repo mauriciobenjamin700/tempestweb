@@ -40,7 +40,7 @@ docs:
 - [`docs/agents/MANIFEST.md`](docs/agents/MANIFEST.md) — parallel agent task plan.
 
 Want runnable apps? Browse the **[Example Gallery](https://mauriciobenjamin700.github.io/tempestweb/en/examples/)**
-([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) — 46
+([PT-BR](https://mauriciobenjamin700.github.io/tempestweb/examples/)) —
 single-concept demos (stopwatch, forms, data table/grid, kanban, chat, theming,
 i18n, canvas charts, app shells, native capabilities, observability, PWA/WebPush,
 a Mode C tour, and a server-mode walkthrough), each running unchanged across the
@@ -217,14 +217,15 @@ js: str = transpile_file("examples/counter/app.py")  # -> native ES module
 
 The generated module runs on the native runtime (`client/transpile/runtime.js`)
 with a JS `diff` locked against a core-derived golden. Coverage is now **100% of
-`tempest_core`**: all ~64 widgets, MD3 styling, state-with-methods, navigation
-(routes + URL), i18n, theme + responsiveness, native capabilities (http/storage/
-cookies/…), field validators and both declarative and imperative animation. The
-`tempestweb build/dev --mode transpile` CLI emits a static, CDN-servable bundle
-that is a **first-class PWA — installable and offline out of the box** (manifest
-+ cache-first service worker precaching the whole shell; customize via `[pwa]` in
-`tempestweb.toml`, or turn either half off with `[pwa] enabled = false` when the
-app is behind a login and gains nothing from precache).
+`tempest_core`**: every widget it builds, MD3 styling, state-with-methods,
+navigation (routes + URL), i18n, theme + responsiveness, native capabilities
+(http/storage/cookies/…), field validators and both declarative and imperative
+animation. The `tempestweb build/dev --mode transpile` CLI emits a static,
+CDN-servable bundle that is a **first-class PWA — installable and offline out of
+the box** (manifest + cache-first service worker precaching the whole shell;
+customize via `[pwa]` in `tempestweb.toml`, or turn either half off with
+`[pwa] enabled = false` when the app is behind a login and gains nothing from
+precache).
 
 See the canonical [`examples/transpile-tour`](examples/transpile-tour/app.py) —
 one app exercising the whole surface — and the guide

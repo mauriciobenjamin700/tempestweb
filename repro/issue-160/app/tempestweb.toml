@@ -1,0 +1,14 @@
+[project]
+name = "tw160-panel"
+entrypoint = "app.py"
+
+[dev]
+mode = "wasm"
+
+[pwa]
+enabled = true
+name = "tw160 admin panel"
+short_name = "tw160"
+
+[wasm]
+assets = ["filler/*.json"]

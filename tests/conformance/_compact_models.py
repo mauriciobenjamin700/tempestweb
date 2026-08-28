@@ -97,16 +97,37 @@ def _float32_boundary_row(estimator: Any, base: Any) -> Any:
 def _cases() -> list[dict[str, Any]]:
     """Build the fitted estimators the fixtures cover.
 
+    One fixture per claim the documentation makes. The reader has two kinds of
+    arithmetic — a dot product and a chain of comparisons — but "covers
+    ``Ridge``" is not provable from "covers ``LinearRegression``": what an
+    estimator's coefficients *mean*, whether it has ``predict_proba``, and what
+    the exporter folds in front of it are all per-estimator facts. A list in the
+    docs longer than the list here is a list of guesses, so every estimator named
+    there is fitted here, exported by the publisher and answered by scikit-learn.
+
+    ``MinMaxScaler`` is the one worth naming: the reader's arithmetic is
+    ``(value - offset) / scale``, and the exporter folds ``data_min_`` and
+    ``data_range_`` into that pair — which is the transform only for the default
+    ``feature_range``. The fixture is what says so, and the exporter's own
+    verification is what refuses the file if it ever stops being true.
+
     Returns:
         One entry per fixture: its name, the fitted estimator, the feature
         names, and the rows every expectation is computed on.
     """
     import numpy
     from sklearn.datasets import load_breast_cancer, load_iris
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.linear_model import LinearRegression, LogisticRegression
+    from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+    from sklearn.linear_model import (
+        LinearRegression,
+        LogisticRegression,
+        Perceptron,
+        Ridge,
+        SGDClassifier,
+    )
     from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import StandardScaler
+    from sklearn.preprocessing import MinMaxScaler, StandardScaler
+    from sklearn.svm import LinearSVC
     from sklearn.tree import DecisionTreeRegressor
 
     cancer = load_breast_cancer()
@@ -165,6 +186,50 @@ def _cases() -> list[dict[str, Any]]:
                     ("model", LogisticRegression(max_iter=5000)),
                 ]
             ).fit(binary_x, binary_y),
+            "features": binary_names,
+            "rows": binary_x[:ROW_COUNT],
+        },
+        {
+            "name": "pipeline_minmax_linear",
+            "estimator": Pipeline(
+                [
+                    ("scale", MinMaxScaler()),
+                    ("model", LogisticRegression(max_iter=5000)),
+                ]
+            ).fit(binary_x, binary_y),
+            "features": binary_names,
+            "rows": binary_x[:ROW_COUNT],
+        },
+        {
+            "name": "extratrees_classifier_normalize",
+            "estimator": ExtraTreesClassifier(
+                n_estimators=8, max_depth=4, random_state=0
+            ).fit(iris_x, iris_y),
+            "features": iris_names,
+            "rows": iris_x[:: len(iris_x) // ROW_COUNT][:ROW_COUNT],
+            "boundary": True,
+        },
+        {
+            "name": "ridge_regression_identity",
+            "estimator": Ridge(alpha=1.0).fit(binary_x, binary_y.astype("float64")),
+            "features": binary_names,
+            "rows": binary_x[:ROW_COUNT],
+        },
+        {
+            "name": "sgd_classifier_sigmoid",
+            "estimator": SGDClassifier(random_state=0).fit(binary_x, binary_y),
+            "features": binary_names,
+            "rows": binary_x[:ROW_COUNT],
+        },
+        {
+            "name": "linear_svc_sigmoid",
+            "estimator": LinearSVC(max_iter=20000).fit(binary_x, binary_y),
+            "features": binary_names,
+            "rows": binary_x[:ROW_COUNT],
+        },
+        {
+            "name": "perceptron_sigmoid",
+            "estimator": Perceptron(random_state=0).fit(binary_x, binary_y),
             "features": binary_names,
             "rows": binary_x[:ROW_COUNT],
         },

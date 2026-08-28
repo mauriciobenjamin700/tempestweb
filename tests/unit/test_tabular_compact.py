@@ -128,6 +128,16 @@ def _rewritten(name: str, mutate: Callable[[dict[str, Any]], None]) -> bytes:
 @pytest.mark.parametrize("name", sorted(EXPECTATIONS))
 @pytest.mark.asyncio
 async def test_every_fixture_matches_sklearn_label_for_label(name: str) -> None:
+    """Every fixture's every row, against what scikit-learn answered for it.
+
+    Three of the estimators the format covers — ``LinearSVC``, ``Perceptron`` and
+    ``SGDClassifier`` with its default hinge loss — have no ``predict_proba`` at
+    all, so scikit-learn recorded no probabilities to compare and the label is the
+    whole assertion. That is the same thing the exporter verifies for them, and it
+    is a real comparison: the reader's probability comes from a sigmoid over the
+    decision function, which is monotone, so a label that agrees is a decision
+    function that agreed on its side of zero.
+    """
     expected = EXPECTATIONS[name]
     predictor, _ = _predictor(name)
 
@@ -142,6 +152,8 @@ async def test_every_fixture_matches_sklearn_label_for_label(name: str) -> None:
         return
 
     assert [prediction.label for prediction in predictions] == expected["labels"]
+    if not expected["probabilities"]:
+        return
     for prediction, answer in zip(predictions, expected["probabilities"], strict=True):
         for index, probability in enumerate(answer):
             label = expected["classes"][index]

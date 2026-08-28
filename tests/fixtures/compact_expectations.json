@@ -1,4 +1,112 @@
 {
+  "extratrees_classifier_normalize": {
+    "classes": [
+      "setosa",
+      "versicolor",
+      "virginica"
+    ],
+    "estimator": "ExtraTreesClassifier",
+    "features": [
+      "sepal length (cm)",
+      "sepal width (cm)",
+      "petal length (cm)",
+      "petal width (cm)"
+    ],
+    "kind": "tree_ensemble",
+    "labels": [
+      "setosa",
+      "setosa",
+      "versicolor",
+      "versicolor",
+      "virginica",
+      "virginica",
+      "setosa"
+    ],
+    "max_abs_diff": 3.777042012487186e-09,
+    "probabilities": [
+      [
+        1.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.9581896551724138,
+        0.04181034482758621,
+        0.0
+      ],
+      [
+        0.005208333333333333,
+        0.7729227521115483,
+        0.22186891455511837
+      ],
+      [
+        0.005208333333333333,
+        0.7386826020177396,
+        0.256109064648927
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ],
+      [
+        0.0,
+        0.17394342576028624,
+        0.8260565742397138
+      ],
+      [
+        1.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "rows": [
+      {
+        "petal length (cm)": 1.4,
+        "petal width (cm)": 0.2,
+        "sepal length (cm)": 5.1,
+        "sepal width (cm)": 3.5
+      },
+      {
+        "petal length (cm)": 1.6,
+        "petal width (cm)": 0.2,
+        "sepal length (cm)": 5.0,
+        "sepal width (cm)": 3.0
+      },
+      {
+        "petal length (cm)": 4.7,
+        "petal width (cm)": 1.4,
+        "sepal length (cm)": 7.0,
+        "sepal width (cm)": 3.2
+      },
+      {
+        "petal length (cm)": 4.4,
+        "petal width (cm)": 1.4,
+        "sepal length (cm)": 6.6,
+        "sepal width (cm)": 3.0
+      },
+      {
+        "petal length (cm)": 6.0,
+        "petal width (cm)": 2.5,
+        "sepal length (cm)": 6.3,
+        "sepal width (cm)": 3.3
+      },
+      {
+        "petal length (cm)": 6.0,
+        "petal width (cm)": 1.8,
+        "sepal length (cm)": 7.2,
+        "sepal width (cm)": 3.2
+      },
+      {
+        "petal length (cm)": 1.4,
+        "petal width (cm)": 0.2,
+        "sepal length (cm)": 5.1,
+        "sepal width (cm)": 3.5
+      }
+    ],
+    "size_bytes": 3536,
+    "task": "classification"
+  },
   "forest_classifier_normalize": {
     "classes": [
       "setosa",
@@ -381,6 +489,265 @@
     "size_bytes": 444,
     "task": "regression"
   },
+  "linear_svc_sigmoid": {
+    "classes": [
+      "0",
+      "1"
+    ],
+    "estimator": "LinearSVC",
+    "features": [
+      "mean radius",
+      "mean texture",
+      "mean perimeter",
+      "mean area",
+      "mean smoothness",
+      "mean compactness"
+    ],
+    "kind": "linear",
+    "labels": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "1"
+    ],
+    "max_abs_diff": 0.0,
+    "probabilities": [],
+    "rows": [
+      {
+        "mean area": 1001.0,
+        "mean compactness": 0.2776,
+        "mean perimeter": 122.8,
+        "mean radius": 17.99,
+        "mean smoothness": 0.1184,
+        "mean texture": 10.38
+      },
+      {
+        "mean area": 1326.0,
+        "mean compactness": 0.07864,
+        "mean perimeter": 132.9,
+        "mean radius": 20.57,
+        "mean smoothness": 0.08474,
+        "mean texture": 17.77
+      },
+      {
+        "mean area": 1203.0,
+        "mean compactness": 0.1599,
+        "mean perimeter": 130.0,
+        "mean radius": 19.69,
+        "mean smoothness": 0.1096,
+        "mean texture": 21.25
+      },
+      {
+        "mean area": 386.1,
+        "mean compactness": 0.2839,
+        "mean perimeter": 77.58,
+        "mean radius": 11.42,
+        "mean smoothness": 0.1425,
+        "mean texture": 20.38
+      },
+      {
+        "mean area": 1297.0,
+        "mean compactness": 0.1328,
+        "mean perimeter": 135.1,
+        "mean radius": 20.29,
+        "mean smoothness": 0.1003,
+        "mean texture": 14.34
+      },
+      {
+        "mean area": 477.1,
+        "mean compactness": 0.17,
+        "mean perimeter": 82.57,
+        "mean radius": 12.45,
+        "mean smoothness": 0.1278,
+        "mean texture": 15.7
+      }
+    ],
+    "size_bytes": 444,
+    "task": "classification"
+  },
+  "perceptron_sigmoid": {
+    "classes": [
+      "0",
+      "1"
+    ],
+    "estimator": "Perceptron",
+    "features": [
+      "mean radius",
+      "mean texture",
+      "mean perimeter",
+      "mean area",
+      "mean smoothness",
+      "mean compactness"
+    ],
+    "kind": "linear",
+    "labels": [
+      "0",
+      "0",
+      "0",
+      "1",
+      "0",
+      "1"
+    ],
+    "max_abs_diff": 0.0,
+    "probabilities": [],
+    "rows": [
+      {
+        "mean area": 1001.0,
+        "mean compactness": 0.2776,
+        "mean perimeter": 122.8,
+        "mean radius": 17.99,
+        "mean smoothness": 0.1184,
+        "mean texture": 10.38
+      },
+      {
+        "mean area": 1326.0,
+        "mean compactness": 0.07864,
+        "mean perimeter": 132.9,
+        "mean radius": 20.57,
+        "mean smoothness": 0.08474,
+        "mean texture": 17.77
+      },
+      {
+        "mean area": 1203.0,
+        "mean compactness": 0.1599,
+        "mean perimeter": 130.0,
+        "mean radius": 19.69,
+        "mean smoothness": 0.1096,
+        "mean texture": 21.25
+      },
+      {
+        "mean area": 386.1,
+        "mean compactness": 0.2839,
+        "mean perimeter": 77.58,
+        "mean radius": 11.42,
+        "mean smoothness": 0.1425,
+        "mean texture": 20.38
+      },
+      {
+        "mean area": 1297.0,
+        "mean compactness": 0.1328,
+        "mean perimeter": 135.1,
+        "mean radius": 20.29,
+        "mean smoothness": 0.1003,
+        "mean texture": 14.34
+      },
+      {
+        "mean area": 477.1,
+        "mean compactness": 0.17,
+        "mean perimeter": 82.57,
+        "mean radius": 12.45,
+        "mean smoothness": 0.1278,
+        "mean texture": 15.7
+      }
+    ],
+    "size_bytes": 452,
+    "task": "classification"
+  },
+  "pipeline_minmax_linear": {
+    "classes": [
+      "0",
+      "1"
+    ],
+    "estimator": "LogisticRegression",
+    "features": [
+      "mean radius",
+      "mean texture",
+      "mean perimeter",
+      "mean area",
+      "mean smoothness",
+      "mean compactness"
+    ],
+    "kind": "linear",
+    "labels": [
+      "0",
+      "0",
+      "0",
+      "0",
+      "0",
+      "1"
+    ],
+    "max_abs_diff": 2.9399895074000426e-08,
+    "probabilities": [
+      [
+        0.9505777904234146,
+        0.04942220957658535
+      ],
+      [
+        0.8873402216517905,
+        0.11265977834820945
+      ],
+      [
+        0.9700796891058762,
+        0.029920310894123812
+      ],
+      [
+        0.7668257203581677,
+        0.2331742796418324
+      ],
+      [
+        0.9319860664102884,
+        0.0680139335897117
+      ],
+      [
+        0.3947254773213724,
+        0.6052745226786276
+      ]
+    ],
+    "rows": [
+      {
+        "mean area": 1001.0,
+        "mean compactness": 0.2776,
+        "mean perimeter": 122.8,
+        "mean radius": 17.99,
+        "mean smoothness": 0.1184,
+        "mean texture": 10.38
+      },
+      {
+        "mean area": 1326.0,
+        "mean compactness": 0.07864,
+        "mean perimeter": 132.9,
+        "mean radius": 20.57,
+        "mean smoothness": 0.08474,
+        "mean texture": 17.77
+      },
+      {
+        "mean area": 1203.0,
+        "mean compactness": 0.1599,
+        "mean perimeter": 130.0,
+        "mean radius": 19.69,
+        "mean smoothness": 0.1096,
+        "mean texture": 21.25
+      },
+      {
+        "mean area": 386.1,
+        "mean compactness": 0.2839,
+        "mean perimeter": 77.58,
+        "mean radius": 11.42,
+        "mean smoothness": 0.1425,
+        "mean texture": 20.38
+      },
+      {
+        "mean area": 1297.0,
+        "mean compactness": 0.1328,
+        "mean perimeter": 135.1,
+        "mean radius": 20.29,
+        "mean smoothness": 0.1003,
+        "mean texture": 14.34
+      },
+      {
+        "mean area": 477.1,
+        "mean compactness": 0.17,
+        "mean perimeter": 82.57,
+        "mean radius": 12.45,
+        "mean smoothness": 0.1278,
+        "mean texture": 15.7
+      }
+    ],
+    "size_bytes": 580,
+    "task": "classification"
+  },
   "pipeline_scaler_linear": {
     "classes": [
       "0",
@@ -482,6 +849,159 @@
       }
     ],
     "size_bytes": 700,
+    "task": "classification"
+  },
+  "ridge_regression_identity": {
+    "classes": [],
+    "estimator": "Ridge",
+    "features": [
+      "mean radius",
+      "mean texture",
+      "mean perimeter",
+      "mean area",
+      "mean smoothness",
+      "mean compactness"
+    ],
+    "kind": "linear",
+    "labels": [
+      "0.13607193698648867",
+      "0.2997244388942506",
+      "0.07335099001954148",
+      "0.5224173866892956",
+      "0.16483873398983961",
+      "0.6864128149634765"
+    ],
+    "max_abs_diff": 8.81904527183508e-08,
+    "probabilities": [],
+    "rows": [
+      {
+        "mean area": 1001.0,
+        "mean compactness": 0.2776,
+        "mean perimeter": 122.8,
+        "mean radius": 17.99,
+        "mean smoothness": 0.1184,
+        "mean texture": 10.38
+      },
+      {
+        "mean area": 1326.0,
+        "mean compactness": 0.07864,
+        "mean perimeter": 132.9,
+        "mean radius": 20.57,
+        "mean smoothness": 0.08474,
+        "mean texture": 17.77
+      },
+      {
+        "mean area": 1203.0,
+        "mean compactness": 0.1599,
+        "mean perimeter": 130.0,
+        "mean radius": 19.69,
+        "mean smoothness": 0.1096,
+        "mean texture": 21.25
+      },
+      {
+        "mean area": 386.1,
+        "mean compactness": 0.2839,
+        "mean perimeter": 77.58,
+        "mean radius": 11.42,
+        "mean smoothness": 0.1425,
+        "mean texture": 20.38
+      },
+      {
+        "mean area": 1297.0,
+        "mean compactness": 0.1328,
+        "mean perimeter": 135.1,
+        "mean radius": 20.29,
+        "mean smoothness": 0.1003,
+        "mean texture": 14.34
+      },
+      {
+        "mean area": 477.1,
+        "mean compactness": 0.17,
+        "mean perimeter": 82.57,
+        "mean radius": 12.45,
+        "mean smoothness": 0.1278,
+        "mean texture": 15.7
+      }
+    ],
+    "size_bytes": 436,
+    "task": "regression"
+  },
+  "sgd_classifier_sigmoid": {
+    "classes": [
+      "0",
+      "1"
+    ],
+    "estimator": "SGDClassifier",
+    "features": [
+      "mean radius",
+      "mean texture",
+      "mean perimeter",
+      "mean area",
+      "mean smoothness",
+      "mean compactness"
+    ],
+    "kind": "linear",
+    "labels": [
+      "0",
+      "0",
+      "0",
+      "1",
+      "0",
+      "1"
+    ],
+    "max_abs_diff": 0.0,
+    "probabilities": [],
+    "rows": [
+      {
+        "mean area": 1001.0,
+        "mean compactness": 0.2776,
+        "mean perimeter": 122.8,
+        "mean radius": 17.99,
+        "mean smoothness": 0.1184,
+        "mean texture": 10.38
+      },
+      {
+        "mean area": 1326.0,
+        "mean compactness": 0.07864,
+        "mean perimeter": 132.9,
+        "mean radius": 20.57,
+        "mean smoothness": 0.08474,
+        "mean texture": 17.77
+      },
+      {
+        "mean area": 1203.0,
+        "mean compactness": 0.1599,
+        "mean perimeter": 130.0,
+        "mean radius": 19.69,
+        "mean smoothness": 0.1096,
+        "mean texture": 21.25
+      },
+      {
+        "mean area": 386.1,
+        "mean compactness": 0.2839,
+        "mean perimeter": 77.58,
+        "mean radius": 11.42,
+        "mean smoothness": 0.1425,
+        "mean texture": 20.38
+      },
+      {
+        "mean area": 1297.0,
+        "mean compactness": 0.1328,
+        "mean perimeter": 135.1,
+        "mean radius": 20.29,
+        "mean smoothness": 0.1003,
+        "mean texture": 14.34
+      },
+      {
+        "mean area": 477.1,
+        "mean compactness": 0.17,
+        "mean perimeter": 82.57,
+        "mean radius": 12.45,
+        "mean smoothness": 0.1278,
+        "mean texture": 15.7
+      }
+    ],
+    "size_bytes": 452,
     "task": "classification"
   },
   "tree_regressor_identity": {

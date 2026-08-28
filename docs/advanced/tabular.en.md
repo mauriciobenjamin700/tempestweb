@@ -283,13 +283,43 @@ print(export.kind, export.size_bytes, export.verified)   # tree_ensemble 4764 Tr
 
 !!! warning "It is a trade, not a replacement"
     ONNX covers **every** estimator; this covers **linear models and tree
-    ensembles** — `LogisticRegression`, `Ridge`, `SGD*`, `LinearSVC`,
-    `Perceptron`, `DecisionTree*`, `RandomForest*`, `ExtraTrees*` — plus a
-    `Pipeline` with `StandardScaler`/`MinMaxScaler` in front (the scaler is
-    **folded** into the header, never ignored). Gradient boosting sums raw
-    contributions through an init estimator: that is a different reader, and the
-    exporter **refuses** rather than writing something this would misread. For
-    those, the route is `TabularPredictor`.
+    ensembles** — the two families whose arithmetic fits here. Gradient boosting
+    sums raw contributions through an init estimator: that is a different reader,
+    and the exporter **refuses** rather than writing something this would
+    misread. For those, the route is `TabularPredictor`.
+
+    Every estimator below has a fixture in the suite, written by the format's
+    publisher and compared against what **scikit-learn** answered for the same
+    rows. The list is exactly what is measured — not one name more:
+
+    | Estimator | Fixture | Link |
+    | --- | --- | --- |
+    | `LogisticRegression` (binary) | `linear_binary_sigmoid` | `sigmoid` |
+    | `LogisticRegression` (multiclass) | `linear_multiclass_softmax` | `softmax` |
+    | `LinearRegression` | `linear_regression_identity` | `identity` |
+    | `Ridge` | `ridge_regression_identity` | `identity` |
+    | `SGDClassifier` | `sgd_classifier_sigmoid` | `sigmoid` |
+    | `LinearSVC` | `linear_svc_sigmoid` | `sigmoid` |
+    | `Perceptron` | `perceptron_sigmoid` | `sigmoid` |
+    | `DecisionTreeRegressor` | `tree_regressor_identity` | `identity` |
+    | `RandomForestClassifier` | `forest_classifier_normalize` | `normalize` |
+    | `ExtraTreesClassifier` | `extratrees_classifier_normalize` | `normalize` |
+    | `Pipeline` + `StandardScaler` | `pipeline_scaler_linear` | `sigmoid` |
+    | `Pipeline` + `MinMaxScaler` | `pipeline_minmax_linear` | `sigmoid` |
+
+    The scaler is **folded** into the header, never ignored: the reader computes
+    `(value - offset) / scale`, and that pair is where the exporter writes
+    `StandardScaler`'s `mean_`/`scale_` and `MinMaxScaler`'s
+    `data_min_`/`data_range_` — which is the transform for the default
+    `feature_range`. Another `feature_range` is outside what is measured, and the
+    exporter refuses to write any file whose predictions disagree with the
+    estimator.
+
+    Each family sibling (`RidgeClassifier`, `SGDRegressor`, `LinearSVR`,
+    `DecisionTreeClassifier`, `RandomForestRegressor`, `ExtraTreesRegressor`,
+    `ExtraTree*`) runs the same arithmetic and the exporter accepts it; the
+    exporter is what decides case by case, comparing the bytes against
+    scikit-learn before writing.
 
 ### Measured in real Chrome
 
@@ -307,12 +337,16 @@ A Mode A artifact, Pyodide, with no `onnxruntime-web` anywhere — a 12-tree
 | Model requests across 200 predictions | **1 per model** |
 
 !!! check "Parity is measured against sklearn, not against ourselves"
-    The suite's `.tmc` files are written by the **format's publisher**, and beside
-    them sits what **scikit-learn** answered for the same rows
+    The suite's twelve `.tmc` files are written by the **format's publisher**, and
+    beside them sits what **scikit-learn** answered for the same rows
     (`tests/fixtures/compact/`). The trap that catches: `sklearn.tree` casts its
-    input to float32 before traversing, so a threshold of 5.099999904632568 and
-    an input of 5.1 compare **equal** and go left. Comparing in float64 sends
-    that row right instead — one tree, one row, a different label.
+    input to float32 before traversing, so a threshold and an input one float64
+    step above it compare **equal** and go left. Comparing in float64 sends that
+    row right instead — and it is not rounding: every tree fixture carries a
+    **boundary row** sitting exactly on a threshold, and on it the forest answers
+    `versicolor` p=0.666667 in float32 (which is what sklearn answered) against
+    `virginica` p=0.833333 in float64, and the tree regressor 0.980769 against
+    0.541667.
 
 !!! warning "Modes A and B"
     The reader is Python. Mode C serves a fixed set of modules and refuses the

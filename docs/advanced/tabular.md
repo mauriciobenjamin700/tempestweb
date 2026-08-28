@@ -282,13 +282,42 @@ print(export.kind, export.size_bytes, export.verified)   # tree_ensemble 4764 Tr
 
 !!! warning "É uma troca, não um substituto"
     ONNX cobre **todo** estimador; isto cobre **modelo linear e ensemble de
-    árvore** — `LogisticRegression`, `Ridge`, `SGD*`, `LinearSVC`, `Perceptron`,
-    `DecisionTree*`, `RandomForest*`, `ExtraTrees*` —, mais um `Pipeline` com
-    `StandardScaler`/`MinMaxScaler` na frente (o escalador é **dobrado** no
-    header, nunca ignorado). Gradient boosting soma contribuições cruas através
-    de um estimador inicial: é outro leitor, e o exportador **recusa** em vez de
-    escrever algo que este leria errado. Para esses, o caminho é o
-    `TabularPredictor`.
+    árvore** — as duas famílias cuja aritmética cabe aqui. Gradient boosting soma
+    contribuições cruas através de um estimador inicial: é outro leitor, e o
+    exportador **recusa** em vez de escrever algo que este leria errado. Para
+    esses, o caminho é o `TabularPredictor`.
+
+    Cada estimador abaixo tem uma fixture na suíte, escrita pelo publicador do
+    formato e comparada com o que o **scikit-learn** respondeu para as mesmas
+    linhas. A lista é exatamente o que está medido — nem um nome a mais:
+
+    | Estimador | Fixture | Link |
+    | --- | --- | --- |
+    | `LogisticRegression` (binário) | `linear_binary_sigmoid` | `sigmoid` |
+    | `LogisticRegression` (multiclasse) | `linear_multiclass_softmax` | `softmax` |
+    | `LinearRegression` | `linear_regression_identity` | `identity` |
+    | `Ridge` | `ridge_regression_identity` | `identity` |
+    | `SGDClassifier` | `sgd_classifier_sigmoid` | `sigmoid` |
+    | `LinearSVC` | `linear_svc_sigmoid` | `sigmoid` |
+    | `Perceptron` | `perceptron_sigmoid` | `sigmoid` |
+    | `DecisionTreeRegressor` | `tree_regressor_identity` | `identity` |
+    | `RandomForestClassifier` | `forest_classifier_normalize` | `normalize` |
+    | `ExtraTreesClassifier` | `extratrees_classifier_normalize` | `normalize` |
+    | `Pipeline` + `StandardScaler` | `pipeline_scaler_linear` | `sigmoid` |
+    | `Pipeline` + `MinMaxScaler` | `pipeline_minmax_linear` | `sigmoid` |
+
+    O escalador é **dobrado** no header, nunca ignorado: o leitor faz
+    `(valor - offset) / escala`, e é nesse par que o exportador escreve
+    `mean_`/`scale_` do `StandardScaler` e `data_min_`/`data_range_` do
+    `MinMaxScaler` — o que é a transformação para o `feature_range` default.
+    Quem quiser outro `feature_range` está fora do medido, e o exportador recusa
+    escrever qualquer arquivo cujas predições discordem do estimador.
+
+    O irmão de cada estimador dessas famílias (`RidgeClassifier`, `SGDRegressor`,
+    `LinearSVR`, `DecisionTreeClassifier`, `RandomForestRegressor`,
+    `ExtraTreesRegressor`, `ExtraTree*`) usa a mesma aritmética e é aceito pelo
+    exportador; quem decide caso a caso é ele, comparando os bytes contra o
+    scikit-learn antes de escrever.
 
 ### Medido em Chrome real
 
@@ -307,13 +336,16 @@ Artefato Modo A, Pyodide, sem `onnxruntime-web` em lugar nenhum — um
 | Requests dos modelos, com 200 predições | **1 por modelo** |
 
 !!! check "A paridade é medida contra o sklearn, não contra nós mesmos"
-    Os `.tmc` da suíte são escritos pelo **publicador do formato** e ao lado deles
-    fica o que o **scikit-learn** respondeu para as mesmas linhas
+    Os doze `.tmc` da suíte são escritos pelo **publicador do formato** e ao lado
+    deles fica o que o **scikit-learn** respondeu para as mesmas linhas
     (`tests/fixtures/compact/`). A armadilha que isso pega: `sklearn.tree`
-    converte a entrada para float32 antes de percorrer, então um limiar
-    5.099999904632568 e uma entrada 5.1 comparam **iguais** e vão para a
-    esquerda. Comparar em float64 manda a linha para a direita — uma árvore, uma
-    linha, um rótulo diferente.
+    converte a entrada para float32 antes de percorrer, então um limiar e uma
+    entrada um passo de float64 acima dele comparam **iguais** e vão para a
+    esquerda. Comparar em float64 manda a linha para a direita — e não é
+    arredondamento: cada fixture de árvore carrega uma **linha de fronteira**
+    exatamente sobre um limiar, e nela o forest responde `versicolor` p=0,666667
+    em float32 (o que o sklearn respondeu) contra `virginica` p=0,833333 em
+    float64, e o regressor de árvore 0,980769 contra 0,541667.
 
 !!! warning "Modos A e B"
     O leitor é Python. Modo C serve um conjunto fechado de módulos e recusa o

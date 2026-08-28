@@ -11,8 +11,9 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.124.0**, ainda **não publicada**. Última publicada no
-    PyPI: **tempestweb 0.121.0**. As três que estão à frente do PyPI:
+    **Versão do repo: 0.124.0**, publicada no PyPI em 2026-08-27 pela tag
+    `v0.124.0` — o tag anterior era `v0.121.0`, então a release carregou três
+    bumps de uma vez:
     **0.122.0** — `CompactPredictor` lê `.tmc` em Python de stdlib, entregando
     inferência tabular sem os 13,96 MB do `onnxruntime-web`, e o artefato Modo A
     passa a levar os sete subpacotes que uma app importa pelo nome;

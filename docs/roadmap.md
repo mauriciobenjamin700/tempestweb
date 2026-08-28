@@ -2,8 +2,8 @@
 
 !!! info "Estado atual — atualizado em 2026-08-27"
     **Todos os trilhos** — 0/W/A/B/P/N/O/S/T/R e a pós-convergência (C/D/E) —
-    estão mesclados na `main` com gate verde: ruff + format ✓ (386 arquivos) ·
-    mypy `--strict` ✓ (156 arquivos, zero issue) · **pytest 2013 pass / 14 skip** ·
+    estão mesclados na `main` com gate verde: ruff + format ✓ (387 arquivos) ·
+    mypy `--strict` ✓ (156 arquivos, zero issue) · **pytest 2017 pass / 14 skip** ·
     **jsdom 894 pass / 0 fail** · `mkdocs build --strict` zero warning. Os números
     foram medidos nesta linha da `main` e se reproduzem com `make check` mais o
     `mkdocs build --strict` — não confie neles de memória, rode. O mesmo

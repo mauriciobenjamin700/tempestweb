@@ -4,6 +4,156 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.123.0] — 2026-08-27
+
+### Fixed
+
+- **`native.storage` prometia IndexedDB e gravava no `localStorage` (#118).** A
+  verificação em device da linha N3 pedia medir persistência num browser real,
+  já que o `indexedDB` do jsdom é um shim. Medido num artefato Modo A buildado,
+  e o defeito não era persistência — era **o backend**:
+
+  ```text
+  indexedDB.databases() → []
+  localStorage          → note (18 chars), bulk (142.890 chars, crus)
+  storage.configure(codec="deflate") → active=deflate supported=True
+  ```
+
+  `client/native/storage.js` prefere `deps.store` e cai para `localStorage`
+  quando não recebe um. Nada injetava esse store: o `browserDeps()` de
+  `client/native/index.js` não o listava, então **só o Modo C** — que monta o
+  seu em `client/transpile/native.js` — usava IndexedDB. Modos A e B ficavam com
+  o `localStorage`: teto de ~5 MB, escrita **síncrona** na main thread,
+  invisível para o service worker. E o codec `deflate` da #180, que configura o
+  store de IndexedDB, virava no-op enquanto `configure` respondia
+  `supported=True` — o pior tipo de resposta, a que parece certa.
+
+  Persistência sozinha não pega isso: o `localStorage` também sobrevive ao
+  reload. Foi preciso olhar **onde** o valor caiu.
+
+  `browserDeps()` passa a construir o store uma vez, preguiçosamente, e a
+  entregá-lo em todo dispatch. Medido depois da correção, mesmo app:
+  `indexedDB.databases()` → `["tempestweb@1"]`, `localStorage` **vazio**, `bulk`
+  de 142.890 caracteres em **10.276 bytes** deflated, `note` e `bulk` de volta
+  intactos após reload, `keys=[]` e object store vazio depois do `remove()` de
+  tudo, e quota reportada de **10.738.498.004 bytes** contra os ~5 MB do
+  `localStorage`.
+
+  Construir uma vez evita **realocar o objeto do store**, e é só isso: o
+  `idb-kv.js` abre e fecha o banco em cada operação — medidos 10
+  `indexedDB.open()` para 10 operações com o store construído uma vez. Segurar
+  conexão aberta bloquearia `versionchange`, então isso fica registrado como
+  candidata a issue em `NOTES-118-storage.md`, não implementado aqui.
+
+  `tests/client/native-storage-backend.test.js` fixa a fiação: que
+  `browserDeps()` carrega um store, que ele é construído uma vez, que uma
+  escrita pelos deps default aterrissa no IndexedDB, que o `deflate` chega ao
+  store onde as escritas vão (envelope `$twcodec` e bytes comprimidos) e que o
+  Modo C alcança o mesmo backend sem manter store próprio.
+
+- **Perfil com IndexedDB bloqueado perdia o storage inteiro (#118).** Regressão
+  aberta pela própria correção acima. `createIdbKv()` só consegue checar se
+  `globalThis.indexedDB` existe; se o banco **abre** é pergunta que só uma
+  operação responde. Num perfil onde ele existe e não abre — Chrome com
+  armazenamento bloqueado para a origem (`SecurityError`), Firefox privado
+  (`InvalidStateError`) — o store voltava truthy, `native/storage.js` o preferia,
+  e o fallback de `localStorage` nunca era alcançado:
+
+  ```text
+  antes: dispatch(storage.put) → {"ok":false,"error":"error","message":"SecurityError: …"}
+         localStorage          → intocado
+  agora: dispatch(storage.put) → {"ok":true,"value":{}}
+         localStorage          → note=hello
+  ```
+
+  Na 0.122.0 esse mesmo perfil gravava e lia normalmente, então era perda direta
+  da capacidade. Agora degrada de verdade: `StoreUnavailableError` — só ela, nunca
+  uma escrita que falhou — zera o store cacheado do `browserDeps()` e repete a
+  operação pelo adaptador de `localStorage`; a chamada seguinte nem tenta o open.
+  `tests/client/native-storage-blocked.test.js` é arquivo e processo próprios,
+  porque `browserDeps()` cacheia o store pela vida do módulo, como uma aba.
+
+- **`storage.configure` mentia no ramo de fallback (#118).** Sem store, ele
+  respondia `{"requested":"deflate","active":"deflate","supported":true}` e depois
+  gravava cru — medido, 44.000 caracteres de payload deixavam **44.000 caracteres
+  crus** no `localStorage`. Era a mesma falha silenciosa que o bullet acima narra
+  como morta, do outro lado do `if`, e o contrário do que as docstrings e o
+  [codec do store](docs/advanced/storage-codec.md) afirmavam. Agora `active` sai
+  do backend: sem store, `json`, e o codec não é armado. `supported` continua
+  respondendo sobre o **runtime**, para dar para distinguir "este browser não
+  deflaciona" de "este perfil não tem onde deflacionar".
+
+- **`quota_exceeded` documentado e inalcançável, e um abort que voltava como
+  sucesso (#118).** Dois defeitos do backend que passavam porque todo teste do
+  `storage` injetava um stand-in escrito à mão. Um `put` que falhava com
+  `QuotaExceededError` saía do store como throw cru, e o roteador codifica tudo
+  que não é `CapabilityError` como o opaco `"error"` — enquanto
+  `tempestweb/native/storage.py` e `docs/examples/file-storage.md` prometem
+  `NativeError("quota_exceeded")`. E `withStore` resolvia no `onsuccess` do
+  request, que dispara com a transação ainda **aberta**, então um commit que o
+  browser jogou fora voltava `ok: true`. Agora o store fecha em
+  `tx.oncomplete` / `tx.onabort`, com o erro do request ganhando de uma transação
+  completa, e mapeia `QuotaExceededError` → `quota_exceeded`.
+
+### Changed
+
+- **Modos A e B passam a ler e gravar no IndexedDB, e o que ficou no
+  `localStorage` não migra sozinho (#118).** O que a sua app escreveu por
+  `native.storage` até a **0.122.0** foi para o `localStorage`. Da **0.123.0** em
+  diante a leitura vai ao IndexedDB, então esse conteúdo fica **órfão**: não é
+  apagado, mas ninguém mais o lê, e a app volta a ver um store vazio.
+
+  App nova não faz nada. App já publicada migra **uma vez**, na página do
+  artefato, antes do boot — lendo o `localStorage` e reescrevendo por
+  `storage.put`:
+
+  ```html
+  <script type="module">
+    import { dispatch } from "./client/native/index.js";
+
+    const MARCA = "tw.storage.migrated.v1";
+    const LEGADO = ["notes", "draft", "cache"];  // as chaves da SUA app
+
+    if (!localStorage.getItem(MARCA)) {
+      let tudo_ok = true;
+      for (const name of LEGADO) {
+        const content = localStorage.getItem(name);
+        if (content === null) continue;
+        const escrita = await dispatch({
+          kind: "native_call",
+          call_id: `migrate-${name}`,
+          capability: "storage.put",
+          args: { name, content },
+        });
+        tudo_ok = tudo_ok && escrita.ok;
+      }
+      if (tudo_ok) localStorage.setItem(MARCA, "1");
+    }
+  </script>
+  ```
+
+  Liste as chaves **da sua app**: `Object.keys(localStorage)` varre também o que
+  não é seu. E **não apague o original** — num perfil onde o IndexedDB não abre a
+  capacidade continua gravando no próprio `localStorage`, o `put` reescreve a
+  mesma chave, e um `removeItem` depois apagaria o dado que você acabou de salvar.
+  A marca é o que evita reprocessar a cada boot.
+
+- **O `storage` não tem escopo por owner, e a documentação parou de prometer que
+  tem (#118).** Quatro docstrings e um typedef diziam "the owner-scoped store from
+  `client/offline/store.js` (T9/P2)"; nenhum caminho injeta aquele store. O que
+  `browserDeps()` injeta é o `createIdbKv()`: banco `tempestweb`, object store
+  `kv`, **chave igual ao nome cru**. Logo dois owners na mesma origem (Modo B,
+  dois logins no mesmo device) compartilham um keyspace, `storage.list_keys()`
+  devolve as chaves de todos e o `remove()` de um alcança o dado do outro —
+  prefixe a chave se isso importar. Escopo por owner fica aberto na #118, com a
+  consequência descrita em `NOTES-118-storage.md`.
+
+- **O Modo C perdeu o segundo store de IndexedDB.** `client/transpile/native.js`
+  mantinha `_store`/`idbStore()` e duas atribuições `deps.store = store` que
+  viraram código morto quando o `browserDeps()` passou a injetar o store: um
+  segundo cache de módulo e um segundo objeto para o mesmo banco. Apagados — os
+  três modos compartilham um backend e uma correção.
+
 ## [0.122.0] — 2026-08-27
 
 ### Added

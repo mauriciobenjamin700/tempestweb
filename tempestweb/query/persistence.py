@@ -2,8 +2,8 @@
 
 An offline-first screen that shows the last known answer while the network wakes
 up needs the cache to survive a reload. tempestweb already ships that storage —
-``native.storage``, over the owner-scoped IndexedDB store in
-``client/offline/store.js`` — so nothing is reimplemented here. This module is
+``native.storage``, over the IndexedDB key/value store in
+``client/native/idb-kv.js`` — so nothing is reimplemented here. This module is
 only the bridge: which keys to write under, and how a tuple key and a JSON value
 become a string and back.
 

@@ -259,7 +259,7 @@ test("storage.list: empty store returns an empty array", async () => {
   assert.deepEqual(res.value.keys, []);
 });
 
-test("storage: prefers an injected owner-scoped IndexedDB store", async () => {
+test("storage: prefers an injected IndexedDB store", async () => {
   const map = new Map();
   const store = {
     get: async (n) => (map.has(n) ? map.get(n) : null),

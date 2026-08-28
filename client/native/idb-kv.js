@@ -3,14 +3,16 @@
 // The `storage` capability (client/native/storage.js) uses an injected
 // `deps.store` with the async interface { get, put, remove, keys }, falling back
 // to localStorage when none is injected. This provides that interface backed by
-// IndexedDB — the proper client store (larger quota, async) — so Mode C (and any
-// caller that injects it) persists over IndexedDB rather than the ~5 MB
-// synchronous localStorage.
+// IndexedDB — the proper client store (larger quota, async) — so every mode
+// persists over IndexedDB rather than the ~5 MB synchronous localStorage.
 //
 // A single object store holds string values keyed by name. All operations return
 // promises. `createIdbKv` returns null when IndexedDB is unavailable, so the
-// caller can fall back to localStorage cleanly.
+// caller can fall back to localStorage cleanly; when IndexedDB exists but the
+// database will not open, operations reject with StoreUnavailableError and the
+// caller degrades the same way.
 
+import { CapabilityError } from "./index.js";
 import { CODEC_JSON, decodeValue, encodeValue, resolveCodec } from "../offline/codec.js";
 
 const DB_NAME = "tempestweb";
@@ -23,6 +25,26 @@ const STORE = "kv";
  * @type {string}
  */
 let _codec = CODEC_JSON;
+
+/**
+ * Raised when IndexedDB exists but its database will not open.
+ *
+ * Having `globalThis.indexedDB` is not having a store. Chrome answers
+ * `SecurityError` on an origin whose storage the user blocked; a Firefox private
+ * window answers `InvalidStateError`. Both leave the factory in place and every
+ * open failing, so callers must treat this as "no backend" rather than as a
+ * failed write: `client/native/storage.js` replays the operation on localStorage.
+ */
+export class StoreUnavailableError extends Error {
+  /**
+   * @param {string} [message]  Detail from the underlying failure.
+   */
+  constructor(message) {
+    super(message || "IndexedDB will not open");
+    this.name = "StoreUnavailableError";
+    this.code = "unavailable";
+  }
+}
 
 /**
  * Choose the codec new writes use.
@@ -47,6 +69,40 @@ export function getKvCodec() {
 }
 
 /**
+ * Describe a DOMException or Error in one line, for an error message.
+ *
+ * @param {*} err  Anything thrown, including null.
+ * @returns {string} `"Name: message"`, whichever half exists, or `""`.
+ */
+function describe(err) {
+  if (!err) return "";
+  const name = err.name ? String(err.name) : "";
+  const message = err.message ? String(err.message) : "";
+  if (name && message) return `${name}: ${message}`;
+  return name || message;
+}
+
+/**
+ * Translate an IndexedDB failure into the capability's error vocabulary.
+ *
+ * `QuotaExceededError` is the one the public API documents — `storage.put` in
+ * `tempestweb/native/storage.py` raises `NativeError("quota_exceeded")` — so it
+ * must not reach the router as a plain throw: the router codes anything that is
+ * not a `CapabilityError` as the opaque `"error"`. Everything else, including
+ * {@link StoreUnavailableError}, passes through so the caller can still tell an
+ * absent backend from a failed write.
+ *
+ * @param {*} err  The rejection from a transaction.
+ * @returns {*} A `CapabilityError` for a mapped failure, or `err` unchanged.
+ */
+function asCapabilityError(err) {
+  if (err && err.name === "QuotaExceededError") {
+    return new CapabilityError("quota_exceeded", describe(err));
+  }
+  return err;
+}
+
+/**
  * Wrap an IndexedDB request in a promise.
  * @param {IDBRequest} request
  * @returns {Promise<*>}
@@ -60,12 +116,22 @@ function promisify(request) {
 
 /**
  * Open (creating if needed) the tempestweb key/value database.
+ *
  * @param {IDBFactory} idb  The IndexedDB factory (`globalThis.indexedDB`).
- * @returns {Promise<IDBDatabase>}
+ * @returns {Promise<IDBDatabase>} The open database.
+ * @throws {StoreUnavailableError} When the factory throws synchronously or the
+ *         open request errors — this backend is not usable in this profile.
  */
 function openDb(idb) {
   return new Promise((resolve, reject) => {
-    const open = idb.open(DB_NAME, 1);
+    /** @type {IDBOpenDBRequest} */
+    let open;
+    try {
+      open = idb.open(DB_NAME, 1);
+    } catch (err) {
+      reject(new StoreUnavailableError(describe(err)));
+      return;
+    }
     open.onupgradeneeded = () => {
       const db = open.result;
       if (!db.objectStoreNames.contains(STORE)) {
@@ -73,7 +139,43 @@ function openDb(idb) {
       }
     };
     open.onsuccess = () => resolve(open.result);
-    open.onerror = () => reject(open.error);
+    open.onerror = () => reject(new StoreUnavailableError(describe(open.error)));
+  });
+}
+
+/**
+ * Run one transaction and settle on the transaction, not on the request.
+ *
+ * A request's `onsuccess` fires while the transaction is still open, so
+ * resolving there reports success for a write the browser may yet throw away —
+ * quota reached at commit time, an `abort()`, a commit that fails. Settling on
+ * `oncomplete` / `onabort` is the only report that matches what is on disk. A
+ * request that errored still wins over a completed transaction, so a handled
+ * error is never silently a success.
+ *
+ * @param {IDBDatabase} db  An open database.
+ * @param {IDBTransactionMode} mode  `"readonly"` or `"readwrite"`.
+ * @param {(store: IDBObjectStore) => Promise<*>} run  Issues the requests.
+ * @returns {Promise<*>} What `run` resolved to, once the transaction committed.
+ */
+function runTx(db, mode, run) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, mode);
+    /** @type {*} */
+    let result;
+    /** @type {*} */
+    let failure = null;
+    tx.oncomplete = () => (failure ? reject(failure) : resolve(result));
+    tx.onabort = () =>
+      reject(failure || new Error(describe(tx.error) || "the transaction aborted"));
+    Promise.resolve(run(tx.objectStore(STORE))).then(
+      (value) => {
+        result = value;
+      },
+      (err) => {
+        failure = err || new Error("the transaction failed");
+      },
+    );
   });
 }
 
@@ -98,9 +200,9 @@ export function createIdbKv(idb = /** @type {any} */ (globalThis).indexedDB) {
   const withStore = async (mode, run) => {
     const db = await openDb(idb);
     try {
-      const tx = db.transaction(STORE, mode);
-      const result = await run(tx.objectStore(STORE));
-      return result;
+      return await runTx(db, mode, run);
+    } catch (err) {
+      throw asCapabilityError(err);
     } finally {
       db.close();
     }
@@ -111,10 +213,17 @@ export function createIdbKv(idb = /** @type {any} */ (globalThis).indexedDB) {
       const value = await withStore("readonly", (store) => promisify(store.get(name)));
       return decodeValue(value);
     },
-    /** @param {string} name @param {string} content @returns {Promise<void>} */
+    /**
+     * Write a value, encoding it before the transaction opens.
+     *
+     * The order matters: awaiting a non-IndexedDB promise (the codec's) inside
+     * an open transaction lets the browser auto-commit it, and the write is lost.
+     *
+     * @param {string} name
+     * @param {string} content
+     * @returns {Promise<void>}
+     */
     async put(name, content) {
-      // Encoding happens BEFORE the transaction opens: awaiting a non-IDB
-      // promise inside one lets it auto-commit, and the write is lost.
       const stored = await encodeValue(content, _codec);
       await withStore("readwrite", (store) => promisify(store.put(stored, name)));
     },

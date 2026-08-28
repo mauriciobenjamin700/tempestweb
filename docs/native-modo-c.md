@@ -84,10 +84,13 @@ concordarem — mas a implementação é sempre por plataforma. Recomendação: 
   `await native.http.request(...)`.
 - **N-C2 — storage/clipboard/geo. ✅** Fachada estendida às capacidades já com
   handler JS, desembrulhando os campos de resultado (`.content`/`.keys`/`.text`)
-  como o lado Python. **storage é IndexedDB de verdade:** a fachada injeta um KV
-  IndexedDB (`client/native/idb-kv.js`) como `deps.store`, com fallback a
-  localStorage quando o IDB não existe. Verificado no Playwright: o valor persiste
-  no object store `tempestweb/kv` (não no localStorage) e o round-trip funciona.
+  como o lado Python. **storage é IndexedDB de verdade:** a fachada despacha com o
+  `browserDeps()` de `client/native/index.js`, que é quem constrói o KV IndexedDB
+  (`client/native/idb-kv.js`) e o entrega como `deps.store` — Mode C não mantém
+  store próprio, então os três modos compartilham um backend e uma correção. Sem
+  IndexedDB (ou com um que não abre) o `native/storage.js` cai para localStorage.
+  Verificado no Playwright: o valor persiste no object store `tempestweb/kv` (não
+  no localStorage) e o round-trip funciona.
 - **N-C3 — cookies. ✅** Capacidade nova ponta-a-ponta: `tempestweb/native/
   cookies.py` (awaitable Python) + `client/native/cookies.js` (handler
   `document.cookie`, registrado no `HANDLERS`) + fachada Modo C. Verificado nos

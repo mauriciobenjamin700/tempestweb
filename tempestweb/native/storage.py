@@ -1,10 +1,18 @@
-"""Native storage capability layered over the browser's IndexedDB (N3 + P2).
+"""Native storage capability layered over the browser's IndexedDB (N3).
 
 The web sibling of :mod:`tempestroid.native.storage`. On the web a "file name" maps
-to an owner-scoped IndexedDB key and its content to the stored string value;
-``client/native/storage.js`` drives the owner-scoped store from
-``client/offline/store.js`` (T9 / P2), falling back to ``localStorage`` where
-IndexedDB is unavailable. The same envelope reaches the browser in both modes.
+to an IndexedDB key and its content to the stored string value;
+``client/native/storage.js`` drives the key/value store built by
+``client/native/idb-kv.js`` (database ``tempestweb``, object store ``kv``),
+falling back to ``localStorage`` where IndexedDB is absent or refuses to open.
+The same envelope reaches the browser in all three modes.
+
+The keyspace is per **origin**, not per owner. Two owners on the same origin —
+Mode B with two logins on one device, for instance — share it: a key one writes
+the other reads, and :func:`list_keys` returns every owner's keys. Prefix keys
+with something that identifies the owner where that matters. Owner scoping stays
+open on issue #118, because deriving the prefix needs an owner identity Mode A
+does not define.
 
 Two surfaces are exposed over the one backend:
 
@@ -111,7 +119,7 @@ async def put(name: str, content: str) -> None:
     """Write a string value under a storage key, creating or overwriting it.
 
     Args:
-        name: The storage key (owner-scoped IndexedDB key).
+        name: The storage key (an IndexedDB key, scoped to the origin).
         content: The string value to store.
 
     Raises:
@@ -126,7 +134,7 @@ async def get(name: str) -> str:
     """Read the string value stored under a key.
 
     Args:
-        name: The storage key (owner-scoped IndexedDB key).
+        name: The storage key (an IndexedDB key, scoped to the origin).
 
     Returns:
         The stored string value.
@@ -143,7 +151,7 @@ async def remove(name: str) -> None:
     """Delete the value stored under a key.
 
     Args:
-        name: The storage key (owner-scoped IndexedDB key).
+        name: The storage key (an IndexedDB key, scoped to the origin).
 
     Raises:
         NativeError: If the key does not exist (``not_found``).
@@ -154,6 +162,9 @@ async def remove(name: str) -> None:
 
 async def list_keys() -> list[str]:
     """List the keys currently present in storage.
+
+    The keys are the origin's, not one owner's: on a device where two owners used
+    the app, both sets come back.
 
     Returns:
         The storage keys, or ``[]`` when storage is empty.

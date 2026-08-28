@@ -19,22 +19,10 @@ import {
   subscribeDispatch,
   unsubscribeDispatch,
 } from "../native/index.js";
-import { createIdbKv } from "../native/idb-kv.js";
 
 // Monotonic local subscription counter (Mode C mints its own sub_id — no Python
 // side to do it). Deterministic on purpose: no Date/Math.random.
 let _subCounter = 0;
-
-// The `storage` capability persists over IndexedDB when available (injected as
-// `deps.store`), falling back to localStorage otherwise. Built once, lazily.
-let _store;
-/** @returns {?import("../native/idb-kv.js").KeyValueStore} */
-function idbStore() {
-  if (_store === undefined) {
-    _store = createIdbKv();
-  }
-  return _store;
-}
 
 /**
  * An error thrown when a native capability fails (mirrors Python's NativeError).
@@ -54,8 +42,9 @@ export class NativeError extends Error {
 /**
  * Dispatch a capability in-process and unwrap its result.
  *
- * The IndexedDB KV store is injected so `storage.*` persists over IndexedDB (the
- * other capabilities ignore it); it falls back to localStorage when IDB is absent.
+ * `browserDeps()` is the same dependency set Modes A and B dispatch with, down to
+ * the IndexedDB store `storage.*` persists into — Mode C keeps no store of its
+ * own, so a fix to that seam lands here for free.
  *
  * @param {string} capability  The dotted capability name (e.g. "http.request").
  * @param {Object} args        The JSON-able capability arguments.
@@ -63,12 +52,7 @@ export class NativeError extends Error {
  * @throws {NativeError}        When the capability reports `ok: false`.
  */
 async function call(capability, args) {
-  const deps = browserDeps();
-  const store = idbStore();
-  if (store !== null) {
-    deps.store = store;
-  }
-  const result = await dispatch({ capability, args }, deps);
+  const result = await dispatch({ capability, args }, browserDeps());
   if (!result.ok) {
     throw new NativeError(result.error, result.message);
   }
@@ -79,9 +63,9 @@ async function call(capability, args) {
  * Subscribe to a streaming capability in-process and forward its events (T-EV).
  *
  * The Mode C mirror of `await native.geolocation.watch(...)`. Mints a local
- * `sub_id`, injects the same IndexedDB store `call()` does, and unwraps each
- * `{ event: <value> }` payload into `onEvent(<value>)`. `{error}` / `{done}`
- * frames are ignored here (the facade surfaces only positive updates).
+ * `sub_id`, dispatches with the same `browserDeps()` {@link call} uses, and
+ * unwraps each `{ event: <value> }` payload into `onEvent(<value>)`. `{error}` /
+ * `{done}` frames are ignored here (the facade surfaces only positive updates).
  *
  * @param {string} capability  The dotted streaming capability (e.g. "geolocation.watch").
  * @param {Object} args        The JSON-able capability arguments.
@@ -89,18 +73,13 @@ async function call(capability, args) {
  * @returns {() => void}        Unsubscribe: stops delivery.
  */
 function stream(capability, args, onEvent) {
-  const deps = browserDeps();
-  const store = idbStore();
-  if (store !== null) {
-    deps.store = store;
-  }
   const sub_id = "s" + _subCounter++;
   subscribeDispatch(
     { sub_id, capability, args },
     (payload) => {
       if (payload.event !== undefined) onEvent(payload.event);
     },
-    deps,
+    browserDeps(),
   );
   return () => unsubscribeDispatch(sub_id);
 }

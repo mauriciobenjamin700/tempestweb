@@ -56,6 +56,7 @@ import { cookiesAll, cookiesGet, cookiesRemove, cookiesSet } from "./cookies.js"
 import { cameraCapture } from "./camera.js";
 import { onnxLoad, onnxRun } from "./onnx.js";
 import { compactLoad } from "./compact.js";
+import { createIdbKv } from "./idb-kv.js";
 import { fileSave, filePick } from "./file.js";
 import { installState, installPrompt } from "./install.js";
 import {
@@ -139,7 +140,10 @@ import { webaudioLevels, webaudioSequence, webaudioStop, webaudioTone } from "./
  * @property {Function} [MediaRecorder]  MediaRecorder constructor.
  * @property {Function} [BroadcastChannel]  BroadcastChannel constructor.
  * @property {Function} [AudioContext]  AudioContext constructor (Web Audio tone).
- * @property {Object} [store]   Owner-scoped IndexedDB store (T9/P2), optional.
+ * @property {Object} [store]   IndexedDB key/value store (client/native/idb-kv.js),
+ *           optional. Origin-scoped, not owner-scoped.
+ * @property {Function} [forgetStore]  Drops the cached `store` after IndexedDB
+ *           refused to open, so the capability degrades to localStorage.
  */
 
 /**
@@ -295,12 +299,56 @@ export const EVENT_HANDLERS = {
 const _subscriptions = new Map();
 
 /**
+ * The IndexedDB-backed key/value store the `storage` capability persists into,
+ * or null where this runtime has no store — no `indexedDB` at all (jsdom, a
+ * worker without it) or one that refuses to open. Either way
+ * `native/storage.js` falls back to localStorage on its own.
+ *
+ * `undefined` means "not decided yet". Built once because `browserDeps()` runs
+ * on **every** dispatch and there is no reason to reallocate the store object
+ * per call; it buys no fewer database opens — `idb-kv.js` opens and closes the
+ * database per operation, measured at 10 opens for 10 operations.
+ *
+ * @type {?import("./idb-kv.js").KeyValueStore|undefined}
+ */
+let _kvStore;
+
+/**
+ * Resolve the shared IndexedDB key/value store, creating it on first use.
+ *
+ * @returns {?import("./idb-kv.js").KeyValueStore} The store, or null when the
+ *          runtime has no IndexedDB.
+ */
+function kvStore() {
+  if (_kvStore === undefined) _kvStore = createIdbKv();
+  return _kvStore;
+}
+
+/**
+ * Forget the cached store, so later dispatches carry none.
+ *
+ * `createIdbKv()` can only see whether `indexedDB` exists; whether it *opens* is
+ * a question only an operation answers. `native/storage.js` calls this the first
+ * time an open fails — a Chrome origin whose storage the user blocked answers
+ * `SecurityError`, a Firefox private window `InvalidStateError` — and replays
+ * the operation on localStorage. Without it that profile would keep being handed
+ * a store that cannot work, and the fallback would never be reached.
+ *
+ * @returns {void}
+ */
+function forgetKvStore() {
+  _kvStore = null;
+}
+
+/**
  * Resolve the live browser globals as the default dependency set.
  * @returns {NativeDeps}
  */
 export function browserDeps() {
   const g = /** @type {any} */ (globalThis);
   return {
+    store: kvStore() || undefined,
+    forgetStore: forgetKvStore,
     fetch: g.fetch ? g.fetch.bind(g) : undefined,
     navigator: g.navigator,
     Notification: g.Notification,

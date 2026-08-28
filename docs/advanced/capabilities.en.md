@@ -93,6 +93,47 @@ how the call reaches the Web API, not your code.
     **streaming** capabilities (consumed with `async for`) have their own tutorial:
     the [Native event channel](native-events.md). 🚀
 
+!!! warning "Migration: whatever ≤0.122.0 wrote is still in `localStorage`"
+    Up to **0.122.0**, `native.storage` in Modes A and B fell through to
+    `localStorage` — that was the defect 0.123.0 fixed. From **0.123.0** on, reads
+    go to IndexedDB, so that old content is **orphaned**: it is not deleted, but
+    nobody reads it any more, and your app sees an empty store again.
+
+    A new app does nothing. An app already in the field migrates **once**, on the
+    artifact's page, before boot — reading `localStorage` and rewriting through
+    `storage.put`:
+
+    ```html
+    <script type="module">
+      import { dispatch } from "./client/native/index.js";
+
+      const MARK = "tw.storage.migrated.v1";
+      const LEGACY = ["notes", "draft", "cache"];  // YOUR app's keys
+
+      if (!localStorage.getItem(MARK)) {
+        let allOk = true;
+        for (const name of LEGACY) {
+          const content = localStorage.getItem(name);
+          if (content === null) continue;
+          const written = await dispatch({
+            kind: "native_call",
+            call_id: `migrate-${name}`,
+            capability: "storage.put",
+            args: { name, content },
+          });
+          allOk = allOk && written.ok;
+        }
+        if (allOk) localStorage.setItem(MARK, "1");
+      }
+    </script>
+    ```
+
+    List **your app's** keys: `Object.keys(localStorage)` sweeps up what is not
+    yours too. And **do not delete the original** — in a profile where IndexedDB
+    will not open, the capability keeps writing into `localStorage` itself, `put`
+    rewrites the same key, and a `removeItem` afterwards would delete the value
+    you just saved. The mark is what keeps this from running on every boot.
+
 ## Example: typed HTTP with retry
 
 `native.http` (N0) is the foundation of offline replay. A request with retry and

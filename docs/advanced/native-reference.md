@@ -243,8 +243,8 @@ async def choose_quality() -> int:
     conhecido e deixe o desconhecido cair no seu default.
 
 !!! info "Só hardware mora aqui"
-    Tipo de conexão é [`network`](#network--condições-de-conexão) e uso de
-    armazenamento é [`quota`](#quota--uso-e-persistência-de-armazenamento). Repetir
+    Tipo de conexão é [`network`](#network-condicoes-de-conexao) e uso de
+    armazenamento é [`quota`](#quota-uso-e-persistencia-de-armazenamento). Repetir
     os dois aqui daria dois nomes ao mesmo fato no contrato, e os dois nomes
     driftariam.
 

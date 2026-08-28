@@ -242,8 +242,8 @@ async def choose_quality() -> int:
     the unknown fall through to your default.
 
 !!! info "Only hardware lives here"
-    Connection type is [`network`](#network--connection-conditions) and storage
-    usage is [`quota`](#quota--storage-usage-and-persistence). Repeating either
+    Connection type is [`network`](#network-connection-conditions) and storage
+    usage is [`quota`](#quota-storage-usage-and-persistence). Repeating either
     here would give one fact two names in the contract, and the two names would
     drift.
 

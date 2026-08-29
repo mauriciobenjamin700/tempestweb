@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from tempestweb.native import install_bridge, storage, uninstall_bridge
+from tempestweb.native.dispatch import NativeError
 from tempestweb.native.storage import CODEC_DEFLATE, CODEC_JSON
 
 
@@ -113,3 +114,64 @@ def test_the_capability_is_in_the_contract_and_reaches_mode_c() -> None:
 
     assert "storage.configure" in names
     assert "storage.configure" in mode_c
+
+
+class FailingBridge:
+    """A fake bridge answering every call with one scripted failure envelope.
+
+    Separate from :class:`ScriptedBridge` because that one always reports
+    ``ok: True``: the point here is the ``ok: False`` branch, which is where the
+    client's error code becomes a Python exception.
+    """
+
+    def __init__(self, error: str, message: str = "") -> None:
+        """Initialize the bridge.
+
+        Args:
+            error: The machine-readable code the client would report.
+            message: The human-readable detail alongside it.
+        """
+        self.error: str = error
+        self.message: str = message
+
+    async def call(self, envelope: dict[str, Any]) -> dict[str, Any]:
+        """Answer one call with the scripted failure.
+
+        Args:
+            envelope: The ``native_call`` envelope; ignored.
+
+        Returns:
+            A failing ``native_result`` envelope.
+        """
+        return {"ok": False, "error": self.error, "message": self.message}
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        lambda: storage.put("notes", "hi"),
+        lambda: storage.get("notes"),
+        lambda: storage.remove("notes"),
+        lambda: storage.list_keys(),
+    ],
+    ids=["put", "get", "remove", "list_keys"],
+)
+async def test_a_blocked_store_reaches_python_as_its_own_code(operation: Any) -> None:
+    """``blocked`` survives the trip, so an app can tell it from a real failure.
+
+    The client raises this when another tab is mid-upgrade and the open never
+    settles. It must arrive as its own code rather than the opaque ``"error"``:
+    the app's answer is "another tab is updating this app, try again", which is
+    nothing like the answer to a quota failure or to a missing key.
+
+    It must also not arrive as ``unavailable``. That code means "this profile has
+    no IndexedDB" and makes the client degrade to ``localStorage`` permanently,
+    which would split the app's data across two backends over what is a
+    transient condition.
+    """
+    install_bridge(FailingBridge("blocked", "another tab is mid-upgrade"))
+
+    with pytest.raises(NativeError) as caught:
+        await operation()
+
+    assert caught.value.code == "blocked"

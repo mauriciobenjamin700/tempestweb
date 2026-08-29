@@ -124,7 +124,8 @@ async def put(name: str, content: str) -> None:
 
     Raises:
         NativeError: If the write fails, e.g. the quota is exceeded
-            (``quota_exceeded``).
+            (``quota_exceeded``), or another tab held an older database version
+            open long enough to time the operation out (``blocked``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
     await send_native_call("storage.put", {"name": name, "content": content})
@@ -140,7 +141,9 @@ async def get(name: str) -> str:
         The stored string value.
 
     Raises:
-        NativeError: If the key does not exist (``not_found``).
+        NativeError: If the key does not exist (``not_found``), or another tab
+            held an older database version open long enough to time the operation
+            out (``blocked``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
     value = await send_native_call("storage.get", {"name": name})
@@ -154,7 +157,9 @@ async def remove(name: str) -> None:
         name: The storage key (an IndexedDB key, scoped to the origin).
 
     Raises:
-        NativeError: If the key does not exist (``not_found``).
+        NativeError: If the key does not exist (``not_found``), or another tab
+            held an older database version open long enough to time the operation
+            out (``blocked``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
     await send_native_call("storage.remove", {"name": name})
@@ -170,6 +175,8 @@ async def list_keys() -> list[str]:
         The storage keys, or ``[]`` when storage is empty.
 
     Raises:
+        NativeError: If another tab held an older database version open long
+            enough to time the operation out (``blocked``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
     value = await send_native_call("storage.list", {})

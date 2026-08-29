@@ -26,7 +26,11 @@ import {
 import { vibrationVibrate } from "./vibration.js";
 import { badgeClear, badgeSet } from "./badge.js";
 import { wakelockRelease, wakelockRequest } from "./wakelock.js";
-import { fullscreenEnter, fullscreenExit, fullscreenState } from "./fullscreen.js";
+import {
+  fullscreenEnter,
+  fullscreenExit,
+  fullscreenState,
+} from "./fullscreen.js";
 import { visibilityState, visibilityWatch } from "./visibility.js";
 import {
   orientationLock,
@@ -52,7 +56,12 @@ import {
   storagePut,
   storageRemove,
 } from "./storage.js";
-import { cookiesAll, cookiesGet, cookiesRemove, cookiesSet } from "./cookies.js";
+import {
+  cookiesAll,
+  cookiesGet,
+  cookiesRemove,
+  cookiesSet,
+} from "./cookies.js";
 import { cameraCapture } from "./camera.js";
 import { onnxLoad, onnxRun } from "./onnx.js";
 import { compactLoad } from "./compact.js";
@@ -75,7 +84,12 @@ import {
   notificationsSubscribe,
   notificationsUnsubscribe,
 } from "./notifications.js";
-import { speechCancel, speechListen, speechSpeak, speechVoices } from "./speech.js";
+import {
+  speechCancel,
+  speechListen,
+  speechSpeak,
+  speechVoices,
+} from "./speech.js";
 import { recorderStart, recorderStop } from "./recorder.js";
 import {
   filesystemOpenFile,
@@ -95,14 +109,24 @@ import { contactsIsSupported, contactsSelect } from "./contacts.js";
 import { eyedropperOpen } from "./eyedropper.js";
 import { gamepadState, gamepadWatch } from "./gamepad.js";
 import { hidIsSupported, hidRequest } from "./hid.js";
-import { midiIsSupported, midiMessages, midiRequestAccess, midiSend } from "./midi.js";
+import {
+  midiIsSupported,
+  midiMessages,
+  midiRequestAccess,
+  midiSend,
+} from "./midi.js";
 import { nfcIsSupported, nfcScan, nfcWrite } from "./nfc.js";
 import { paymentIsSupported, paymentRequest } from "./payment.js";
 import { pipExit, pipRequest } from "./pip.js";
 import { pointerlockExit, pointerlockRequest } from "./pointerlock.js";
 import { serialIsSupported, serialRequest } from "./serial.js";
 import { usbIsSupported, usbRequest } from "./usb.js";
-import { webaudioLevels, webaudioSequence, webaudioStop, webaudioTone } from "./webaudio.js";
+import {
+  webaudioLevels,
+  webaudioSequence,
+  webaudioStop,
+  webaudioTone,
+} from "./webaudio.js";
 
 /**
  * @typedef {Object} NativeCall
@@ -387,6 +411,35 @@ export class CapabilityError extends Error {
 }
 
 /**
+ * Raised when the open sat blocked by another tab for too long.
+ *
+ * Deliberately **not** a {@link StoreUnavailableError}. That class means "this
+ * profile has no IndexedDB", and `client/native/storage.js` answers it by
+ * dropping the store and replaying on `localStorage` — permanently, for the rest
+ * of the page's life. Being blocked means the opposite: the database is there,
+ * it is healthy, and another tab is mid-upgrade. Degrading would write this value
+ * into a different backend from the ones around it and split the app's data in
+ * two, which is the failure that class of degrade exists to avoid.
+ *
+ * It extends `CapabilityError` so the code survives the trip: the router passes
+ * a `CapabilityError` through as-is and codes anything else as the opaque
+ * `"error"`, so Python sees `NativeError("blocked")` and can say "another tab is
+ * updating this app" instead of "something went wrong".
+ */
+export class StoreBlockedError extends CapabilityError {
+  /**
+   * @param {string} [message]  Detail about the wait.
+   */
+  constructor(message) {
+    super(
+      "blocked",
+      message || "another tab is holding an older database version",
+    );
+    this.name = "StoreBlockedError";
+  }
+}
+
+/**
  * Run one `native_call` and produce its `native_result`.
  *
  * Never throws: any handler failure (unknown capability, thrown error, rejected
@@ -449,7 +502,12 @@ export function subscribeDispatch(envelope, emit, deps = defaultDeps()) {
     const unsubscribe = handler(envelope.args || {}, emit, deps);
     _subscriptions.set(envelope.sub_id, unsubscribe);
   } catch (err) {
-    const code = err instanceof CapabilityError ? err.code : err && err.code ? err.code : "error";
+    const code =
+      err instanceof CapabilityError
+        ? err.code
+        : err && err.code
+          ? err.code
+          : "error";
     const message = err && err.message ? String(err.message) : "";
     emit({ error: code, message });
   }
@@ -469,8 +527,7 @@ export function unsubscribeDispatch(subId) {
   if (!unsubscribe) return;
   try {
     unsubscribe();
-  } catch {
-  }
+  } catch {}
   _subscriptions.delete(subId);
 }
 
@@ -497,5 +554,6 @@ export function installNativeBridge(target = globalThis, deps = undefined) {
       (payload) => emitStr(JSON.stringify(payload)),
       deps,
     );
-  target.__tempestweb_native_unsubscribe__ = (subId) => unsubscribeDispatch(subId);
+  target.__tempestweb_native_unsubscribe__ = (subId) =>
+    unsubscribeDispatch(subId);
 }

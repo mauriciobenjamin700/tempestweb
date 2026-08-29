@@ -32,7 +32,15 @@
     O sintoma deixa de ter caminho: o lote não é construível, não é serializável,
     e um frame ruim é reparado sem a baseline ter andado.
 
-    A última publicada no PyPI é a **0.126.0**, em 2026-08-29 pela tag
+    A última publicada no PyPI é a **0.127.0**, em 2026-08-29 pela tag
+    `v0.127.0`, que fechou a #195 inteira: o keyspace do `storage` passou a ser
+    por dono, uma chamada durante o upgrade de outra aba deixou de pendurar
+    (código `blocked`), e o banco passou a ser aberto **uma vez** em vez de uma
+    vez por operação — medido em Chrome real, 10 operações caíram de 10 opens
+    para 1, e 50 escritas de 24 ms para 12 ms. Com ela as três pendências que a
+    verificação em device da #118 tinha registrado estão fechadas.
+
+    A anterior, **0.126.0**, saiu no mesmo dia pela tag
     `v0.126.0` — o tag anterior era `v0.124.0`, então a release carregou dois
     bumps de uma vez: **0.125.0** — a metade da #160 que mora neste repo, com o
     encoder recusando payload não-finito pelo `encode_wire` e a decodificação

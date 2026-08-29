@@ -4,6 +4,66 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.126.0] — 2026-08-29
+
+### Changed
+
+- **Piso `tempest-core>=0.18.0`, e com ele a #160 fecha inteira.** A 0.125.0
+  corrigiu a metade que mora neste repo — o encoder recusa payload não-finito, o
+  decoder reporta a perda e pede resync — mas registrou duas lacunas que eram do
+  core e seguiam abertas. Elas saíram na `tempest-core` 0.18.0:
+
+  - **Nenhum modelo do core aceita mais `nan`/`inf`.** A varredura mostrou que a
+    lacuna era muito maior do que a issue supunha: **68 modelos** com campo
+    float, **nenhum** guardado — `Slider.value`, `ProgressBar.value`,
+    `Shadow.blur`, `DetectionBox`, os comandos de `Canvas` e os `Event` de gesto
+    perdiam um lote exatamente como `Style.width`. E **limite não substitui
+    finitude**: `Style.opacity` só recusava `inf` por ser limitado dos dois lados
+    (`inf <= 1.0` é falso); `text_scale` e `aspect_ratio` têm `gt=0.0` e
+    aceitavam `inf`, já que `inf > 0.0` é verdadeiro. O core passou a ter uma
+    base compartilhada com `allow_inf_nan=False` — **222 de 222 modelos
+    guardados** — porque foi a ausência dela que deixou os 68 driftarem.
+
+  - **A baseline só avança depois da entrega.** Estava errado em **dois**
+    lugares, não um: `App._rebuild` e `App.swap_view` faziam `self._current = new`
+    antes de `self._apply(patches)`. Os dois passam pelo novo `App._commit`.
+    Entrega que falha agora é auto-reparável — a baseline continua descrevendo o
+    que o cliente tem, e o rebuild seguinte regenera o trabalho perdido,
+    **inclusive um `insert`**, que é justamente o que um diff posterior não
+    recuperaria se a baseline tivesse andado. É a forma exata do relato: um
+    `AppBar` cuja segunda ação nunca chegou.
+
+  Com as duas fechadas, o sintoma da #160 deixa de ter caminho: um lote com
+  `nan` não é mais construível no core, não é mais serializável no encoder daqui,
+  e um frame que ainda assim não decodifique reporta e pede resync sem que a
+  baseline tenha andado.
+
+  Consumidor que hoje passa `nan`/`inf` para prop de widget passa a receber
+  `ValidationError` nomeando o campo, na linha que montou o widget. Antes era
+  aceito e destruía o lote inteiro que o carregava — a mudança é a correção, não
+  efeito colateral, mas é comportamento visível novo.
+
+### Notes
+
+- **Subir o pin mostrou que este seam virou backstop, e os testes diziam outra
+  coisa.** Três casos de `tests/test_wire_encoding.py` construíam
+  `Style(width=float("nan"))` para chegar ao encoder; com o core 0.18.0 eles
+  passaram a reprovar na própria fixture, porque o valor não é mais construível.
+
+  Investigando para reescrevê-los apareceu a segunda metade do quadro: o
+  `model_dump(mode="json")` do Pydantic converte `nan` dentro de campo `Any`
+  (`Node.props`, `Update.set_props`, `MapView.markers`) para **`null`** antes da
+  serialização. Somando as duas coisas, nenhum caminho normal
+  widget→build→serialize alcança mais o `NonFiniteWireValueError`.
+
+  O guard **fica**, porque continua sendo a única defesa para payload que não
+  passa por nenhum dos dois — envelope montado à mão, patch produzido fora da
+  camada de widget, ou app resolvido contra um core mais antigo que o piso. Mas
+  os testes pararam de alegar um gatilho que não existe mais: dois deles envenenam
+  o serializador de propósito, porque backstop que nada dispara é backstop que
+  ninguém sabe que quebrou. Um terceiro passou a fixar a recusa do core em si, para
+  a regressão aparecer aqui em vez de como lote perdido num browser.
+
 ## [0.125.0] — 2026-08-29
 
 ### Fixed

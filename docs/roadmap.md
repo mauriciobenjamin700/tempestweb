@@ -11,14 +11,17 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.125.0** — a #160 saiu de `needs-repro` e a metade dela
-    que mora neste repo está corrigida: um lote que o cliente não conseguiria
-    decodificar agora **falha alto no encoder**, nomeando o campo, e um frame que
-    mesmo assim não decodifique reporta a perda e pede resync em vez de sumir.
-    As outras duas lacunas da issue são do `tempest-core` (campo numérico sem
-    bound aceita `nan`; `App._rebuild` commita a baseline antes de entregar) e
-    seguem abertas — enquanto elas existirem, o sintoma visível ainda aparece,
-    reparado pelo resync da #159 no tick seguinte.
+    **Versão do repo: 0.126.0** — a #160 está **fechada inteira**. A metade que
+    mora neste repo saiu na 0.125.0: um lote que o cliente não conseguiria
+    decodificar **falha alto no encoder**, nomeando o campo, e um frame que mesmo
+    assim não decodifique reporta a perda e pede resync em vez de sumir. As outras
+    duas lacunas eram do `tempest-core` e saíram na **0.18.0**, que este repo pina
+    desde a 0.126.0: nenhum modelo do core aceita `nan`/`inf` (eram **68**
+    modelos desguardados, não só o `Style`, e limite de um lado só não barrava
+    `inf`), e a baseline só avança depois da entrega — `App._rebuild` **e**
+    `App.swap_view` commitavam antes, e agora os dois passam por `App._commit`.
+    O sintoma deixa de ter caminho: o lote não é construível, não é serializável,
+    e um frame ruim é reparado sem a baseline ter andado.
 
     A última publicada no PyPI é a **0.124.0**, em 2026-08-27 pela tag
     `v0.124.0` — o tag anterior era `v0.121.0`, então a release carregou três

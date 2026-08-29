@@ -23,9 +23,15 @@
     O sintoma deixa de ter caminho: o lote não é construível, não é serializável,
     e um frame ruim é reparado sem a baseline ter andado.
 
-    A última publicada no PyPI é a **0.124.0**, em 2026-08-27 pela tag
-    `v0.124.0` — o tag anterior era `v0.121.0`, então a release carregou três
-    bumps de uma vez:
+    A última publicada no PyPI é a **0.126.0**, em 2026-08-29 pela tag
+    `v0.126.0` — o tag anterior era `v0.124.0`, então a release carregou dois
+    bumps de uma vez: **0.125.0** — a metade da #160 que mora neste repo, com o
+    encoder recusando payload não-finito pelo `encode_wire` e a decodificação
+    virando responsabilidade do transporte (`client/wire.js`), que reporta a perda
+    e pede um resync por sequência de frames ruins; **0.126.0** — o piso sobe para
+    `tempest-core>=0.18.0`, que fecha a outra metade.
+
+    A release anterior, **0.124.0**, saiu em 2026-08-27 carregando três bumps:
     **0.122.0** — `CompactPredictor` lê `.tmc` em Python de stdlib, entregando
     inferência tabular sem os 13,96 MB do `onnxruntime-web`, e o artefato Modo A
     passa a levar os sete subpacotes que uma app importa pelo nome;

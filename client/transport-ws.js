@@ -24,6 +24,7 @@
 
 import { dispatch, subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
 import { applyThemeMode } from "./theme.js";
+import { createWireDecoder } from "./wire.js";
 
 /**
  * @typedef {import("./transport.js").Patch} Patch
@@ -182,6 +183,22 @@ export function createWebSocketTransport(url, options = {}) {
    * @param {*} payload  The value when ok, otherwise the error string.
    * @returns {void}
    */
+  /**
+   * Ask the server to re-send the whole scene.
+   *
+   * The DOM is only correct while every patch has applied in order, so a frame
+   * the client could not decode — or a patch the renderer could not apply —
+   * leaves a tree no later index-relative patch fits. This asks for one root
+   * replace to start over from.
+   *
+   * @returns {void}
+   */
+  function requestResync() {
+    send({ kind: "event", data: { type: "resync", key: "" } });
+  }
+
+  const decode = createWireDecoder(requestResync, "the WebSocket transport");
+
   function sendNativeResult(callId, ok, payload) {
     const envelope = { kind: "native_result", call_id: callId, ok };
     if (ok) envelope.value = payload;
@@ -226,7 +243,9 @@ export function createWebSocketTransport(url, options = {}) {
    * @returns {void}
    */
   function onMessage(event) {
-    const envelope = JSON.parse(event.data);
+    const decoded = decode(event.data);
+    if (!decoded.ok) return;
+    const envelope = decoded.value;
     if (envelope.kind === "patches") {
       if (patchHandler) patchHandler(envelope.data);
       else pendingBatches.push(envelope.data);
@@ -373,18 +392,7 @@ export function createWebSocketTransport(url, options = {}) {
       send({ kind: "event", data: event });
     },
 
-    /**
-     * Ask the server to re-send the whole scene.
-     *
-     * The DOM is only correct while every patch has applied in order, so a batch
-     * the renderer could not apply leaves a tree no later index-relative patch
-     * fits. This asks for one root replace to start from instead.
-     *
-     * @returns {void}
-     */
-    requestResync() {
-      send({ kind: "event", data: { type: "resync", key: "" } });
-    },
+    requestResync,
 
     sendNativeResult,
 

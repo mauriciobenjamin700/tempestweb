@@ -17,9 +17,15 @@ import { fixture, freshDom } from "./setup.js";
 import { mount } from "../../client/tempestweb.js";
 import { createWasmTransport } from "../../client/transport-wasm.js";
 
-/** Build a fake pyodide.ffi bridge that records pushed events and exposes deliver. */
+/**
+ * Build a fake pyodide.ffi bridge that records pushed events and exposes deliver.
+ *
+ * The real bridge hands the transport the batch as JSON **text** (the FFI seam is
+ * a string), so `deliver` encodes what a test passes it. `deliverRaw` writes the
+ * text verbatim, for the frames Python could not encode.
+ */
 function fakeBridge() {
-  /** @type {(patches: any[]) => void} */
+  /** @type {(batchJson: string) => void} */
   let deliver = () => {};
   const pushed = [];
   return {
@@ -32,7 +38,8 @@ function fakeBridge() {
       },
       close() {},
     },
-    deliver: (patches) => deliver(patches),
+    deliver: (patches) => deliver(JSON.stringify(patches)),
+    deliverRaw: (text) => deliver(text),
     pushed,
   };
 }

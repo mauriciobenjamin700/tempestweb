@@ -340,12 +340,19 @@ def test_wasm_bootstrap_buffers_patches_delivered_before_the_transport(
     was missing whatever it carried (tempestweb#160). The initial node is a
     snapshot taken in ``start()``, so buffering is safe: the buffered batches diff
     from exactly the tree the client mounts.
+
+    What is buffered is the **undecoded text**. The glue used to ``JSON.parse``
+    here, which threw out of the callback for a frame Python could not encode and
+    lost that batch just as quietly — and a batch still sitting in this buffer had
+    no transport to ask for a resync through. Decoding is the transport's job
+    (``client/transport-wasm.js``), so this template must not parse.
     """
     result = build_artifact(_project(tmp_path), mode="wasm")
     bootstrap = (result.out_dir / "bootstrap.js").read_text(encoding="utf-8")
     assert "const bootPatches = [];" in bootstrap
-    assert "bootPatches.push(patches);" in bootstrap
+    assert "bootPatches.push(patchesJson);" in bootstrap
     assert "while (bootPatches.length > 0) {" in bootstrap
+    assert "JSON.parse(patchesJson)" not in bootstrap
 
 
 def test_wasm_bootstrap_parses(tmp_path: Path) -> None:

@@ -121,14 +121,24 @@ export const native = Object.freeze({
     get: (name) => call("storage.get", { name }).then((r) => r.content),
     /** Remove a value by key. @returns {Promise<void>} */
     remove: (name) => call("storage.remove", { name }),
-    /** List every stored key. @returns {Promise<string[]>} */
+    /** List the configured owner's keys. @returns {Promise<string[]>} */
     list_keys: () => call("storage.list", {}).then((r) => r.keys),
     /**
-     * Choose the codec new writes use. Off by default; measure before enabling.
-     * @returns {Promise<{requested: string, active: string, supported: boolean}>}
+     * Choose the codec new writes use, and scope the keyspace to an owner.
+     *
+     * The codec is off by default; measure before enabling. `owner` defaults to
+     * `""`, which stores keys raw — byte for byte what a build without scoping
+     * wrote — so an app that never passes it is unaffected. Both are set on
+     * every call, so pass them together rather than reconfiguring one.
+     *
+     * @param {{codec?: string, owner?: string}} [opts]
+     * @returns {Promise<{requested: string, active: string, supported: boolean, owner: string}>}
      */
     configure: (opts = {}) =>
-      call("storage.configure", { codec: opts.codec ?? "json" }),
+      call("storage.configure", {
+        codec: opts.codec ?? "json",
+        owner: opts.owner ?? "",
+      }),
   }),
   imaging: Object.freeze({
     /** Shrink to a byte budget by searching quality. @returns {Promise<Object>} */

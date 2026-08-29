@@ -49,7 +49,7 @@ async def test_the_default_is_json_and_the_call_says_so() -> None:
 
     result = await storage.configure()
 
-    assert bridge.calls[0]["args"] == {"codec": CODEC_JSON}
+    assert bridge.calls[0]["args"] == {"codec": CODEC_JSON, "owner": ""}
     assert (result.requested, result.active, result.supported) == (
         CODEC_JSON,
         CODEC_JSON,
@@ -65,7 +65,7 @@ async def test_deflate_is_asked_for_by_name() -> None:
 
     result = await storage.configure(codec=CODEC_DEFLATE)
 
-    assert bridge.calls[0]["args"] == {"codec": CODEC_DEFLATE}
+    assert bridge.calls[0]["args"] == {"codec": CODEC_DEFLATE, "owner": ""}
     assert result.active == CODEC_DEFLATE
     assert result.supported
 
@@ -175,3 +175,71 @@ async def test_a_blocked_store_reaches_python_as_its_own_code(operation: Any) ->
         await operation()
 
     assert caught.value.code == "blocked"
+
+
+async def test_configure_sends_the_owner_and_echoes_it_back() -> None:
+    """``owner`` crosses the wire and comes back on the dataclass.
+
+    Scoping the keyspace is the app's decision, so the round trip has to be
+    visible: an app that asked for an owner and silently got the default would
+    write into the shared keyspace believing it was isolated.
+    """
+    bridge = ScriptedBridge(
+        [
+            {
+                "requested": CODEC_JSON,
+                "active": CODEC_JSON,
+                "supported": True,
+                "owner": "alice",
+            }
+        ]
+    )
+    install_bridge(bridge)
+
+    result = await storage.configure(owner="alice")
+
+    assert bridge.calls[0]["args"] == {"codec": CODEC_JSON, "owner": "alice"}
+    assert result.owner == "alice"
+
+
+async def test_configure_with_no_arguments_resets_the_owner_too() -> None:
+    """``configure()`` resets both knobs, the same way it already reset the codec.
+
+    Deliberately symmetric. A rule that reset one and preserved the other would
+    be the kind of asymmetry inside a single function that nobody remembers six
+    months on — at the cost that reconfiguring the codec alone drops the owner,
+    which is why the docstring says to pass both together.
+    """
+    bridge = ScriptedBridge(
+        [
+            {
+                "requested": CODEC_JSON,
+                "active": CODEC_JSON,
+                "supported": True,
+                "owner": "",
+            }
+        ]
+    )
+    install_bridge(bridge)
+
+    result = await storage.configure()
+
+    assert bridge.calls[0]["args"] == {"codec": CODEC_JSON, "owner": ""}
+    assert result.owner == ""
+
+
+async def test_the_owner_defaults_to_unscoped() -> None:
+    """A bridge that never heard of ``owner`` still produces a usable result.
+
+    The client echoes the field, but an older artifact would not. Falling back
+    to the requested value keeps the dataclass honest instead of reporting an
+    owner the store is not actually using.
+    """
+    bridge = ScriptedBridge(
+        [{"requested": CODEC_JSON, "active": CODEC_JSON, "supported": True}]
+    )
+    install_bridge(bridge)
+
+    result = await storage.configure()
+
+    assert result.owner == ""

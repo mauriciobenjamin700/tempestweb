@@ -7,14 +7,79 @@
 // so the capability still works in plain pages, under jsdom, and in a profile
 // whose storage the user blocked.
 //
-// The keyspace is per ORIGIN, not per owner: two owners on the same origin
-// (Mode B, two logins on one device) share it, and `storage.list_keys()` returns
-// every owner's keys. Prefix your keys if that matters. Owner scoping stays open
-// on #118 — see NOTES-118-storage.md.
+// The keyspace is scoped by OWNER, set with `storage.configure({owner})`. The
+// scoping is derived HERE rather than inside idb-kv.js, because this is the only
+// point both backends pass through: pushing it down would leave the localStorage
+// fallback unscoped, and that is the degraded profile nobody watches.
+//
+// The default owner is the empty string, and it writes the key RAW — byte for
+// byte what this file wrote before scoping existed. That is what makes the
+// change free for data already on disk: nothing is rewritten, nothing is
+// migrated, and no database version has to move.
 
 import { CapabilityError } from "./index.js";
 import { CODEC_JSON, isCodecSupported } from "../offline/codec.js";
 import { setKvCodec, StoreUnavailableError } from "./idb-kv.js";
+
+/**
+ * The owner every key is currently scoped to. Empty means "no scoping".
+ *
+ * Module state, like the codec beside it. In Mode B that means it belongs to the
+ * tab, so it survives a socket reconnect but NOT a page reload — the app has to
+ * configure it during boot, before the first storage call.
+ *
+ * @type {string}
+ */
+let _owner = "";
+
+/**
+ * The byte that separates an owner from a key name.
+ *
+ * NUL is chosen because it sorts below every printable character, so one owner
+ * occupies a contiguous key range, and because a real key name is vanishingly
+ * unlikely to contain it. A legacy name that does contain one is readable by
+ * exact `get`/`remove` but will not appear under the default owner's listing —
+ * pinned by test rather than guarded, since guarding costs a check on every
+ * write for a case that has never occurred.
+ *
+ * @type {string}
+ */
+const SEP = "\u0000";
+
+/**
+ * Derive the stored key for a name under the configured owner.
+ *
+ * @param {string} owner  The owner, or `""` for the unscoped default.
+ * @param {string} name  The key the app asked for.
+ * @returns {string} The key as the backend sees it.
+ */
+function scopedKey(owner, name) {
+  return owner ? owner + SEP + name : name;
+}
+
+/**
+ * Select the names belonging to `owner` from a backend listing, unprefixed.
+ *
+ * Returning the app's own names — not the stored keys — is what keeps callers
+ * that filter the listing working unchanged. `tempestweb/query/persistence.py`
+ * is one: it walks `list_keys()` looking for its own prefix, and would match
+ * nothing if the owner prefix were still attached.
+ *
+ * The default owner deliberately takes every key that carries no separator,
+ * rather than every key: without that, `configure()` back to the default would
+ * list another owner's data.
+ *
+ * @param {string} owner  The owner, or `""` for the unscoped default.
+ * @param {string[]} keys  Every key the backend holds.
+ * @returns {string[]} The names this owner stored.
+ */
+function ownedNames(owner, keys) {
+  if (!owner) return keys.filter((key) => !key.includes(SEP));
+  const prefix = owner + SEP;
+  return keys
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length));
+}
 
 /**
  * @typedef {Object} KeyValueStore
@@ -98,7 +163,8 @@ async function onBackend(deps, run) {
  * @throws {CapabilityError} quota_exceeded when the backend is full.
  */
 export async function storagePut(args, deps) {
-  await onBackend(deps, (store) => store.put(args.name, args.content));
+  const key = scopedKey(_owner, args.name);
+  await onBackend(deps, (store) => store.put(key, args.content));
   return {};
 }
 
@@ -110,7 +176,9 @@ export async function storagePut(args, deps) {
  * @throws {CapabilityError} not_found when the key is absent.
  */
 export async function storageGet(args, deps) {
-  const value = await onBackend(deps, (store) => store.get(args.name));
+  const value = await onBackend(deps, (store) =>
+    store.get(scopedKey(_owner, args.name)),
+  );
   if (value === null || value === undefined) {
     throw new CapabilityError("not_found", args.name);
   }
@@ -130,10 +198,11 @@ export async function storageGet(args, deps) {
  * @throws {CapabilityError} not_found when the key is absent.
  */
 export async function storageRemove(args, deps) {
+  const key = scopedKey(_owner, args.name);
   const removed = await onBackend(deps, async (store) => {
-    const value = await store.get(args.name);
+    const value = await store.get(key);
     if (value === null || value === undefined) return false;
-    await store.remove(args.name);
+    await store.remove(key);
     return true;
   });
   if (!removed) {
@@ -143,15 +212,20 @@ export async function storageRemove(args, deps) {
 }
 
 /**
- * List all keys. Returns an empty array when storage is empty (never throws
- * not_found — a collection lookup). The keys are the origin's, not one owner's.
+ * List the configured owner's keys, unprefixed.
+ *
+ * Returns an empty array when the owner stored nothing (never throws not_found —
+ * a collection lookup). Another owner's keys are not in the answer, which is the
+ * half of #195 that a caller notices: `tempestweb/query/persistence.py` restores
+ * its cache by walking this listing, so before scoping, one user's boot filled
+ * the cache with another user's API responses.
  * @param {Object} _args
  * @param {import("./index.js").NativeDeps} deps
  * @returns {Promise<{keys:string[]}>}
  */
 export async function storageList(_args, deps) {
   const keys = await onBackend(deps, (store) => store.keys());
-  return { keys: Array.isArray(keys) ? keys : [] };
+  return { keys: ownedNames(_owner, Array.isArray(keys) ? keys : []) };
 }
 
 /**
@@ -185,5 +259,15 @@ export async function storageConfigure(args, deps) {
   const supported = isCodecSupported(requested);
   const apply = (deps && /** @type {any} */ (deps).setKvCodec) || setKvCodec;
   const active = deps && deps.store ? apply(requested) : CODEC_JSON;
-  return { requested, active, supported };
+  _owner = String((args && args.owner) || "");
+  return { requested, active, supported, owner: _owner };
+}
+
+/**
+ * Reset the module's owner. Test seam, not part of the capability surface.
+ *
+ * @returns {void}
+ */
+export function resetStorageOwner() {
+  _owner = "";
 }

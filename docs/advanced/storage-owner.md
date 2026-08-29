@@ -161,6 +161,16 @@ Isso é diferente de um erro de escrita: o banco está lá e saudável, e a oper
 volta a funcionar quando a outra aba fechar. Antes desta versão a chamada
 simplesmente **nunca respondia**.
 
+!!! info "E o código `stale`, que é o oposto"
+    `blocked` diz "espere". `stale` diz **"recarregue"**: outra aba já subiu a
+    versão do banco e esta página está rodando o build antigo. Tentar de novo não
+    resolve — só carregar o código novo.
+
+    Hoje ele é inalcançável (a versão do banco é `1` e nunca subiu). Ele existe
+    para o dia do bump, e é o que impede aquele dia de fazer as abas antigas
+    caírem para o `localStorage` em silêncio, partindo o dado do app entre dois
+    backends.
+
 ## Recapitulando
 
 - `configure(owner=...)` dá a cada pessoa o seu keyspace: sem leitura cruzada,
@@ -171,4 +181,5 @@ simplesmente **nunca respondia**.
 - Ligar o escopo começa vazio de propósito; adotar o legado é uma decisão da app,
   e **não** se faz em device compartilhado.
 - `configure()` define codec **e** dono — passe os dois juntos.
-- `blocked` significa "outra aba está atualizando", não "a escrita falhou".
+- `blocked` significa "outra aba está atualizando", não "a escrita falhou";
+  `stale` significa "recarregue, este build está velho".

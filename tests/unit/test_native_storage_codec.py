@@ -156,6 +156,35 @@ class FailingBridge:
     ],
     ids=["put", "get", "remove", "list_keys"],
 )
+async def test_a_stale_build_reaches_python_as_its_own_code(operation: Any) -> None:
+    """``stale`` says the page is behind, which is not a failure to retry.
+
+    Raised when another tab already upgraded the database and this build asks for
+    the version it knows. It is kept apart from ``unavailable`` for a concrete
+    reason: that code makes the client degrade to ``localStorage`` permanently,
+    so a page that is merely out of date would start writing into a second
+    backend and split the app's data with no way back.
+
+    It is also not ``blocked``: waiting does not help, only reloading does.
+    """
+    install_bridge(FailingBridge("stale", "the database is newer than this build"))
+
+    with pytest.raises(NativeError) as caught:
+        await operation()
+
+    assert caught.value.code == "stale"
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        lambda: storage.put("notes", "hi"),
+        lambda: storage.get("notes"),
+        lambda: storage.remove("notes"),
+        lambda: storage.list_keys(),
+    ],
+    ids=["put", "get", "remove", "list_keys"],
+)
 async def test_a_blocked_store_reaches_python_as_its_own_code(operation: Any) -> None:
     """``blocked`` survives the trip, so an app can tell it from a real failure.
 

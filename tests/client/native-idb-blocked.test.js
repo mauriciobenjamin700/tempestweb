@@ -91,6 +91,31 @@ function upgradeToV2(idb) {
   return { events, settled };
 }
 
+/**
+ * Await `promise`, or reject with `label` when it does not settle in time.
+ *
+ * Used wherever a regression's symptom is a hang rather than a wrong value. A
+ * bare `await` there would run until the CI runner kills the job, and a job that
+ * times out reads as flaky infrastructure instead of as the broken assertion it
+ * is.
+ *
+ * @param {Promise<*>} promise  The promise under test.
+ * @param {string} label  What was being waited for, for the failure message.
+ * @param {number} [ms]  How long to allow.
+ * @returns {Promise<*>} What `promise` resolved to.
+ */
+function within(promise, label, ms = 1500) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} never settled within ${ms}ms`)),
+        ms,
+      ).unref?.(),
+    ),
+  ]);
+}
+
 test(
   "blocked is not terminal: the open still succeeds once the holder closes",
   { timeout: 5000 },
@@ -103,7 +128,7 @@ test(
     assert.deepEqual(events, ["blocked"], "only blocked so far");
 
     held.close();
-    assert.equal(await settled, "success");
+    assert.equal(await within(settled, "the unblocked upgrade"), "success");
     assert.deepEqual(events, ["blocked", "upgradeneeded", "success"]);
   },
 );
@@ -280,11 +305,16 @@ test(
     await store.put("legacy", "legacy-value");
 
     const { events, settled } = upgradeToV2(idb);
-    assert.equal(await settled, "success");
+    assert.equal(
+      await within(settled, "the upgrade beside a held store connection"),
+      "success",
+    );
     assert.deepEqual(
       events,
       ["upgradeneeded", "success"],
-      "the store closes each connection, so an upgrade should sail through",
+      "the store holds its connection open now, so this only passes because " +
+        "`versionchange` closes it — without that handler the upgrade never " +
+        "completes and every later storage call is stuck behind it",
     );
   },
 );

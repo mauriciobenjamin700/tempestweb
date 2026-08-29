@@ -11,8 +11,17 @@
 // caller can fall back to localStorage cleanly; when IndexedDB exists but the
 // database will not open, operations reject with StoreUnavailableError and the
 // caller degrades the same way.
+//
+// The connection is opened once and reused. It used to be opened and closed per
+// operation — ten calls cost ten `indexedDB.open()` — and reusing it is only
+// safe because the connection now yields on `versionchange`: a held connection
+// is exactly what blocks another tab's upgrade.
 
-import { CapabilityError, StoreBlockedError } from "./index.js";
+import {
+  CapabilityError,
+  StoreBlockedError,
+  StoreStaleError,
+} from "./index.js";
 import {
   CODEC_JSON,
   decodeValue,
@@ -189,6 +198,10 @@ function promisify(request) {
  *         open request errors — this backend is not usable in this profile.
  * @throws {StoreBlockedError} When the open did not settle within
  *         `openTimeoutMs`, because another tab is mid-upgrade.
+ * @throws {StoreStaleError} When the stored database is newer than
+ *         {@link DB_VERSION} — another tab already upgraded and this build is
+ *         behind. Kept apart from `StoreUnavailableError` so it does not degrade
+ *         the page to `localStorage` and split the app's data in two.
  */
 function openDb(idb, openTimeoutMs) {
   return new Promise((resolve, reject) => {
@@ -237,8 +250,15 @@ function openDb(idb, openTimeoutMs) {
       }
       settle(resolve, db);
     };
-    open.onerror = () =>
-      settle(reject, new StoreUnavailableError(describe(open.error)));
+    open.onerror = () => {
+      const error = open.error;
+      settle(
+        reject,
+        error && error.name === "VersionError"
+          ? new StoreStaleError(describe(error))
+          : new StoreUnavailableError(describe(error)),
+      );
+    };
   });
 }
 
@@ -286,6 +306,7 @@ function runTx(db, mode, run) {
  * @property {(name: string, content: string) => Promise<void>} put
  * @property {(name: string) => Promise<void>} remove
  * @property {() => Promise<string[]>} keys
+ * @property {() => void} close  Release the held connection.
  */
 
 /**
@@ -305,14 +326,102 @@ export function createIdbKv(
   if (!idb) {
     return null;
   }
+  /**
+   * The live connection, or null when there is none to reuse.
+   * @type {?IDBDatabase}
+   */
+  let cached = null;
+  /**
+   * The open in flight, or null. Collapses concurrent callers onto one open.
+   * @type {?Promise<IDBDatabase>}
+   */
+  let opening = null;
+
+  /**
+   * Drop `db` from the cache, if it is still the one cached.
+   *
+   * Guarded on identity because a stale handler — a `versionchange` for a
+   * connection that was already replaced — must not evict the live one.
+   *
+   * @param {IDBDatabase} db  The connection to forget.
+   * @returns {void}
+   */
+  const forget = (db) => {
+    if (cached === db) cached = null;
+  };
+
+  /**
+   * Return the live connection, opening one if needed.
+   *
+   * Reusing the connection is the point: the store used to open and close the
+   * database on every single call, so ten operations cost ten opens. It is also
+   * what makes the lifecycle handlers load-bearing rather than theoretical — a
+   * held connection blocks another tab's upgrade until `versionchange` closes
+   * it, which is why that half shipped first.
+   *
+   * Three things this must not get wrong:
+   *
+   * * **Concurrent callers share one open.** Without the in-flight promise,
+   *   five parallel `put`s would each start their own, which is the cost the
+   *   caching was meant to remove.
+   * * **A failed open is not cached.** The promise is cleared on rejection, so
+   *   a profile that recovers (or a `blocked` that clears) is retried rather
+   *   than being answered from a poisoned cache forever.
+   * * **A closed connection is dropped.** `versionchange` closes and forgets,
+   *   so the next call opens fresh; `close` covers the connection the browser
+   *   terminates on its own.
+   *
+   * @returns {Promise<IDBDatabase>} The connection to run a transaction on.
+   */
+  const connection = () => {
+    if (cached) return Promise.resolve(cached);
+    if (!opening) {
+      opening = openDb(idb, openTimeoutMs).then(
+        (db) => {
+          db.onversionchange = () => {
+            forget(db);
+            db.close();
+          };
+          db.onclose = () => forget(db);
+          cached = db;
+          opening = null;
+          return db;
+        },
+        (err) => {
+          opening = null;
+          throw err;
+        },
+      );
+    }
+    return opening;
+  };
+
+  /**
+   * Run one transaction on the shared connection, reopening if it went away.
+   *
+   * The retry exists for one narrow race: a caller that took the cached
+   * connection microseconds before another tab's upgrade closed it gets
+   * `InvalidStateError` from `transaction()`. Reopening once turns that into a
+   * normal call instead of an error the app has to understand. It is deliberately
+   * not a general retry — a quota failure, an abort or a `blocked` open is the
+   * caller's answer and propagates on the first try.
+   *
+   * @param {IDBTransactionMode} mode  `"readonly"` or `"readwrite"`.
+   * @param {(store: IDBObjectStore) => Promise<*>} run  Issues the requests.
+   * @returns {Promise<*>} What `run` resolved to, once the transaction committed.
+   */
   const withStore = async (mode, run) => {
-    const db = await openDb(idb, openTimeoutMs);
-    try {
-      return await runTx(db, mode, run);
-    } catch (err) {
-      throw asCapabilityError(err);
-    } finally {
-      db.close();
+    for (let attempt = 0; ; attempt += 1) {
+      const db = await connection();
+      try {
+        return await runTx(db, mode, run);
+      } catch (err) {
+        if (!err || err.name !== "InvalidStateError") {
+          throw asCapabilityError(err);
+        }
+        forget(db);
+        if (attempt > 0) throw asCapabilityError(err);
+      }
     }
   };
   return {
@@ -342,6 +451,24 @@ export function createIdbKv(
     /** @param {string} name @returns {Promise<void>} */
     async remove(name) {
       await withStore("readwrite", (store) => promisify(store.delete(name)));
+    },
+    /**
+     * Release the connection this store is holding.
+     *
+     * Required, not a convenience: the store keeps one connection open, and an
+     * open connection is what blocks another tab's upgrade. Dropping the store
+     * object without closing would leave that connection alive and unreachable —
+     * nothing left to close it, and `versionchange` firing on a handler whose
+     * store nobody consults. A later call reopens lazily, so closing early is
+     * never wrong, only wasteful.
+     *
+     * @returns {void}
+     */
+    close() {
+      const db = cached;
+      cached = null;
+      opening = null;
+      if (db) db.close();
     },
     /** @returns {Promise<string[]>} */
     async keys() {

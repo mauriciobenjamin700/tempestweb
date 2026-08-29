@@ -77,11 +77,29 @@ Ordem de grandeza antes de priorizar: o open é o custo dominante só em rajada 
 operações pequenas; para o caso que a #118 mediu (um valor de 142.890
 caracteres) o open desaparece ao lado do encode e da escrita.
 
-**Atualização (0.127.0):** o pré-requisito que esta pendência listava já existe.
-O `onversionchange` → `db.close()` foi entregue pela pendência 3, então segurar a
-conexão deixou de trazer o risco de prender outra aba no `onblocked`. O que resta
-do desenho é a reabertura preguiçosa depois do close e o destino de uma transação
-em vôo no meio da troca.
+**Atualização: FECHADA na 0.127.0 (#195).** A conexão passou a ser aberta uma vez
+e reusada, com single-flight. Medido com um `IDBFactory` que conta: **10 operações
+→ 1 open**, e 8 escritas concorrentes → **1 open**.
+
+Os três itens que o desenho pedia estão cobertos: `onversionchange` → `db.close()`
+(entregue pela pendência 3), reabertura preguiçosa na chamada seguinte, e a
+transação em vôo — medido que `db.close()` **não** aborta transação já aberta, a
+escrita ainda commita. Somou-se um retry único em `InvalidStateError`, para o
+caller que pegou a conexão microssegundos antes de ela fechar.
+
+Duas coisas apareceram só ao reusar, e as duas viraram correção no mesmo commit:
+
+1. **`forgetKvStore()` vazava a conexão.** Ele largava a referência do store sem
+   fechar; com conexão retida isso deixaria uma conexão viva e inalcançável —
+   e conexão aberta é o que bloqueia upgrade. O store ganhou `close()`.
+2. **`VersionError` degradava para `localStorage`.** A reabertura pós-upgrade é
+   um caminho normal agora, e o build antigo pedindo a versão que conhece recebia
+   `VersionError` → `StoreUnavailableError` → degrade permanente, partindo o dado
+   do app entre dois backends. Ganhou código próprio, `stale`.
+
+A nota anterior deste arquivo já apontava o risco do `VersionError`; ele saiu de
+"vale uma linha quando o bump vier" para corrigido, porque o reuso o pôs no
+caminho quente.
 
 ## Pendência 3 — `onblocked` do open não é tratado
 

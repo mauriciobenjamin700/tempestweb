@@ -55,6 +55,33 @@ versioning.
   O `onversionchange` sai agora, e não junto do bump que vai precisar dele, porque
   só ajuda se estiver no build **já implantado** quando alguém sobe a versão.
 
+- **Um `indexedDB.open()` por operação (#195).** `withStore` abria e fechava o
+  banco a cada chamada: medido com um `IDBFactory` que conta, cinco `put` mais
+  cinco `get` custavam **10 opens**. O cache de `_kvStore` no `browserDeps()`
+  evitava realocar o objeto do store e nada além disso — a JSDoc dizia isso.
+
+  A conexão passa a ser aberta uma vez e reusada, com **single-flight**: sem ele,
+  oito escritas em paralelo abririam oito vezes, que é justamente quando o custo
+  importa. Medido depois: **10 operações → 1 open**, e 8 escritas concorrentes →
+  **1 open**.
+
+  Isso só é seguro porque o `versionchange` acima fecha e larga a conexão — uma
+  conexão retida é exatamente o que bloqueia o upgrade de outra aba. Por isso
+  aquela metade saiu primeiro. O store ganhou `close()`, e o `forgetKvStore()` do
+  `browserDeps()` passa a chamá-lo antes de largar a referência: sem isso a
+  conexão ficaria viva e inalcançável, sem ninguém capaz de fechá-la.
+
+- **`VersionError` degradava para `localStorage` em silêncio (#195).** Só apareceu
+  ao reusar a conexão, que torna a reabertura pós-`versionchange` um caminho
+  normal: uma aba com o build antigo pede a versão que conhece contra um banco que
+  outra aba já subiu, e o `VersionError` resultante virava `StoreUnavailableError`
+  — o código que faz o cliente cair para o `localStorage` **de forma permanente**,
+  partindo o dado do app entre dois backends por uma condição que significa
+  "recarregue para pegar o build novo".
+
+  Agora tem código próprio, `stale`, que não degrada. Diferente de `blocked`:
+  esperar não resolve, só recarregar.
+
 ### Migration
 
 Nada a fazer para quem não passa `owner`: o default é `""` e grava a chave
@@ -70,14 +97,18 @@ tem o dado das duas misturado, sem registro de quem é o quê.
 `configure()` define codec **e** dono a cada chamada, simétrico com o que o codec
 já fazia — reconfigurar só o codec derruba o dono, então passe os dois juntos.
 
-`blocked` é código de erro **novo**. App publicado não o trata, mas ele só aparece
-num cenário que antes pendurava para sempre, então o pior caso é uma exceção onde
-havia deadlock.
+`blocked` e `stale` são códigos de erro **novos**. App publicado não os trata, mas
+`blocked` só aparece num cenário que antes pendurava para sempre (o pior caso é
+uma exceção onde havia deadlock), e `stale` é hoje inalcançável — `DB_VERSION` é
+`1` e nunca subiu. Ele existe para o dia do bump, e é o que impede aquele dia de
+partir o dado das abas antigas entre dois backends.
 
 ### Tests
 
 `tests/client/native-storage-scope.test.js` (13 casos, rodando nos **dois**
-backends) e `tests/client/native-idb-blocked.test.js` (8 casos). Medido com cada
+backends), `tests/client/native-idb-blocked.test.js` (8 casos) e
+`tests/client/native-idb-reuse.test.js` (6 casos, com um `IDBFactory` que conta
+opens). Medido com cada
 correção revertida: **9 de 13** reprovam sem a derivação de chave; sem o ciclo de
 vida da conexão os testes não reprovam, eles **penduram** — que é o próprio
 defeito —, e por isso cada caso carrega `timeout` explícito.

@@ -331,9 +331,11 @@ const _subscriptions = new Map();
  * `native/storage.js` falls back to localStorage on its own.
  *
  * `undefined` means "not decided yet". Built once because `browserDeps()` runs
- * on **every** dispatch and there is no reason to reallocate the store object
- * per call; it buys no fewer database opens — `idb-kv.js` opens and closes the
- * database per operation, measured at 10 opens for 10 operations.
+ * on **every** dispatch, and the store now holds its database connection, so
+ * reallocating it per call would also reopen the database per call. Measured
+ * against a counting `IDBFactory`: **10 operations cost 1 open**, and eight
+ * concurrent writes still cost 1, because the store collapses callers onto a
+ * single in-flight open.
  *
  * @type {?import("./idb-kv.js").KeyValueStore|undefined}
  */
@@ -360,9 +362,15 @@ function kvStore() {
  * the operation on localStorage. Without it that profile would keep being handed
  * a store that cannot work, and the fallback would never be reached.
  *
+ * Closing first is not optional. The store holds one database connection, and an
+ * open connection blocks another tab's upgrade — dropping the reference without
+ * closing would strand it: alive, unreachable, and with nothing left able to
+ * release it.
+ *
  * @returns {void}
  */
 function forgetKvStore() {
+  if (_kvStore && typeof _kvStore.close === "function") _kvStore.close();
   _kvStore = null;
 }
 
@@ -438,6 +446,31 @@ export class StoreBlockedError extends CapabilityError {
       message || "another tab is holding an older database version",
     );
     this.name = "StoreBlockedError";
+  }
+}
+
+/**
+ * Raised when the database is newer than the build asking for it.
+ *
+ * `VersionError` means another tab already upgraded the schema and this page is
+ * running yesterday's code. Like {@link StoreBlockedError} and unlike
+ * `StoreUnavailableError`, it must **not** degrade to `localStorage`: the
+ * database is healthy, it is this build that is behind, and quietly writing into
+ * a second backend would split the app's data with no way back.
+ *
+ * Unlike `blocked`, waiting does not help — the only fix is to load the new
+ * build, so an app answering this should reload rather than retry.
+ */
+export class StoreStaleError extends CapabilityError {
+  /**
+   * @param {string} [message]  Detail from the failed open.
+   */
+  constructor(message) {
+    super(
+      "stale",
+      message || "the database is newer than this build; reload the page",
+    );
+    this.name = "StoreStaleError";
   }
 }
 

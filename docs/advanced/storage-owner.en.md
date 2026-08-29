@@ -160,6 +160,16 @@ This is not a write failure: the database is there and healthy, and the operatio
 works again once the other tab closes. Before this version the call simply
 **never answered**.
 
+!!! info "And the `stale` code, which is its opposite"
+    `blocked` says "wait". `stale` says **"reload"**: another tab already raised
+    the database version and this page is running the older build. Retrying does
+    not help — only loading the new code does.
+
+    It is unreachable today (the database version is `1` and has never moved). It
+    exists for the day of the bump, and it is what stops that day from silently
+    dropping older tabs onto `localStorage` and splitting the app's data across
+    two backends.
+
 ## Recap
 
 - `configure(owner=...)` gives each person their own keyspace: no cross reads, no
@@ -171,4 +181,5 @@ works again once the other tab closes. Before this version the call simply
 - Turning scoping on starts empty on purpose; adopting the legacy data is the
   app's decision, and **not** something to do on a shared device.
 - `configure()` sets codec **and** owner — pass them together.
-- `blocked` means "another tab is updating", not "the write failed".
+- `blocked` means "another tab is updating", not "the write failed"; `stale`
+  means "reload, this build is old".

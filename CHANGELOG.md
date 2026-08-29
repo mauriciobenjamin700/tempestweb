@@ -4,6 +4,84 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.127.0] — 2026-08-29
+
+### Fixed
+
+- **Dois logins no mesmo device compartilhavam o keyspace do `storage` (#195).**
+  A chave que chegava ao IndexedDB era o nome cru que o app passou, então numa
+  origem com dois donos — Modo B, duas contas no mesmo navegador — o `put` de um
+  sobrescrevia o valor do outro, `list_keys()` devolvia os dois conjuntos e o
+  `remove` alcançava a chave alheia.
+
+  O dano não estava limitado à chave que o app escolhe:
+  `tempestweb/query/persistence.py` restaura o cache percorrendo `list_keys()`, e
+  o boot de um usuário enchia o `QueryCache` com **respostas de API que outro
+  tinha persistido** — dado de servidor aparecendo na tela de quem não pediu.
+  Fechado sem uma linha em `query/`.
+
+  `storage.configure(owner=...)` escopa o keyspace. O dono vem do app porque nada
+  aqui poderia derivá-lo: o Modo A não tem sessão, e o `session_id` do Modo B
+  identifica um **transporte** e muda a cada reconexão, então keyar storage por
+  ele orfanaria o dado no primeiro socket caído.
+
+  A derivação mora em `client/native/storage.js`, acima da escolha de backend, e
+  não dentro do `idb-kv.js`: é o único ponto por onde os dois passam, e empurrá-la
+  para baixo deixaria o fallback de `localStorage` sem escopo — o perfil degradado
+  que ninguém olha.
+
+- **Chamada de `storage` durante um upgrade de outra aba nunca respondia (#195).**
+  `openDb` não tratava `onblocked` nem `onversionchange`, e as duas faltas se
+  alimentavam: a aba que tenta subir a versão ficava com a promise pendurada, e a
+  aba que segura a versão antiga nunca era avisada para soltar.
+
+  Medindo contra um `IDBFactory` real, dois fatos derrubaram a correção óbvia:
+  `blocked` **não é terminal** (o request segue pendente e ainda dá `success`
+  quando o bloqueador fecha, então rejeitar ali reprovaria um open que ia dar
+  certo); e a **aba espectadora não recebe evento nenhum** — nem `blocked`, nem
+  `success`, nem `error` —, ficando enfileirada em silêncio. Armar o prazo dentro
+  do `onblocked` salvaria só quem faz o upgrade e deixaria todas as outras
+  penduradas, que é o caso comum.
+
+  Então o prazo (`OPEN_TIMEOUT_MS`, 3 s) cobre **todo** open, e conexão que chega
+  depois dele é fechada na hora — segurá-la deixaria uma conexão inalcançável na
+  versão antiga, que é justamente o que bloqueia o upgrade seguinte.
+
+  `StoreBlockedError` tem código `blocked` e **não** herda de
+  `StoreUnavailableError`: aquela classe faz o cliente degradar para
+  `localStorage` de forma permanente, e fazer isso por uma condição transitória
+  partiria o dado do app entre dois backends.
+
+  O `onversionchange` sai agora, e não junto do bump que vai precisar dele, porque
+  só ajuda se estiver no build **já implantado** quando alguém sobe a versão.
+
+### Migration
+
+Nada a fazer para quem não passa `owner`: o default é `""` e grava a chave
+**crua**, byte a byte como antes. Nada é reescrito, nenhuma versão de banco se
+move.
+
+Ligar o escopo abre um keyspace **vazio** — o dado antigo continua legível pelo
+dono default, mas não é carregado, porque só o app sabe de quem ele era. A receita
+de adoção está em [escopo do storage por dono](docs/advanced/storage-owner.md).
+**Num device onde duas pessoas já usaram o app, não adote:** o keyspace default
+tem o dado das duas misturado, sem registro de quem é o quê.
+
+`configure()` define codec **e** dono a cada chamada, simétrico com o que o codec
+já fazia — reconfigurar só o codec derruba o dono, então passe os dois juntos.
+
+`blocked` é código de erro **novo**. App publicado não o trata, mas ele só aparece
+num cenário que antes pendurava para sempre, então o pior caso é uma exceção onde
+havia deadlock.
+
+### Tests
+
+`tests/client/native-storage-scope.test.js` (13 casos, rodando nos **dois**
+backends) e `tests/client/native-idb-blocked.test.js` (8 casos). Medido com cada
+correção revertida: **9 de 13** reprovam sem a derivação de chave; sem o ciclo de
+vida da conexão os testes não reprovam, eles **penduram** — que é o próprio
+defeito —, e por isso cada caso carrega `timeout` explícito.
+
 ## [0.126.0] — 2026-08-29
 
 ### Changed

@@ -134,6 +134,46 @@ how the call reaches the Web API, not your code.
     rewrites the same key, and a `removeItem` afterwards would delete the value
     you just saved. The mark is what keeps this from running on every boot.
 
+!!! warning "Migration: from 0.127.0 the keyspace has an owner"
+    Until **0.126.0** the keyspace belonged to the **origin**: two people using
+    the app in the same browser shared the keys, one overwrote the other's data,
+    and `list_keys()` returned both sets. From **0.127.0**,
+    `storage.configure(owner=...)` gives each of them their own.
+
+    **An app that never passes `owner` does nothing.** The default owner is `""`
+    and it stores keys **raw**, byte for byte as before — nothing is rewritten,
+    nothing is migrated, no database version moves.
+
+    **An app that turns scoping on starts with an empty keyspace.** The old data
+    stays readable under the default owner, but it does not come along: only your
+    app knows whose it was. To carry it over, use the public API, **once**:
+
+    ```python
+    from tempestweb import native
+
+
+    async def adopt_legacy(user_id: str) -> None:
+        """Move data from the default keyspace into the user's."""
+        await native.storage.configure()
+        legacy = {
+            name: await native.storage.get(name)
+            for name in await native.storage.list_keys()
+        }
+        await native.storage.configure(owner=user_id)
+        for name, content in legacy.items():
+            await native.storage.put(name, content)
+    ```
+
+    **On a device two people already used, do not adopt.** The default keyspace
+    holds both sets mixed together, with no record of whose is whose, and adopting
+    would hand one person the other's. Wherever both wrote the same key there is
+    **one** value, the last writer's — the first one's vanished the day it was
+    overwritten, and that is not recoverable before or after this change. Start
+    empty.
+
+    Detail, recipe and the new `blocked` error code:
+    [scoping storage by owner](storage-owner.md).
+
 ## Example: typed HTTP with retry
 
 `native.http` (N0) is the foundation of offline replay. A request with retry and

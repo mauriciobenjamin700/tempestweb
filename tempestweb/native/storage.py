@@ -7,12 +7,18 @@ to an IndexedDB key and its content to the stored string value;
 falling back to ``localStorage`` where IndexedDB is absent or refuses to open.
 The same envelope reaches the browser in all three modes.
 
-The keyspace is per **origin**, not per owner. Two owners on the same origin —
-Mode B with two logins on one device, for instance — share it: a key one writes
-the other reads, and :func:`list_keys` returns every owner's keys. Prefix keys
-with something that identifies the owner where that matters. Owner scoping stays
-open on issue #118, because deriving the prefix needs an owner identity Mode A
-does not define.
+The keyspace is scoped by **owner**, which the app sets with
+:func:`configure`. Two owners on the same origin — Mode B with two logins on one
+device — get separate keyspaces: neither reads, overwrites nor lists the other's
+keys. The owner is an app-supplied string because there is no identity the
+framework could derive on its own: Mode A has no session, and Mode B's session id
+identifies a *transport* and changes on every reconnect, so keying storage by it
+would orphan the data on the first dropped socket.
+
+The default owner is the empty string, and it stores keys **raw** — byte for byte
+what a build without scoping wrote. Data already on disk therefore stays exactly
+where it is, and an app that never calls :func:`configure` sees no change at
+all.
 
 Two surfaces are exposed over the one backend:
 
@@ -70,14 +76,16 @@ class StorageCodec:
         active: The codec new writes will actually use. Differs from
             ``requested`` when the browser cannot run it.
         supported: Whether this browser can run the requested codec.
+        owner: The owner every key is now scoped to; ``""`` means unscoped.
     """
 
     requested: str
     active: str
     supported: bool
+    owner: str = ""
 
 
-async def configure(*, codec: str = CODEC_JSON) -> StorageCodec:
+async def configure(*, codec: str = CODEC_JSON, owner: str = "") -> StorageCodec:
     """Choose the codec new writes use, and report what will actually run.
 
     **Measure before turning this on.** IndexedDB already compresses what it
@@ -95,8 +103,42 @@ async def configure(*, codec: str = CODEC_JSON) -> StorageCodec:
     wrote it, so turning the codec on does not orphan what is already stored, and
     turning it off does not orphan what was written while it was on.
 
+    **Also scopes the keyspace**, via ``owner``. Every key written after this
+    call belongs to that owner, and :func:`get`, :func:`remove` and
+    :func:`list_keys` see only that owner's keys. The owner is a string the app
+    supplies — typically the signed-in user's id — because nothing here could
+    derive it: Mode A has no session at all, and Mode B's session id identifies a
+    *transport* and changes on every reconnect, so keying storage by it would
+    orphan the data on the first dropped socket.
+
+    The default, ``""``, stores keys **raw**: byte for byte what a build without
+    scoping wrote. So an app that never passes ``owner`` is unaffected, and data
+    already on disk stays readable exactly where it is.
+
+    Turning scoping on does **not** carry the existing data across — the new
+    keyspace starts empty, and only the app knows whose the old data was. Adopt
+    it deliberately, with the public API::
+
+        await storage.configure()
+        legacy = {k: await storage.get(k) for k in await storage.list_keys()}
+        await storage.configure(owner=user_id)
+        for name, content in legacy.items():
+            await storage.put(name, content)
+
+    On a device where two people already used the app, **do not** do that: the
+    default keyspace holds both of their data mixed together, with no record of
+    whose is whose, and adopting it would hand one user the other's. Start empty
+    there.
+
+    Both arguments are set on every call, like the codec has always been:
+    ``configure()`` with no arguments resets the codec to :data:`CODEC_JSON`
+    **and** the owner to ``""``. One rule for the whole function — but it means
+    reconfiguring only the codec drops the owner, so pass both together.
+
     Args:
         codec: :data:`CODEC_JSON` (the default) or :data:`CODEC_DEFLATE`.
+        owner: The keyspace owner for every later call. ``""`` (the default)
+            stores keys unscoped.
 
     Returns:
         A :class:`StorageCodec` saying what was asked for and what will run. An
@@ -107,11 +149,14 @@ async def configure(*, codec: str = CODEC_JSON) -> StorageCodec:
     Raises:
         BrowserUnavailableError: If called with no native bridge installed.
     """
-    value = await send_native_call("storage.configure", {"codec": codec})
+    value = await send_native_call(
+        "storage.configure", {"codec": codec, "owner": owner}
+    )
     return StorageCodec(
         requested=str(value.get("requested", codec)),
         active=str(value.get("active", CODEC_JSON)),
         supported=bool(value.get("supported", False)),
+        owner=str(value.get("owner", owner)),
     )
 
 
@@ -119,12 +164,14 @@ async def put(name: str, content: str) -> None:
     """Write a string value under a storage key, creating or overwriting it.
 
     Args:
-        name: The storage key (an IndexedDB key, scoped to the origin).
+        name: The storage key, within the owner configured by
+            :func:`configure`.
         content: The string value to store.
 
     Raises:
         NativeError: If the write fails, e.g. the quota is exceeded
-            (``quota_exceeded``).
+            (``quota_exceeded``), or another tab held an older database version
+            open long enough to time the operation out (``blocked``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
     await send_native_call("storage.put", {"name": name, "content": content})
@@ -134,13 +181,16 @@ async def get(name: str) -> str:
     """Read the string value stored under a key.
 
     Args:
-        name: The storage key (an IndexedDB key, scoped to the origin).
+        name: The storage key, within the owner configured by
+            :func:`configure`.
 
     Returns:
         The stored string value.
 
     Raises:
-        NativeError: If the key does not exist (``not_found``).
+        NativeError: If the key does not exist (``not_found``), or another tab
+            held an older database version open long enough to time the operation
+            out (``blocked``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
     value = await send_native_call("storage.get", {"name": name})
@@ -151,10 +201,13 @@ async def remove(name: str) -> None:
     """Delete the value stored under a key.
 
     Args:
-        name: The storage key (an IndexedDB key, scoped to the origin).
+        name: The storage key, within the owner configured by
+            :func:`configure`.
 
     Raises:
-        NativeError: If the key does not exist (``not_found``).
+        NativeError: If the key does not exist (``not_found``), or another tab
+            held an older database version open long enough to time the operation
+            out (``blocked``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
     await send_native_call("storage.remove", {"name": name})
@@ -163,13 +216,16 @@ async def remove(name: str) -> None:
 async def list_keys() -> list[str]:
     """List the keys currently present in storage.
 
-    The keys are the origin's, not one owner's: on a device where two owners used
-    the app, both sets come back.
+    The keys are the configured owner's, and they come back as the app wrote
+    them — the owner prefix is not part of the answer, so a caller that filters
+    the listing by its own prefix keeps working.
 
     Returns:
         The storage keys, or ``[]`` when storage is empty.
 
     Raises:
+        NativeError: If another tab held an older database version open long
+            enough to time the operation out (``blocked``).
         BrowserUnavailableError: If called with no native bridge installed.
     """
     value = await send_native_call("storage.list", {})

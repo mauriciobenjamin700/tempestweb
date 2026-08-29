@@ -229,6 +229,13 @@ em IndexedDB do `client/native/idb-kv.js` — **nada foi reimplementado**. O
 parâmetro é um `QueryStorage`, que aquele módulo satisfaz como está; um teste
 passa um dicionário falso.
 
+!!! tip "O cache persistido segue o dono configurado"
+    O `restore` lê pelo `list_keys()` do `native.storage`, então ele herda o
+    escopo por dono: com `configure(owner=...)` ligado, cada pessoa restaura só o
+    próprio cache. Sem isso — e era o caso até a 0.127.0 — o boot de um usuário
+    enchia o `QueryCache` com respostas de API que **outro** tinha persistido no
+    mesmo device. Veja [escopo do storage por dono](../advanced/storage-owner.md).
+
 !!! warning "Só valor JSON-able persiste"
     Uma entrada guardando um `HttpResponse`, uma dataclass ou um `datetime` não
     vira JSON. O `persist` **pula** essas e reporta quantas pulou, em vez de

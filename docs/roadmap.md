@@ -11,7 +11,16 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.126.0** — a #160 está **fechada inteira**. A metade que
+    **Versão do repo: 0.127.0** — a #195 fechou as duas pendências de `storage`
+    que a medição em device da #118 tinha deixado registradas: o keyspace passa a
+    ser **por dono** (`storage.configure(owner=...)`), o que também para de deixar
+    o `restore()` do `QueryCache` encher a tela de um usuário com resposta de API
+    persistida por outro; e uma chamada de `storage` durante o upgrade de outra
+    aba deixa de pendurar para sempre, respondendo `blocked`. Fica aberta a
+    terceira, de custo (um `indexedDB.open()` por operação), cujo desenho depende
+    do `onversionchange` que este trabalho entregou.
+
+    A #160 está **fechada inteira**. A metade que
     mora neste repo saiu na 0.125.0: um lote que o cliente não conseguiria
     decodificar **falha alto no encoder**, nomeando o campo, e um frame que mesmo
     assim não decodifique reporta a perda e pede resync em vez de sumir. As outras

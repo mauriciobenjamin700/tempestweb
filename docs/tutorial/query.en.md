@@ -230,6 +230,14 @@ key/value store in `client/native/idb-kv.js` — **nothing was reimplemented**. 
 parameter is a `QueryStorage`, which that module satisfies as it stands; a test
 passes a dictionary-backed fake.
 
+!!! tip "The persisted cache follows the configured owner"
+    `restore` reads through `native.storage`'s `list_keys()`, so it inherits the
+    owner scoping: with `configure(owner=...)` on, each person restores only
+    their own cache. Without it — which was the case until 0.127.0 — one user's
+    boot filled the `QueryCache` with API responses **another** had persisted on
+    the same device. See [scoping storage by
+    owner](../advanced/storage-owner.md).
+
 !!! warning "Only JSON-able values persist"
     An entry holding an `HttpResponse`, a dataclass or a `datetime` cannot become
     JSON. `persist` **skips** those and reports how many it skipped, rather than

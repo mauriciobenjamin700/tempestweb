@@ -12,11 +12,48 @@
 // database will not open, operations reject with StoreUnavailableError and the
 // caller degrades the same way.
 
-import { CapabilityError } from "./index.js";
-import { CODEC_JSON, decodeValue, encodeValue, resolveCodec } from "../offline/codec.js";
+import { CapabilityError, StoreBlockedError } from "./index.js";
+import {
+  CODEC_JSON,
+  decodeValue,
+  encodeValue,
+  resolveCodec,
+} from "../offline/codec.js";
 
 const DB_NAME = "tempestweb";
 const STORE = "kv";
+
+/**
+ * The schema version every open requests.
+ *
+ * Named rather than inlined because it is the trigger for a whole failure mode:
+ * the moment this changes, every tab still running the previous build holds a
+ * connection at the old version, and the new tab's open sits in `blocked` until
+ * they let go. Raising it is a deployment decision, not an edit — see
+ * {@link openDb}.
+ *
+ * @type {number}
+ */
+const DB_VERSION = 1;
+
+/**
+ * How long any open may stay unsettled before the operation gives up, in ms.
+ *
+ * The deadline covers **every** open, not only one that reported `blocked`,
+ * because the tab that gets told it is blocked is not the tab that suffers most.
+ * Measured against a real `IDBFactory`: while one tab's upgrade sits blocked, a
+ * second tab opening the database at the current version receives **no event at
+ * all** — not `blocked`, not `success`, not `error`. It is queued silently
+ * behind the pending upgrade. Arming the clock only inside `onblocked` would
+ * therefore rescue the tab doing the upgrading and leave every bystander hanging
+ * exactly as before, which is the common case, not the rare one.
+ *
+ * Three seconds is far longer than a healthy open (single-digit milliseconds)
+ * and short enough that a screen waiting on `storage` fails instead of hanging.
+ *
+ * @type {number}
+ */
+const OPEN_TIMEOUT_MS = 3000;
 
 /**
  * The codec new writes use. Reads never consult it — an envelope carries its own
@@ -117,29 +154,91 @@ function promisify(request) {
 /**
  * Open (creating if needed) the tempestweb key/value database.
  *
+ * Three lifecycle facts shape this, and each was measured against a real
+ * `IDBFactory` rather than read off the spec:
+ *
+ * **`blocked` is not terminal.** It fires when another tab holds the database at
+ * an older version, and the request stays pending — `onsuccess` still arrives
+ * once that tab lets go. Settling the promise there would report a failure for
+ * an open that is about to succeed, so the handler only records that it
+ * happened, for the error message.
+ *
+ * **A bystander gets no event at all.** While one tab's upgrade sits blocked, a
+ * second tab opening at the current version receives no `blocked`, no `success`
+ * and no `error` — it is queued silently behind the pending upgrade. That is why
+ * the deadline covers every open instead of being armed inside `onblocked`:
+ * arming it there rescues the tab doing the upgrade and leaves every other tab
+ * hanging exactly as before. The bystander is the common case.
+ *
+ * **A late arrival must not be kept.** When the deadline has already rejected,
+ * an `onsuccess` that lands afterwards is closed immediately. Holding it would
+ * leave an unreachable connection open at the old version — which is itself
+ * what blocks the next upgrade, so abandoning it silently would turn one late
+ * open into the cause of the next hang.
+ *
+ * `onversionchange` is the other half of the fix, and it has to be in the build
+ * that is *already deployed* when a bump happens: an upgrade is blocked by
+ * yesterday's tabs, not by tomorrow's. Closing on that event is what lets the
+ * upgrading tab through, and closing does not abort a transaction already in
+ * flight — that write still commits.
+ *
  * @param {IDBFactory} idb  The IndexedDB factory (`globalThis.indexedDB`).
+ * @param {number} openTimeoutMs  How long the open may stay unsettled.
  * @returns {Promise<IDBDatabase>} The open database.
  * @throws {StoreUnavailableError} When the factory throws synchronously or the
  *         open request errors — this backend is not usable in this profile.
+ * @throws {StoreBlockedError} When the open did not settle within
+ *         `openTimeoutMs`, because another tab is mid-upgrade.
  */
-function openDb(idb) {
+function openDb(idb, openTimeoutMs) {
   return new Promise((resolve, reject) => {
     /** @type {IDBOpenDBRequest} */
     let open;
     try {
-      open = idb.open(DB_NAME, 1);
+      open = idb.open(DB_NAME, DB_VERSION);
     } catch (err) {
       reject(new StoreUnavailableError(describe(err)));
       return;
     }
+    let abandoned = false;
+    let sawBlocked = false;
+    /** @type {*} */
+    const timer = setTimeout(() => {
+      abandoned = true;
+      reject(
+        new StoreBlockedError(
+          sawBlocked
+            ? "another tab held an older database version open"
+            : "the open never settled; another tab is mid-upgrade",
+        ),
+      );
+    }, openTimeoutMs);
+    if (timer && typeof timer.unref === "function") timer.unref();
+
+    const settle = (fn, value) => {
+      clearTimeout(timer);
+      if (!abandoned) fn(value);
+    };
+    open.onblocked = () => {
+      sawBlocked = true;
+    };
     open.onupgradeneeded = () => {
       const db = open.result;
       if (!db.objectStoreNames.contains(STORE)) {
         db.createObjectStore(STORE);
       }
     };
-    open.onsuccess = () => resolve(open.result);
-    open.onerror = () => reject(new StoreUnavailableError(describe(open.error)));
+    open.onsuccess = () => {
+      const db = open.result;
+      db.onversionchange = () => db.close();
+      if (abandoned) {
+        db.close();
+        return;
+      }
+      settle(resolve, db);
+    };
+    open.onerror = () =>
+      settle(reject, new StoreUnavailableError(describe(open.error)));
   });
 }
 
@@ -167,7 +266,9 @@ function runTx(db, mode, run) {
     let failure = null;
     tx.oncomplete = () => (failure ? reject(failure) : resolve(result));
     tx.onabort = () =>
-      reject(failure || new Error(describe(tx.error) || "the transaction aborted"));
+      reject(
+        failure || new Error(describe(tx.error) || "the transaction aborted"),
+      );
     Promise.resolve(run(tx.objectStore(STORE))).then(
       (value) => {
         result = value;
@@ -191,14 +292,21 @@ function runTx(db, mode, run) {
  * Create an IndexedDB-backed key/value store, or null when IndexedDB is absent.
  *
  * @param {IDBFactory} [idb]  The IndexedDB factory (defaults to the global one).
+ * @param {Object} [options]
+ * @param {number} [options.openTimeoutMs]  How long an open may stay unsettled
+ *        before the operation gives up. Defaults to {@link OPEN_TIMEOUT_MS};
+ *        injectable so a test can prove the deadline without waiting for it.
  * @returns {?KeyValueStore}  The store, or null when IndexedDB is unavailable.
  */
-export function createIdbKv(idb = /** @type {any} */ (globalThis).indexedDB) {
+export function createIdbKv(
+  idb = /** @type {any} */ (globalThis).indexedDB,
+  { openTimeoutMs = OPEN_TIMEOUT_MS } = {},
+) {
   if (!idb) {
     return null;
   }
   const withStore = async (mode, run) => {
-    const db = await openDb(idb);
+    const db = await openDb(idb, openTimeoutMs);
     try {
       return await runTx(db, mode, run);
     } catch (err) {
@@ -210,7 +318,9 @@ export function createIdbKv(idb = /** @type {any} */ (globalThis).indexedDB) {
   return {
     /** @param {string} name @returns {Promise<?string>} */
     async get(name) {
-      const value = await withStore("readonly", (store) => promisify(store.get(name)));
+      const value = await withStore("readonly", (store) =>
+        promisify(store.get(name)),
+      );
       return decodeValue(value);
     },
     /**
@@ -225,7 +335,9 @@ export function createIdbKv(idb = /** @type {any} */ (globalThis).indexedDB) {
      */
     async put(name, content) {
       const stored = await encodeValue(content, _codec);
-      await withStore("readwrite", (store) => promisify(store.put(stored, name)));
+      await withStore("readwrite", (store) =>
+        promisify(store.put(stored, name)),
+      );
     },
     /** @param {string} name @returns {Promise<void>} */
     async remove(name) {
@@ -233,7 +345,9 @@ export function createIdbKv(idb = /** @type {any} */ (globalThis).indexedDB) {
     },
     /** @returns {Promise<string[]>} */
     async keys() {
-      const keys = await withStore("readonly", (store) => promisify(store.getAllKeys()));
+      const keys = await withStore("readonly", (store) =>
+        promisify(store.getAllKeys()),
+      );
       return (keys || []).map(String);
     },
   };

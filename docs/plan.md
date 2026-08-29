@@ -614,7 +614,9 @@ sequencial. Trilho 0 antecede tudo; Trilho W pode correr em paralelo ao A após 
   - **Arquivos:** `tempestweb/native/{geolocation,clipboard,storage}.py`; backends
     cliente correspondentes; `storage` por cima de `client/offline/store.js`.
   - **API:** `await geolocation.get()` → `Position`; `await clipboard.read()` /
-    `clipboard.write(text)`; `storage` = a API do store owner-scoped (P2).
+    `clipboard.write(text)`; `storage` = key/value sobre IndexedDB, com keyspace
+    escopado por dono via `configure(owner=...)` (0.127.0). **Não** é a API do
+    store de registro do P2 — aquele tem índice e consulta; este é um KV.
   - **Feito quando:** `await geolocation.get()` retorna a posição (com permissão);
     `storage.put/list` persiste e lê do IndexedDB.
   - **Cuidados:** todas exigem permissão e contexto seguro; tratar negação como

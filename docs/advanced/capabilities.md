@@ -134,6 +134,46 @@ chamada chega na Web API, não o seu código.
     mesma chave, e um `removeItem` depois apagaria o dado que você acabou de
     salvar. A marca é o que evita reprocessar a cada boot.
 
+!!! warning "Migração: da 0.127.0 em diante o keyspace tem dono"
+    Até a **0.126.0** o keyspace era da **origem**: duas pessoas usando o app no
+    mesmo navegador compartilhavam as chaves, uma sobrescrevia o dado da outra, e
+    o `list_keys()` devolvia os dois conjuntos. Da **0.127.0** em diante,
+    `storage.configure(owner=...)` dá a cada uma o seu.
+
+    **App que não passa `owner` não faz nada.** O dono default é `""` e grava a
+    chave **crua**, byte a byte como antes — nada é reescrito, nada é migrado,
+    nenhuma versão de banco se move.
+
+    **App que liga o escopo começa com keyspace vazio.** O dado antigo continua
+    legível pelo dono default, mas não vem junto: só a sua app sabe de quem ele
+    era. Para levá-lo, use a API pública, **uma vez**:
+
+    ```python
+    from tempestweb import native
+
+
+    async def adotar_legado(user_id: str) -> None:
+        """Move o dado do keyspace default para o do usuário."""
+        await native.storage.configure()
+        legado = {
+            nome: await native.storage.get(nome)
+            for nome in await native.storage.list_keys()
+        }
+        await native.storage.configure(owner=user_id)
+        for nome, conteudo in legado.items():
+            await native.storage.put(nome, conteudo)
+    ```
+
+    **Num device onde duas pessoas já usaram o app, não adote.** O keyspace
+    default tem o dado das duas misturado, sem registro de quem é o quê, e adotar
+    entregaria o de uma para a outra. Onde as duas escreveram a mesma chave existe
+    **um** valor, o de quem escreveu por último — o da primeira sumiu no dia em
+    que foi sobrescrito, e isso não é recuperável nem antes nem depois desta
+    mudança. Comece vazio.
+
+    Detalhe, receita e o código de erro `blocked` novo:
+    [escopo do storage por dono](storage-owner.md).
+
 ## Exemplo: HTTP tipado com retry
 
 O `native.http` (N0) é a base do replay offline. Uma requisição com retry e

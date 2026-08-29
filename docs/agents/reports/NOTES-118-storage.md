@@ -5,8 +5,19 @@ são pendências medidas, para virarem item da #118 (ou issue própria).
 
 ## Pendência 1 — o keyspace do `storage` é por origem, não por owner
 
-**Estado:** aberto. A promessa foi removida da documentação nesta branch; a
-capacidade continua sem escopo por owner.
+**Estado: FECHADA na 0.127.0 (#195).** `storage.configure(owner=...)` escopa o
+keyspace; o dono default (`""`) grava a chave crua, então nada do que já está no
+disco se move.
+
+A nota supunha que o bloqueio era achar de onde tirar a identidade do dono. Era
+mesmo, e a resposta é que **não há** de onde: o Modo A não tem sessão, e o
+`session_id` do Modo B identifica um transporte e muda a cada reconexão. O dono
+virou parâmetro do app.
+
+O que a nota **não** dizia, e é o dano concreto que a correção fecha:
+`tempestweb/query/persistence.py` restaura o cache percorrendo `list_keys()`, então
+o boot de um usuário enchia o `QueryCache` com respostas de API persistidas por
+outro no mesmo device. Isso saiu de graça, sem uma linha em `query/`.
 
 Quatro docstrings e um typedef prometiam "the owner-scoped store from
 `client/offline/store.js` (T9/P2)":
@@ -66,12 +77,37 @@ Ordem de grandeza antes de priorizar: o open é o custo dominante só em rajada 
 operações pequenas; para o caso que a #118 mediu (um valor de 142.890
 caracteres) o open desaparece ao lado do encode e da escrita.
 
+**Atualização (0.127.0):** o pré-requisito que esta pendência listava já existe.
+O `onversionchange` → `db.close()` foi entregue pela pendência 3, então segurar a
+conexão deixou de trazer o risco de prender outra aba no `onblocked`. O que resta
+do desenho é a reabertura preguiçosa depois do close e o destino de uma transação
+em vôo no meio da troca.
+
 ## Pendência 3 — `onblocked` do open não é tratado
 
-**Estado:** aberto, consequência conhecida, sem número medido.
+**Estado: FECHADA na 0.127.0 (#195).**
 
-`openDb()` fecha em `onsuccess` e em `onerror`. Se um dia o banco subir de versão,
-`onblocked` (outra aba com a versão antiga aberta) não resolve nem rejeita: a
-promise fica pendurada e a operação de `storage` nunca responde. Hoje é
-inalcançável — a versão é `1` e nunca subiu —, então tratar agora seria código
-sem teste possível. Vira obrigatório no mesmo commit que subir `DB_VERSION`.
+`openDb()` fechava em `onsuccess` e em `onerror`. Se o banco subisse de versão,
+`onblocked` não resolvia nem rejeitava: a promise ficava pendurada e a operação de
+`storage` nunca respondia.
+
+**A nota original errou em dois pontos, e vale registrar quais.**
+
+Primeiro, "hoje é inalcançável, tratar agora seria código sem teste possível"
+estava errado: `fake-indexeddb` já está no `devDependencies` e roteiriza a
+sequência inteira. `tests/client/native-idb-blocked.test.js` são 8 casos, sem
+subir versão de banco nenhuma.
+
+Segundo, e mais importante, "vira obrigatório no mesmo commit que subir
+`DB_VERSION`" estava exatamente ao contrário. O `onversionchange` é o handler que
+faz a aba **antiga** soltar a conexão, então ele precisa estar no build **já
+implantado** quando alguém sobe a versão — entregá-lo junto do bump é entregá-lo
+uma release tarde demais.
+
+E medindo apareceu um terceiro fato que o desenho da nota não cobria: a aba que
+apenas **usa** o banco enquanto outra faz upgrade **não recebe evento nenhum** —
+nem `blocked`, nem `success`, nem `error`. Fica enfileirada em silêncio. Um prazo
+armado dentro do `onblocked` salvaria só quem faz o upgrade e deixaria toda
+espectadora pendurada, que é o caso comum. Por isso o prazo (`OPEN_TIMEOUT_MS`)
+cobre todo open, e conexão que chega depois dele é fechada — segurá-la deixaria
+uma conexão inalcançável na versão antiga, bloqueando o upgrade seguinte.

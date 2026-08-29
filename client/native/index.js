@@ -165,7 +165,9 @@ import {
  * @property {Function} [BroadcastChannel]  BroadcastChannel constructor.
  * @property {Function} [AudioContext]  AudioContext constructor (Web Audio tone).
  * @property {Object} [store]   IndexedDB key/value store (client/native/idb-kv.js),
- *           optional. Origin-scoped, not owner-scoped.
+ *           optional. Keys reach it already scoped: `client/native/storage.js`
+ *           derives the owner prefix above the backend choice, so the
+ *           localStorage fallback is scoped by the same rule.
  * @property {Function} [forgetStore]  Drops the cached `store` after IndexedDB
  *           refused to open, so the capability degrades to localStorage.
  */

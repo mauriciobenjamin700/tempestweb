@@ -32,6 +32,7 @@ from tempestweb.html import theme_css
 from tempestweb.native.bridges import FFIBridge
 from tempestweb.native.dispatch import install_bridge, uninstall_bridge
 from tempestweb.runtime.wasm import WasmRuntime
+from tempestweb.transports.base import encode_wire
 from tempestweb.transports.wasm import WasmTransport
 
 __all__ = ["WasmAppHandle", "bootstrap"]
@@ -128,8 +129,12 @@ class WasmAppHandle(Generic[S]):
 
         Returns:
             The initial root node, JSON-encoded.
+
+        Raises:
+            NonFiniteWireValueError: If the tree carries a non-finite float, which
+                no ``JSON.parse`` accepts.
         """
-        return json.dumps(self._initial)
+        return encode_wire(self._initial)
 
     def push_event_json(self, event_json: str) -> None:
         """Feed one DOM event into the runtime.
@@ -220,8 +225,17 @@ def bootstrap(
     """
 
     def deliver(patches: list[dict[str, Any]]) -> None:
-        """Forward a patch batch to JS as a JSON string."""
-        on_patches(json.dumps(patches))
+        """Forward a patch batch to JS as a JSON string.
+
+        Args:
+            patches: The JSON-able patch dicts for one coalesced tick.
+
+        Raises:
+            NonFiniteWireValueError: If the batch carries a non-finite float. It
+                would cross the FFI as a token the client's decode rejects,
+                dropping the whole batch without a word (issue #160).
+        """
+        on_patches(encode_wire(patches))
 
     transport = WasmTransport(deliver)
     runtime: WasmRuntime[S] = WasmRuntime(

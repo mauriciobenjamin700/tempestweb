@@ -31,7 +31,9 @@ The envelope shape is identical for WebSocket and SSE; only the framing differs.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
+from math import isfinite
 from typing import Any, Literal, Protocol, runtime_checkable
 
 # A patch is a plain JSON-able dict produced by ``Patch.model_dump(mode="json")``.
@@ -69,6 +71,99 @@ EnvelopeKind = Literal[
 
 #: A wire envelope: a JSON-able dict tagged by ``kind`` (see module docstring).
 Envelope = dict[str, Any]
+
+
+class NonFiniteWireValueError(ValueError):
+    """Raised when a payload carries a float the JSON grammar cannot express.
+
+    ``nan``, ``inf`` and ``-inf`` have no JSON token. Python's encoder writes the
+    bare words ``NaN``/``Infinity`` unless told otherwise, and every browser's
+    ``JSON.parse`` rejects them — so the batch used to reach the client as a
+    ``SyntaxError`` thrown inside the decode, **before** the transport, the
+    renderer and any diagnostic. The whole batch vanished, and the core's
+    baseline had already moved past it, so every later patch addressed a tree the
+    client never received (``patch path out of range``, issue #160).
+
+    Failing at the encoder trades a silent loss for a loud error that names the
+    field, because the value is almost always a backend number that arrived
+    non-finite (a metric reported as the string ``"NaN"``, a division by zero)
+    and was handed straight to an unbounded numeric prop such as ``Style.width``.
+    """
+
+
+def _find_non_finite(value: Any, path: str) -> tuple[str, float] | None:  # noqa: ANN401 - walks arbitrary JSON-able payloads
+    """Locate the first non-finite float in a JSON-able payload.
+
+    Args:
+        value: The payload node being walked.
+        path: Dotted/indexed path of ``value`` within the payload being encoded.
+
+    Returns:
+        The path and the offending value, or ``None`` when the subtree is clean.
+    """
+    if isinstance(value, float) and not isfinite(value):
+        return path or "<root>", value
+    if isinstance(value, dict):
+        for key, item in value.items():
+            found = _find_non_finite(item, f"{path}.{key}" if path else str(key))
+            if found is not None:
+                return found
+        return None
+    if isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            found = _find_non_finite(item, f"{path}[{index}]")
+            if found is not None:
+                return found
+    return None
+
+
+def encode_wire(
+    payload: Any,  # noqa: ANN401 - any JSON-able wire payload
+    *,
+    separators: tuple[str, str] | None = None,
+    ensure_ascii: bool = True,
+) -> str:
+    """Serialize a wire payload, refusing what the client could not decode.
+
+    The single place Python turns a patch batch, an initial node or a Mode B
+    envelope into the text that crosses to the browser. Unlike a bare
+    :func:`json.dumps` it sets ``allow_nan=False``, so a non-finite float raises
+    here instead of being written as a token no ``JSON.parse`` accepts.
+
+    Args:
+        payload: The JSON-able value to encode.
+        separators: Item/key separators handed to :func:`json.dumps`; ``None``
+            keeps the stdlib default. Pass ``(",", ":")`` for the compact framing
+            the Mode B envelopes use.
+        ensure_ascii: Whether to escape non-ASCII characters. Kept ``True`` for
+            the SSE framing and set ``False`` for the WebSocket one, so each call
+            site reproduces byte for byte what it emitted before.
+
+    Returns:
+        The encoded JSON text.
+
+    Raises:
+        NonFiniteWireValueError: If the payload carries ``nan``, ``inf`` or
+            ``-inf``, with the path of the first offending field.
+    """
+    try:
+        return json.dumps(
+            payload,
+            separators=separators,
+            ensure_ascii=ensure_ascii,
+            allow_nan=False,
+        )
+    except ValueError as exc:
+        found = _find_non_finite(payload, "")
+        if found is None:
+            raise
+        where, offender = found
+        raise NonFiniteWireValueError(
+            f"tempestweb: cannot encode the wire payload — {offender} at "
+            f"{where}. JSON has no token for nan/inf, so the client would reject "
+            "the whole batch while decoding it. Guard the value where it enters "
+            "the tree (a float() over a backend field, a division by zero)."
+        ) from exc
 
 
 def encode_patches(patches: list[Patch]) -> Envelope:

@@ -163,8 +163,10 @@ inteira antes do próximo frame.
 O shape de Node/Patch/Evento acima **não muda** entre transportes; muda só o
 envelope:
 
-- **WASM (Modo A):** chamada de função em-processo via `pyodide.ffi`. Python passa
-  a lista de patches (já JSON-able) direto ao cliente; eventos voltam por callback.
+- **WASM (Modo A):** chamada de função em-processo via `pyodide.ffi`. Python
+  entrega o lote como **texto JSON** (string atravessa a FFI sem conversão de
+  proxy) e o transporte `client/transport-wasm.js` decodifica; eventos voltam por
+  callback.
 - **WebSocket (Modo B):** cada mensagem WS é um JSON `{ "kind": "patches", "data":
   [<Patch>...] }` (servidor→cliente) ou `{ "kind": "event", "data": <Evento> }`
   (cliente→servidor). Bidirecional no mesmo canal.

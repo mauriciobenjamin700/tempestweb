@@ -119,9 +119,10 @@ envelope does:
 
 === "WASM (Mode A)"
 
-    In-process function call via `pyodide.ffi`. Python passes the patch list
-    directly to the client; events come back via callback. No network, no
-    envelope.
+    In-process function call via `pyodide.ffi`. No network and no envelope: the
+    patch batch crosses as **JSON text** (a string crosses the FFI with no proxy
+    conversion), and the transport (`client/transport-wasm.js`) is what decodes
+    it. Events come back via callback.
 
 === "WebSocket (Mode B)"
 
@@ -137,6 +138,35 @@ envelope does:
     The server responds with `text/event-stream`. Each tick is an SSE event whose
     `data:` is the JSON of the **same** patch list. Events go up via HTTP POST
     (body = `Event`). Reconnect uses `Last-Event-ID`.
+
+!!! warning "Every batch is text, and not every float becomes text"
+
+    All three transports hand the client **text**, so the real boundary is the
+    JSON grammar — and it has no token for `nan`, `inf` or `-inf`. Python's
+    encoder writes `NaN`/`Infinity` by default, which **no** `JSON.parse`
+    accepts: the whole batch died inside the decode, before the transport, the
+    renderer and any diagnostic.
+
+    So tempestweb encodes through a single place,
+    [`encode_wire`](../reference/transports.md), which **refuses** the value
+    instead of writing it, naming the field:
+
+    ```text
+    tempestweb: cannot encode the wire payload — nan at data[1].style.width.
+    JSON has no token for nan/inf, so the client would reject the whole batch
+    while decoding it. Guard the value where it enters the tree (a float() over
+    a backend field, a division by zero).
+    ```
+
+    Backend data produces this more often than you would think: a metric that
+    comes back as the string `"NaN"` and goes through `float(...)`, or a division
+    by zero, landing on an unbounded numeric field such as `Style.width`. Fix it
+    at the source — `value if isfinite(value) else 0.0` — because the widget
+    accepts the number and the wire does not.
+
+    On the other side, a frame that still fails to decode does not vanish
+    quietly: the transport reports the loss on the console and asks for **one**
+    resync (not one per frame — the same payload would come back identical).
 
 ## The native call (Mode B — proxy)
 
@@ -169,6 +199,8 @@ in the browser. In Mode B it is **proxied** via a round-trip:
 - Four crossings: **IR → client**, **Event → handler**, **Style → CSS**, **native
   call**.
 - The shapes are pinned by golden fixtures derived from the real core.
+- A non-finite float does **not** cross: `encode_wire` refuses it and names the
+  field.
 
 For each field, read the canonical
 [`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md).

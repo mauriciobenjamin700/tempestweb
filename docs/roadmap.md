@@ -11,7 +11,16 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.124.0**, publicada no PyPI em 2026-08-27 pela tag
+    **Versão do repo: 0.125.0** — a #160 saiu de `needs-repro` e a metade dela
+    que mora neste repo está corrigida: um lote que o cliente não conseguiria
+    decodificar agora **falha alto no encoder**, nomeando o campo, e um frame que
+    mesmo assim não decodifique reporta a perda e pede resync em vez de sumir.
+    As outras duas lacunas da issue são do `tempest-core` (campo numérico sem
+    bound aceita `nan`; `App._rebuild` commita a baseline antes de entregar) e
+    seguem abertas — enquanto elas existirem, o sintoma visível ainda aparece,
+    reparado pelo resync da #159 no tick seguinte.
+
+    A última publicada no PyPI é a **0.124.0**, em 2026-08-27 pela tag
     `v0.124.0` — o tag anterior era `v0.121.0`, então a release carregou três
     bumps de uma vez:
     **0.122.0** — `CompactPredictor` lê `.tmc` em Python de stdlib, entregando

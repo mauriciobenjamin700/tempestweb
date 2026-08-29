@@ -10,6 +10,7 @@ that, with a socket whose first write is deliberately slower than its second.
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any
 
 from starlette.websockets import WebSocketState
@@ -18,7 +19,7 @@ from tempestweb.transports.websocket import WebSocketTransport
 
 
 class SlowFirstWebSocket:
-    """A socket duble whose first ``send_json`` takes longer than its second."""
+    """A socket duble whose first ``send_text`` takes longer than its second."""
 
     def __init__(self, delays: list[float]) -> None:
         """Store the per-send delays and the order writes completed in."""
@@ -26,9 +27,10 @@ class SlowFirstWebSocket:
         self._delays = iter(delays)
         self.written: list[int] = []
 
-    async def send_json(self, envelope: dict[str, Any]) -> None:
+    async def send_text(self, text: str) -> None:
         """Sleep this write's delay, then record the batch it carried."""
         await asyncio.sleep(next(self._delays, 0.0))
+        envelope: dict[str, Any] = json.loads(text)
         self.written.append(envelope["data"][0]["tick"])
 
 
@@ -56,10 +58,10 @@ async def test_sends_stay_ordered_across_envelope_kinds() -> None:
             self.client_state = WebSocketState.CONNECTED
             self._delays = iter([0.05, 0.0])
 
-        async def send_json(self, envelope: dict[str, Any]) -> None:
+        async def send_text(self, text: str) -> None:
             """Sleep this write's delay, then record the envelope kind."""
             await asyncio.sleep(next(self._delays, 0.0))
-            order.append(str(envelope["kind"]))
+            order.append(str(json.loads(text)["kind"]))
 
     transport = WebSocketTransport(RecordingWebSocket())  # type: ignore[arg-type]
     patches = asyncio.ensure_future(transport.send_patches([{"tick": 1}]))

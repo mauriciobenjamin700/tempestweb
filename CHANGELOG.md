@@ -4,6 +4,65 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.125.0] — 2026-08-29
+
+### Fixed
+
+- **Um lote que o cliente não conseguia decodificar sumia sem uma linha de log
+  (#160).** Float não-finito não tem token em JSON: `json.dumps` escreve `NaN` /
+  `Infinity` por default, e nenhum `JSON.parse` aceita. Um lote com `nan` cruzava
+  a fronteira como texto inválido e morria **dentro da decodificação do cliente**
+  — antes do transporte, antes do renderizador, antes de qualquer diagnóstico.
+  Como o `App._rebuild` do core já tinha commitado a baseline, todo patch
+  seguinte endereçava índice de uma árvore que o cliente nunca recebeu, e o
+  sintoma aparecia um tick depois, num lugar sem relação com a causa
+  (`patch path out of range`). Em 3 das 7 reproduções medidas não havia **nenhuma**
+  linha de console.
+
+  Como o valor chega ali: campo numérico sem bound (`Style.width`) aceita
+  `float("nan")` — os que têm bound, como `Style.opacity`, recusam —, e o `nan`
+  costuma vir de dado de backend (`float(metrics["load_pct"])` sobre a string
+  `"NaN"`, uma divisão por zero).
+
+  Toda serialização de fio passa a ir por `encode_wire`
+  (`tempestweb.transports`), que usa `allow_nan=False` e **recusa** o payload
+  levantando `NonFiniteWireValueError` com o caminho do campo
+  (`data[1].style.width`), em vez da mensagem genérica da stdlib. Os três pontos
+  que viravam texto adotaram: o nó inicial e o lote do Modo A
+  (`runtime/wasm_main.py`), o frame WebSocket (`send_text` no lugar de
+  `send_json`, que codifica com `allow_nan=True` e não aceita a opção) e o frame
+  SSE. Para payload finito, cada chamada reproduz byte a byte o encoder que
+  substituiu.
+
+- **E, um nível abaixo, decodificar não era responsabilidade de ninguém.** Os
+  três transportes chamavam `JSON.parse` cru dentro do handler de mensagem, então
+  um frame inválido estourava para fora do handler: lote perdido, sem log e sem
+  reparo. No Modo A o parse morava no `bootstrap.js` **gerado**, acima do
+  transporte — um lote ainda no buffer de boot não tinha nem transporte por onde
+  pedir resync.
+
+  A decodificação virou `client/wire.js` (`createWireDecoder`), usado pelos três:
+  reporta a perda no console com o tamanho do frame e o `SyntaxError` do V8 (que
+  já carrega o trecho ofensor), e pede **um** resync por sequência de frames
+  ruins, rearmado no primeiro que decodifica — um por frame giraria, já que o
+  mesmo payload volta igual. O `bootstrap.js` passa o texto adiante sem parsear,
+  e `client/transport-wasm.js` decodifica: **mudança de contrato do bridge do
+  Modo A** — `onDeliver` agora entrega `string`, não `Patch[]`.
+
+  Medido em Chrome real, Modo B, dois frames inválidos injetados no socket vivo:
+  duas linhas de `console.error` nomeando a perda, **um** `{"kind":"event","data":
+  {"type":"resync","key":""}}` no fio, e a árvore intacta depois do reparo
+  (`Count: 1` antes e depois).
+
+### Notes
+
+- As outras duas lacunas que a #160 nomeia são do `tempest-core` e continuam
+  abertas: campo numérico de `Style` sem bound aceita `nan`/`inf`, e
+  `App._rebuild` commita `self._current` **antes** de `self._apply`, então uma
+  entrega que falha deixa o Python descrevendo uma árvore que o cliente não tem.
+  Enquanto elas existirem, o sintoma visível ainda ocorre — reparado pelo resync
+  do Modo A (#159) no tick seguinte, em vez de deixar a tela truncada.
+
 ## [0.124.0] — 2026-08-27
 
 ### Fixed

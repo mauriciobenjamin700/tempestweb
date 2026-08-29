@@ -38,6 +38,7 @@ from tempestweb.transports.base import (
     encode_navigate,
     encode_patches,
     encode_theme,
+    encode_wire,
 )
 
 __all__ = ["WebSocketTransport"]
@@ -247,17 +248,26 @@ class WebSocketTransport:
         client's tree. :class:`asyncio.Lock` wakes waiters FIFO, so the order the
         session queued the batches in is the order they are written.
 
+        The envelope is encoded through :func:`encode_wire` rather than handed to
+        Starlette's ``send_json``, which encodes with ``allow_nan=True``: a
+        non-finite float would then reach the browser as a token ``JSON.parse``
+        rejects, and the client would drop the whole batch while decoding it. The
+        arguments reproduce ``send_json``'s bytes exactly for every finite
+        payload.
+
         Args:
             envelope: The JSON-able wire envelope to send.
 
         Raises:
             TransportClosedError: If the socket is closed or disconnects mid-send.
+            NonFiniteWireValueError: If the envelope carries a non-finite float.
         """
         async with self._send_lock:
             if self._closed or self.websocket.client_state != WebSocketState.CONNECTED:
                 raise TransportClosedError("websocket is closed")
+            text = encode_wire(envelope, separators=(",", ":"), ensure_ascii=False)
             try:
-                await self.websocket.send_json(envelope)
+                await self.websocket.send_text(text)
             except (WebSocketDisconnect, RuntimeError) as exc:
                 self._closed = True
                 raise TransportClosedError("websocket disconnected") from exc

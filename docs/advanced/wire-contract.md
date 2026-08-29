@@ -118,9 +118,10 @@ O shape de Node/Patch/Evento **não muda** entre transportes; muda só o envelop
 
 === "WASM (Modo A)"
 
-    Chamada de função em-processo via `pyodide.ffi`. Python passa a lista de
-    patches direto ao cliente; eventos voltam por callback. Sem rede, sem
-    envelope.
+    Chamada de função em-processo via `pyodide.ffi`. Sem rede e sem envelope: o
+    lote de patches cruza como **texto JSON** (uma string atravessa a FFI sem
+    conversão de proxy), e quem decodifica é o transporte
+    (`client/transport-wasm.js`). Eventos voltam por callback.
 
 === "WebSocket (Modo B)"
 
@@ -136,6 +137,35 @@ O shape de Node/Patch/Evento **não muda** entre transportes; muda só o envelop
     O servidor responde `text/event-stream`. Cada tick é um evento SSE cujo
     `data:` é o JSON da **mesma** lista de patches. Eventos sobem por HTTP POST
     (corpo = `Evento`). Reconnect usa `Last-Event-ID`.
+
+!!! warning "Todo lote é texto, e nem todo float vira texto"
+
+    Os três transportes entregam **texto** ao cliente, então a fronteira real é
+    a gramática do JSON — e ela não tem token para `nan`, `inf` nem `-inf`.
+    O encoder do Python escreve `NaN`/`Infinity` por default, que **nenhum**
+    `JSON.parse` aceita: o lote inteiro morria dentro da decodificação, antes do
+    transporte, do renderizador e de qualquer diagnóstico.
+
+    Por isso o `tempestweb` codifica por um lugar só,
+    [`encode_wire`](../reference/transports.md), que **recusa** o valor em vez de
+    escrevê-lo, nomeando o campo:
+
+    ```text
+    tempestweb: cannot encode the wire payload — nan at data[1].style.width.
+    JSON has no token for nan/inf, so the client would reject the whole batch
+    while decoding it. Guard the value where it enters the tree (a float() over
+    a backend field, a division by zero).
+    ```
+
+    Isso acontece com dado de backend mais do que parece: uma métrica que volta
+    como a string `"NaN"` e passa por `float(...)`, ou uma divisão por zero,
+    caindo num campo numérico sem bound como `Style.width`. Trate na origem —
+    `value if isfinite(value) else 0.0` — porque o widget aceita o número e o
+    fio não.
+
+    Do outro lado, um frame que mesmo assim não decodifique não some calado: o
+    transporte reporta a perda no console e pede **um** resync (não um por
+    frame — o mesmo payload voltaria igual).
 
 ## A chamada nativa (Modo B — proxy)
 
@@ -166,6 +196,7 @@ browser. No Modo B ela é **proxiada** por um round-trip:
 - Quatro cruzamentos: **IR → cliente**, **Evento → handler**, **Style → CSS**,
   **chamada nativa**.
 - Os shapes são fixados por golden fixtures derivadas do core real.
+- Float não-finito **não** atravessa: `encode_wire` recusa e nomeia o campo.
 
 Para cada campo, leia o
 [`docs/contract.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/contract.md)

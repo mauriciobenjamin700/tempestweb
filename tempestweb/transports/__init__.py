@@ -8,7 +8,9 @@ by the golden fixtures under ``tests/fixtures/``.
 - :class:`~tempestweb.transports.wasm.WasmTransport` — Mode A (``pyodide.ffi``).
 - :class:`~tempestweb.transports.websocket.WebSocketTransport` — Mode B over WS.
 - :class:`~tempestweb.transports.sse.SSETransport` — Mode B over SSE + HTTP POST.
-- Envelope encoders and the ``Envelope``/``Patch``/``Event`` type aliases.
+- Envelope encoders, :func:`~tempestweb.transports.base.encode_wire` (the one
+  place a payload becomes wire text) and the ``Envelope``/``Patch``/``Event``
+  type aliases.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from tempestweb.transports.base import (
     NativeCall,
     NativeEvent,
     NativeResult,
+    NonFiniteWireValueError,
     Patch,
     PatchTransport,
     TransportClosedError,
@@ -33,6 +36,7 @@ from tempestweb.transports.base import (
     encode_native_unsubscribe,
     encode_navigate,
     encode_patches,
+    encode_wire,
 )
 from tempestweb.transports.wasm import WasmTransport
 
@@ -80,6 +84,7 @@ __all__ = [
     "NativeCall",
     "NativeEvent",
     "NativeResult",
+    "NonFiniteWireValueError",
     "Patch",
     "PatchTransport",
     "SSETransport",
@@ -94,4 +99,5 @@ __all__ = [
     "encode_native_unsubscribe",
     "encode_navigate",
     "encode_patches",
+    "encode_wire",
 ]

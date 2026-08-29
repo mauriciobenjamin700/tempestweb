@@ -70,6 +70,7 @@ _CLIENT_ASSETS: tuple[str, ...] = (
     "pages.js",
     "transport.js",
     "virtualize.js",
+    "wire.js",
     "router.js",
     "camera-widgets.js",
     "constants.js",
@@ -1041,14 +1042,17 @@ export async function boot() {{
   //    Python starts its rebuild loop inside start(), so a batch that lands in
   //    the gap used to vanish with no error, and the mounted tree silently missed
   //    whatever it carried (tempestweb#160).
+  //    The text is passed through UNPARSED. Decoding belongs to the transport
+  //    (transport-wasm.js), which pairs a frame it cannot decode with a resync —
+  //    parsing here threw out of the glue instead, losing the batch just as
+  //    quietly, and a buffered batch had no transport to repair through yet.
   let deliverToTransport = null;
   const bootPatches = [];
   const onPatches = (patchesJson) => {{
-    const patches = JSON.parse(patchesJson);
     if (deliverToTransport) {{
-      deliverToTransport(patches);
+      deliverToTransport(patchesJson);
     }} else {{
-      bootPatches.push(patches);
+      bootPatches.push(patchesJson);
     }}
   }};
   // View -> URL: push the new path when the app navigates (no popstate fires, so

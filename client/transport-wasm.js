@@ -5,8 +5,9 @@
 // `WasmTransport` (tempestweb/transports/wasm.py) to the shared `Transport`
 // interface from transport.js that the DOM renderer (tempestweb.js) consumes:
 //
-//   - Patches out (Python -> client): the Python side calls `deliver(patches)`;
-//     this transport forwards each batch to the registered `onPatches` handler.
+//   - Patches out (Python -> client): the Python side calls `deliver(batchJson)`
+//     with the batch as JSON text; this transport decodes it and forwards it to
+//     the registered `onPatches` handler.
 //   - Events in (client -> Python): `sendEvent(ev)` calls the Python side's
 //     `push_event`, which enqueues it for the runtime's event loop.
 //   - Repair (client -> Python): `requestResync()` pushes a `resync` event the
@@ -17,14 +18,21 @@
 // by public/index.html. This file is bridge-agnostic so it is unit-testable with
 // a plain fake bridge under jsdom (no Pyodide). See ../docs/contract.md.
 
+import { createWireDecoder } from "./wire.js";
+
 /**
  * @typedef {Object} WasmBridge
  * The thin seam over pyodide.ffi the bootstrap supplies. Every value crossing it
- * is already plain JSON-able (the FFI converts Python dicts/lists to JS
- * objects/arrays), so this transport never touches a Pyodide proxy directly.
- * @property {(handler: (patches: import("./transport.js").Patch[]) => void) => void} onDeliver
+ * is a plain string or a plain JSON-able object, so this transport never touches
+ * a Pyodide proxy directly.
+ * @property {(handler: (batchJson: string) => void) => void} onDeliver
  *           Register the JS callback the Python `WasmTransport` invokes with each
- *           patch batch. Called exactly once by the transport at creation.
+ *           patch batch, as the JSON **text** Python encoded. Called exactly once
+ *           by the transport at creation. The text is decoded here rather than in
+ *           the generated bootstrap so a frame that cannot be parsed reaches the
+ *           repair path instead of throwing out of the glue (issue #160) — and so
+ *           a batch buffered before this transport existed is still decoded with
+ *           the resync available.
  * @property {(event: import("./transport.js").TWEvent) => void} pushEvent
  *           Hand a wire event to the Python side (its `push_event`).
  * @property {() => void} [close]
@@ -34,9 +42,11 @@
 /**
  * Create a Mode A (WASM) transport bridging the JS client to in-process Python.
  *
- * Registers the sink the Python side calls with each patch batch. Batches that
- * arrive before the renderer has registered its handler (e.g. the initial mount
- * race) are buffered and flushed in order once onPatches() lands.
+ * Registers the sink the Python side calls with each patch batch, decodes the
+ * JSON text it carries, and repairs the tree with one resync when a batch cannot
+ * be decoded. Batches that arrive before the renderer has registered its handler
+ * (e.g. the initial mount race) are buffered and flushed in order once
+ * onPatches() lands.
  *
  * @param {WasmBridge} bridge  The pyodide.ffi adapter from the bootstrap.
  * @returns {import("./transport.js").Transport}
@@ -52,12 +62,26 @@ export function createWasmTransport(bridge) {
   const pending = [];
   let closed = false;
 
-  bridge.onDeliver((patches) => {
+  /**
+   * Ask the Python side to re-send the whole scene.
+   *
+   * @returns {void}
+   */
+  const requestResync = () => {
     if (closed) return;
+    bridge.pushEvent({ type: "resync", key: "", payload: {} });
+  };
+
+  const decode = createWireDecoder(requestResync, "the Mode A bridge");
+
+  bridge.onDeliver((batchJson) => {
+    if (closed) return;
+    const decoded = decode(batchJson);
+    if (!decoded.ok) return;
     if (patchHandler) {
-      patchHandler(patches);
+      patchHandler(decoded.value);
     } else {
-      pending.push(patches);
+      pending.push(decoded.value);
     }
   });
 
@@ -96,10 +120,7 @@ export function createWasmTransport(bridge) {
      *
      * @returns {void}
      */
-    requestResync() {
-      if (closed) return;
-      bridge.pushEvent({ type: "resync", key: "", payload: {} });
-    },
+    requestResync,
 
     /**
      * Tear down the transport.

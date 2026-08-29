@@ -29,7 +29,6 @@ new stream takes over: the previous one is retired at its next wake-up.
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
@@ -50,6 +49,7 @@ from tempestweb.transports.base import (
     encode_navigate,
     encode_patches,
     encode_theme,
+    encode_wire,
 )
 
 __all__ = ["SSETransport"]
@@ -342,6 +342,9 @@ def _frame(tick_id: int, envelope: Envelope) -> str:
 
     Returns:
         The SSE wire text for this event (``id``/``data`` lines + blank line).
+
+    Raises:
+        NonFiniteWireValueError: If the envelope carries a non-finite float.
     """
-    payload = json.dumps(envelope, separators=(",", ":"))
+    payload = encode_wire(envelope, separators=(",", ":"))
     return f"id: {tick_id}\ndata: {payload}\n\n"

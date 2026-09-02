@@ -29,7 +29,6 @@
 // Usage: node scripts/pwa-audit.mjs <base-url>
 // Exit code 0 means the artifact is installable and works offline.
 
-import { chromium } from "playwright";
 import { validateInstallable } from "../client/pwa/manifest.js";
 
 /** How long to wait for the service worker to take control, in milliseconds. */
@@ -198,12 +197,36 @@ async function auditOffline(context, page) {
 }
 
 /**
+ * Load Playwright's Chromium launcher.
+ *
+ * The import is deferred rather than declared at module scope because an ESM
+ * `import` is resolved before any of this file's code runs: with a static one, a
+ * checkout that has not installed the browser fails with `ERR_MODULE_NOT_FOUND`
+ * before the script can so much as check its arguments — which is what the unit
+ * gate saw, since only the audit job installs Playwright (`--no-save`).
+ *
+ * @returns {Promise<import("playwright").BrowserType>}  The chromium launcher.
+ * @throws {Error} If Playwright is not installed, naming how to install it.
+ */
+async function chromiumLauncher() {
+  try {
+    return (await import("playwright")).chromium;
+  } catch (error) {
+    throw new Error(
+      `this audit needs Playwright, which is not installed here (${error.code ?? error.message}). ` +
+        "Install it with: npm install --no-save playwright && npx playwright install chromium",
+    );
+  }
+}
+
+/**
  * Audit the artifact served at ``baseUrl``.
  *
  * @param {string} baseUrl  The base URL the artifact is served from.
  * @returns {Promise<number>}  The process exit code.
  */
 export async function runAudit(baseUrl) {
+  const chromium = await chromiumLauncher();
   const browser = await chromium.launch();
   const context = await browser.newContext();
   /** @type {Array<string>} */
@@ -243,4 +266,9 @@ if (target === undefined) {
   console.error("usage: node scripts/pwa-audit.mjs <base-url>");
   process.exit(2);
 }
-process.exit(await runAudit(target));
+try {
+  process.exit(await runAudit(target));
+} catch (error) {
+  console.error(`PWA audit could not run: ${error.message}`);
+  process.exit(2);
+}

@@ -53,6 +53,14 @@ versioning.
   | `sw.js` removido | `service worker: no worker became ready` | 1 |
   | (nenhuma) | `PWA audit OK: … is installable and renders offline.` | 0 |
 
+  O import do Playwright é **lazy** dentro do script: um `import` ESM estático é
+  resolvido antes de qualquer linha rodar, então num checkout sem o browser o
+  arquivo morria com `ERR_MODULE_NOT_FOUND` antes de conseguir checar os próprios
+  argumentos — só o job de auditoria instala Playwright, e com `--no-save`. Sem
+  ele, o script agora diz o que falta e como instalar. (Achado pela CI, não pelo
+  ambiente local, que tinha o pacote instalado à mão: `node --check` parseia sem
+  resolver import, exatamente como o `CLAUDE.md` avisa.)
+
   O `.lighthouserc.json` foi removido em vez de corrigido — era config de uma
   categoria descontinuada. `tests/unit/test_pwa_gate.py` ganhou o guard que
   faltava: `test_pwa_audit_job_can_fail_the_build` reprova se `continue-on-error`

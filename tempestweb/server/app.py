@@ -53,7 +53,16 @@ from tempestweb.transports.base import PatchTransport
 from tempestweb.transports.sse import SSETransport
 from tempestweb.transports.websocket import WebSocketTransport
 
-__all__ = ["TempestWebServer", "create_app"]
+#: Seconds a WebSocket session is kept alive after its socket drops.
+#:
+#: A reconnect inside this window resumes the session, so the user's state
+#: survives a tunnel, a Wi-Fi handover or a sleeping laptop. Past it the session
+#: is closed like any other, because a client that never comes back must not pin
+#: state forever. Wide enough to cover a network blip; far below anything a person
+#: would read as "my session is still open".
+DEFAULT_WS_RESUME_SECONDS: float = 60.0
+
+__all__ = ["DEFAULT_WS_RESUME_SECONDS", "TempestWebServer", "create_app"]
 
 _LOGGER = logging.getLogger("tempestweb.server")
 
@@ -157,6 +166,7 @@ class TempestWebServer(Generic[S]):
         sse_backend: SessionRouter | None = None,
         concurrent_dispatch: bool = False,
         theme: Theme | None = None,
+        ws_resume_seconds: float = DEFAULT_WS_RESUME_SECONDS,
     ) -> None:
         """Build the server and register the WebSocket and SSE routes.
 
@@ -187,6 +197,10 @@ class TempestWebServer(Generic[S]):
                 widget key keep their arrival order; handlers for different keys
                 overlap, so one slow handler no longer freezes the connection.
                 Off by default — see :class:`~tempestweb.runtime.AppSession`.
+            ws_resume_seconds: How long a WebSocket session outlives a dropped
+                socket, waiting for that client to come back with the same id.
+                ``0`` restores the old behaviour, where every connection got a
+                fresh state.
         """
         if security is None:
             _LOGGER.warning(
@@ -199,6 +213,9 @@ class TempestWebServer(Generic[S]):
         self._state_factory: Callable[[], S] = state_factory
         self._view: Callable[[App[S]], Widget] = view
         self._sse_sessions: dict[str, _SSESession[S]] = {}
+        self._ws_sessions: dict[str, _WSSession[S]] = {}
+        self._expiry_tasks: set[asyncio.Task[None]] = set()
+        self._ws_resume_seconds: float = ws_resume_seconds
         self._concurrent_dispatch: bool = concurrent_dispatch
         self._theme: Theme | None = theme
         self._security: SecurityConfig = security or SecurityConfig()
@@ -389,19 +406,32 @@ class TempestWebServer(Generic[S]):
                 self._rejected += 1
                 await websocket.close(code=1013)  # try again later
                 return
+            session_id = websocket.query_params.get("session") or ""
+            if session_id and not self._owns_ws(session_id, credentials):
+                self._rejected += 1
+                await websocket.close(code=1008)
+                return
             await websocket.accept()
-            self._live += 1
-            self._opened += 1
             transport = WebSocketTransport(
                 websocket,
                 allow_inbound=lambda: self._event_rate_ok(credentials),
             )
-            session = self._new_session(transport)
+            resumed = await self._claim_ws(session_id, transport, credentials)
+            session = resumed.session if resumed is not None else None
+            if session is None:
+                self._live += 1
+                self._opened += 1
+                session = self._new_session(transport)
+                if session_id:
+                    self._ws_sessions[session_id] = _WSSession(
+                        session, _session_fingerprint(credentials)
+                    )
+            generation = self._ws_generation(session_id)
             try:
                 with self._observability.session(session.session_id, transport="ws"):
-                    await session.run()
+                    await session.serve()
             finally:
-                self._live -= 1
+                await self._release_ws(session_id, session, generation)
 
         @self.api.get("/sse")
         async def sse_endpoint(request: Request, session: str) -> Response:
@@ -524,6 +554,131 @@ class TempestWebServer(Generic[S]):
         if sse is None:
             return True
         return hmac.compare_digest(sse.owner, _session_fingerprint(credentials))
+
+    def _owns_ws(self, session_id: str, credentials: Credentials) -> bool:
+        """Whether these credentials may claim the WebSocket session under this id.
+
+        An id the server holds nothing for is *not* refused: that is a client
+        naming the session it is about to open. Only a live session owned by
+        somebody else is, because the id travels in a URL and on its own
+        authorizes nothing — the same rule :meth:`_owns_sse` states for SSE.
+
+        Args:
+            session_id: The session id from the query string.
+            credentials: The credentials extracted from the upgrade request.
+
+        Returns:
+            ``True`` when the id is free or already this principal's.
+        """
+        held = self._ws_sessions.get(session_id)
+        if held is None:
+            return True
+        return hmac.compare_digest(held.owner, _session_fingerprint(credentials))
+
+    def _ws_generation(self, session_id: str) -> int:
+        """The generation token of the socket currently holding a session.
+
+        Args:
+            session_id: The session id, or ``""`` for a non-resumable connection.
+
+        Returns:
+            The current token, or ``0`` when no session is held under the id.
+        """
+        held = self._ws_sessions.get(session_id)
+        return held.generation if held is not None else 0
+
+    async def _claim_ws(
+        self,
+        session_id: str,
+        transport: WebSocketTransport,
+        credentials: Credentials,
+    ) -> _WSSession[S] | None:
+        """Take over a live session for a reconnecting client, if there is one.
+
+        Claiming is a **takeover**: the new socket becomes the owner of record, so
+        the socket it replaced can no longer retire the session when its own
+        handler finally unwinds. That race is not theoretical — it is the one the
+        SSE path already pays for with ``stream_token``, and it drops a session the
+        client had just successfully reconnected to.
+
+        Args:
+            session_id: The session id the client asked for (``""`` for none).
+            transport: The transport for the new socket.
+            credentials: The credentials extracted from the upgrade request.
+
+        Returns:
+            The claimed session record, or ``None`` when there is nothing to
+            resume and a fresh session should be built.
+        """
+        if not session_id or self._ws_resume_seconds <= 0:
+            return None
+        held = self._ws_sessions.get(session_id)
+        if held is None:
+            return None
+        if not hmac.compare_digest(held.owner, _session_fingerprint(credentials)):
+            return None
+        held.cancel_expiry()
+        held.generation += 1
+        await held.session.rebind(transport)
+        return held
+
+    async def _release_ws(
+        self, session_id: str, session: AppSession[S], generation: int
+    ) -> None:
+        """Let go of a socket, keeping the session alive if it can be resumed.
+
+        A session with no id, a server with the window switched off, or a socket
+        that has already been superseded closes immediately. Otherwise the session
+        is left mounted and a timer is armed: come back inside the window and the
+        state is still there; do not, and it is closed like any other.
+
+        Args:
+            session_id: The session id, or ``""`` when the client named none.
+            session: The session this socket was serving.
+            generation: The token this socket held when it started serving.
+        """
+        held = self._ws_sessions.get(session_id) if session_id else None
+        if held is None or self._ws_resume_seconds <= 0:
+            self._live -= 1
+            await session.close()
+            return
+        if held.generation != generation:
+            return
+        held.cancel_expiry()
+        held.expiry = asyncio.get_running_loop().call_later(
+            self._ws_resume_seconds,
+            lambda: self._spawn_ws_expiry(session_id, generation),
+        )
+
+    def _spawn_ws_expiry(self, session_id: str, generation: int) -> None:
+        """Close an orphaned session from the event loop's timer callback.
+
+        ``call_later`` cannot await, so the close runs as its own task. The task is
+        kept referenced until it finishes: a bare ``ensure_future`` may be garbage
+        collected mid-flight, which would leave the session mounted forever — the
+        exact leak the timer exists to prevent.
+
+        Args:
+            session_id: The session id whose window expired.
+            generation: The token that armed this expiry; a newer socket wins.
+        """
+        task = asyncio.ensure_future(self._expire_ws(session_id, generation))
+        self._expiry_tasks.add(task)
+        task.add_done_callback(self._expiry_tasks.discard)
+
+    async def _expire_ws(self, session_id: str, generation: int) -> None:
+        """Close a session whose client never came back.
+
+        Args:
+            session_id: The session id whose window expired.
+            generation: The token that armed this expiry.
+        """
+        held = self._ws_sessions.get(session_id)
+        if held is None or held.generation != generation:
+            return
+        del self._ws_sessions[session_id]
+        self._live -= 1
+        await held.session.close()
 
     async def _open_sse(
         self, request: Request, session_id: str, credentials: Credentials
@@ -660,6 +815,44 @@ class TempestWebServer(Generic[S]):
             await sse.session.close()
 
 
+class _WSSession(Generic[S]):
+    """Bookkeeping for one resumable WebSocket session.
+
+    The WebSocket's own transport dies with the socket, so what survives a drop is
+    this record: the :class:`AppSession` — its ``App``, its state, its live handler
+    identities — waiting to be pointed at the next socket.
+
+    Attributes:
+        session: The app session, alive across connections.
+        owner: Fingerprint of the principal that opened it; every later socket
+            claiming this id must match, because the id travels in a URL and on
+            its own authorizes nothing.
+        generation: Monotonic token of the socket that currently owns the session.
+            Only the holder of the newest token may retire it, so a reconnect's
+            takeover survives the old socket's handler unwinding — the same race
+            the SSE path pays for with ``stream_token``.
+        expiry: Handle of the task that closes the session if nobody comes back.
+    """
+
+    def __init__(self, session: AppSession[S], owner: str) -> None:
+        """Bind the session and its owner.
+
+        Args:
+            session: The app session to keep alive across connections.
+            owner: Fingerprint of the principal that opened it.
+        """
+        self.session: AppSession[S] = session
+        self.owner: str = owner
+        self.generation: int = 0
+        self.expiry: asyncio.TimerHandle | None = None
+
+    def cancel_expiry(self) -> None:
+        """Stop a pending orphan-expiry timer, if one is armed."""
+        if self.expiry is not None:
+            self.expiry.cancel()
+            self.expiry = None
+
+
 class _SSESession(Generic[S]):
     """Bookkeeping for one live SSE session (transport + session + task).
 
@@ -717,6 +910,7 @@ def create_app(
     sse_backend: SessionRouter | None = None,
     concurrent_dispatch: bool = False,
     theme: Theme | None = None,
+    ws_resume_seconds: float = DEFAULT_WS_RESUME_SECONDS,
 ) -> FastAPI:
     """Build a Mode B FastAPI app for a ``view`` and state factory.
 
@@ -745,6 +939,10 @@ def create_app(
             :func:`~tempestweb.html.theme_css` in the page head: the CSS
             variables cover what the base stylesheet paints, and this covers
             what components resolve in Python.
+        ws_resume_seconds: How long a WebSocket session outlives a dropped socket,
+            waiting for that client to reconnect with the same id — so a tunnel or
+            a Wi-Fi handover no longer resets the user's state. ``0`` restores the
+            old behaviour, where every connection built a fresh state.
 
     Returns:
         The configured FastAPI application with WS and SSE routes mounted.
@@ -759,4 +957,5 @@ def create_app(
         sse_backend=sse_backend,
         concurrent_dispatch=concurrent_dispatch,
         theme=theme,
+        ws_resume_seconds=ws_resume_seconds,
     ).api

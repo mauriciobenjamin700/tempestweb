@@ -8,7 +8,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixture, freshDom } from "./setup.js";
 import { THEME_MODE_ATTR } from "../../client/theme.js";
-import { createWebSocketTransport, backoffDelay } from "../../client/transport-ws.js";
+import {
+  createWebSocketTransport,
+  backoffDelay,
+  newSessionId,
+  withSession,
+} from "../../client/transport-ws.js";
 
 /** Minimal WebSocket double the test drives as the server. */
 class FakeWebSocket {
@@ -481,4 +486,77 @@ test("ws transport marks the document when the server reports a theme mode", asy
 
   socket.serverSend({ kind: "theme", mode: "light" });
   assert.equal(dom.document.documentElement.getAttribute(THEME_MODE_ATTR), "light");
+});
+
+// --- session resume (#203) --------------------------------------------------
+
+test("the socket URL carries a session id", () => {
+  const sockets = [];
+  const Impl = class extends ManualWebSocket {
+    constructor(url) {
+      super(url);
+      sockets.push(this);
+    }
+  };
+  createWebSocketTransport("ws://x/ws", { WebSocketImpl: Impl, session: "abc" });
+  assert.equal(sockets[0].url, "ws://x/ws?session=abc");
+});
+
+test("a reconnect asks for the same session, which is what resumes it", () => {
+  const { sockets, timers } = reconnectingHarness({ session: "keep-me" });
+  sockets[0].open();
+  sockets[0].close();
+  timers.find((t) => t)?.fn();
+
+  assert.equal(sockets.length, 2, "the transport reconnected");
+  assert.equal(sockets[1].url, "ws://x/ws?session=keep-me");
+  assert.equal(
+    sockets[0].url,
+    sockets[1].url,
+    "a reconnect that asked for a different session would start over",
+  );
+});
+
+test("a url with a query string keeps it and gains the session", () => {
+  const sockets = [];
+  const Impl = class extends ManualWebSocket {
+    constructor(url) {
+      super(url);
+      sockets.push(this);
+    }
+  };
+  createWebSocketTransport("ws://x/ws?token=sesame", {
+    WebSocketImpl: Impl,
+    session: "s1",
+  });
+  assert.equal(sockets[0].url, "ws://x/ws?token=sesame&session=s1");
+});
+
+test("withSession escapes an id that would otherwise break the query", () => {
+  assert.equal(withSession("/ws", "a b&c=d"), "/ws?session=a%20b%26c%3Dd");
+});
+
+test("each transport mints its own session id", () => {
+  const sockets = [];
+  const Impl = class extends ManualWebSocket {
+    constructor(url) {
+      super(url);
+      sockets.push(this);
+    }
+  };
+  createWebSocketTransport("ws://x/ws", { WebSocketImpl: Impl });
+  createWebSocketTransport("ws://x/ws", { WebSocketImpl: Impl });
+  assert.notEqual(sockets[0].url, sockets[1].url, "two clients shared a session id");
+});
+
+test("newSessionId works without crypto.randomUUID", () => {
+  const saved = globalThis.crypto;
+  try {
+    Object.defineProperty(globalThis, "crypto", { value: {}, configurable: true });
+    const id = newSessionId();
+    assert.ok(id.length > 8, `expected a usable id, got ${id}`);
+    assert.notEqual(id, newSessionId(), "the fallback repeats itself");
+  } finally {
+    Object.defineProperty(globalThis, "crypto", { value: saved, configurable: true });
+  }
 });

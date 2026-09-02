@@ -517,11 +517,13 @@ class AppSession(Generic[S]):
         payload = {k: v for k, v in event.items() if k not in ("kind", "sub_id")}
         self._bridge.deliver_event(sub_id, payload)
 
-    async def run(self) -> None:
-        """Serve the client until the transport closes.
+    async def serve(self) -> None:
+        """Pump events until the transport closes, leaving the session alive.
 
         Mounts (if not already) then loops: await the next event, dispatch it, let
-        the rebuild loop flush patches. Returns cleanly when the transport closes.
+        the rebuild loop flush patches. Returns cleanly when the transport closes,
+        **without** unmounting — so a caller that can offer the client a way back
+        (:meth:`rebind`) still holds the state it left with.
 
         A handler that raises is logged and the loop carries on, exactly as in
         concurrent mode. It used to end the connection instead — and in Mode B the
@@ -546,6 +548,50 @@ class AppSession(Generic[S]):
                         )
         except TransportClosedError:
             return
+
+    async def rebind(self, transport: PatchTransport) -> None:
+        """Point this session at a new transport and hand the client the scene.
+
+        This is what makes a reconnect keep the user's state instead of starting
+        over. The session — its ``App``, its state, its handler identities — is
+        untouched; only the pipe changes.
+
+        The client on the other end is new and holds no tree, so a resync (one
+        root replace carrying the scene as it stands) is the correct repair, and
+        the only correct one: patches address the tree by index, so replaying them
+        against an empty client would apply to nothing.
+
+        The native sinks are re-registered because they were bound to the old
+        transport in :meth:`__init__`. What is deliberately *not* carried over is
+        anything connection-scoped: an in-flight ``native_call`` belonged to a
+        socket that no longer exists, and its awaiter is failed rather than left
+        waiting for a result no client will send.
+
+        Args:
+            transport: The transport for the reconnected client.
+        """
+        if self._closed:
+            return
+        self._bridge.fail_pending(TransportClosedError("client reconnected"))
+        self.transport = transport
+        transport.on_native_result(self._resolve_native_result)
+        transport.on_native_event(self._deliver_native_event)
+        self._last_mode = None
+        await self.resync()
+        mode = self._resolved_mode()
+        if mode is not None:
+            self._last_mode = mode
+            await self.transport.send_theme(mode)
+
+    async def run(self) -> None:
+        """Serve the client until the transport closes, then unmount.
+
+        The one-connection-one-session lifecycle: :meth:`serve` plus a close. A
+        caller that wants the session to outlive a dropped connection calls
+        :meth:`serve` directly and decides when to :meth:`close`.
+        """
+        try:
+            await self.serve()
         finally:
             await self.close()
 

@@ -20,6 +20,15 @@
     terceira, de custo (um `indexedDB.open()` por operação), cujo desenho depende
     do `onversionchange` que este trabalho entregou.
 
+    A **#203** acabou com a assimetria entre os dois transportes do Modo B na
+    0.130.0: o WebSocket reconectava numa sessão **nova**, então um blip de rede
+    de 400 ms zerava o estado do usuário, enquanto o SSE retomava. Nota de
+    método que quase passou batido: `setOffline` do Playwright **não derruba**
+    um WebSocket já estabelecido — a primeira medição mostrou o estado
+    "sobrevivendo" a um reconnect que nunca aconteceu, nos dois códigos. Com um
+    proxy TCP que corta as conexões de verdade, a diferença apareceu: código
+    anterior volta a **Count: 0**, código novo fica em **Count: 7**.
+
     A **#202** fechou a outra metade do baseline de a11y na 0.129.0: contraste
     em widget renderizado passou a ser medido em Chromium real (job `contrast`),
     nas mesmas cenas geradas, em light e dark. Achado de método no caminho: medir
@@ -190,7 +199,7 @@ pelos Modos A e B.
 | Fase | Escopo | Status |
 |---|---|---|
 | B0 | Host FastAPI + tempest-fastapi-sdk com endpoint WS; patches iniciais ao conectar | ✅ ao vivo (counter por WS no browser, 2026-06-11) |
-| B1 | Transporte WebSocket (Python + JS); `counter` por WS — **mesmo `app.py` do Modo A** | ✅ ao vivo (Playwright, round-trip +/- verificado). **Reconnect** com backoff exponencial + jitter (`backoffDelay`), buffer de saída **só de `event`** (frames connection-scoped — `native_result`/`native_event` — não são bufferados p/ não agir em id morto no servidor fresco; cap + drop-oldest logado) drenado no reopen, hook `onReconnect`; listeners do socket velho removidos + guard contra timer de reconnect duplo — paridade de resiliência com o SSE (que herda o reconnect do `EventSource`). Servidor faz estado fresco por conexão → reconnect re-renderiza e o DOM re-sincroniza; resume de sessão (replay exato do estado antigo) é follow-up do servidor |
+| B1 | Transporte WebSocket (Python + JS); `counter` por WS — **mesmo `app.py` do Modo A** | ✅ ao vivo (Playwright, round-trip +/- verificado). **Reconnect** com backoff exponencial + jitter (`backoffDelay`), buffer de saída **só de `event`** (frames connection-scoped — `native_result`/`native_event` — não são bufferados p/ não agir em id morto no servidor fresco; cap + drop-oldest logado) drenado no reopen, hook `onReconnect`; listeners do socket velho removidos + guard contra timer de reconnect duplo — paridade de resiliência com o SSE (que herda o reconnect do `EventSource`). **Resume de sessão entregue na v0.130.0 (#203)**: o cliente carrega um id estável na URL do socket (`?session=<id>`) e o servidor retoma a sessão em vez de construir uma nova, reusando o mecanismo que o SSE já tinha — dono por principal (o id viaja numa URL e não autoriza nada sozinho), takeover por geração (o socket velho desenrolando não derruba a sessão recém-retomada) e janela de expiração para sessão órfã. Medido em Chrome real, com o socket cortado por um proxy TCP: antes o contador voltava de 7 para **0**, agora fica em **7** |
 | B2 | Sessão e ciclo de vida por conexão (connect=mount, disconnect=unmount, cancelamento de tasks) | ✅ |
 | B3 | `native/` split cliente/servidor (camera/geo no cliente, proxiados por WS) | ✅ (`ProxyBridge` + split documentado em T4) |
 | B4 | `tempestweb dev` (modo B): reload do servidor + push aos clientes | ✅ (via T5 devserver) |

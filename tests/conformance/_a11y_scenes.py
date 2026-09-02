@@ -41,12 +41,13 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from tempest_core import App, build
+from tempest_core import App, Theme, ThemeMode, build, use_theme
 from tempestweb.runtime.serialize import node_to_wire
 
 ROOT: Path = Path(__file__).resolve().parents[2]
 EXAMPLES: Path = ROOT / "examples"
 SCENES_FIXTURE: Path = ROOT / "tests" / "fixtures" / "a11y_scenes.json"
+DARK_SCENES_FIXTURE: Path = ROOT / "tests" / "fixtures" / "a11y_scenes_dark.json"
 
 #: The examples the gate audits, and why each one is here.
 SCENES: dict[str, str] = {
@@ -82,8 +83,28 @@ def _load(name: str) -> ModuleType:
     return module
 
 
-def build_scenes() -> dict[str, Any]:
-    """Build every scene to its serialized IR.
+def build_scenes(mode: ThemeMode = ThemeMode.LIGHT) -> dict[str, Any]:
+    """Build every scene to its serialized IR, under one theme.
+
+    The theme has to be installed **around the build**, not swapped on the
+    rendered DOM: what the core resolves — a Text's colour, a Card's surface —
+    travels as inline style on the IR, so flipping ``data-tw-theme`` on a tree
+    built in light paints a dark sheet under light colours. That mixture exists in
+    no app, and measuring contrast on it reports failures nobody can fix.
+
+    It goes on the ``App`` **and** in the context variable, because views read it
+    both ways: a component that takes ``theme=app.theme`` (which is what the
+    tempestweb fields document) reads the attribute, while one that defaults reads
+    the context. Setting only the context left ``login_demo`` painting a light
+    label on a dark ground — a failure of the fixture, not of the app.
+
+    An app that declares its own ``THEME`` keeps it, exactly as the emitted
+    entrypoints do (``theme=getattr(_project, "THEME", None)``). Overriding it
+    would audit a screen that ships nowhere: the palette an app pins is the
+    palette its users see, in either mode.
+
+    Args:
+        mode: The theme mode to build under.
 
     Returns:
         ``{example name: wire node}``.
@@ -91,38 +112,56 @@ def build_scenes() -> dict[str, Any]:
     scenes: dict[str, Any] = {}
     for name in SCENES:
         module = _load(name)
+        theme: Theme = getattr(module, "THEME", None) or Theme(mode=mode)
         app: App[Any] = App(
             state=module.make_state(),
             view=module.view,
             apply_patches=lambda _: None,
+            theme=theme,
         )
-        scenes[name] = node_to_wire(build(module.view(app)))
+        with use_theme(theme):
+            scenes[name] = node_to_wire(build(module.view(app)))
     return scenes
 
 
-def render_fixture_text() -> str:
-    """Render the scenes fixture as canonical JSON text.
+def render_fixture_text(mode: ThemeMode = ThemeMode.LIGHT) -> str:
+    """Render a scenes fixture as canonical JSON text.
+
+    Args:
+        mode: The theme mode to build the scenes under.
 
     Returns:
         The fixture file content.
     """
-    payload = json.dumps(build_scenes(), indent=2, sort_keys=True, ensure_ascii=False)
+    payload = json.dumps(
+        build_scenes(mode), indent=2, sort_keys=True, ensure_ascii=False
+    )
     return payload + "\n"
 
 
-def write_fixture() -> Path:
-    """Write the scenes fixture to disk.
+def write_fixture() -> list[Path]:
+    """Write both scenes fixtures to disk.
+
+    The light fixture is what both gates read; the dark one is read only by the
+    contrast gate, which is the only gate a palette swap can change. Keeping them
+    in two files rather than one keyed structure means the light scenes are
+    generated in exactly one place, so the structural gate cannot drift from the
+    contrast gate.
 
     Returns:
-        The path written.
+        The paths written.
     """
-    SCENES_FIXTURE.write_text(render_fixture_text(), encoding="utf-8")
-    return SCENES_FIXTURE
+    SCENES_FIXTURE.write_text(render_fixture_text(ThemeMode.LIGHT), encoding="utf-8")
+    DARK_SCENES_FIXTURE.write_text(
+        render_fixture_text(ThemeMode.DARK), encoding="utf-8"
+    )
+    return [SCENES_FIXTURE, DARK_SCENES_FIXTURE]
 
 
 def main() -> None:
-    """Regenerate the scenes fixture and print its path."""
-    print(f"wrote {write_fixture()}")
+    """Regenerate the scenes fixtures and print their paths."""
+    for path in write_fixture():
+        print(f"wrote {path}")
 
 
 if __name__ == "__main__":

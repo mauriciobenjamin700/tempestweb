@@ -53,9 +53,24 @@ from tempest_core import (
     Scaffold,
     Style,
     Text,
+    Theme,
+    ThemeMode,
     Widget,
     build,
 )
+
+#: The palette this app paints with.
+#:
+#: Every colour below — ``BACKGROUND``, ``SURFACE``, ``MUTED``, ``ACCENT`` and the
+#: ``ON_*`` that pair with them — is the core's dark set, and the screen was drawn
+#: for it. What was missing was saying so: without a declared theme the widgets
+#: that resolve their own colour (the ``Breadcrumb``, a ``Card``'s surface) came
+#: back light, and the two halves met on the same pixel — a black breadcrumb on
+#: the ``#1f2937`` app bar (1.19:1) and a near-white section title on a white card
+#: (1.01:1, invisible). Declaring the palette is what makes the halves agree, and
+#: it is the same attribute the emitted entrypoints read
+#: (``theme=getattr(_project, "THEME", None)``).
+THEME: Theme = Theme(mode=ThemeMode.DARK)
 
 # ---------------------------------------------------------------------------
 # Static content catalogue

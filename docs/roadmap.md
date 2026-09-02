@@ -20,6 +20,18 @@
     terceira, de custo (um `indexedDB.open()` por operação), cujo desenho depende
     do `onversionchange` que este trabalho entregou.
 
+    A **#202** fechou a outra metade do baseline de a11y na 0.129.0: contraste
+    em widget renderizado passou a ser medido em Chromium real (job `contrast`),
+    nas mesmas cenas geradas, em light e dark. Achado de método no caminho: medir
+    dark trocando `data-tw-theme` numa árvore construída em light reporta 9
+    violações e nenhuma é real — o tema tem que entrar na **geração da cena**,
+    porque o que o core resolve viaja como style inline. Construídas por tema,
+    sobram 2, ambas reais e ambas do `tempest-core`, registradas como exceção com
+    dono. Um defeito deste repo saiu junto: o `examples/router-drawer` pintava com
+    a paleta escura estática do core sem declarar tema, então entregava breadcrumb
+    preto sobre app bar escura (1,19:1) e título quase branco sobre card branco
+    (1,01:1 — invisível).
+
     A #160 está **fechada inteira**. A metade que
     mora neste repo saiu na 0.125.0: um lote que o cliente não conseguiria
     decodificar **falha alto no encoder**, nomeando o campo, e um frame que mesmo
@@ -272,7 +284,7 @@ backend sem tocar a app) herdado do `tempest-react-sdk`. Servidor reusa o
 | S7 | **Supply chain & política:** `SECURITY.md` (report privado + modelo de segurança) + job `pip-audit` no CI + `.github/dependabot.yml` (pip/actions/npm semanal). Pins formais de versão ficam a critério do app | ✅ (v0.43.0 + v0.47.0) |
 | S8 | **Observabilidade de servidor:** `create_app(..., metrics=True)` monta `GET /metrics` (Prometheus) com os contadores de conexão **e** o histograma de latência evento→patch; `observability=ServerObservability(...)` liga log estruturado por sessão (JSON, com o id que o trace também carrega) e tracing OpenTelemetry por adapter — default inerte, sem import da lib | ✅ |
 | S9 | **Perf & carga:** gate de regressão no CI (`benchmarks/perf_gate.py` — escala do build/diff, patch mínimo, custo calibrado e throughput de sessão), throughput do Modo B (`bench_ws_throughput.py`) e cold-start do Modo A medido em browser real por job agendado (`bench_cold_start.mjs`) | ✅ |
-| S10 | **Rumo a 1.0:** `docs/stability.md` (PT+EN) — contrato de superfície pública + política de depreciação, matriz de browsers (A/B/C), baseline de a11y **medido** (gate axe-core que trava o merge, sobre cenas geradas dos exemplos) e **wire-contract congelado** (`tempestweb.contract`: versão própria + digest de forma) | ✅ |
+| S10 | **Rumo a 1.0:** `docs/stability.md` (PT+EN) — contrato de superfície pública + política de depreciação, matriz de browsers (A/B/C), baseline de a11y **medido** (gate axe-core que trava o merge, sobre cenas geradas dos exemplos) e **wire-contract congelado** (`tempestweb.contract`: versão própria + digest de forma) | ✅. Desde a v0.129.0 (#202) o baseline tem **dois** gates: `a11y` (estrutura, jsdom) e `contrast` (`color-contrast` sobre o DOM pintado, Chromium real, light **e** dark). O segundo fechou a única regra que o primeiro desligava — e que estava delegada a uma camada Lighthouse que nunca auditou nada. Achou dois defeitos no `router-drawer` (1,19:1 e 1,01:1, este invisível) e dois do `tempest-core`, que viraram exceção com dono |
 | S11 | **Modo C — contrato do subset:** `docs/stability.md` declara o subset como **contrato estável e fail-loud** (o que está dentro/fora e por quê). Port dos `components` (resolvers em JS) segue como decisão aberta | ✅ (v0.45.0 — contrato documentado; components = decisão futura) |
 
 !!! note "Ordem sugerida"

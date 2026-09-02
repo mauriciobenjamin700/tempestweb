@@ -49,8 +49,8 @@ jobs:
     # Blocking on purpose (Track S — S10). docs/stability.md declares an
     # accessibility baseline; before this job nothing measured one, and an
     # IconButton shipped as an unfocusable div with no accessible name (#109).
-    # The Lighthouse job in pwa.yml stays a soft signal — it owns contrast and
-    # installability, which need a real browser.
+    # Structural rules only, in jsdom: contrast needs layout and is measured by
+    # the `contrast` job below, in a real browser.
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -66,9 +66,44 @@ jobs:
       - name: The scenes are generated from the example apps, not hand-written
         run: |
           uv run python -m tests.conformance._a11y_scenes
-          git diff --exit-code tests/fixtures/a11y_scenes.json
+          git diff --exit-code tests/fixtures/
       - name: axe-core over the DOM the renderer builds
         run: node scripts/a11y-gate.mjs
+
+  contrast:
+    name: Contrast gate (axe color-contrast, real Chromium)
+    runs-on: ubuntu-latest
+    # Blocking, and the other half of the a11y gate (#202). `color-contrast` is
+    # the one rule the axe job switches off, because jsdom produces no laid-out
+    # box to sample colours from — it was delegated to a Lighthouse layer that
+    # audited nothing for its whole life (#201). Chromium is what closes it: the
+    # same generated scenes, the same renderer, but with real layout, in both
+    # themes. A whole dark palette shipped without CI able to tell a legible one
+    # from an illegible one (#148); that is what this measures.
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - run: npm install
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install
+        run: uv sync --all-extras
+      - name: The scenes are generated from the example apps, not hand-written
+        run: |
+          uv run python -m tests.conformance._a11y_scenes
+          git diff --exit-code tests/fixtures/
+      - name: Install a browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: axe color-contrast over the painted DOM, light and dark
+        run: node scripts/contrast-gate.mjs
+      - name: And the proof that the gate bites
+        run: node --test tests/client/contrast-gate.test.js
 
   perf:
     name: Performance gate (reconciler + Mode B throughput)

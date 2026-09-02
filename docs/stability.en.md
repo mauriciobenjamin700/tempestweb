@@ -42,9 +42,16 @@ over the DOM the real renderer builds, for scenes generated from the apps this
 repo ships (`tests/conformance/_a11y_scenes.py` → `scripts/a11y-gate.mjs`), and it
 **blocks the merge** on a `serious` or `critical` violation:
 
-| What the gate catches | What it does not |
-|---|---|
-| a control with no accessible name, an image with no `alt`, an invalid `role`, a nested interactive, a label with no field, a duplicate `id` | colour contrast — it needs real layout, and stays delegated (#202) |
+There are **two** jobs, because the rules split by what they need:
+
+| Job | Where it runs | What it measures |
+|---|---|---|
+| `a11y` | jsdom | structure: a control with no accessible name, an image with no `alt`, an invalid `role`, a nested interactive, a label with no field, a duplicate `id` |
+| `contrast` | real Chromium | `color-contrast` over the **painted** DOM, for scenes in **light and dark** |
+
+Contrast needs a laid-out box to sample colours from, and jsdom produces none —
+which is why it is the one rule the `a11y` job disables, and why the `contrast`
+job exists. Both audit the **same** generated scenes, so they cannot drift.
 
 The scenes are **generated**, not hand-written: the Mode C component gallery, the
 control panel, a list with a text field, a form, a nav shell with a drawer and an
@@ -59,11 +66,23 @@ scene looks like it does and does not — it builds the core's
 result: `PasswordField` shipped an anonymous control (`label`, critical) with a
 green gate until 0.113.0. `login_demo` closes that axis.
 
+!!! info "The theme goes into the scene, not onto the DOM"
+    The dark scene is **built** under the dark theme
+    (`tests/fixtures/a11y_scenes_dark.json`), not obtained by flipping an
+    attribute on an already-rendered tree. What the core resolves — a `Text`'s
+    colour, a `Card`'s surface — travels as inline style on the IR, so a tree
+    built in light under the dark sheet is a mixture that exists in no app.
+    Measured that way it reported 9 violations; built per theme, 2 — and those 2
+    were real.
+
 One rule may only be loosened in writing: an axe rule that cannot apply to a scene
-goes into `KNOWN_EXCEPTIONS` **with its reason** (today: the three whole-document
-rules — `landmark-one-main`, `page-has-heading-one`, `region` — plus
-`color-contrast`, which belongs to the Lighthouse layer). Silencing without a
-written reason is what turned "accessibility baseline" into an empty claim before.
+goes into `KNOWN_EXCEPTIONS` **with its reason** (today: the whole-document rules —
+`landmark-one-main`, `page-has-heading-one`, `region`). The contrast gate keeps its
+own list, keyed by the **colour pair** rather than by rule, because the pair is
+what has to change; today's entries all belong to `tempest-core`, whose palette
+this repo pins and does not edit. Both gates report an exception that stopped
+firing, so an exception list cannot rot in silence. Silencing without a written
+reason is what turned "accessibility baseline" into an empty claim before.
 
 ## The wire contract is frozen
 
@@ -118,5 +137,6 @@ components (a JS resolver layer) remains on the [roadmap](https://github.com/mau
 
 - Pre-1.0: documented public surface + wire contract; pin the version.
 - Modern browsers (recent Chrome/Edge/Firefox/Safari) in all three modes.
-- a11y via semantics/roles; an axe gate is a follow-up.
+- a11y via semantics/roles, measured by two merge-blocking gates: `a11y`
+  (structure, jsdom) and `contrast` (painted `color-contrast`, Chromium, light + dark).
 - The Mode C subset is a stable, fail-loud contract; components stay in A/B.

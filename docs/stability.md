@@ -43,9 +43,17 @@ o DOM que o renderizador de verdade constrói, para cenas geradas dos apps que e
 repo entrega (`tests/conformance/_a11y_scenes.py` → `scripts/a11y-gate.mjs`), e
 **trava o merge** em violação `serious` ou `critical`:
 
-| O que o gate pega | O que ele não pega |
-|---|---|
-| controle sem nome acessível, imagem sem `alt`, `role` inválido, interativo aninhado, rótulo sem campo, `id` duplicado | contraste de cor — precisa de layout real, e segue delegado (#202) |
+São **dois** jobs, porque as regras se dividem por aquilo de que precisam:
+
+| Job | Onde roda | O que mede |
+|---|---|---|
+| `a11y` | jsdom | estrutura: controle sem nome acessível, imagem sem `alt`, `role` inválido, interativo aninhado, rótulo sem campo, `id` duplicado |
+| `contrast` | Chromium real | `color-contrast` sobre o DOM **pintado**, nas cenas em **light e dark** |
+
+Contraste precisa de caixa com layout para amostrar cor, e o jsdom não produz
+uma — por isso ele é a única regra que o job `a11y` desliga, e por isso o job
+`contrast` existe. Os dois auditam as **mesmas** cenas geradas, então não podem
+divergir.
 
 As cenas são **geradas**, não escritas à mão: a galeria de componentes do Modo C,
 o painel de controles, uma lista com campo de texto, um formulário, uma casca de
@@ -60,11 +68,23 @@ dentro de um `FormField`, que o renderizador nomeia. Resultado: o `PasswordField
 entregou um controle anônimo (`label`, crítico) com o gate verde até a 0.113.0.
 `login_demo` fecha esse eixo.
 
+!!! info "O tema entra na geração da cena, não no DOM"
+    A cena dark é **construída** sob o tema dark
+    (`tests/fixtures/a11y_scenes_dark.json`), não obtida trocando um atributo na
+    árvore já renderizada. O que o core resolve — a cor de um `Text`, a superfície
+    de um `Card` — viaja como style inline na IR, então uma árvore construída em
+    light sob a folha dark é uma mistura que não existe em app nenhum. Medida
+    assim, ela acusou 9 violações; construída por tema, 2 — e as 2 eram reais.
+
 Regra que só pode ser afrouxada por escrito: uma regra do axe que não se aplica a
-uma cena entra em `KNOWN_EXCEPTIONS` **com o motivo** (hoje: as quatro regras de
-documento inteiro — `landmark-one-main`, `page-has-heading-one`, `region` — e
-`color-contrast`, que é da camada Lighthouse). Silenciar sem motivo escrito é o que
-transformou "baseline de a11y" em declaração vazia antes.
+uma cena entra em `KNOWN_EXCEPTIONS` **com o motivo** (hoje: as regras de documento
+inteiro — `landmark-one-main`, `page-has-heading-one`, `region`). O gate de
+contraste tem a sua própria lista, chaveada pelo **par de cores** em vez de pela
+regra, porque é o par que precisa mudar; as entradas de hoje pertencem todas ao
+`tempest-core`, cuja paleta este repo pina e não edita. Os dois gates relatam
+exceção que parou de disparar, para lista de exceção não apodrecer em silêncio.
+Silenciar sem motivo escrito é o que transformou "baseline de a11y" em declaração
+vazia antes.
 
 ## O wire-contract é congelado
 
@@ -120,5 +140,6 @@ decisão de portar os components (camada de resolvers em JS) segue no
 
 - Pré-1.0: superfície pública documentada + wire-contract; fixe a versão.
 - Browsers modernos (Chrome/Edge/Firefox/Safari recentes) nos três modos.
-- a11y por semantics/roles; gate axe é follow-up.
+- a11y por semantics/roles, medida por dois gates que travam o merge: `a11y`
+  (estrutura, jsdom) e `contrast` (`color-contrast` pintado, Chromium, light + dark).
 - Subset do Modo C é um contrato estável e fail-loud; components ficam em A/B.

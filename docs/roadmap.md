@@ -11,7 +11,7 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.127.0** — a #195 fechou as duas pendências de `storage`
+    **Versão do repo: 0.130.0.** A 0.127.0 — a #195 — fechou as duas pendências de `storage`
     que a medição em device da #118 tinha deixado registradas: o keyspace passa a
     ser **por dono** (`storage.configure(owner=...)`), o que também para de deixar
     o `restore()` do `QueryCache` encher a tela de um usuário com resposta de API
@@ -53,8 +53,30 @@
     O sintoma deixa de ter caminho: o lote não é construível, não é serializável,
     e um frame ruim é reparado sem a baseline ter andado.
 
-    A última publicada no PyPI é a **0.127.0**, em 2026-08-29 pela tag
-    `v0.127.0`, que fechou a #195 inteira: o keyspace do `storage` passou a ser
+    A última publicada no PyPI é a **0.130.0**, em 2026-09-02 pela tag
+    `v0.130.0`, que carregou três bumps — a tag anterior era a `v0.127.0`.
+    **0.128.0 (#201):** o job Lighthouse do PWA Gate nunca auditou uma página, e
+    por baixo do duplo soft-fail estava o motivo real — o Lighthouse 12 removeu a
+    categoria `pwa`, então 6 dos 7 audits assertados não existem num relatório
+    moderno. Trocado por `scripts/pwa-audit.mjs`, que dirige Chromium sobre o
+    artefato buildado e reprova de verdade. **0.129.0 (#202):** contraste em
+    widget renderizado passou a ser medido no DOM pintado, em light e dark (job
+    `contrast`); o achado de método foi que o tema tem que entrar na **geração da
+    cena**, porque medido do jeito errado ele reporta 9 violações e nenhuma é
+    real. **0.130.0 (#203):** o WebSocket do Modo B retoma a sessão no reconnect,
+    como o SSE já fazia — medido com o socket cortado de verdade, o contador
+    volta em 7 em vez de 0.
+
+    Validada em venv limpa contra o índice simples: `tempestweb[server]==0.130.0`
+    retoma a sessão (`Count: 7`) e `ws_resume_seconds=0` devolve o comportamento
+    antigo (`Count: 0`).
+
+    Fica aberta a **#206**, achada pela verificação em browser da #202: o Modo C
+    ignora o `THEME` que a app declara, então a mesma tela fica legível no Modo B
+    e ilegível no C — e o gate de contraste não pega, porque mede a IR que os
+    Modos A/B renderizam.
+
+    A anterior, a **0.127.0**, saiu em 2026-08-29 e fechou a #195 inteira: o keyspace do `storage` passou a ser
     por dono, uma chamada durante o upgrade de outra aba deixou de pendurar
     (código `blocked`), e o banco passou a ser aberto **uma vez** em vez de uma
     vez por operação — medido em Chrome real, 10 operações caíram de 10 opens

@@ -4,6 +4,80 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.129.0] — 2026-09-02
+
+### Fixed
+
+- **Contraste em widget renderizado não era medido por ninguém, e a doc dizia que
+  o gate de a11y nem existia (#202).** Duas metades de um mesmo buraco.
+
+  A doc primeiro: `docs/stability.md` e `.en.md` fechavam o Recap com "a11y por
+  semantics/roles; **gate axe é follow-up**". O gate axe bloqueia merge desde a
+  S10 — job `a11y`, `scripts/a11y-gate.mjs`, sem `continue-on-error`. Quem lia o
+  Recap concluía que a11y aqui era promessa.
+
+  A lacuna de verdade era outra. `scripts/a11y-gate.mjs` desliga uma única regra,
+  `color-contrast`, com o motivo certo — no jsdom não existe caixa com layout para
+  amostrar cor — e delegava a "camada Lighthouse". Essa camada auditou nada a vida
+  inteira, e a categoria que ela usava foi removida do Lighthouse 12 (#201). Do
+  outro lado, `tests/client/theme-contrast.test.js` cobre a metade que dispensa
+  layout: os **pares que a paleta promete**. Entre as duas sobrava exatamente o
+  caso que o header daquele arquivo já nomeava — se um widget usou o par que
+  devia. Um `--tw-on-surface` pintado sobre `--tw-primary` é par que a paleta nunca
+  prometeu: invisível para o teste de tokens, e para o gate estrutural também.
+
+  O job `contrast` fecha isso: axe `color-contrast` sobre o DOM **pintado**, em
+  Chromium real, nas mesmas cenas geradas dos exemplos — em **light e dark**.
+
+  **O tema entra na geração da cena, não no DOM.** Medir dark trocando
+  `data-tw-theme` numa árvore construída em light reportou **9** violações; nenhuma
+  era real. O que o core resolve — a cor de um `Text`, a superfície de um `Card` —
+  viaja como style inline na IR, então aquilo era uma árvore light sob folha dark,
+  mistura que não existe em app nenhum. Construídas por tema
+  (`tests/fixtures/a11y_scenes_dark.json`), sobraram **2**, e as 2 eram reais. O
+  gerador também passou a respeitar o `THEME` que um exemplo declara, como os
+  entrypoints emitidos já faziam — sem isso, `login_demo` (que passa
+  `theme=app.theme`) aparecia pintando label light sobre fundo dark.
+
+  **O que o gate achou, e de quem é cada defeito:**
+
+  | Achado | Medido | Dono |
+  | --- | --- | --- |
+  | `router-drawer`: breadcrumb preto na app bar `#1f2937` | **1,19:1** | este repo |
+  | `router-drawer`: título de seção quase branco em card branco | **1,01:1** (invisível) | este repo |
+  | `ON_MUTED` sobre `MUTED` (o par que a paleta promete pelo nome) | **4,06:1** | `tempest-core` |
+  | `success` tingindo o delta de um `Metric`, 13px | **2,40:1** e **2,94:1** | `tempest-core` |
+
+  Os dois primeiros eram **um** defeito: `examples/router-drawer/app.py` pinta com
+  as constantes estáticas do core (`SURFACE`, `MUTED`, `ON_SURFACE` — a paleta
+  escura) e nunca declarou tema, então os widgets que resolvem a própria cor
+  voltavam claros e as duas metades se encontravam no mesmo pixel. `THEME: Theme =
+  Theme(mode=ThemeMode.DARK)` é a linha que faltava — o exemplo já *era* escuro.
+
+  Os dois últimos são do `tempest-core`, cuja paleta este repo pina e não edita, e
+  viraram `KNOWN_EXCEPTIONS` **com motivo e dono**, chaveadas pelo par de cores
+  (é o par que precisa mudar, não o chamador). Um pass de staleness relata a
+  exceção que parar de disparar, para a lista não apodrecer quando o core corrigir.
+
+  Verificado em Chrome real (Modo B, `examples/router-drawer` servido do artefato):
+  `data-tw-theme` passa de ausente a `"dark"`, a página de `#fef7ff` a `#141218`, o
+  breadcrumb de **1,20:1** a **11,66:1** e o título de seção de **1,02:1** a
+  **16,81:1**. Console limpo, sem overflow horizontal em 390px nem em 1440px.
+
+  **Achado que a validação em browser trouxe e o gate não traz:** o **Modo C
+  ignora o `THEME` que a app declara**. Os entrypoints dos Modos A e B leem
+  `getattr(_project, "THEME", None)`; o compilador de transpile não, então o mesmo
+  artefato que ficou legível no Modo B continua com breadcrumb a 1,20:1 no Modo C.
+  Fica em issue própria — é superfície do compilador, não do gate. Registrado aqui
+  porque o gate mede a IR que os Modos A/B renderizam: ele fica verde enquanto o
+  Modo C entrega o defeito, e essa é a fronteira do que ele prova.
+
+  Provado quebrando: baixando `--tw-on-surface` do tema dark para `#2a2730`, o gate
+  acha **15** violações e sai 1; restaurado, sai 0. É o cenário da #148 — uma
+  paleta escura inteira entrou sem nada em CI capaz de distinguir legível de
+  ilegível. `tests/client/contrast-gate.test.js` fixa as duas metades: as cenas
+  passam, e uma cena-sonda com texto ilegível reprova.
+
 ## [0.128.0] — 2026-09-02
 
 ### Fixed

@@ -4,6 +4,72 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.128.0] — 2026-09-02
+
+### Fixed
+
+- **O gate PWA do CI nunca auditou uma página, e o que ele mandava auditar não
+  existe mais (#201).** O job `lighthouse` do `pwa.yml` passava em todo PR desde
+  que foi escrito. Três camadas de silêncio, empilhadas: o `.lighthouserc.json`
+  coletava de `./dist`, que **nenhum passo do job construía**; `|| echo
+  "lighthouse soft-fail (no build yet)"` convertia a morte do `lhci` em exit 0; e
+  `continue-on-error: true` engolia o que sobrasse. A fase P4 promete "Trava o
+  merge"; ele não travava nada.
+
+  Removidas as três camadas, apareceu a quarta, que é a real: **o Lighthouse 12
+  removeu a categoria `pwa`**. Medido na 12.1.0 contra um artefato de verdade —
+  `onlyCategories: ["pwa"]` devolve `categories: []`, e dos sete audits que o
+  `.lighthouserc.json` assertava, **seis não existem** no relatório
+  (`installable-manifest`, `service-worker`, `maskable-icon`,
+  `apple-touch-icon`, `splash-screen`, `themed-omnibox`); só `viewport`
+  sobrevive, e migrado para outra categoria. Ligar o job como estava era
+  impossível: não havia o que assertar. O soft-fail não estava escondendo um gate
+  desligado, estava escondendo um gate cujo produto tinha sido descontinuado.
+
+  `scripts/pwa-audit.mjs` mede o que a P4 queria — "installable + offline" —
+  dirigindo Chromium sobre o artefato que `tempestweb build` emite:
+
+    - o `<meta name="viewport">` que a heurística de instalabilidade exige;
+    - o manifest que o artefato **serve**, lido do `<link rel="manifest">` da
+      própria página e validado por `validateInstallable`;
+    - cada ícone que o manifest promete: resolve, e o tamanho real do PNG é o
+      `sizes` declarado;
+    - o service worker registrando **e controlando** a página — registrar sem
+      controlar não serve navegação nenhuma, então não há história de offline;
+    - offline de verdade: rede cortada, reload, e o `#app` ainda pinta.
+
+  Os dois últimos são a costura que `scripts/pwa-gate.mjs` não alcança: aquele
+  script valida o manifest que o *builder devolve em processo* — um dublê do
+  arquivo. Este lê o que o browser lê. É a mesma classe de defeito que o repo já
+  pagou no `storage` caindo em `localStorage` e no `410 Gone` contra sender fake,
+  e está registrada no `CLAUDE.md`: **teste que exercita o dublê, não a costura**.
+
+  Provado quebrando, contra o artefato de `examples/counter`:
+
+  | Sabotagem no artefato | O que a auditoria diz | Exit |
+  | --- | --- | --- |
+  | `start_url` removido do manifest | `manifest: start_url is required` | 1 |
+  | manifest declara `512x512` sobre o PNG de 192 | `icon /icons/icon-192.png declares 512x512 but the file is 192x192` | 1 |
+  | `sw.js` removido | `service worker: no worker became ready` | 1 |
+  | (nenhuma) | `PWA audit OK: … is installable and renders offline.` | 0 |
+
+  O import do Playwright é **lazy** dentro do script: um `import` ESM estático é
+  resolvido antes de qualquer linha rodar, então num checkout sem o browser o
+  arquivo morria com `ERR_MODULE_NOT_FOUND` antes de conseguir checar os próprios
+  argumentos — só o job de auditoria instala Playwright, e com `--no-save`. Sem
+  ele, o script agora diz o que falta e como instalar. (Achado pela CI, não pelo
+  ambiente local, que tinha o pacote instalado à mão: `node --check` parseia sem
+  resolver import, exatamente como o `CLAUDE.md` avisa.)
+
+  O `.lighthouserc.json` foi removido em vez de corrigido — era config de uma
+  categoria descontinuada. `tests/unit/test_pwa_gate.py` ganhou o guard que
+  faltava: `test_pwa_audit_job_can_fail_the_build` reprova se `continue-on-error`
+  ou um `|| echo` voltar ao job — verificado reintroduzindo o defeito.
+
+  O job `push-e2e` continua `continue-on-error` e continua sendo placeholder; a
+  lacuna lá é de CI e não de comportamento (o WebPush foi medido à mão contra FCM
+  real), e sai em issue própria.
+
 ## [0.127.0] — 2026-08-29
 
 ### Fixed

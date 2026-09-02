@@ -45,7 +45,7 @@ repo entrega (`tests/conformance/_a11y_scenes.py` → `scripts/a11y-gate.mjs`), 
 
 | O que o gate pega | O que ele não pega |
 |---|---|
-| controle sem nome acessível, imagem sem `alt`, `role` inválido, interativo aninhado, rótulo sem campo, `id` duplicado | contraste de cor e instalabilidade — precisam de layout real, e ficam na camada Lighthouse (`pwa.yml`) |
+| controle sem nome acessível, imagem sem `alt`, `role` inválido, interativo aninhado, rótulo sem campo, `id` duplicado | contraste de cor — precisa de layout real, e segue delegado (#202) |
 
 As cenas são **geradas**, não escritas à mão: a galeria de componentes do Modo C,
 o painel de controles, uma lista com campo de texto, um formulário, uma casca de

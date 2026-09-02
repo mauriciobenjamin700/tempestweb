@@ -537,15 +537,20 @@ sequencial. Trilho 0 antecede tudo; Trilho W pode correr em paralelo ao A após 
 
 - **P4 — Gate PWA no CI.**
   - **Objetivo:** travar regressão de PWA/offline/push automaticamente.
-  - **Arquivos:** job no CI rodando **Lighthouse PWA** (headless), teste de SW
-    (precache + update), teste **e2e de push** (subscribe → envio → notificação)
-    com browser headless (Playwright).
+  - **Arquivos:** job no CI auditando o artefato buildado em **Chromium real**
+    (`scripts/pwa-audit.mjs`, via Playwright), teste de SW (precache + update),
+    teste **e2e de push** (subscribe → envio → notificação).
   - **Depende de:** P0–P3.
   - **Feito quando:** o CI reprova um PR que quebre "installable", o offline ou o
-    fluxo de push; o relatório Lighthouse fica anexado ao job.
+    fluxo de push.
   - **Verificação:** o próprio gate é a verificação; rodar localmente antes do push.
-  - **Cuidados:** Lighthouse headless é sensível a flakiness — fixar versão do
-    Chromium e usar thresholds, não notas exatas.
+  - **Cuidados:** o desenho original era **Lighthouse PWA headless**, e ele não
+    sobreviveu ao produto: o Lighthouse 12 **removeu a categoria `pwa`**, então
+    `installable-manifest`, `service-worker`, `maskable-icon`, `apple-touch-icon`,
+    `splash-screen` e `themed-omnibox` deixaram de existir num relatório (medido
+    na 12.1.0). A auditoria passou a medir instalabilidade e offline direto no
+    browser. A lição de flakiness continua valendo — o que se assere é
+    propriedade (o worker controla a página; o reload offline pinta), nunca nota.
 
 - **P5 — Extras de manifest (valor de produto).**
   - **Objetivo:** integrações de SO que agregam valor: atalhos e receber conteúdo.

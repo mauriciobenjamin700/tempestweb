@@ -115,6 +115,47 @@ WebSocket (ou SSE). Análogo ao Phoenix LiveView:
     `transport-ws.js` / `transport-sse.js` (Modo B). O renderizador
     (`client/dom.js`, `client/style.js`) é **um só**.
 
+### A conexão cai — e a sessão continua
+
+O estado do usuário vive no servidor, então a pergunta óbvia é: o que acontece
+quando a rede pisca? Um túnel, uma troca de Wi-Fi, um notebook que dormiu.
+
+Nada. O cliente carrega um **id estável** na URL do socket, o servidor guarda a
+sessão por um tempo depois que o socket cai, e a reconexão volta para a **mesma**
+sessão:
+
+```python
+from tempestweb.server import create_app
+
+api = create_app(
+    make_state,
+    view,
+    ws_resume_seconds=60,  # o padrão
+)
+```
+
+O cliente reconecta sozinho (backoff exponencial com jitter) e o servidor
+responde com a cena inteira — o cliente novo não tem árvore nenhuma, e patch
+endereça a árvore por índice, então mandar patch para ele não aplicaria em nada.
+
+!!! check "Medido, não prometido"
+    Com o socket cortado de verdade no meio de uma sessão, o contador que estava
+    em **7** volta em **7**. Antes da v0.130.0 voltava em **0** — o servidor
+    construía estado fresco por conexão, e um blip de 400 ms apagava o formulário
+    meio preenchido do usuário.
+
+!!! warning "A janela é curta, e é de propósito"
+    Passados os `ws_resume_seconds`, a sessão é fechada como qualquer outra. Um
+    cliente que nunca volta não pode prender estado no servidor para sempre.
+    `ws_resume_seconds=0` desliga o resume e devolve o comportamento antigo, de
+    estado fresco a cada conexão.
+
+!!! info "O id não autoriza nada"
+    Ele viaja numa URL, e URL vaza — para log, para referrer, para o ombro do
+    lado. Por isso o servidor confere o **dono** antes de entregar uma sessão: o
+    token do usuário quando o host é autenticado, o endereço do par quando não é.
+    Outro principal que apresente o mesmo id é recusado no upgrade.
+
 ## Modo C — Python transcrito para JavaScript (transpile)
 
 No Modo C, não há Python vivo em lugar nenhum. Um compilador transcreve a **camada

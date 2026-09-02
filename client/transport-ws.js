@@ -16,11 +16,20 @@
 // onReconnect hook lets the runtime re-sync after a drop. Connection-scoped
 // frames (native_result keyed to a call_id, native_event keyed to a sub_id) are
 // NOT buffered — after a reconnect the fresh server never issued that call/sub,
-// so replaying them would act on a stale id. The server builds fresh state per
-// connection (no session resume yet), so on reconnect it re-renders and the
-// client receives a full patch batch that re-syncs the DOM; the buffered events
-// replay best-effort against that fresh state — full session-resume
-// reconciliation is a server-side follow-up.
+// so replaying them would act on a stale id.
+//
+// Session resume: the transport carries a stable id in the socket URL
+// (`?session=<id>`), so a reconnect lands on the session it left rather than on a
+// fresh one. Until this existed, a 400 ms blip reset the user's state — a
+// half-filled form, a cart, the selected tab — because the server built fresh
+// state per connection. The server answers a resumed socket with one full patch
+// batch carrying the scene as it stands, and the buffered events replay against
+// the state they were written for.
+//
+// The id lives in this closure, not in storage: it identifies *this page's*
+// connection to the server, and a reload is a new page with a new tree. The
+// server keeps a dropped session for a short window (`ws_resume_seconds`) and
+// closes it afterwards, so an id nobody comes back for pins nothing.
 
 import { dispatch, subscribeDispatch, unsubscribeDispatch } from "./native/index.js";
 import { applyThemeMode } from "./theme.js";
@@ -70,6 +79,10 @@ export function backoffDelay(attempt, opts) {
  *        so a plain shell gets the whole native surface with no wiring.
  * @param {typeof WebSocket} [options.WebSocketImpl]
  *        WebSocket constructor to use (injectable for tests/jsdom).
+ * @param {string} [options.session]
+ *        Stable session id carried in the socket URL, so a reconnect resumes the
+ *        server-side session instead of starting a fresh one. Defaults to a newly
+ *        minted id, which is what an app wants; pass one only to pin it in a test.
  * @param {boolean} [options.reconnect]
  *        Auto-reconnect on an unexpected close (default true). When false, the
  *        transport behaves like a single-shot socket: `ready` rejects on error
@@ -91,10 +104,46 @@ export function backoffDelay(attempt, opts) {
  *            ready: Promise<void>
  *          }}
  */
+/**
+ * Mint an id for this page's session.
+ *
+ * `crypto.randomUUID` is not everywhere (it needs a secure context), so the
+ * fallback is a random string of the same shape. The id only has to be unguessable
+ * enough that another client cannot name it, and unique enough not to collide —
+ * the server checks the owner's fingerprint before handing a session over, so
+ * knowing an id is not by itself enough to claim one.
+ *
+ * @returns {string}  The session id.
+ */
+export function newSessionId() {
+  const uuid = globalThis.crypto?.randomUUID;
+  if (typeof uuid === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `s-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+
+/**
+ * Add a `session` query parameter to a socket URL, preserving what it already has.
+ *
+ * Built by hand rather than with `URL`, because the URL a caller passes is often
+ * relative (`/ws`) and `URL` needs a base for that — and the base would have to
+ * come from `location`, which a test does not have.
+ *
+ * @param {string} url  The socket URL, absolute or relative.
+ * @param {string} session  The session id to carry.
+ * @returns {string}  The URL with the session parameter appended.
+ */
+export function withSession(url, session) {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}session=${encodeURIComponent(session)}`;
+}
+
 export function createWebSocketTransport(url, options = {}) {
   const WebSocketImpl = options.WebSocketImpl || globalThis.WebSocket;
   const onNativeCall = options.onNativeCall || null;
   const reconnect = options.reconnect !== false;
+  const session = options.session ?? newSessionId();
   const backoff = {
     baseMs: options.backoff?.baseMs ?? 500,
     maxMs: options.backoff?.maxMs ?? 30000,
@@ -323,9 +372,18 @@ export function createWebSocketTransport(url, options = {}) {
    * Open a socket and wire its listeners, detaching the previous one first.
    * @returns {void}
    */
+  /**
+   * The socket URL for this session.
+   *
+   * @returns {string}  The URL carrying this transport's session id.
+   */
+  function sessionUrl() {
+    return withSession(url, session);
+  }
+
   function connect() {
     detach(socket);
-    socket = new WebSocketImpl(url);
+    socket = new WebSocketImpl(sessionUrl());
     socket.addEventListener("open", onOpen);
     socket.addEventListener("message", onMessage);
     socket.addEventListener("close", onClose);

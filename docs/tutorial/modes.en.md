@@ -116,6 +116,45 @@ WebSocket (or SSE). Like Phoenix LiveView:
     `transport-ws.js` / `transport-sse.js` (Mode B). The renderer (`client/dom.js`,
     `client/style.js`) is **a single one**.
 
+### The connection drops — and the session carries on
+
+The user's state lives on the server, so the obvious question is what happens
+when the network blinks. A tunnel, a Wi-Fi handover, a laptop that slept.
+
+Nothing. The client carries a **stable id** in the socket URL, the server keeps
+the session for a while after the socket drops, and the reconnect lands on the
+**same** session:
+
+```python
+from tempestweb.server import create_app
+
+api = create_app(
+    make_state,
+    view,
+    ws_resume_seconds=60,  # the default
+)
+```
+
+The client reconnects on its own (exponential backoff with jitter) and the server
+answers with the whole scene — the new client holds no tree, and a patch addresses
+the tree by index, so sending it patches would apply to nothing.
+
+!!! check "Measured, not promised"
+    With the socket severed for real mid-session, a counter sitting at **7** comes
+    back at **7**. Before v0.130.0 it came back at **0** — the server built fresh
+    state per connection, and a 400 ms blip wiped the user's half-filled form.
+
+!!! warning "The window is short, on purpose"
+    Past `ws_resume_seconds` the session is closed like any other. A client that
+    never returns must not pin state on the server forever. `ws_resume_seconds=0`
+    turns resume off and restores the old fresh-state-per-connection behaviour.
+
+!!! info "The id authorizes nothing"
+    It travels in a URL, and URLs leak — to a log, to a referrer, to the person
+    next to you. So the server checks the **owner** before handing a session over:
+    the user's token when the host is authenticated, the peer address when it is
+    not. Another principal presenting the same id is refused at the upgrade.
+
 ## Mode C — Python transcribed to JavaScript (transpile)
 
 In Mode C there is no live Python anywhere. A compiler transcribes the **app

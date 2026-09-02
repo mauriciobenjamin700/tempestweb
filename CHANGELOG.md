@@ -4,6 +4,58 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.130.0] — 2026-09-02
+
+### Added
+
+- **O WebSocket do Modo B retoma a sessão no reconnect, como o SSE já fazia
+  (#203).** Os dois transportes do mesmo modo discordavam sobre o que é uma
+  reconexão. O SSE reconectava e **retomava**: `_open_sse` abre, resume ou faz
+  takeover, com `Last-Event-ID`, replay buffer, resync quando o gap é grande
+  demais e dono por principal. O WebSocket chamava `_new_session` — *"a fresh
+  `AppSession` for this connection"* — então um blip de 400 ms zerava o estado do
+  usuário: o formulário meio preenchido, o carrinho, a aba selecionada.
+
+  O cliente já tinha a metade dele desde a B1 (backoff exponencial com jitter,
+  buffer de saída, `onReconnect`); o próprio cabeçalho de `client/transport-ws.js`
+  registrava a lacuna do outro lado. Agora ele carrega um id estável na URL do
+  socket (`?session=<id>`) e o servidor retoma.
+
+  **Reusa o mecanismo do SSE em vez de reimplementá-lo**, porque reimplementar
+  significaria repagar as três armadilhas que aquele caminho já pagou:
+
+    - **o id não autoriza nada** — ele viaja numa URL, então o servidor confere o
+      dono (token quando há auth, endereço do par quando não há) e recusa outro
+      principal no upgrade;
+    - **takeover por geração** — o socket velho desenrolando não pode derrubar a
+      sessão que o cliente acabou de retomar, que é exatamente a corrida que o
+      `stream_token` do SSE existe para evitar;
+    - **resync, não replay** — o cliente reconectado não tem árvore nenhuma, e
+      patch endereça a árvore por índice, então a única reparação correta é a cena
+      inteira.
+
+  `AppSession` ganhou `serve()` (bombeia eventos e **não** desmonta quando o
+  transporte cai) e `rebind(transport)` (aponta a sessão para o socket novo e
+  entrega a cena). `run()` continua sendo `serve()` + `close()`, então nada que
+  usava a sessão de uma conexão só mudou de comportamento.
+
+  Sessão órfã expira: `ws_resume_seconds` (padrão **60 s**, `0` desliga e devolve
+  o estado fresco por conexão). Um cliente que nunca volta não prende estado.
+
+  **Medido em Chrome real, e a primeira medição estava errada.** `setOffline` do
+  Playwright **não derruba** um WebSocket já estabelecido: instrumentando os
+  eventos de socket, 1 aberto e **0 fechados** — o estado "sobrevivia" a um
+  reconnect que nunca aconteceu, e o código *anterior* passava no mesmo teste.
+  Com um proxy TCP cortando as conexões de verdade (servidor intocado), a
+  diferença aparece:
+
+  | | antes da queda | socket caiu | reconectou | depois |
+  | --- | --- | --- | --- | --- |
+  | código anterior | Count: 7 | ✅ | ✅ | **Count: 0** |
+  | com resume | Count: 7 | ✅ | ✅ | **Count: 7** |
+
+  E a sessão retomada continua viva: o clique seguinte leva a **8**, não a 1.
+
 ## [0.129.0] — 2026-09-02
 
 ### Fixed

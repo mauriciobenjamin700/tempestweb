@@ -44,7 +44,7 @@ repo ships (`tests/conformance/_a11y_scenes.py` → `scripts/a11y-gate.mjs`), an
 
 | What the gate catches | What it does not |
 |---|---|
-| a control with no accessible name, an image with no `alt`, an invalid `role`, a nested interactive, a label with no field, a duplicate `id` | colour contrast and installability — they need real layout, and live in the Lighthouse layer (`pwa.yml`) |
+| a control with no accessible name, an image with no `alt`, an invalid `role`, a nested interactive, a label with no field, a duplicate `id` | colour contrast — it needs real layout, and stays delegated (#202) |
 
 The scenes are **generated**, not hand-written: the Mode C component gallery, the
 control panel, a list with a text field, a form, a nav shell with a drawer and an

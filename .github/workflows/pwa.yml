@@ -3,16 +3,18 @@ name: PWA Gate
 # Track P / P4 — locks PWA + offline + push regressions automatically.
 #
 # Three layers, fast to slow:
-#   1. unit     — the manifest/sw/offline/webpush unit tests (always run; the
-#                 authoritative gate that blocks a PR).
-#   2. lighthouse — a headless Lighthouse PWA audit against a built static app,
-#                 asserting the "installable" category via thresholds (not exact
-#                 scores — Chromium headless is flaky on absolute numbers).
-#   3. push-e2e — a Playwright end-to-end (subscribe -> server send -> notification)
-#                 wired but allowed to be skipped where push is unavailable in CI.
+#   1. unit      — the manifest/sw/offline/webpush unit tests (always run).
+#   2. pwa-audit — a real Chromium driven over a real `tempestweb build` artifact,
+#                  asserting installability and an offline reload. Blocking.
+#   3. push-e2e  — a Playwright end-to-end (subscribe -> server send -> notification)
+#                  wired but allowed to be skipped where push is unavailable in CI.
 #
-# Pin the Chromium version (via the lhci / playwright action pins) and use
-# thresholds so the gate is stable.
+# Layer 2 used to be a Lighthouse job asserting the `pwa` category. Lighthouse 12
+# removed that category, so six of its seven assertions name audits that no longer
+# exist in a report (measured on 12.1.0). It was also wrapped in
+# `continue-on-error` plus `|| echo soft-fail`, over a `staticDistDir` no step
+# built — so it passed every PR without auditing a page. `scripts/pwa-audit.mjs`
+# measures what P4 actually wanted, in a browser that still ships the feature.
 
 on:
   push:
@@ -50,30 +52,51 @@ jobs:
       - name: PWA Python tests (manifest emitter + webpush)
         run: uv run pytest tests/unit/test_pwa*.py -q
 
-  lighthouse:
-    name: Lighthouse PWA (installable)
+  pwa-audit:
+    name: PWA audit (installable + offline, real Chromium)
     runs-on: ubuntu-latest
-    # Lighthouse needs a real build artifact (Trilho C). Until the static build is
-    # wired this job validates the manifest and is allowed to be a soft signal.
-    continue-on-error: true
+    # Blocking on purpose: this is the job P4 promised ("Trava o merge"). It audits
+    # the Mode C artifact because the PWA shell — manifest emitter, icons, service
+    # worker — is shared across modes, and Mode C needs no Pyodide download in a
+    # PR's critical path. A Mode A audit needs `build --offline` (it vendors the
+    # runtime), which belongs in a scheduled job like perf-cold-start.yml.
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: "22"
       - run: npm install
-      - name: Validate manifest is installable-shaped
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install
+        run: uv sync --all-extras
+      - name: Validate the manifest the builder emits (no browser needed)
         run: node scripts/pwa-gate.mjs
-      - name: Lighthouse CI (PWA category)
+      - name: Build a real artifact
+        run: uv run tempestweb build --mode transpile --path examples/counter
+      - name: Install a browser
         run: |
-          npx --yes @lhci/cli@0.14.x autorun \
-            --config=.lighthouserc.json || echo "lighthouse soft-fail (no build yet)"
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Serve the artifact
+        run: |
+          python3 -m http.server 8000 --directory examples/counter/dist/transpile &
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8000/ && break
+            sleep 1
+          done
+      - name: Audit it in Chromium
+        run: node scripts/pwa-audit.mjs http://127.0.0.1:8000/
 
   push-e2e:
     name: WebPush e2e (subscribe -> send -> notify)
     runs-on: ubuntu-latest
     # E2E push needs a served app + a push-capable headless browser. Wired here;
-    # soft until the static build and a test VAPID pair are provisioned in CI.
+    # soft until a test VAPID pair is provisioned in CI. Tracked separately — the
+    # WebPush path itself was measured by hand against real FCM
+    # (docs/agents/device-verification.md), so the gap here is CI, not behavior.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
@@ -81,5 +104,5 @@ jobs:
         with:
           node-version: "22"
       - run: npm install
-      - name: Push e2e smoke (placeholder until build artifact exists)
+      - name: Push e2e smoke (placeholder until a VAPID pair exists in CI)
         run: node scripts/pwa-gate.mjs --push-smoke

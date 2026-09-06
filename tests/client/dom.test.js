@@ -4,6 +4,11 @@ import assert from "node:assert/strict";
 import { fixture, freshDom } from "./setup.js";
 import { applyPatches, buildElement, KEY_ATTR, TYPE_ATTR } from "../../client/dom.js";
 
+/** Read the `<input>` an `Input` wrapper owns (see TAG_BY_TYPE's Input note). */
+function controlOf(el) {
+  return el.querySelector(":scope > input");
+}
+
 /** Install jsdom's `document` globally so dom.js's `document.createElement` works. */
 function withDocument() {
   const dom = freshDom();
@@ -148,16 +153,18 @@ test("Input builds a real <input> carrying value/placeholder (E.6)", () => {
     props: { value: "a@b.com", placeholder: "Email", secure: false },
     children: [],
   });
-  assert.equal(el.tagName, "INPUT");
-  assert.equal(el.getAttribute("type"), "text");
-  assert.equal(el.value, "a@b.com");
-  assert.equal(el.getAttribute("placeholder"), "Email");
+  assert.equal(el.tagName, "DIV");
+  const control = controlOf(el);
+  assert.equal(control.tagName, "INPUT");
+  assert.equal(control.getAttribute("type"), "text");
+  assert.equal(control.value, "a@b.com");
+  assert.equal(control.getAttribute("placeholder"), "Email");
 });
 
 test("a secure Input renders type=password", () => {
   withDocument();
   const el = buildElement({ type: "Input", key: "pw", props: { secure: true }, children: [] });
-  assert.equal(el.getAttribute("type"), "password");
+  assert.equal(controlOf(el).getAttribute("type"), "password");
 });
 
 test("Checkbox builds a <label> wrapping a checkbox input plus visible caption", () => {
@@ -387,8 +394,8 @@ test("unset_props clears props beyond style/content/label", () => {
     },
     children: [],
   });
-  assert.equal(el.getAttribute("placeholder"), "type here");
-  assert.equal(el.getAttribute("id"), "the-field");
+  assert.equal(controlOf(el).getAttribute("placeholder"), "type here");
+  assert.equal(controlOf(el).getAttribute("id"), "the-field");
 
   applyPatches(el, [
     {
@@ -480,16 +487,16 @@ test("a value-only update leaves a secure Input masked", () => {
     props: { value: "hunter2", secure: true, placeholder: "p" },
     children: [],
   });
-  assert.equal(el.getAttribute("type"), "password");
+  assert.equal(controlOf(el).getAttribute("type"), "password");
 
   // Typing patches `value` alone; the type must not be re-derived from a props
   // bag that never mentioned `secure`.
   applyPatches(el, [{ path: [], set_props: { value: "hunter22" } }]);
-  assert.equal(el.getAttribute("type"), "password");
+  assert.equal(controlOf(el).getAttribute("type"), "password");
 
   // Turning secure off is still honoured when the patch says so.
   applyPatches(el, [{ path: [], set_props: { secure: false } }]);
-  assert.equal(el.getAttribute("type"), "text");
+  assert.equal(controlOf(el).getAttribute("type"), "text");
 });
 
 test("a container's label prop is metadata, not its text content", () => {
@@ -536,14 +543,14 @@ test("a form control gets a name from its key, other elements do not", () => {
     props: { value: "", placeholder: "you@example.com" },
     children: [],
   });
-  assert.equal(input.tagName, "INPUT");
-  assert.equal(input.getAttribute("name"), "email", "an input with no name or id is an a11y and autofill dead end");
+  assert.equal(controlOf(input).tagName, "INPUT");
+  assert.equal(controlOf(input).getAttribute("name"), "email", "an input with no name or id is an a11y and autofill dead end");
 
   const box = buildElement({ type: "Container", key: "wrap", props: {}, children: [] });
   assert.equal(box.getAttribute("name"), null, "only form controls carry a name");
 
   const unkeyed = buildElement({ type: "Input", key: null, props: {}, children: [] });
-  assert.equal(unkeyed.getAttribute("name"), null, "no key, nothing to name it after");
+  assert.equal(controlOf(unkeyed).getAttribute("name"), null, "no key, nothing to name it after");
 });
 
 test("a Checkbox names the input nested in its label", () => {
@@ -568,20 +575,20 @@ test("an Input's keyboard becomes the control's type and autofill hint", () => {
     props: { value: "", keyboard: "email" },
     children: [],
   });
-  assert.equal(email.getAttribute("type"), "email", "the widget declared an e-mail keyboard");
-  assert.equal(email.getAttribute("autocomplete"), "email");
+  assert.equal(controlOf(email).getAttribute("type"), "email", "the widget declared an e-mail keyboard");
+  assert.equal(controlOf(email).getAttribute("autocomplete"), "email");
 
   const phone = buildElement({ type: "Input", key: "tel", props: { keyboard: "phone" }, children: [] });
-  assert.equal(phone.getAttribute("type"), "tel");
-  assert.equal(phone.getAttribute("autocomplete"), "tel");
+  assert.equal(controlOf(phone).getAttribute("type"), "tel");
+  assert.equal(controlOf(phone).getAttribute("autocomplete"), "tel");
 
   const amount = buildElement({ type: "Input", key: "qty", props: { keyboard: "number" }, children: [] });
-  assert.equal(amount.getAttribute("inputmode"), "numeric");
-  assert.equal(amount.getAttribute("type"), "text", "a number input fights a controlled value");
+  assert.equal(controlOf(amount).getAttribute("inputmode"), "numeric");
+  assert.equal(controlOf(amount).getAttribute("type"), "text", "a number input fights a controlled value");
 
   const plain = buildElement({ type: "Input", key: "nick", props: { keyboard: "text" }, children: [] });
-  assert.equal(plain.getAttribute("type"), "text");
-  assert.equal(plain.getAttribute("autocomplete"), null, "no hint for a plain text field");
+  assert.equal(controlOf(plain).getAttribute("type"), "text");
+  assert.equal(controlOf(plain).getAttribute("autocomplete"), null, "no hint for a plain text field");
 });
 
 test("secure wins over the keyboard type, and typing does not reset either", () => {
@@ -592,11 +599,11 @@ test("secure wins over the keyboard type, and typing does not reset either", () 
     props: { value: "", keyboard: "email", secure: true },
     children: [],
   });
-  assert.equal(el.getAttribute("type"), "password", "a secure field is masked whatever its keyboard");
+  assert.equal(controlOf(el).getAttribute("type"), "password", "a secure field is masked whatever its keyboard");
 
   applyPatches(el, [{ path: [], set_props: { value: "abc" } }]);
-  assert.equal(el.getAttribute("type"), "password", "a value-only patch must not unmask it");
-  assert.equal(el.value, "abc");
+  assert.equal(controlOf(el).getAttribute("type"), "password", "a value-only patch must not unmask it");
+  assert.equal(controlOf(el).value, "abc");
 });
 
 test("an app-provided autocomplete is not overwritten by the derived hint", () => {
@@ -607,5 +614,92 @@ test("an app-provided autocomplete is not overwritten by the derived hint", () =
     props: { keyboard: "email", attrs: { autocomplete: "new-password" } },
     children: [],
   });
-  assert.equal(el.getAttribute("autocomplete"), "new-password", "only the app knows the field's role");
+  assert.equal(controlOf(el).getAttribute("autocomplete"), "new-password", "only the app knows the field's role");
+});
+
+test("a secure Input carries the renderer-owned reveal toggle (#209)", () => {
+  withDocument();
+  const el = buildElement({ type: "Input", key: "pw", props: { secure: true }, children: [] });
+
+  const control = el.querySelector("input");
+  assert.equal(control.getAttribute("type"), "password");
+
+  const toggle = el.querySelector('[data-tw-part="reveal"]');
+  assert.notEqual(toggle, null, "a secure field offers the eye the core promises");
+  assert.equal(toggle.tagName, "BUTTON");
+  assert.equal(toggle.getAttribute("type"), "button");
+  assert.equal(toggle.getAttribute("aria-pressed"), "false");
+});
+
+test("a non-secure Input has no reveal toggle", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "email",
+    props: { value: "a@b.com", secure: false },
+    children: [],
+  });
+  assert.equal(el.querySelector('[data-tw-part="reveal"]'), null);
+});
+
+test("turning secure off removes the toggle and the revealed state", () => {
+  withDocument();
+  const el = buildElement({ type: "Input", key: "pw", props: { secure: true }, children: [] });
+  el.setAttribute("data-tw-reveal", "");
+
+  applyPatches(el, [{ path: [], set_props: { secure: false } }]);
+  assert.equal(el.querySelector('[data-tw-part="reveal"]'), null);
+  assert.equal(el.hasAttribute("data-tw-reveal"), false);
+  assert.equal(el.querySelector("input").getAttribute("type"), "text");
+});
+
+test("a revealed Input stays revealed across an update that mentions secure", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { value: "hunter2", secure: true },
+    children: [],
+  });
+  el.setAttribute("data-tw-reveal", "");
+  applyPatches(el, [{ path: [], set_props: { value: "hunter22", secure: true } }]);
+
+  // The reveal is renderer-local state; re-deriving `type` from the props bag
+  // alone is what made the eye "work only sometimes".
+  assert.equal(el.querySelector("input").getAttribute("type"), "text");
+});
+
+test("an Input's accessible name reaches the control, not the wrapper", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { secure: true, semantics: { label: "Senha" } },
+    children: [],
+  });
+  // A role-less wrapper carrying aria-label names nothing a reader can reach.
+  assert.equal(el.querySelector("input").getAttribute("aria-label"), "Senha");
+});
+
+test("an Input's control attrs reach the control, and the app still wins", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { secure: true, attrs: { autocomplete: "new-password" } },
+    children: [],
+  });
+  assert.equal(el.querySelector("input").getAttribute("autocomplete"), "new-password");
+});
+
+test("an Input's tab stop is the control, never the wrapper", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { secure: true, focusable: true },
+    children: [],
+  });
+  assert.equal(el.hasAttribute("tabindex"), false);
+  assert.equal(el.querySelector("input").getAttribute("tabindex"), "0");
 });

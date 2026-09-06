@@ -41,7 +41,13 @@ const TAG_BY_TYPE = Object.freeze({
   // is a renderer-owned <svg> (see applyIconButtonProps); IconButton is an IR
   // leaf, so no patch path descends into it.
   IconButton: "button",
-  Input: "input",
+  // An Input is a <div> wrapping a renderer-owned <input>, so a secure field can
+  // carry the visibility toggle ("eye") the core's `secure` prop promises — a
+  // void <input> has nowhere to put it, and a sibling in the parent would corrupt
+  // the patch paths. Legal because Input is an IR leaf: no patch path descends
+  // into it. The wrapper is unconditional (the tag cannot depend on a prop: an
+  // Update never swaps a keyed element's tag); only the toggle is conditional.
+  Input: "div",
   // A TextArea is a multi-line field. It rendered as an anonymous <div>: the base
   // sheet styles by [data-tw-type], so it *looked* like a field at the right size
   // and had nothing to focus and no input event to fire. `FORM_CONTROL_TAGS` and
@@ -283,13 +289,20 @@ function applyProps(el, props) {
   // running it last stripped the role every widget had just set, leaving a
   // ProgressBar with aria-valuemin and no role at all, and a Toast that
   // announced nothing.
-  applyA11yProps(el, props);
+  // An Input's wrapper is a role-less <div>: `aria-label` on it names nothing a
+  // reader can reach, a `tabindex` on it adds a tab stop next to the real one,
+  // and `attrs` on it never reaches the control the app meant (an
+  // `autocomplete` there stops beating the keyboard hint). All three target the
+  // nested control instead, which is exactly where they landed while an Input
+  // *was* the control.
+  const control = type === "Input" ? ensureFieldControl(el) : null;
+  applyA11yProps(control ?? el, props);
   applyIconButtonProps(el, type, props);
   applyIndicatorProps(el, type, props);
   applyControlProps(el, type, props);
   applyDragProps(el, type, props);
   applyOverlayProps(el, type, props);
-  applyEscapeHatchAttrs(el, props);
+  applyEscapeHatchAttrs(control ?? el, props);
   applyScrollProps(el, type, props);
   applyLazyProps(el, type, props);
   applyListEventProps(el, type, props);
@@ -1200,6 +1213,129 @@ function ensureNestedInput(el, inputType) {
   return input;
 }
 
+/** Attribute marking a secure `Input` whose text is currently revealed. */
+export const REVEAL_ATTR = "data-tw-reveal";
+
+/** The reveal toggle's accessible name, by whether the text is showing. */
+const REVEAL_NAMES = Object.freeze({ shown: "Hide password", hidden: "Show password" });
+
+/**
+ * Get (creating it once) the `<input>` a keyed `Input` wrapper owns.
+ *
+ * The wrapper is the keyed, path-addressed element; this control carries the
+ * value, the type, the accessible name and the tab stop. Separate from
+ * `ensureNestedInput` because an `Input` has no caption to be named by, so the
+ * control is appended rather than inserted first — the toggle stays last.
+ *
+ * @param {HTMLElement} el      The keyed `Input` wrapper.
+ * @returns {HTMLInputElement}  The renderer-owned text control.
+ */
+function ensureFieldControl(el) {
+  let control = /** @type {HTMLInputElement|null} */ (
+    el.querySelector(":scope > input")
+  );
+  if (control == null) {
+    control = /** @type {HTMLInputElement} */ (document.createElement("input"));
+    control.setAttribute("type", "text");
+    nameFormControl(control, el.getAttribute(KEY_ATTR));
+    el.insertBefore(control, el.firstChild);
+  }
+  return control;
+}
+
+/**
+ * Read the toggle a secure `Input` wrapper owns, or `null` when it has none.
+ *
+ * @param {HTMLElement} el          The keyed `Input` wrapper.
+ * @returns {?HTMLButtonElement}    The reveal toggle, when present.
+ */
+function revealToggleOf(el) {
+  return /** @type {HTMLButtonElement|null} */ (
+    el.querySelector(`:scope > [${ITEM_ATTR}="reveal"]`)
+  );
+}
+
+/**
+ * Paint a reveal toggle for its current state: glyph plus accessible name.
+ *
+ * The eye means "press to reveal" while the text is masked, and the crossed eye
+ * means "press to hide" while it shows — the glyph names the action, not the
+ * state, which is what `aria-pressed` carries.
+ *
+ * @param {HTMLButtonElement} toggle  The reveal toggle.
+ * @param {boolean} revealed          Whether the text is currently showing.
+ * @returns {void}
+ */
+function paintRevealToggle(toggle, revealed) {
+  toggle.setAttribute("aria-pressed", revealed ? "true" : "false");
+  toggle.setAttribute("aria-label", revealed ? REVEAL_NAMES.shown : REVEAL_NAMES.hidden);
+  let svg = toggle.querySelector(`[${ITEM_ATTR}="glyph"]`);
+  if (svg == null) {
+    svg = createIconSvg();
+    svg.setAttribute(ITEM_ATTR, "glyph");
+    toggle.appendChild(svg);
+  }
+  renderIcon(/** @type {any} */ (svg), { name: revealed ? "eye-off" : "eye" });
+}
+
+/**
+ * Add or remove a secure `Input`'s reveal toggle to match its `secure` prop.
+ *
+ * Only acts when the props bag mentions `secure`: a partial Update that never
+ * names it must leave both the toggle and the revealed state alone. Dropping
+ * `secure` also drops the revealed state, so a field that stops being a password
+ * does not keep a stale toggle pressed.
+ *
+ * @param {HTMLElement} el   The keyed `Input` wrapper.
+ * @param {Object} props     The props being applied (may be a partial Update).
+ * @returns {void}
+ */
+function applyRevealToggle(el, props) {
+  if (!("secure" in props)) {
+    return;
+  }
+  const existing = revealToggleOf(el);
+  if (props.secure !== true) {
+    el.removeAttribute(REVEAL_ATTR);
+    existing?.remove();
+    return;
+  }
+  const toggle =
+    existing ?? /** @type {HTMLButtonElement} */ (document.createElement("button"));
+  if (existing == null) {
+    toggle.setAttribute("type", "button");
+    toggle.setAttribute(ITEM_ATTR, "reveal");
+    toggle.setAttribute("tabindex", "0");
+    el.appendChild(toggle);
+  }
+  paintRevealToggle(toggle, el.hasAttribute(REVEAL_ATTR));
+}
+
+/**
+ * Flip a secure `Input` between masked and revealed, locally.
+ *
+ * The core promises this costs no round-trip to Python: the value never moves,
+ * only the control's `type`. The state lives on the wrapper as an attribute so
+ * the next Update that mentions `secure` re-derives the same type instead of
+ * silently re-masking a field the reader chose to show.
+ *
+ * @param {HTMLElement} el   The keyed `Input` wrapper.
+ * @returns {void}
+ */
+export function toggleReveal(el) {
+  const control = /** @type {HTMLInputElement|null} */ (
+    el.querySelector(":scope > input")
+  );
+  const toggle = revealToggleOf(el);
+  if (control == null || toggle == null) {
+    return;
+  }
+  const revealed = !el.hasAttribute(REVEAL_ATTR);
+  setOrRemove(el, REVEAL_ATTR, revealed ? "" : null);
+  control.setAttribute("type", revealed ? "text" : "password");
+  paintRevealToggle(toggle, revealed);
+}
+
 /**
  * Set a wrapper's visible caption, as a single trailing text node.
  *
@@ -1483,7 +1619,7 @@ const KEYBOARD_HINTS = Object.freeze({
  * @param {Object} props     The props being applied.
  * @returns {void}
  */
-function applyInputType(el, props) {
+function applyInputType(el, props, host = null) {
   const hint = "keyboard" in props ? KEYBOARD_HINTS[String(props.keyboard)] : null;
   if (hint?.inputmode != null) {
     el.setAttribute("inputmode", hint.inputmode);
@@ -1492,7 +1628,8 @@ function applyInputType(el, props) {
     el.setAttribute("autocomplete", hint.autocomplete);
   }
   if (props.secure === true) {
-    el.setAttribute("type", "password");
+    const revealed = host != null && host.hasAttribute(REVEAL_ATTR);
+    el.setAttribute("type", revealed ? "text" : "password");
   } else if (hint?.type != null) {
     el.setAttribute("type", hint.type);
   } else if ("secure" in props || !el.hasAttribute("type")) {
@@ -1847,15 +1984,17 @@ function applyControlProps(el, type, props) {
   if (type === "Canvas") {
     paintCanvas(el, props);
   } else if (type === "Input") {
-    applyInputType(el, props);
+    const control = ensureFieldControl(el);
+    applyRevealToggle(el, props);
+    applyInputType(control, props, el);
     if ("value" in props) {
-      el.value = props.value == null ? "" : String(props.value);
+      control.value = props.value == null ? "" : String(props.value);
     }
     if ("placeholder" in props) {
-      setOrRemove(el, "placeholder", props.placeholder);
+      setOrRemove(control, "placeholder", props.placeholder);
     }
     if ("max_length" in props) {
-      setOrRemove(el, "maxlength", props.max_length);
+      setOrRemove(control, "maxlength", props.max_length);
     }
   } else if (type === "TextArea") {
     if ("value" in props) {

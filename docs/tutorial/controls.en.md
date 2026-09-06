@@ -15,7 +15,7 @@ picker:
 
 | Widget | Element | Event → handler | What arrives |
 |---|---|---|---|
-| `Input` | `<input>` | `input`/`change` → `on_change` | `TextChangeEvent(value)` |
+| `Input` | `<div>` + `<input>` | `input`/`change` → `on_change` | `TextChangeEvent(value)` |
 | `TextArea` | `<textarea>` | `input`/`change` → `on_change` | `TextChangeEvent(value)` |
 | `MaskedInput` | `<input>` + mask | `input`/`change` → `on_change` | `TextChangeEvent(value)` |
 | `PinInput` | `<input>` + `one-time-code` | `input` → `on_change`, `complete` | `TextChangeEvent(value)` |
@@ -38,6 +38,88 @@ The same in all three modes: the renderer (`client/dom.js`) is shared by Mode A
     `RangeSlider` gets `event.low`/`event.high`. You never read
     `payload["value"]` by hand — the runtime validates the payload into the typed
     event the handler declared.
+
+## Passwords: the eye comes for free
+
+A password field is an `Input` with `secure=True`. You never ask for the
+show/hide eye — the renderer draws it, and the reveal is **local**:
+
+```python
+from dataclasses import dataclass
+
+from tempest_core import App, Column, Input, Style, Text, Widget
+
+
+@dataclass
+class State:
+    """Application state."""
+
+    password: str = ""
+
+
+def make_state() -> State:
+    """Build the initial state.
+
+    Returns:
+        A fresh :class:`State`.
+    """
+    return State()
+
+
+def view(app: App[State]) -> Widget:
+    """Render a password field and a live length readout.
+
+    Args:
+        app: The application handle.
+
+    Returns:
+        The widget tree for the current state.
+    """
+
+    def set_password(event: object) -> None:
+        value = getattr(event, "value", "")
+        app.set_state(lambda s: setattr(s, "password", value))
+
+    return Column(
+        style=Style(gap=8.0),
+        children=[
+            Input(
+                value=app.state.password,
+                placeholder="Password",
+                secure=True,
+                on_change=set_password,
+                key="pw",
+            ),
+            Text(content=f"{len(app.state.password)} characters", key="count"),
+        ],
+    )
+```
+
+Press the eye and the password shows; press it again and it masks. The counter
+keeps reporting the same length — because the value never moves.
+
+!!! info "Why an `Input` is a `<div>` wrapping an `<input>`"
+    An `<input>` is a *void* element: it takes no children, so there is nowhere
+    to put the eye. The renderer draws the field box as the keyed element and
+    puts the real control (plus the eye, when `secure=True`) inside it. That is
+    legal because `Input` is an **IR leaf** — no patch path descends into it,
+    and the child belongs to the renderer, not to your tree.
+
+!!! check "Revealing never talks to Python"
+    The eye flips the control's `type` in the browser and nothing else. No event
+    crosses the wire, no patch is produced, and in Mode B there is no network
+    round-trip — which also means your `state` has **no** `password_visible`
+    field to keep. It is presentation state, and it lives where it is cheap: in
+    the `data-tw-reveal` attribute the base sheet reads.
+
+    One consequence worth knowing: a `Replace` patch on the field rebuilds the
+    element, so the password goes back to masked.
+
+!!! tip "The icon is Lucide, not Material"
+    The glyph is `eye` / `eye-off` from the core's curated set (`Icons.EYE` /
+    `Icons.EYE_OFF`). The Material Symbols names (`visibility`,
+    `visibility_off`) resolve to the same glyph through an alias — the alias
+    resolves the *name*, not the family.
 
 ## A switch and a slider
 
@@ -216,6 +298,8 @@ def view(app: App[Profile]) -> Widget:
   `low`/`high`, `value`/`index`), never a raw dict.
 * `Dropdown` and `FilePicker` report `on_select`; the other fields report
   `on_change`.
+* `Input(secure=True)` ships the show/hide eye, revealed locally — no state in
+  your `state`, and no round-trip to Python.
 * `TabBar` draws the strip, `TabView` shows the panel, and both share the handler.
 * A summary `Text` next to the form is the quickest way to prove the two-way
   binding works — which is what the [Booking form](../examples/booking-form.md)

@@ -4,6 +4,84 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.133.0] — 2026-09-06
+
+### Added
+
+- **`leading_icon` / `trailing_icon` passam a ser desenhados, nos três widgets
+  que os declaram (#211).** O core promete, em `Input`, `Dropdown` e
+  `Autocomplete`, que *"the renderer resolves and places it"* — e
+  `grep -rn "leading_icon" client/*.js` não retornava nada. Pior: o Modo C
+  **transportava** os nomes (`codegen.py` os mapeia para camelCase e o builder os
+  põe na IR) e nenhum renderizador os desenhava. Efeito concreto: o
+  `PasswordInput` do core passa `leading_icon="lock"` e o cadeado nunca apareceu,
+  em modo nenhum.
+
+  É a mesma classe de defeito da #209, pela mesma causa raiz — o elemento não
+  aceitava filho — e a 0.132.0 já tinha pago metade do preço: o `Input` virou um
+  `<div>` com o `<input>` dentro, e o `Autocomplete` sempre foi um `<label>`. Nos
+  dois, o lugar do ícone já existia.
+
+  Ordem dentro do campo: `leading` → controle → `trailing` → olho. **Cada parte
+  se posiciona em relação ao controle**, nunca por `appendChild`: senão um
+  `Update` que adiciona um ícone a um campo já na tela o colocaria onde a passada
+  calhasse, e a ordem viraria função da ordem das chamadas em vez das props.
+
+### Changed
+
+- **O `Dropdown` passou a ser um `<div>` com o `<select>` dentro.** Um `<select>`
+  só admite `<option>`/`<optgroup>`: não há onde pôr um `<svg>`. Legal porque
+  `Dropdown` é folha da IR, como `Input` e `Autocomplete`.
+
+  > **Atenção:** quem consulta `[data-tw-type="Dropdown"].value` em código
+  > próprio passa a ler `undefined` — o valor está no `> select`. O mesmo já
+  > valia para o `Input` desde a 0.132.0.
+
+- **O `Dropdown` desenha o próprio chevron.** A seta nativa é pintada contra a
+  borda do `<select>`, o que dentro do wrapper a colocaria embaixo de qualquer
+  `trailing_icon` — duas setas no mesmo campo. A folha base desliga a nativa
+  (`appearance: none`) e o renderizador desenha um `chevron-down` na fenda
+  trailing, saindo da frente quando o app fornece o seu. **Isto muda a aparência
+  de todo `Dropdown` já entregue**, que passa a usar o glifo do conjunto curado
+  em vez da seta do sistema.
+
+### Fixed
+
+- **O payload de seleção do `Dropdown` teria ido errado, em silêncio.**
+  `sendControlSelection` fazia `const select = (widget)`; com o wrapper, `widget`
+  é o `<div>`, então `select.value` seria `undefined` e o `findIndex` daria `-1`
+  — um frame que chega parecendo válido e carrega a escolha errada. Passa a
+  resolver o controle, espelhando o ramo do `FilePicker` logo acima, e há teste
+  fixando o payload.
+
+- **O guard de paridade SSR↔cliente era cego para tipos `div`.**
+  `test_ssr_tag_table_matches_the_dom_renderer` filtrava `if tag != "div"` e usava
+  `"div"` como default do lado do SSR, então um widget que **virasse** `div` no
+  cliente saía da comparação e o SSR podia divergir sem nada falhar. Já estava
+  cego para o `Input` desde a 0.132.0. Agora compara todas as entradas —
+  verificado plantando a divergência e vendo o teste reprovar.
+
+- **A sonda de caption podia perder o nome do campo.** `nameNestedControl` decide
+  se copia o `aria-label` para dentro lendo `el.textContent` do wrapper inteiro.
+  Um glifo que algum dia contribuísse texto — um `<title>` no svg — tornaria a
+  sonda `truthy` e o campo nomeado por `semantics` **pararia de nomear o
+  controle**, sem erro. Passa a contar só os nós de texto do próprio wrapper.
+
+- **Uma regra de tamanho na folha base que não fazia nada.** O bloco de ícone
+  declarava `width: 20px; height: 20px`, e o medido em Chrome foi 14x14:
+  `renderIcon` escreve o tamanho **inline** quando o app não pediu um explícito,
+  e style inline sempre ganha do stylesheet. A regra saiu, com o porquê no
+  comentário — um número que parece a fonte da verdade e não muda nada é pior que
+  nenhum. O ícone escala com a fonte do campo, que é o comportamento desejado.
+
+  Medido no Chrome real depois disso, `mode=server`, SW e caches limpos: os nove
+  glifos da tela de sonda desenham (`path` presente em todos), a ordem sai
+  `leading → controle → trailing → olho`, a seleção pelo `Dropdown` envelopado
+  entrega `{"value": "Olinda", "index": 1}`, e o par do `option` em dark dá
+  **14,35:1** de contraste (16,23:1 em light) — sem a regra explícita seria
+  branco no branco. Sem overflow horizontal em 1280 e 390 px; console com 0 erro
+  e 0 warning.
+
 ## [0.132.0] — 2026-09-06
 
 ### Added

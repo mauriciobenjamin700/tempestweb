@@ -137,6 +137,22 @@ def email_input(value: str) -> Input:
     kwarg it does not declare. Need an icon in the field? Use the core's `Input`
     directly, as above.
 
+!!! info "Where the icon is drawn"
+    The renderer places the glyph **inside the field box**, as a sibling of the
+    control: `leading` → control → `trailing`. On a `secure` field the show/hide
+    eye always comes last, against the edge. The icon is decorative —
+    `aria-hidden`, out of the tab order — and never replaces the field's name.
+
+    This holds in all three modes and in static HTML, because the same
+    `client/dom.js` draws them.
+
+!!! tip "The `Dropdown` draws its own chevron"
+    A `<select>` only admits `<option>` inside it, so the field is a box wrapping
+    the control — and the browser's native arrow, painted against the `<select>`'s
+    edge, would land under your `trailing_icon`. The renderer turns the native one
+    off and draws a `chevron-down` in the trailing slot; pass a `trailing_icon`
+    yourself and it steps aside for yours.
+
 !!! note "The name grammar"
     Under the hood, the set is encoded as a **prefix** on the `Icon` name:
     `"material:home"`, `"lucide:mail"`. The `material_icon`/`lucide_icon` helpers

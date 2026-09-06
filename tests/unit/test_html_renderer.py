@@ -512,11 +512,41 @@ def test_range_slider_names_both_thumbs() -> None:
     assert 'aria-label="Maximum"' in bare
 
 
-def test_dropdown_is_a_select_with_its_options_and_placeholder() -> None:
+def test_dropdown_wraps_a_select_with_its_options_and_placeholder() -> None:
+    """The keyed element is the field box; the select it owns holds the options.
+
+    A ``select`` only admits ``option``/``optgroup``, so the field icons the core
+    promises have nowhere to go inside one.
+    """
     html = render_to_html(Dropdown(options=["Light", "Dark"], value="Dark"))
-    assert html.startswith("<select")
+    assert html.startswith("<div")
+    assert "<select" in html
     assert '<option value="Light">Light</option>' in html
     assert 'disabled data-tw-part="placeholder"' in html
+
+
+def test_a_dropdown_ships_the_chevron_the_native_arrow_no_longer_draws() -> None:
+    """``appearance: none`` hides the browser's arrow, so the renderer draws one."""
+    html = render_to_html(Dropdown(options=["Light"]))
+    assert 'data-tw-part="chevron"' in html
+    assert 'data-tw-icon="chevron-down"' in html
+
+
+def test_a_dropdown_steps_aside_for_the_app_s_own_trailing_icon() -> None:
+    """Two arrows on one field is the defect the chevron exists to avoid."""
+    html = render_to_html(Dropdown(options=["Light"], trailing_icon="search"))
+    assert 'data-tw-part="trailing"' in html
+    assert 'data-tw-part="chevron"' not in html
+
+
+def test_a_dropdown_names_the_select_not_the_wrapper() -> None:
+    """A name on the role-less wrapper leaves the control anonymous (axe: label)."""
+    html = render_to_html(
+        Dropdown(key="city", options=["Recife"], semantics=Semantics(label="Cidade"))
+    )
+    control = html[html.index("<select") :]
+    assert 'aria-label="Cidade"' in control
+    assert 'name="city"' in control
 
 
 def test_autocomplete_ships_the_datalist_its_input_points_at() -> None:
@@ -588,11 +618,10 @@ def test_ssr_tag_table_matches_the_dom_renderer() -> None:
     )
     start = dom.index("const TAG_BY_TYPE = Object.freeze({")
     table = dom[start : dom.index("});", start)]
-    client_tags = {
-        name: tag
-        for name, tag in re.findall(r'^\s*(\w+): "(\w+)"', table, re.M)
-        if tag != "div"
-    }
+    # Every entry, `div` included: filtering them out made the guard blind to
+    # exactly the widgets this renderer wraps — a type that moves *to* `div` on
+    # the client could stay `select`/`input` here with nothing failing.
+    client_tags = dict(re.findall(r'^\s*(\w+): "(\w+)"', table, re.M))
     drift = {
         name: (tag, _TAG_BY_TYPE.get(name, "div"))
         for name, tag in client_tags.items()
@@ -602,3 +631,35 @@ def test_ssr_tag_table_matches_the_dom_renderer() -> None:
         "the SSR renderer disagrees with client/dom.js on "
         f"{sorted(drift)} (client, ssr): {drift}"
     )
+
+
+def test_an_input_ships_the_field_icons_the_core_declares() -> None:
+    """The core promises the renderer places them; SSR has to match the DOM."""
+    html = render_to_html(Input(value="", leading_icon="user", trailing_icon="search"))
+    assert 'data-tw-part="leading"' in html
+    assert 'data-tw-icon="user"' in html
+    assert 'data-tw-part="trailing"' in html
+    assert 'data-tw-icon="search"' in html
+    # Decorative: never announced beside the field's own name.
+    assert 'aria-hidden="true"' in html
+
+
+def test_a_secure_input_keeps_the_eye_past_the_trailing_icon() -> None:
+    """The eye sits against the edge, where a reader has learned to look for it."""
+    html = render_to_html(Input(value="", secure=True, trailing_icon="search"))
+    assert html.index('data-tw-part="trailing"') < html.index('data-tw-part="reveal"')
+
+
+def test_a_field_without_icons_ships_none() -> None:
+    """An unset icon draws nothing — no empty box holding space."""
+    html = render_to_html(Input(value=""))
+    assert "data-tw-part=" not in html
+
+
+def test_an_autocomplete_ships_its_field_icons() -> None:
+    """The same promise, on the widget whose wrapper already existed."""
+    html = render_to_html(
+        Autocomplete(value="", options=["Recife"], leading_icon="search")
+    )
+    assert 'data-tw-part="leading"' in html
+    assert "<datalist" in html, "the renderer-owned datalist survives the icon"

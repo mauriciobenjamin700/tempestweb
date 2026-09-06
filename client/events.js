@@ -622,7 +622,13 @@ function sendControlSelection(widget, key, transport) {
     });
     return;
   }
-  const select = /** @type {HTMLSelectElement} */ (widget);
+  // The widget is the keyed wrapper, not the control: reading `.value` off it
+  // would send `undefined` with an index of -1 — a frame that arrives looking
+  // valid and carries the wrong choice.
+  const select = /** @type {HTMLSelectElement|null} */ (widget.querySelector("select"));
+  if (select == null) {
+    return;
+  }
   const options = Array.from(select.querySelectorAll("option")).filter(
     (option) => option.getAttribute(ITEM_ATTR) !== "placeholder",
   );

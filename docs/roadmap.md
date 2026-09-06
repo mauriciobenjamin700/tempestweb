@@ -1,17 +1,29 @@
 # Roadmap e fases
 
-!!! info "Estado atual — atualizado em 2026-08-27"
+!!! info "Estado atual — atualizado em 2026-09-06"
     **Todos os trilhos** — 0/W/A/B/P/N/O/S/T/R e a pós-convergência (C/D/E) —
-    estão mesclados na `main` com gate verde: ruff + format ✓ (387 arquivos) ·
-    mypy `--strict` ✓ (156 arquivos, zero issue) · **pytest 2017 pass / 14 skip** ·
-    **jsdom 894 pass / 0 fail** · `mkdocs build --strict` zero warning. Os números
+    estão mesclados na `main` com gate verde: ruff + format ✓ (395 arquivos) ·
+    mypy `--strict` ✓ (156 arquivos, zero issue) · **pytest 2069 pass / 14 skip** ·
+    **jsdom 935 pass / 2 skip / 0 fail** · `mkdocs build --strict` zero warning. Os números
     foram medidos nesta linha da `main` e se reproduzem com `make check` mais o
     `mkdocs build --strict` — não confie neles de memória, rode. O mesmo
     `examples/counter/app.py` roda ao vivo nos **três** modos (Pyodide no browser,
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.130.0.** A 0.127.0 — a #195 — fechou as duas pendências de `storage`
+    **Versão do repo: 0.131.0; o PyPI serve a 0.130.0.** A diferença é a #208: o
+    `Ctrl-C` no `tempestweb dev` não terminava o processo enquanto uma aba do app
+    estivesse aberta — medido, vivo depois de 60 s, e o segundo `Ctrl-C` também
+    não resolvia. Duas peças se somavam: o canal de livereload é um gerador sem
+    fim parado em `ReloadSignal.wait()`, então a aba mantinha uma resposta HTTP em
+    curso que o desligamento gracioso do uvicorn esperava para sempre
+    (`timeout_graceful_shutdown` no default é sem limite); e `_serve_dev_static`
+    esperava servidor e watcher com `asyncio.gather`, de modo que o
+    `watchfiles.awatch` — que só termina por cancelamento — segurava o processo
+    depois de o servidor sair. Agora o hub fecha, servidor e watcher se derrubam,
+    e o timeout fica limitado: **de "nunca" para 0,3 s**, com o reload intacto.
+
+    A 0.127.0 — a #195 — fechou as duas pendências de `storage`
     que a medição em device da #118 tinha deixado registradas: o keyspace passa a
     ser **por dono** (`storage.configure(owner=...)`), o que também para de deixar
     o `restore()` do `QueryCache` encher a tela de um usuário com resposta de API

@@ -42,12 +42,19 @@ DEFAULT_NATIVE_CALL_TIMEOUT: float = 30.0
 #: files constantly; restricting suffixes keeps the loop quiet).
 DEFAULT_WATCH_SUFFIXES: tuple[str, ...] = (".py", ".html", ".css", ".js")
 
+#: Seconds the dev server waits for open connections before forcing the shutdown.
+#: The livereload SSE stream never ends on its own, so an open browser tab keeps a
+#: connection in flight forever; uvicorn's default (no timeout) would then hang on
+#: Ctrl-C until the tab is closed. A dev connection is disposable — cut it.
+DEV_GRACEFUL_SHUTDOWN_SECONDS: int = 1
+
 __all__ = [
     "DEFAULT_MODE",
     "DEFAULT_NATIVE_CALL_TIMEOUT",
     "DEFAULT_SSE_PING_INTERVAL",
     "DEFAULT_SSE_REPLAY_BUFFER",
     "DEFAULT_WATCH_SUFFIXES",
+    "DEV_GRACEFUL_SHUTDOWN_SECONDS",
     "VALID_MODES",
     "WASM_PACKAGE_ARCHIVE",
     "WASM_PYODIDE_VERSION",

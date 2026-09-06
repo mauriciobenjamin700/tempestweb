@@ -32,6 +32,7 @@ from starlette.responses import (
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+from tempestweb.core.constants import DEV_GRACEFUL_SHUTDOWN_SECONDS
 from tempestweb.devserver.reload import ReloadSignal
 
 if TYPE_CHECKING:
@@ -55,7 +56,9 @@ async def livereload_frames(signal: ReloadSignal) -> AsyncIterator[str]:
     Emits an initial ``": connected"`` comment frame so the client knows the
     stream is open, then one ``reload`` event per :meth:`ReloadSignal.trigger`,
     carrying the reload generation as the SSE ``data``. Runs until the consumer
-    (the HTTP response) is closed.
+    (the HTTP response) is closed, or until the hub itself closes — which is how
+    the dev server ends the stream on shutdown instead of waiting on a tab that
+    is waiting on it.
 
     Args:
         signal: The reload hub to await reloads from.
@@ -67,6 +70,8 @@ async def livereload_frames(signal: ReloadSignal) -> AsyncIterator[str]:
     yield ": connected\n\n"
     while True:
         event = await signal.wait()
+        if event is None:
+            return
         yield f"event: reload\ndata: {event.generation}\n\n"
 
 
@@ -152,24 +157,46 @@ def create_dev_app(
     return Starlette(routes=routes)
 
 
-def make_server(app: Starlette, host: str, port: int) -> uvicorn.Server:
+def make_server(
+    app: Starlette,
+    host: str,
+    port: int,
+    *,
+    graceful_timeout: int | None = DEV_GRACEFUL_SHUTDOWN_SECONDS,
+) -> uvicorn.Server:
     """Build a non-started uvicorn server for ``app`` bound to ``host:port``.
 
     Splitting construction from running lets the dev loop drive ``server.serve()``
     concurrently with the file watcher under one event loop, and lets tests assert
     the bind config without opening a socket.
 
+    The graceful-shutdown timeout is bounded on purpose. :func:`livereload_frames`
+    is an endless generator, so an open browser tab holds an in-flight response for
+    as long as it lives; uvicorn's own default (no timeout) would then wait on it
+    forever and Ctrl-C would never return the terminal. Capping the wait cancels
+    the stream instead — a dev connection is disposable.
+
     Args:
         app: The Starlette app to serve.
         host: The bind address.
         port: The bind port.
+        graceful_timeout: Seconds to wait for open connections to finish before
+            cancelling them. Defaults to
+            :data:`~tempestweb.core.constants.DEV_GRACEFUL_SHUTDOWN_SECONDS`.
+            ``None`` restores uvicorn's unbounded wait.
 
     Returns:
         A configured (but not started) :class:`uvicorn.Server`.
     """
     import uvicorn
 
-    config = uvicorn.Config(app, host=host, port=port, log_level="warning")
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="warning",
+        timeout_graceful_shutdown=graceful_timeout,
+    )
     return uvicorn.Server(config)
 
 

@@ -4,6 +4,52 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.131.0] — 2026-09-06
+
+### Fixed
+
+- **`Ctrl-C` no `tempestweb dev` devolve o terminal na hora, com a aba do app
+  aberta.** Com uma aba aberta o processo **não terminava**: medido, seguia vivo
+  depois de 60 s, e o segundo `Ctrl-C` também não resolvia — só `SIGKILL`. Sem
+  aba, saía em 0,3 s. Ou seja, a demora era exatamente *estar usando o app*.
+
+  Duas peças se somavam:
+
+    - **O canal de livereload nunca termina sozinho.** `livereload_frames` é um
+      `while True` parado em `ReloadSignal.wait()`, então enquanto a aba vive há
+      uma resposta HTTP em curso. Uvicorn desliga de forma graciosa e espera as
+      respostas em curso; com `timeout_graceful_shutdown` no default (`None`,
+      sem limite) essa espera é infinita. O browser esperava o servidor, o
+      servidor esperava o browser.
+    - **O watcher segurava o processo mesmo depois do servidor sair.**
+      `_serve_dev_static` fazia `asyncio.gather(server.serve(), watcher.run())`.
+      Quando `serve()` retornava, `watcher.run()` seguia dentro de
+      `watchfiles.awatch`, que só termina por cancelamento — e ninguém
+      cancelava. `py-spy` no processo travado mostrava exatamente isso: nenhum
+      frame de uvicorn, o loop parado no `gather`.
+
+  Agora `ReloadSignal` fecha (`close()`, e `wait()` devolve `None` no
+  fechamento), o dev loop fecha o hub assim que o servidor começa a desligar —
+  então o stream termina limpo, sem cancelamento e sem despejar traceback de
+  ASGI no terminal —, servidor e watcher são tarefas irmãs em que a primeira a
+  terminar derruba a outra, e `timeout_graceful_shutdown` fica limitado
+  (`DEV_GRACEFUL_SHUTDOWN_SECONDS = 1`) como rede para qualquer outra conexão
+  pendurada.
+
+  Medido no mesmo app, com o canal de livereload conectado: **de "nunca" para
+  0,3 s**, saída de três linhas, e o reload continua disparando
+  (`event: reload` / `data: 1` depois de tocar o `app.py`). O Modo B já saía em
+  0,4 s com WebSocket aberto — uvicorn fecha WebSocket ativamente —, e continua.
+
+### Changed
+
+- **`ReloadSignal.wait()` agora devolve `ReloadEvent | None`.** `None` significa
+  "o hub fechou, pare de esperar". Consumidor que só trata `ReloadEvent` precisa
+  do guard — é como o stream de livereload termina.
+- **`make_server()` aceita `graceful_timeout`** (default
+  `DEV_GRACEFUL_SHUTDOWN_SECONDS`); passar `None` restaura a espera sem limite do
+  uvicorn.
+
 ## [0.130.0] — 2026-09-02
 
 ### Added

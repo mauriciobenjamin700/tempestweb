@@ -173,6 +173,12 @@ tempestweb dev --mode server --host 0.0.0.0 --port 9000 --path ./myapp
     see the counter. Editing `app.py` reloads the page (A/C) or restarts the server
     (B).
 
+!!! tip "`Ctrl-C` gives the terminal back at once"
+    Even with app tabs open. The livereload channel is a connection that never
+    ends on its own, so `dev` closes it on shutdown instead of waiting for the
+    browser to disconnect — and cuts any other lingering connection after
+    1 second.
+
 ---
 
 ## 3. Build the artifact — `build`

@@ -203,3 +203,30 @@ async def test_watcher_run_reloads_on_real_file_write(tmp_path: Path) -> None:
     assert seen, "a real file write did not produce a reload event"
     assert seen[-1].kind is ReloadKind.RESTART
     assert any("app.py" in path for event in seen for path in event.paths)
+
+
+async def test_reload_signal_close_releases_waiters_with_none() -> None:
+    """Closing the hub hands every parked waiter ``None`` instead of stranding it."""
+    signal = ReloadSignal()
+    waiter = asyncio.ensure_future(signal.wait())
+    await asyncio.sleep(0)
+    assert not signal.closed
+
+    signal.close()
+    assert signal.closed
+    assert await asyncio.wait_for(waiter, 1.0) is None
+
+
+async def test_reload_signal_wait_after_close_returns_immediately() -> None:
+    """A waiter arriving after the close does not park — it gets ``None`` at once."""
+    signal = ReloadSignal()
+    signal.close()
+    assert await asyncio.wait_for(signal.wait(), 1.0) is None
+
+
+def test_reload_signal_close_is_idempotent() -> None:
+    """Closing twice is a no-op, so the teardown path can call it unconditionally."""
+    signal = ReloadSignal()
+    signal.close()
+    signal.close()
+    assert signal.closed

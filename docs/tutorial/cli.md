@@ -171,6 +171,12 @@ tempestweb dev --mode server --host 0.0.0.0 --port 9000 --path ./meuapp
     (mode=wasm); edit a file to reload. Ctrl-C to stop.`, você abre no browser e vê
     o counter. Editar `app.py` recarrega a página (A/C) ou reinicia o servidor (B).
 
+!!! tip "`Ctrl-C` devolve o terminal na hora"
+    Mesmo com abas do app abertas. O canal de livereload é uma conexão que nunca
+    termina sozinha, então o `dev` a encerra no desligamento em vez de esperar o
+    browser desconectar — e corta qualquer outra conexão pendurada depois de
+    1 segundo.
+
 ---
 
 ## 3. Gerar o artefato — `build`

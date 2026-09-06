@@ -173,3 +173,61 @@ async def test_serve_dev_builds_with_dev_flag(
     with pytest.raises(DevError):
         await serve_dev(root, mode="wasm")
     assert seen["dev"] is True
+
+
+async def test_serve_dev_static_stops_when_the_server_stops(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A finished server tears the watcher down instead of hanging the process.
+
+    ``watchfiles.awatch`` only ever exits on cancellation, so awaiting server and
+    watcher together with :func:`asyncio.gather` left ``dev`` alive after Ctrl-C
+    until a second signal killed it. The stub watcher here never finishes: the
+    call returning at all is the regression guard.
+    """
+    import asyncio
+
+    from tempestweb.devserver.reload import ReloadSignal
+
+    root = _project(tmp_path)
+
+    class _NeverEndingWatcher:
+        """A watcher whose run loop only ever ends by cancellation."""
+
+        cancelled = False
+
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            """Accept the real watcher's constructor signature and ignore it."""
+
+        async def run(self) -> None:
+            """Block until cancelled, recording that it was."""
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                _NeverEndingWatcher.cancelled = True
+                raise
+
+    class _ImmediateServer:
+        """A uvicorn stand-in whose ``serve()`` returns at once, as on Ctrl-C."""
+
+        should_exit = False
+
+        async def serve(self) -> None:
+            """Return immediately, standing in for a signalled shutdown."""
+
+    monkeypatch.setattr(
+        "tempestweb.cli.commands.dev.FileWatcher", _NeverEndingWatcher, raising=True
+    )
+    monkeypatch.setattr(
+        "tempestweb.devserver.make_server",
+        lambda *_args, **_kwargs: _ImmediateServer(),
+        raising=True,
+    )
+    monkeypatch.setattr(
+        "tempestweb.devserver.create_dev_app",
+        lambda *_args, **_kwargs: ReloadSignal(),
+        raising=True,
+    )
+
+    await asyncio.wait_for(serve_dev(root, mode="wasm"), timeout=30.0)
+    assert _NeverEndingWatcher.cancelled

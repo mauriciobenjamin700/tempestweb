@@ -14,7 +14,7 @@ teclado, foco, leitor de tela e, no celular, o teclado e o seletor certos:
 
 | Widget | Elemento | Evento → handler | O que chega |
 |---|---|---|---|
-| `Input` | `<input>` | `input`/`change` → `on_change` | `TextChangeEvent(value)` |
+| `Input` | `<div>` + `<input>` | `input`/`change` → `on_change` | `TextChangeEvent(value)` |
 | `TextArea` | `<textarea>` | `input`/`change` → `on_change` | `TextChangeEvent(value)` |
 | `MaskedInput` | `<input>` + máscara | `input`/`change` → `on_change` | `TextChangeEvent(value)` |
 | `PinInput` | `<input>` + `one-time-code` | `input` → `on_change`, `complete` | `TextChangeEvent(value)` |
@@ -37,6 +37,88 @@ Vale igual nos três modos: o renderizador (`client/dom.js`) é o mesmo no Modo 
     `RangeSlider` recebe `event.low`/`event.high`. Você nunca lê
     `payload["value"]` na mão — o runtime valida o payload no evento tipado que o
     handler declarou.
+
+## Senha: o olho vem de graça
+
+Um campo de senha é um `Input` com `secure=True`. Você não precisa pedir o olho
+de mostrar/ocultar — o renderizador o desenha, e a revelação é **local**:
+
+```python
+from dataclasses import dataclass
+
+from tempest_core import App, Column, Input, Style, Text, Widget
+
+
+@dataclass
+class State:
+    """Application state."""
+
+    password: str = ""
+
+
+def make_state() -> State:
+    """Build the initial state.
+
+    Returns:
+        A fresh :class:`State`.
+    """
+    return State()
+
+
+def view(app: App[State]) -> Widget:
+    """Render a password field and a live length readout.
+
+    Args:
+        app: The application handle.
+
+    Returns:
+        The widget tree for the current state.
+    """
+
+    def set_password(event: object) -> None:
+        value = getattr(event, "value", "")
+        app.set_state(lambda s: setattr(s, "password", value))
+
+    return Column(
+        style=Style(gap=8.0),
+        children=[
+            Input(
+                value=app.state.password,
+                placeholder="Senha",
+                secure=True,
+                on_change=set_password,
+                key="pw",
+            ),
+            Text(content=f"{len(app.state.password)} caracteres", key="count"),
+        ],
+    )
+```
+
+Pressione o olho e a senha aparece; pressione de novo e ela volta a mascarar. O
+contador continua reportando o mesmo comprimento — porque o valor nunca se move.
+
+!!! info "Por que o `Input` é um `<div>` com um `<input>` dentro"
+    Um `<input>` é elemento *void*: não aceita filho, então não há onde pendurar
+    o botão do olho. O renderizador desenha a caixa do campo como o elemento
+    keyed e põe o controle real (mais o olho, quando `secure=True`) dentro dela.
+    Isso é legal porque `Input` é **folha da IR** — nenhum patch path desce ali,
+    e o filho é do renderizador, não da sua árvore.
+
+!!! check "A revelação não fala com o Python"
+    O olho troca o `type` do controle no browser e nada mais. Nenhum evento
+    atravessa o fio, nenhum patch é gerado, e no Modo B não há ida e volta de
+    rede — o que também significa que o seu `state` **não** tem um campo
+    `password_visible` para manter. É estado de apresentação, e ele mora onde é
+    barato: no atributo `data-tw-reveal` que a folha base lê.
+
+    Uma consequência a conhecer: um patch `Replace` no campo recria o elemento,
+    então a senha volta a mascarada.
+
+!!! tip "O ícone é Lucide, não Material"
+    O glifo é o `eye` / `eye-off` do conjunto curado do core
+    (`Icons.EYE` / `Icons.EYE_OFF`). Os nomes do Material Symbols
+    (`visibility`, `visibility_off`) resolvem para o mesmo glifo por alias — o
+    alias resolve o *nome*, não a família.
 
 ## Um switch e um slider
 
@@ -215,6 +297,8 @@ def view(app: App[Profile]) -> Widget:
   `low`/`high`, `value`/`index`), nunca um dicionário cru.
 * `Dropdown` e `FilePicker` reportam `on_select`; os demais campos reportam
   `on_change`.
+* `Input(secure=True)` já vem com o olho de mostrar/ocultar, revelado
+  localmente — sem estado no seu `state` e sem round-trip ao Python.
 * `TabBar` desenha a faixa, `TabView` mostra o painel, e os dois compartilham o
   handler.
 * Um `Text` de resumo ao lado do formulário é o jeito mais rápido de provar que a

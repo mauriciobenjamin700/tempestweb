@@ -51,7 +51,11 @@ _TAG_BY_TYPE: dict[str, str] = {
     # An IconButton is a button — the core declares ``on_click`` on it — so the
     # ``div`` fallback made the static page carry an unfocusable, unnamed box.
     "IconButton": "button",
-    "Input": "input",
+    # An Input is a ``div`` wrapping the real ``input``, so a secure field can
+    # carry the visibility toggle the core's ``secure`` prop promises — a void
+    # ``input`` has nowhere to put it. A port of ``TAG_BY_TYPE`` in
+    # ``client/dom.js``; the shape has to match or hydration replaces the tree.
+    "Input": "div",
     # The fields #142 gave the client and this renderer never got: a TextArea that
     # is a real one, and the two inputs the base sheet was already styling as
     # fields (a static page showed a CPF box nobody could type into either).
@@ -323,14 +327,6 @@ def _control_attributes(node: Node) -> list[str]:
             attributes.append('data-tw-open=""')
         else:
             attributes.append('aria-hidden="true"')
-    elif node.type == "Input":
-        attributes.append(f'type="{"password" if props.get("secure") else "text"}"')
-        if "value" in props:
-            attributes.append(f'value="{escape_attr(props.get("value"))}"')
-        if props.get("placeholder") is not None:
-            attributes.append(f'placeholder="{escape_attr(props["placeholder"])}"')
-        if props.get("max_length") is not None:
-            attributes.append(f'maxlength="{escape_attr(props["max_length"])}"')
     elif node.type == "Image":
         if props.get("src") is not None:
             attributes.append(f'src="{escape_attr(props["src"])}"')
@@ -372,6 +368,55 @@ def _range_thumb_name(dumped: dict[str, Any], part: str) -> str:
     if label is None or str(label) == "":
         return alone
     return f"{label} ({suffix})"
+
+
+#: The reveal toggle's accessible name, by whether the text is showing. Mirrors
+#: ``REVEAL_NAMES`` in ``client/dom.js``.
+_REVEAL_NAMES: dict[bool, str] = {True: "Hide password", False: "Show password"}
+
+
+def _input_html(node: Node) -> str:
+    """Render an ``Input``'s inner markup: the control, plus the reveal toggle.
+
+    The keyed element is a role-less ``div``, so everything a reader reaches has
+    to be named on the control inside it — the same reason
+    :func:`_range_thumb_name` exists. The toggle is emitted for a secure field
+    even though a static page cannot run it: the shape has to match what
+    ``client/dom.js`` builds, or hydration replaces the subtree and the field
+    jumps. It carries no glyph here for the same reason an ``IconButton`` does
+    not — this renderer holds no icon path data, and the client draws it on
+    hydration.
+
+    Args:
+        node: The ``Input`` node to render the inner HTML for.
+
+    Returns:
+        The inner HTML string: one ``<input>``, and a ``<button>`` when secure.
+    """
+    props = node.props
+    secure = bool(props.get("secure"))
+    parts: list[str] = [f'type="{"password" if secure else "text"}"']
+    if node.key:
+        parts.append(f'name="{escape_attr(node.key)}"')
+    if "value" in props:
+        parts.append(f'value="{escape_attr(props.get("value"))}"')
+    if props.get("placeholder") is not None:
+        parts.append(f'placeholder="{escape_attr(props["placeholder"])}"')
+    if props.get("max_length") is not None:
+        parts.append(f'maxlength="{escape_attr(props["max_length"])}"')
+    semantics = _dump(props.get("semantics"))
+    label = semantics.get("label") if isinstance(semantics, dict) else None
+    if label is not None and str(label) != "":
+        parts.append(f'aria-label="{escape_attr(label)}"')
+    control = f"<input {' '.join(parts)}>"
+    if not secure:
+        return control
+    name = escape_attr(_REVEAL_NAMES[False])
+    return (
+        f"{control}"
+        f'<button type="button" data-tw-part="reveal" tabindex="0" '
+        f'aria-pressed="false" aria-label="{name}"></button>'
+    )
 
 
 def _range_attributes(props: dict[str, Any], value: Any) -> list[str]:  # noqa: ANN401 — wire-shaped prop value
@@ -583,6 +628,8 @@ def _inner_html(node: Node) -> str:
         return escape_text(node.props.get("value"))
     if node.type == "Dropdown":
         return _options_html(node.props.get("options"), node.props.get("placeholder"))
+    if node.type == "Input":
+        return _input_html(node)
     if node.type == "Autocomplete":
         list_id = f"tw-list-{node.key or 'anon'}"
         value = escape_attr(node.props.get("value"))

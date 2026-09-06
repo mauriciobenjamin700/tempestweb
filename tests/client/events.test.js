@@ -265,3 +265,80 @@ test("typing in a TextArea reports its value like any other field", () => {
     payload: { value: "a note" },
   });
 });
+
+test("pressing the reveal toggle sends nothing to Python (#209)", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const field = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { value: "hunter2", secure: true },
+    children: [],
+  });
+  dom.root.appendChild(field);
+  const transport = mockTransport();
+  bindEvents(dom.root, transport);
+
+  const toggle = field.querySelector('[data-tw-part="reveal"]');
+  const control = field.querySelector(":scope > input");
+  assert.equal(control.getAttribute("type"), "password");
+
+  // Click the glyph, not the button: that is where a pointer actually lands, and
+  // the glyph carries a `data-tw-part` of its own.
+  const glyph = toggle.querySelector('[data-tw-part="glyph"]');
+  assert.notEqual(glyph, null, "the toggle draws its eye as a renderer-owned svg");
+  glyph.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+
+  // The core promises the reveal is local: no round-trip, no re-render.
+  assert.deepEqual(transport.events, []);
+  assert.equal(control.getAttribute("type"), "text");
+  assert.equal(toggle.getAttribute("aria-pressed"), "true");
+  assert.equal(control.value, "hunter2", "revealing never touches the value");
+
+  glyph.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+  assert.deepEqual(transport.events, []);
+  assert.equal(control.getAttribute("type"), "password");
+  assert.equal(toggle.getAttribute("aria-pressed"), "false");
+});
+
+test("tabbing off the reveal toggle does not report an empty field", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const wrapper = buildElement({
+    type: "FormField",
+    key: "pw-field",
+    props: { name: "password" },
+    children: [{ type: "Input", key: "pw", props: { value: "hunter2", secure: true }, children: [] }],
+  });
+  dom.root.appendChild(wrapper);
+  const transport = mockTransport();
+  bindEvents(dom.root, transport);
+
+  const toggle = wrapper.querySelector('[data-tw-part="reveal"]');
+  toggle.dispatchEvent(new dom.window.FocusEvent("focusout", { bubbles: true }));
+
+  // A <button> has `.value === ""`; reporting it would blank a field the reader
+  // never cleared.
+  assert.deepEqual(transport.events, []);
+});
+
+test("pressing the reveal toggle keeps the caret in the field", () => {
+  const dom = freshDom();
+  globalThis.document = dom.document;
+  const field = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { value: "hunter2", secure: true },
+    children: [],
+  });
+  dom.root.appendChild(field);
+  bindEvents(dom.root, mockTransport());
+
+  const glyph = field.querySelector('[data-tw-part="glyph"]');
+  const press = new dom.window.MouseEvent("mousedown", { bubbles: true, cancelable: true });
+  glyph.dispatchEvent(press);
+
+  // Letting the press move focus blurs the field, which makes an edited input
+  // fire its native `change` — one frame on the wire for a local toggle.
+  assert.equal(press.defaultPrevented, true);
+});

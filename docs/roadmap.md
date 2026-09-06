@@ -11,7 +11,20 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.131.0; o PyPI serve a 0.130.0.** A diferença é a #208: o
+    **Versão do repo: 0.132.0; o PyPI serve a 0.130.0.** A diferença mais nova é
+    a **#209**: o contrato do core descreve o campo `secure` do `Input` dizendo
+    que *"the renderer also offers a visibility toggle ('eye') that reveals the
+    text locally without a round-trip to Python"* — e o renderizador DOM só
+    escrevia `type="password"`. Agora todo `Input(secure=True)` carrega o olho,
+    sem prop nova e sem estado de apresentação no `state` da app. O `Input`
+    passou a ser um `<div>` com o `<input>` dentro, porque um `<input>` é
+    elemento void e o botão não tinha onde ir; é legal porque `Input` é folha da
+    IR, como `RangeSlider` e `Autocomplete` já eram. O Modo C saiu de graça (o
+    runtime dele monta pelo mesmo `client/dom.js`) e as fixtures deram diff
+    zero. Segue devendo o `leading_icon`/`trailing_icon`, a mesma promessa pela
+    mesma causa.
+
+    Antes dela, a #208: o
     `Ctrl-C` no `tempestweb dev` não terminava o processo enquanto uma aba do app
     estivesse aberta — medido, vivo depois de 60 s, e o segundo `Ctrl-C` também
     não resolvia. Duas peças se somavam: o canal de livereload é um gerador sem

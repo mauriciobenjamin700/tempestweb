@@ -175,8 +175,10 @@ body {
    inset box-shadow (not a border-color change) because the core's inline border
    would otherwise win over a stylesheet :focus rule. */
 [data-tw-type="Input"] {
+  display: flex;
+  align-items: center;
   min-height: 40px;
-  padding: 9px 16px;
+  padding: 0 16px;
   background: var(--tw-surface);
   color: var(--tw-on-surface);
   font-family: var(--tw-font);
@@ -184,17 +186,53 @@ body {
   line-height: 22px;
   transition: border-color var(--tw-motion), box-shadow var(--tw-motion);
 }
-[data-tw-type="Input"]::placeholder { color: var(--tw-on-surface-variant); }
+[data-tw-type="Input"] > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  outline: none;
+}
+[data-tw-type="Input"] > input::placeholder { color: var(--tw-on-surface-variant); }
 [data-tw-type="Input"]:hover { border-color: var(--tw-on-surface); }
-[data-tw-type="Input"]:focus,
-[data-tw-type="Input"]:focus-visible {
+[data-tw-type="Input"]:focus-within {
   outline: none;
   border-color: var(--tw-primary);
   box-shadow: inset 0 0 0 1px var(--tw-primary);
 }
-[data-tw-type="Input"]:disabled {
-  border-color: rgba(29,27,32,0.12);
+[data-tw-type="Input"] > input:disabled {
   color: rgba(29,27,32,0.38);
+}
+[data-tw-type="Input"]:has(> input:disabled) {
+  border-color: rgba(29,27,32,0.12);
+}
+[data-tw-type="Input"] > [data-tw-part="reveal"] {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tw-on-surface-variant);
+  cursor: pointer;
+}
+[data-tw-type="Input"] > [data-tw-part="reveal"]:hover { color: var(--tw-on-surface); }
+[data-tw-type="Input"] > [data-tw-part="reveal"]:focus-visible {
+  outline: 2px solid var(--tw-primary);
+  outline-offset: 1px;
+}
+[data-tw-type="Input"] > [data-tw-part="reveal"] > svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* ── Checkbox: a <label> wrapping the real <input type=checkbox> ─────────────

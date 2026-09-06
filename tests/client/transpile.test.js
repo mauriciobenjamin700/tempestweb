@@ -9,6 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import { fixture, freshDom } from "./setup.js";
+import { buildElement, toggleReveal } from "../../client/dom.js";
 import { diff } from "../../client/transpile/diff.js";
 import {
   Button,
@@ -1492,4 +1493,32 @@ test("a handler that declares a parameter still receives the event", () => {
   field.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
 
   assert.deepEqual(seen, ["typed"]);
+});
+
+test("Mode C gets the reveal toggle from the shared renderer (#209)", () => {
+  // Mode C mounts through client/dom.js (runtime.js imports `mount` from
+  // ../tempestweb.js), so the eye is the same code path as A and B — but only a
+  // DOM assertion proves it: the IR parity matrix cannot see rendered markup.
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  const bare = buildElement(Input({ value: "hunter2", secure: true, key: "pw" }));
+  const bareToggle = bare.querySelector('[data-tw-part="reveal"]');
+  assert.notEqual(bareToggle, null, "a Mode C secure Input carries the eye");
+  assert.equal(bare.querySelector(":scope > input").getAttribute("type"), "password");
+
+  toggleReveal(bare);
+  assert.equal(bare.querySelector(":scope > input").getAttribute("type"), "text");
+  assert.equal(bareToggle.getAttribute("aria-pressed"), "true");
+
+  // Keyed and unkeyed both, because a build without `key` hides the namespaced
+  // child-key derivation the name of the nested control comes from.
+  const composed = buildElement(PasswordField({ onChange() {}, key: "login" }));
+  const control = composed.querySelector("input");
+  assert.equal(control.getAttribute("name"), "login-input");
+  assert.notEqual(
+    composed.querySelector('[data-tw-part="reveal"]'),
+    null,
+    "PasswordField is secure, so it gets the eye without asking",
+  );
 });

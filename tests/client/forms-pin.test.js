@@ -127,7 +127,8 @@ test("a FormField carries its name, and leaving it asks for validation", () => {
 
   assert.equal(field.getAttribute("data-tw-field"), "email");
 
-  const control = field.querySelector("[data-tw-key=\"email-in\"]");
+  // The keyed element is the field box; the control it owns holds the value.
+  const control = field.querySelector("[data-tw-key=\"email-in\"] > input");
   control.value = "not-an-email";
   control.dispatchEvent(new dom.window.Event("focusout", { bubbles: true }));
 

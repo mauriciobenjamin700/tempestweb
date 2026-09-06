@@ -74,11 +74,39 @@ def test_primitive_type_maps_to_expected_tag(widget: Widget, opening: str) -> No
     assert render_to_html(widget).startswith(opening)
 
 
-def test_input_is_a_void_input_element() -> None:
-    html = render_to_html(Input(value=""))
-    assert html.startswith("<input")
-    assert html.endswith("/>")
-    assert "</input>" not in html
+def test_input_wraps_a_real_control() -> None:
+    """The keyed element is the field box; the control it owns lives inside it.
+
+    A void ``<input>`` has nowhere to put the visibility toggle the core's
+    ``secure`` prop promises, so the shape matches ``client/dom.js``: wrapper
+    plus control. Divergence here is not cosmetic — hydration would replace the
+    subtree and the field would jump.
+    """
+    html = render_to_html(Input(value="typed"))
+    assert html.startswith("<div")
+    assert '<input type="text" value="typed"' in html
+    assert html.endswith("</div>")
+
+
+def test_a_secure_input_ships_the_reveal_toggle() -> None:
+    """A secure field carries the eye: named, focusable, glyph-less until hydration."""
+    html = render_to_html(Input(value="", secure=True))
+    assert '<input type="password"' in html
+    assert 'data-tw-part="reveal"' in html
+    assert 'aria-pressed="false"' in html
+    assert 'aria-label="Show password"' in html
+
+
+def test_a_plain_input_has_no_reveal_toggle() -> None:
+    """The eye belongs to a password field, not to every text box."""
+    assert 'data-tw-part="reveal"' not in render_to_html(Input(value=""))
+
+
+def test_an_input_names_the_control_not_the_wrapper() -> None:
+    """A name on the role-less wrapper leaves the control anonymous (axe: label)."""
+    html = render_to_html(Input(value="", semantics=Semantics(label="Senha")))
+    control = html[html.index("<input") :]
+    assert 'aria-label="Senha"' in control
 
 
 def test_image_is_a_void_img_element() -> None:

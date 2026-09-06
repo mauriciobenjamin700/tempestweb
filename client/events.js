@@ -28,6 +28,7 @@ import {
   PIN_LENGTH_ATTR,
   REORDER_ATTR,
   TYPE_ATTR,
+  toggleReveal,
 } from "./dom.js";
 
 /**
@@ -239,6 +240,13 @@ function reportPinComplete(target, transport) {
  * @returns {void}
  */
 function reportFieldValidation(target, root, transport) {
+  const source = /** @type {HTMLElement|null} */ (target);
+  if (source?.hasAttribute && source.hasAttribute(ITEM_ATTR)) {
+    // Tabbing off a renderer-owned part (the reveal toggle) is not the field
+    // losing focus — and a `<button>` has `.value === ""`, so reporting it would
+    // hand the app an empty value for a field the reader never cleared.
+    return;
+  }
   const field = closestWithAttr(target, root, FIELD_ATTR);
   if (field == null) {
     return;
@@ -255,6 +263,39 @@ function reportFieldValidation(target, root, transport) {
     key,
     payload: { field: name, value },
   });
+}
+
+/**
+ * Flip a secure `Input` when the click landed on its reveal toggle.
+ *
+ * The core promises the eye reveals "locally without a round-trip to Python", so
+ * this consumes the click: letting it fall through would report a `click` on the
+ * field's key, which in Mode B is a network round-trip and a re-render for every
+ * press of a button the app never declared.
+ *
+ * @param {Event} event      The click being delegated.
+ * @param {HTMLElement} root The delegation root.
+ * @returns {boolean}        Whether the click was a reveal (and is now handled).
+ */
+function sendNothingForReveal(event, root) {
+  // Matched by attribute *value*, not by presence: the click lands on the
+  // `<path>` inside the toggle's own `data-tw-part="glyph"` svg, so stopping at
+  // the nearest part-bearing ancestor finds the glyph and lets the click fall
+  // through to the field's key — measured in Chrome as two frames on the wire
+  // and an eye that did not open.
+  const node = /** @type {Element|null} */ (event.target);
+  const toggle = /** @type {HTMLElement|null} */ (
+    node?.closest ? node.closest(`[${ITEM_ATTR}="reveal"]`) : null
+  );
+  if (toggle == null || !root.contains(toggle)) {
+    return false;
+  }
+  const wrapper = toggle.parentElement;
+  if (wrapper == null) {
+    return false;
+  }
+  toggleReveal(wrapper);
+  return true;
 }
 
 /** The dataTransfer type carrying the dragged item's position within its list. */
@@ -662,6 +703,9 @@ export function bindEvents(root, transport) {
   for (const domType of Object.keys(EVENT_TYPES)) {
     /** @param {Event} event */
     const handler = (event) => {
+      if (domType === "click" && sendNothingForReveal(event, root)) {
+        return;
+      }
       if (domType === "click" && sendMenuSelection(event, root, transport)) {
         return;
       }
@@ -712,6 +756,29 @@ export function bindEvents(root, transport) {
   };
   root.addEventListener("focusout", onFocusOut);
   bound.push(["focusout", onFocusOut]);
+
+  /**
+   * Keep the caret in the field when the reveal toggle is pressed.
+   *
+   * Without this the press moves focus to the button, so the field blurs: the
+   * reader has to click back to keep typing, and an edited field fires its
+   * native `change` on the way out — measured in Chrome as one frame on the
+   * wire for what is supposed to be a local toggle. Keyboard users are
+   * unaffected: they are already on the button, and Space/Enter still activate
+   * it.
+   *
+   * @param {MouseEvent} event  The pointer press being delegated.
+   * @returns {void}
+   */
+  const onMouseDown = (event) => {
+    const node = /** @type {Element|null} */ (event.target);
+    const toggle = node?.closest ? node.closest(`[${ITEM_ATTR}="reveal"]`) : null;
+    if (toggle != null && root.contains(toggle)) {
+      event.preventDefault();
+    }
+  };
+  root.addEventListener("mousedown", onMouseDown);
+  bound.push(["mousedown", onMouseDown]);
 
   const bindDrag = () => {
     /** @param {DragEvent} event */

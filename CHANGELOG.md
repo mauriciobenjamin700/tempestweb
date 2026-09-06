@@ -4,6 +4,100 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.132.0] — 2026-09-06
+
+### Added
+
+- **O campo de senha ganhou o olho de mostrar/ocultar que o core já prometia
+  (#209).** `tempest_core/widgets/inputs.py` descreve o campo `secure` como
+  *"the renderer also offers a visibility toggle ('eye') that reveals the text
+  locally without a round-trip to Python"* — e o renderizador DOM só escrevia
+  `type="password"`. `grep -rn "eye\|reveal\|visibility" client/` não achava
+  nada. Quem seguia o exemplo de login escrevia `LoginForm(...)` e procurava
+  como pedir o olho; pela promessa do contrato, não havia o que pedir.
+
+  Agora todo `Input(secure=True)` carrega o toggle, **sem prop nova**: nada muda
+  no código de quem usa, nenhum campo entra no core, e nenhum estado de
+  apresentação vai para o `state` da app. A revelação é local — troca o `type`
+  do controle no browser, sem evento, sem patch e sem ida e volta de rede no
+  Modo B.
+
+  **Para isso o `Input` passou a ser um `<div>` com o `<input>` dentro.** Um
+  `<input>` é elemento *void*: não aceita filho, então o botão não tinha onde
+  ir, e como irmão corromperia os patch paths. O precedente já existia no
+  arquivo — `RangeSlider` é um `<div>` com dois range inputs, e `Autocomplete`
+  um `<label>` com input e datalist, os dois legais porque são **folha da IR**.
+  O wrapper é incondicional (a tag não pode depender de prop: um `Update` nunca
+  troca a tag de um elemento keyed); só o botão é condicional.
+
+  O trabalho de verdade não foi o botão, e sim os cinco lugares que escreviam no
+  elemento keyed e passariam a escrever na caixa errada — cada um com teste:
+
+    - **nome acessível** vai para o controle, não para o `<div>` role-less, que
+      nomeia nada e deixaria o input anônimo (axe `label`, critical);
+    - **`attrs`** vai para o controle, então `autocomplete="new-password"`
+      continua ganhando do hint derivado do `keyboard`;
+    - **`tabindex`** vai para o controle, senão `focusable=True` criaria um tab
+      stop no wrapper ao lado do real;
+    - **o estado de revelação é atributo** (`data-tw-reveal`) lido por
+      `applyInputType`, senão o próximo `Update` que mencionasse `secure`
+      re-mascararia — o "olho que só funciona às vezes";
+    - **o clique não atravessa o fio**: `events.js` consome o clique no toggle
+      antes da delegação, e um `focusout` em parte do renderizador não vira
+      `validate` (um `<button>` tem `.value === ""`, o que entregaria à app um
+      campo vazio que o leitor nunca limpou).
+
+  **Modo C não custou nada:** `client/transpile/runtime.js` importa `mount` de
+  `../tempestweb.js`, então C monta pelo mesmo `client/dom.js` — o olho aparece
+  nos três modos pela mesma linha. Nenhum gerador rodou e `_served.py` não
+  mudou; o caso novo em `tests/client/transpile.test.js` afirma isso pelo DOM,
+  porque a matriz de paridade é de IR e não vê markup.
+
+  **Fixtures com diff zero** (`_transpile_fields`,
+  `_transpile_component_styles`, `_transpile_served`, `_transpile_widgets`
+  regenerados) — a evidência de que isto é correção de renderizador e não
+  decisão de compatibilidade. `docs/contract.md` não muda.
+
+  O glifo é o `eye` / `eye-off` do conjunto curado (Lucide), não Material; os
+  nomes do Material Symbols resolvem para o mesmo glifo por alias.
+
+  **Dois defeitos que só o Chrome real achou**, e que a suíte jsdom não pegava —
+  cada um agora com teste que reprova sem a correção:
+
+    - **O clique vazava para o Python e o olho não abria.** O intercepto parava no
+      primeiro ancestral com `data-tw-part`, que é o `<svg>` do próprio glifo, e
+      não o botão. Medido: `type` seguia `password`, `aria-pressed` seguia
+      `false`, e o clique virava **2 frames** no WebSocket. O teste jsdom
+      disparava o clique no `<button>`, que é onde um ponteiro nunca cai. O match
+      passou a ser por **valor** do atributo, e o teste agora clica no glifo.
+    - **Revelar tirava o foco do campo.** A pressão movia o foco para o botão, o
+      campo desfocava, e um `<input>` editado dispara o `change` nativo na saída
+      — **1 frame** na rede para o que deveria ser local, e o leitor tinha que
+      clicar de volta para continuar digitando. `mousedown` no toggle agora faz
+      `preventDefault`; teclado não é afetado (Space/Enter seguem ativando).
+
+  Medido depois das duas correções, Modo B, com o campo preenchido: revelar e
+  ocultar enviam **0 frames**, o foco fica no campo (digitei mais dois caracteres
+  sem clicar de volta), o valor sobrevive intacto aos dois toggles, `Tab` chega
+  no olho e `Space` o ativa. Modo C idêntico, com **0 requisições de rede** após
+  o mount. Dois viewports (1280 e 390 px): o olho é 28x28 dentro da caixa do
+  campo, sem sobrepor o texto, sem overflow horizontal. Console: 0 erro, 0
+  warning.
+
+### Changed
+
+- **O SSR acompanha a forma nova.** `tempestweb/html/renderer.py` emite
+  `Input` como wrapper com o controle dentro, com o nome no controle (o mesmo
+  motivo que fez `_range_thumb_name` existir) e o toggle sem glifo até o cliente
+  hidratar (o mesmo que já vale para `IconButton`). Divergir aqui não é
+  cosmético: a hidratação substituiria a subárvore e o campo saltaria.
+
+### Fixed
+
+- **`leading_icon` / `trailing_icon` do `Input` seguem não desenhados** — a
+  mesma promessa não cumprida, pela mesma causa (elemento void). O wrapper deste
+  release é o pré-requisito, e a entrega fica para a próxima issue.
+
 ## [0.131.0] — 2026-09-06
 
 ### Fixed

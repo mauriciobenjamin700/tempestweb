@@ -138,6 +138,23 @@ def email_input(value: str) -> Input:
     não declara. Precisa de ícone no campo? Use o `Input` do core direto, como
     acima.
 
+!!! info "Onde o ícone é desenhado"
+    O renderizador coloca o glifo **dentro da caixa do campo**, como irmão do
+    controle: `leading` → controle → `trailing`. Num campo `secure`, o olho de
+    mostrar/ocultar fica sempre por último, encostado na borda. O ícone é
+    decorativo — `aria-hidden`, fora da ordem de tabulação — e nunca substitui o
+    nome do campo.
+
+    Isso vale nos três modos e no HTML estático, porque quem desenha é o mesmo
+    `client/dom.js`.
+
+!!! tip "O `Dropdown` desenha o próprio chevron"
+    Um `<select>` só aceita `<option>` dentro, então o campo é uma caixa que
+    envolve o controle — e a seta nativa do browser, que é pintada contra a borda
+    do `<select>`, cairia embaixo do seu `trailing_icon`. O renderizador desliga a
+    nativa e desenha um `chevron-down` na fenda trailing; se **você** passar um
+    `trailing_icon`, ele sai da frente e o seu ícone assume.
+
 !!! note "A gramática do nome"
     Por baixo, o conjunto é codificado como um **prefixo** no nome do `Icon`:
     `"material:home"`, `"lucide:mail"`. As funções `material_icon`/`lucide_icon`

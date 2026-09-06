@@ -703,3 +703,79 @@ test("an Input's tab stop is the control, never the wrapper", () => {
   assert.equal(el.hasAttribute("tabindex"), false);
   assert.equal(el.querySelector("input").getAttribute("tabindex"), "0");
 });
+
+test("an Input draws the leading and trailing icons the core promises (#211)", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "user",
+    props: { value: "", leading_icon: "user", trailing_icon: "search" },
+    children: [],
+  });
+
+  const leading = el.querySelector(':scope > [data-tw-part="leading"]');
+  const trailing = el.querySelector(':scope > [data-tw-part="trailing"]');
+  assert.notEqual(leading, null, "the renderer resolves and places the leading icon");
+  assert.notEqual(trailing, null);
+  // Decorative: named by the field, never announced on its own.
+  assert.equal(leading.getAttribute("aria-hidden"), "true");
+  assert.equal(leading.getAttribute("data-tw-icon"), "user");
+  assert.equal(trailing.getAttribute("data-tw-icon"), "search");
+
+  const order = [...el.children].map((c) => c.getAttribute("data-tw-part") ?? c.tagName);
+  assert.deepEqual(order, ["leading", "INPUT", "trailing"]);
+});
+
+test("a secure Input keeps the eye last, past any trailing icon", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "pw",
+    props: { secure: true, leading_icon: "lock", trailing_icon: "search" },
+    children: [],
+  });
+  const order = [...el.children].map((c) => c.getAttribute("data-tw-part") ?? c.tagName);
+  // The eye sits against the edge, where a reader has learned to look for it.
+  assert.deepEqual(order, ["leading", "INPUT", "trailing", "reveal"]);
+});
+
+test("clearing a field icon removes it", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "f",
+    props: { leading_icon: "user" },
+    children: [],
+  });
+  assert.notEqual(el.querySelector('[data-tw-part="leading"]'), null);
+  applyPatches(el, [{ path: [], set_props: { leading_icon: null } }]);
+  assert.equal(el.querySelector('[data-tw-part="leading"]'), null);
+});
+
+test("an update that never mentions an icon leaves it alone", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Input",
+    key: "f",
+    props: { value: "a", leading_icon: "user" },
+    children: [],
+  });
+  applyPatches(el, [{ path: [], set_props: { value: "ab" } }]);
+  assert.notEqual(el.querySelector('[data-tw-part="leading"]'), null);
+});
+
+test("an Autocomplete draws its field icons too", () => {
+  withDocument();
+  const el = buildElement({
+    type: "Autocomplete",
+    key: "city",
+    props: { value: "", options: ["Recife"], leading_icon: "search" },
+    children: [],
+  });
+  const leading = el.querySelector(':scope > [data-tw-part="leading"]');
+  assert.notEqual(leading, null);
+  assert.equal(leading.getAttribute("data-tw-icon"), "search");
+  // The datalist the renderer owns must survive the icon insertion.
+  assert.notEqual(el.querySelector("datalist"), null);
+  assert.notEqual(el.querySelector("input"), null);
+});

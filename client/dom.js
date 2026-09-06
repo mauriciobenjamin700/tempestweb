@@ -81,9 +81,13 @@ const TAG_BY_TYPE = Object.freeze({
   // it stays a <div> holding two renderer-owned range inputs. Legal because
   // RangeSlider is an IR leaf: no patch path descends into it.
   RangeSlider: "div",
-  // A Dropdown is a <select>, its `options` renderer-owned <option>s and its
-  // `placeholder` a disabled leading one. Also an IR leaf.
-  Dropdown: "select",
+  // A Dropdown is a <div> wrapping a renderer-owned <select> (its `options` are
+  // renderer-owned <option>s and its `placeholder` a disabled leading one). A
+  // <select> only admits <option>/<optgroup>, so the `leading_icon` and
+  // `trailing_icon` the core promises have nowhere to go inside one. Legal
+  // because Dropdown is an IR leaf: no patch path descends into it. Wrapper is
+  // unconditional — the tag cannot depend on a prop.
+  Dropdown: "div",
   // An Autocomplete is a <label> wrapping a text input plus a renderer-owned
   // <datalist> of its `options`: `list=` has to point at a datalist *element*, so
   // the input is wrapped rather than bare, and the browser draws the suggestions.
@@ -295,7 +299,7 @@ function applyProps(el, props) {
   // `autocomplete` there stops beating the keyboard hint). All three target the
   // nested control instead, which is exactly where they landed while an Input
   // *was* the control.
-  const control = type === "Input" ? ensureFieldControl(el) : null;
+  const control = FIELD_CONTROL_FOR[type ?? ""]?.(el) ?? null;
   applyA11yProps(control ?? el, props);
   applyIconButtonProps(el, type, props);
   applyIndicatorProps(el, type, props);
@@ -1224,8 +1228,10 @@ const REVEAL_NAMES = Object.freeze({ shown: "Hide password", hidden: "Show passw
  *
  * The wrapper is the keyed, path-addressed element; this control carries the
  * value, the type, the accessible name and the tab stop. Separate from
- * `ensureNestedInput` because an `Input` has no caption to be named by, so the
- * control is appended rather than inserted first — the toggle stays last.
+ * `ensureNestedInput` because an `Input` has no caption to be named by. The
+ * control goes first and every renderer-owned part places itself relative to it
+ * (see `applyFieldIcons`), so a leading icon added by a later patch still lands
+ * ahead of the control.
  *
  * @param {HTMLElement} el      The keyed `Input` wrapper.
  * @returns {HTMLInputElement}  The renderer-owned text control.
@@ -1241,6 +1247,121 @@ function ensureFieldControl(el) {
     el.insertBefore(control, el.firstChild);
   }
   return control;
+}
+
+/**
+ * How to reach the real control inside each widget the renderer wraps.
+ *
+ * Their keyed element is a role-less `<div>`, so `aria-label` on it names nothing
+ * a reader can reach, a `tabindex` on it adds a tab stop next to the real one,
+ * and `attrs` on it never reach the control the app meant. All three target the
+ * control instead — which is exactly where they landed while these widgets *were*
+ * the control.
+ *
+ * @type {Readonly<Record<string, (el: HTMLElement) => HTMLElement>>}
+ */
+const FIELD_CONTROL_FOR = Object.freeze({
+  Input: (el) => ensureFieldControl(el),
+  Dropdown: (el) => ensureSelectControl(el),
+});
+
+/** The field-icon props the renderer draws, mapped to the part each becomes. */
+const FIELD_ICON_PARTS = Object.freeze({
+  leading_icon: "leading",
+  trailing_icon: "trailing",
+});
+
+/**
+ * Draw (or clear) a field's leading and trailing icons inside its wrapper.
+ *
+ * The core promises, on all three field widgets that declare them, that "the
+ * renderer resolves and places it" — so the glyph is renderer-owned markup, the
+ * same way the reveal toggle and an `IconButton`'s glyph already are. Legal
+ * because each of those widgets is an IR leaf: no patch path descends into it.
+ *
+ * Only acts on props the bag actually mentions, so a partial Update that says
+ * nothing about an icon leaves it standing. The icon is decorative:
+ * `createIconSvg` marks it `aria-hidden`, so it never competes with the field's
+ * own accessible name.
+ *
+ * @param {HTMLElement} el   The keyed field wrapper.
+ * @param {Object} props     The props being applied (may be a partial Update).
+ * @returns {void}
+ */
+function applyFieldIcons(el, control, props) {
+  for (const [prop, part] of Object.entries(FIELD_ICON_PARTS)) {
+    if (!(prop in props)) {
+      continue;
+    }
+    const name = props[prop] == null ? "" : String(props[prop]);
+    let svg = el.querySelector(`:scope > [${ITEM_ATTR}="${part}"]`);
+    if (name === "") {
+      svg?.remove();
+      continue;
+    }
+    if (svg == null) {
+      svg = createIconSvg();
+      svg.setAttribute(ITEM_ATTR, part);
+      // Each part places itself relative to the control, never by appending: an
+      // Update that adds an icon to a field already on screen would otherwise
+      // land it wherever the passes happened to run, and the order would be a
+      // function of the call order instead of the props. A trailing icon goes
+      // before the reveal toggle, so the eye stays against the edge — which is
+      // where a reader (and a password manager) has learned to look for it.
+      el.insertBefore(svg, part === "leading" ? control : revealToggleOf(el));
+    }
+    renderIcon(/** @type {any} */ (svg), { name });
+  }
+}
+
+/**
+ * Draw the chevron a `Dropdown` needs once the native arrow is turned off.
+ *
+ * The base sheet sets `appearance: none` on the nested select, because the
+ * browser paints its arrow against the control's own edge — which, inside a
+ * wrapper, lands under any `trailing_icon` the app asked for, showing two arrows.
+ * The renderer draws one instead, in the trailing slot, and steps aside when the
+ * app supplies its own trailing icon: the same rule the reveal toggle follows.
+ *
+ * @param {HTMLElement} el              The keyed `Dropdown` wrapper.
+ * @param {HTMLSelectElement} control   The select the wrapper owns.
+ * @returns {void}
+ */
+function ensureDropdownChevron(el, control) {
+  if (el.querySelector(`:scope > [${ITEM_ATTR}="trailing"]`) != null) {
+    el.querySelector(`:scope > [${ITEM_ATTR}="chevron"]`)?.remove();
+    return;
+  }
+  let svg = el.querySelector(`:scope > [${ITEM_ATTR}="chevron"]`);
+  if (svg == null) {
+    svg = createIconSvg();
+    svg.setAttribute(ITEM_ATTR, "chevron");
+    el.insertBefore(svg, control.nextSibling);
+    renderIcon(/** @type {any} */ (svg), { name: "chevron-down" });
+  }
+}
+
+/**
+ * Get (creating it once) the `<select>` a keyed `Dropdown` wrapper owns.
+ *
+ * Carries the value, the options, the accessible name and the tab stop. It never
+ * takes a `data-tw-part`: `reportFieldValidation` skips renderer-owned parts, so
+ * marking the control would stop every `Dropdown` inside a `Form` from reporting
+ * `validate`.
+ *
+ * @param {HTMLElement} el       The keyed `Dropdown` wrapper.
+ * @returns {HTMLSelectElement}  The renderer-owned select.
+ */
+function ensureSelectControl(el) {
+  let select = /** @type {HTMLSelectElement|null} */ (
+    el.querySelector(":scope > select")
+  );
+  if (select == null) {
+    select = /** @type {HTMLSelectElement} */ (document.createElement("select"));
+    nameFormControl(select, el.getAttribute(KEY_ATTR));
+    el.insertBefore(select, el.firstChild);
+  }
+  return select;
 }
 
 /**
@@ -1673,7 +1794,14 @@ function applySwitchProps(el, props) {
  */
 function nameNestedControl(el, input) {
   const wrapperName = el.getAttribute("aria-label");
-  const caption = (el.textContent ?? "").trim();
+  // Only the wrapper's own text counts as a caption. A renderer-owned part that
+  // ever contributed text — an icon with a <title>, say — would read as one, and
+  // the control named through `semantics` would silently stop being named.
+  const caption = Array.from(el.childNodes)
+    .filter((node) => node.nodeType === 3)
+    .map((node) => node.textContent ?? "")
+    .join("")
+    .trim();
   if (wrapperName && !caption) {
     input.setAttribute("aria-label", wrapperName);
   }
@@ -1792,7 +1920,9 @@ function applyRangeSliderProps(el, props) {
  * @returns {void}
  */
 function applyDropdownProps(el, props) {
-  const select = /** @type {HTMLSelectElement} */ (el);
+  const select = ensureSelectControl(el);
+  applyFieldIcons(el, select, props);
+  ensureDropdownChevron(el, select);
   if ("options" in props) {
     select.__twOptions = Array.isArray(props.options) ? props.options : [];
   }
@@ -1986,6 +2116,7 @@ function applyControlProps(el, type, props) {
   } else if (type === "Input") {
     const control = ensureFieldControl(el);
     applyRevealToggle(el, props);
+    applyFieldIcons(el, control, props);
     applyInputType(control, props, el);
     if ("value" in props) {
       control.value = props.value == null ? "" : String(props.value);
@@ -2050,6 +2181,7 @@ function applyControlProps(el, type, props) {
     applyDropdownProps(el, props);
   } else if (type === "Autocomplete") {
     applyAutocompleteProps(el, props);
+    applyFieldIcons(el, el.querySelector(":scope > input"), props);
   } else if (type != null && type in PICKER_INPUT_TYPES) {
     applyPickerProps(el, type, props);
   } else if (type === "TabBar") {

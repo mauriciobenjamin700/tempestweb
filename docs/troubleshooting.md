@@ -601,6 +601,35 @@ Use sempre o glob, entre aspas para o shell não expandir antes.
 
 ---
 
+### `Ctrl-C` no `tempestweb dev` não devolvia o terminal
+
+Com uma aba do app aberta o processo **não terminava**: seguia vivo depois de
+60 s, e um segundo `Ctrl-C` também não resolvia — só `kill -9`. Sem nenhuma aba
+aberta ele saía em 0,3 s, o que fazia a demora parecer aleatória. Era o contrário
+de aleatório: dependia de você estar *usando* o app.
+
+Duas peças se somavam. O canal de livereload é um gerador sem fim parado em
+`ReloadSignal.wait()`, então enquanto a aba vive há uma resposta HTTP em curso; o
+desligamento gracioso do uvicorn espera as respostas em curso, e o
+`timeout_graceful_shutdown` no default é **sem limite**. O browser esperava o
+servidor e o servidor esperava o browser. Em paralelo, `_serve_dev_static`
+esperava servidor e watcher com `asyncio.gather`, e o `watchfiles.awatch` — que
+só termina por cancelamento — segurava o processo mesmo depois de o servidor sair.
+
+Desde 0.131.0 o hub de reload fecha quando o desligamento começa, servidor e
+watcher se derrubam mutuamente, e o timeout fica limitado. Medido: de "nunca"
+para **0,3 s**, com o reload intacto.
+
+```bash
+uv add "tempestweb>=0.131.0"
+```
+
+!!! tip "Em versão anterior, feche a aba antes do `Ctrl-C`"
+    Fechar a aba encerra a conexão que o servidor está esperando, e o processo sai
+    em 0,3 s. `Ctrl-\` (SIGQUIT) também mata na hora.
+
+---
+
 ## Recapitulando
 
 - **Mensagem de extra faltando** já contém o comando — leia-a antes de procurar

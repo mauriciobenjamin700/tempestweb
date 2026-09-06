@@ -602,6 +602,36 @@ Always use the glob, quoted so the shell does not expand it first.
 
 ---
 
+### `Ctrl-C` on `tempestweb dev` would not give the terminal back
+
+With an app tab open the process **never exited**: still alive after 60 s, and a
+second `Ctrl-C` did not help either — only `kill -9` did. With no tab open it
+exited in 0.3 s, which made the hang look random. It was the opposite of random:
+it depended on you actually *using* the app.
+
+Two things compounded. The livereload channel is an endless generator parked on
+`ReloadSignal.wait()`, so while the tab lives there is an in-flight HTTP
+response; uvicorn's graceful shutdown waits for in-flight responses, and
+`timeout_graceful_shutdown` defaults to **no limit**. The browser waited on the
+server and the server waited on the browser. Meanwhile `_serve_dev_static`
+awaited server and watcher with `asyncio.gather`, and `watchfiles.awatch` — which
+only ever exits on cancellation — held the process after the server was gone.
+
+Since 0.131.0 the reload hub closes when the shutdown starts, server and watcher
+tear each other down, and the timeout is bounded. Measured: from "never" to
+**0.3 s**, with livereload intact.
+
+```bash
+uv add "tempestweb>=0.131.0"
+```
+
+!!! tip "On an older version, close the tab before pressing `Ctrl-C`"
+    Closing the tab ends the connection the server is waiting on, and the process
+    exits in 0.3 s. `Ctrl-\` (SIGQUIT) also kills it outright.
+
+---
+
+
 ## Recap
 
 - **A missing-extra message** already contains the command — read it before

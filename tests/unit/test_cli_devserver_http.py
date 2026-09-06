@@ -12,13 +12,16 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+import pytest
 from starlette.testclient import TestClient
 
+from tempestweb.core.constants import DEV_GRACEFUL_SHUTDOWN_SECONDS
 from tempestweb.devserver import (
     ReloadSignal,
     create_dev_app,
     inject_livereload,
     livereload_frames,
+    make_server,
 )
 
 
@@ -120,3 +123,42 @@ async def test_livereload_frames_emits_reload_on_trigger() -> None:
     assert frame == f"event: reload\ndata: {event.generation}\n\n"
 
     await frames.aclose()
+
+
+def test_make_server_bounds_the_graceful_shutdown() -> None:
+    """The dev server caps the shutdown wait so Ctrl-C returns the terminal.
+
+    ``livereload_frames`` never ends on its own, so an open tab holds a response
+    in flight; with uvicorn's unbounded default the process would wait on it
+    forever.
+    """
+    server = make_server(create_dev_app(Path("."), ReloadSignal()), "127.0.0.1", 0)
+    assert server.config.timeout_graceful_shutdown == DEV_GRACEFUL_SHUTDOWN_SECONDS
+
+
+def test_make_server_graceful_timeout_is_overridable() -> None:
+    """Passing ``None`` restores uvicorn's own unbounded shutdown wait."""
+    server = make_server(
+        create_dev_app(Path("."), ReloadSignal()),
+        "127.0.0.1",
+        0,
+        graceful_timeout=None,
+    )
+    assert server.config.timeout_graceful_shutdown is None
+
+
+async def test_livereload_frames_ends_when_the_hub_closes() -> None:
+    """A closed hub ends the SSE generator, freeing the response uvicorn waits on.
+
+    While it looped forever, an open tab held an in-flight response and Ctrl-C
+    hung until the tab was closed.
+    """
+    signal = ReloadSignal()
+    frames = livereload_frames(signal)
+    assert await anext(frames) == ": connected\n\n"
+
+    pending = asyncio.ensure_future(anext(frames))
+    await asyncio.sleep(0)  # let the generator reach `await signal.wait()`
+    signal.close()
+    with pytest.raises(StopAsyncIteration):
+        await asyncio.wait_for(pending, 1.0)

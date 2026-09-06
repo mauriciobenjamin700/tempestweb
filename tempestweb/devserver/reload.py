@@ -13,6 +13,10 @@ publish/subscribe hub: producers call :meth:`ReloadSignal.trigger`; consumers
 either register a synchronous callback via :meth:`ReloadSignal.subscribe` or
 await the next reload via :meth:`ReloadSignal.wait`. A transport plugs in by
 subscribing; tests plug in by awaiting.
+
+The hub also closes: :meth:`ReloadSignal.close` releases every waiter with
+``None``, which is how a consumer that would otherwise park forever — the
+livereload SSE stream — ends when the dev server shuts down.
 """
 
 from __future__ import annotations
@@ -81,8 +85,18 @@ class ReloadSignal:
     """
 
     _generation: int = 0
+    _closed: bool = False
     _callbacks: list[ReloadCallback] = field(default_factory=list)
-    _waiters: list[asyncio.Future[ReloadEvent]] = field(default_factory=list)
+    _waiters: list[asyncio.Future[ReloadEvent | None]] = field(default_factory=list)
+
+    @property
+    def closed(self) -> bool:
+        """Report whether the hub has been closed.
+
+        Returns:
+            ``True`` once :meth:`close` has been called.
+        """
+        return self._closed
 
     @property
     def generation(self) -> int:
@@ -146,13 +160,32 @@ class ReloadSignal:
                 waiter.set_result(event)
         return event
 
-    async def wait(self) -> ReloadEvent:
-        """Await the next reload event.
+    async def wait(self) -> ReloadEvent | None:
+        """Await the next reload event, or the hub closing.
 
         Returns:
-            The next :class:`ReloadEvent` emitted by :meth:`trigger`.
+            The next :class:`ReloadEvent` emitted by :meth:`trigger`, or ``None``
+            once :meth:`close` has been called — the signal a consumer loop uses
+            to finish instead of parking forever.
         """
+        if self._closed:
+            return None
         loop = asyncio.get_running_loop()
-        future: asyncio.Future[ReloadEvent] = loop.create_future()
+        future: asyncio.Future[ReloadEvent | None] = loop.create_future()
         self._waiters.append(future)
         return await future
+
+    def close(self) -> None:
+        """Close the hub, releasing every waiter with ``None``.
+
+        Called when the dev server starts shutting down. Without it a consumer
+        parked on :meth:`wait` — the livereload SSE stream, which is an endless
+        generator — holds its HTTP response open, and the server waits on that
+        response while the browser tab waits on the server. Idempotent.
+        """
+        self._closed = True
+        waiters = self._waiters
+        self._waiters = []
+        for waiter in waiters:
+            if not waiter.done():
+                waiter.set_result(None)

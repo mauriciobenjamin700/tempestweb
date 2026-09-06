@@ -19,10 +19,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    import uvicorn
     from fastapi import FastAPI
 
 from tempestweb.cli.config import VALID_MODES, ProjectConfig, load_config
 from tempestweb.cli.loader import load_app
+from tempestweb.core.constants import DEV_GRACEFUL_SHUTDOWN_SECONDS
 from tempestweb.devserver import FileWatcher, ReloadEvent, ReloadSignal
 
 __all__ = [
@@ -32,6 +34,31 @@ __all__ = [
     "create_dev_session",
     "serve_dev",
 ]
+
+
+#: How often the shutdown watcher re-checks ``server.should_exit``. Small enough
+#: that Ctrl-C feels instant, large enough to cost nothing while idle.
+_SHUTDOWN_POLL_SECONDS: float = 0.05
+
+
+async def _close_reload_hub_on_shutdown(
+    server: uvicorn.Server, signal: ReloadSignal
+) -> None:
+    """Close the reload hub as soon as the server starts shutting down.
+
+    The livereload SSE response is an endless generator parked on
+    :meth:`ReloadSignal.wait`, so while a browser tab is open the server has a
+    response in flight that never completes. Uvicorn would wait on it and the tab
+    would wait on the server. Closing the hub ends the generator, the response
+    completes, and the shutdown proceeds without cancelling anything.
+
+    Args:
+        server: The running uvicorn server whose ``should_exit`` flag is watched.
+        signal: The reload hub to close once the shutdown starts.
+    """
+    while not server.should_exit:
+        await asyncio.sleep(_SHUTDOWN_POLL_SECONDS)
+    signal.close()
 
 
 class DevError(RuntimeError):
@@ -184,6 +211,12 @@ async def _serve_dev_static(
     channel, and rebuilds into the served dir **before** telling the tab to
     reload, so it always picks up the fresh build.
 
+    Server and watcher run as sibling tasks and the first one to finish tears the
+    other down. Awaiting both with :func:`asyncio.gather` instead would hang on
+    Ctrl-C: uvicorn returns from ``serve()`` while ``watcher.run()`` sits inside
+    ``watchfiles.awatch``, which only ever exits on cancellation, so nothing would
+    end the process.
+
     Args:
         config: The resolved project config.
         mode: The static execution mode (``"wasm"`` or ``"transpile"``).
@@ -240,7 +273,22 @@ async def _serve_dev_static(
         f"tempestweb dev: serving {config.name} at http://{host}:{port} "
         f"(mode={mode}); edit a file to reload. Ctrl-C to stop."
     )
-    await asyncio.gather(server.serve(), watcher.run())
+    serve_task = asyncio.create_task(server.serve())
+    watcher_task = asyncio.create_task(watcher.run())
+    closer_task = asyncio.create_task(_close_reload_hub_on_shutdown(server, signal))
+    try:
+        await asyncio.wait(
+            {serve_task, watcher_task}, return_when=asyncio.FIRST_COMPLETED
+        )
+    finally:
+        server.should_exit = True
+        signal.close()
+        for task in (watcher_task, closer_task):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        with contextlib.suppress(asyncio.CancelledError):
+            await serve_task
 
 
 def _load_server_app(out_dir: Path) -> FastAPI:
@@ -330,7 +378,13 @@ async def _serve_dev_server(config: ProjectConfig, host: str, port: int) -> None
         while True:
             app = _load_server_app(out_dir)
             server = uvicorn.Server(
-                uvicorn.Config(app, host=host, port=port, log_level="warning")
+                uvicorn.Config(
+                    app,
+                    host=host,
+                    port=port,
+                    log_level="warning",
+                    timeout_graceful_shutdown=DEV_GRACEFUL_SHUTDOWN_SECONDS,
+                )
             )
             restart.clear()
             serve_task = asyncio.create_task(server.serve())

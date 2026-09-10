@@ -109,6 +109,34 @@ test("http.request: a rejected fetch becomes a network error", async () => {
   assert.equal(res.error, "network");
 });
 
+test("http.request: the parsed body is readable as json_body too", async () => {
+  const deps = {
+    fetch: async () => ({
+      status: 200,
+      ok: true,
+      headers: { get: () => "application/json" },
+      text: async () => JSON.stringify([{ id: 1 }]),
+    }),
+  };
+  const res = await dispatch(call("http.request", { method: "GET", url: "/api/tasks" }), deps);
+  assert.deepEqual(res.value.json_body, [{ id: 1 }]);
+  assert.deepEqual(res.value.json_body, res.value.json);
+});
+
+test("http.request: json_body is null when the body is not JSON", async () => {
+  const deps = {
+    fetch: async () => ({
+      status: 204,
+      ok: true,
+      headers: { get: () => "text/plain" },
+      text: async () => "no content",
+    }),
+  };
+  const res = await dispatch(call("http.request", { method: "GET", url: "/x" }), deps);
+  assert.equal(res.value.json_body, null);
+  assert.equal(res.value.text, "no content");
+});
+
 test("http.request: a JSON body is serialized with a content-type header", async () => {
   let seen;
   const deps = {

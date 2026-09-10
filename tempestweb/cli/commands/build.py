@@ -1370,8 +1370,8 @@ def build_artifact(
             out,
             client,
             config.name,
-            app_source,
-            config.entrypoint_path.name,
+            config.entrypoint_path,
+            config.root,
             manifest=manifest,
             dev=dev,
             with_manifest=config.pwa.manifest,
@@ -1744,8 +1744,8 @@ def _build_transpile(
     out: Path,
     client: Path,
     name: str,
-    app_source: str,
-    entry_name: str,
+    entry_path: Path,
+    project_root: Path,
     *,
     manifest: ManifestOptions | None = None,
     dev: bool = False,
@@ -1765,8 +1765,9 @@ def _build_transpile(
         out: The artifact root.
         client: The shared ``client/`` directory.
         name: The project name.
-        app_source: The project's entrypoint source to transpile.
-        entry_name: The entrypoint file name (for the generated banner).
+        entry_path: The project's entrypoint module.
+        project_root: The root local module names resolve against. Every module
+            the entrypoint imports from the project is transpiled alongside it.
         manifest: The Web-App-Manifest options; defaults to a name-only manifest.
         dev: When ``True``, inject the dev cache kill-switch into the shell
             instead of registering the caching service worker.
@@ -1783,14 +1784,20 @@ def _build_transpile(
         BuildError: If the app source falls outside the transpilable subset or a
             required client/transpile asset is missing.
     """
-    from tempestweb.transpile import TranspileError, transpile_source
+    from tempestweb.transpile import TranspileError, transpile_project
 
     banner = (
-        f"// {_TRANSPILE_APP_MODULE} — GENERATED from {entry_name} "
+        f"// {_TRANSPILE_APP_MODULE} — GENERATED from {entry_path.name} "
         "by tempestweb transpile (Mode C). Do not edit."
     )
     try:
-        generated = transpile_source(app_source, filename=entry_name, banner=banner)
+        modules = transpile_project(
+            entry_path,
+            project_root,
+            entry_filename=_TRANSPILE_APP_MODULE,
+            banner=banner,
+            reserved=frozenset(_TRANSPILE_ASSETS),
+        )
     except TranspileError as exc:
         raise BuildError(f"transpile failed: {exc}") from exc
 
@@ -1808,8 +1815,9 @@ def _build_transpile(
             raise BuildError(f"missing transpile asset: {source}")
         shutil.copyfile(source, transpile_dest / asset)
         written.append(f"transpile/{asset}")
-    (transpile_dest / _TRANSPILE_APP_MODULE).write_text(generated, encoding="utf-8")
-    written.append(f"transpile/{_TRANSPILE_APP_MODULE}")
+    for module_file, generated in sorted(modules.items()):
+        (transpile_dest / module_file).write_text(generated, encoding="utf-8")
+        written.append(f"transpile/{module_file}")
 
     # Native capability tree — the transpile/native.js facade routes to it. Shipped
     # alongside so `await native.http.request(...)` etc. resolve in the browser.
@@ -1847,7 +1855,7 @@ def _build_transpile(
         *(f"/client/{asset}" for asset in _CLIENT_ASSETS),
         *(f"/client/icons/{asset}" for asset in _ICON_ASSETS),
         *(f"/client/transpile/{asset}" for asset in _TRANSPILE_ASSETS),
-        f"/client/transpile/{_TRANSPILE_APP_MODULE}",
+        *(f"/client/transpile/{module_file}" for module_file in sorted(modules)),
         *(f"/client/native/{asset}" for asset in _NATIVE_ASSETS),
         *(f"/client/offline/{asset}" for asset in _OFFLINE_ASSETS),
         "/client/push/web-push-client.js",

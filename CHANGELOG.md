@@ -4,6 +4,78 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.133.0] — 2026-09-10
+
+### Added
+
+- **Um app Modo C não precisa mais caber num arquivo.** O emissor recusava todo
+  `from X import` fora de `tempest_core`, `tempestweb.components` e
+  `tempestweb.native`, então dois arquivos já paravam o build
+  (`app.py:4: import from 'helper' is not supported`). Agora
+  `tempestweb.transpile.resolve_graph` segue os imports do entrypoint, resolve
+  cada um contra a raiz do projeto e o build transpila **cada módulo alcançado**
+  para um `.gen.js` irmão, nomeado pelo caminho pontilhado
+  (`loja.modelos.gen.js`) — um diretório plano, então o specifier vale de
+  qualquer profundidade. Import relativo resolve (com uma regra própria para
+  `__init__.py`, cuja raiz é o próprio pacote), re-export explícito
+  (`import X as X` ou `__all__`) vira `export … from`, e tudo entra no precache
+  do service worker.
+
+  Ciclo é **recusado** com a cadeia no diagnóstico: os módulos ES carregariam,
+  mas um nome lido durante a avaliação da outra metade estoura em temporal dead
+  zone, numa linha que nenhum dos dois nomeia. Módulo cujo nome colidiria com um
+  asset que o cliente ships (`widgets`, `values`, `spacing`) também é recusado —
+  ele sobrescreveria o arquivo do renderizador sem erro em lugar nenhum.
+
+- **`@classmethod` e `@staticmethod` viram `static`.** Num classmethod `cls`
+  continua ligado à classe, então `cls(...)` constrói. Sem isso nenhum
+  construtor alternativo — `Model.from_dict(...)`, que é como todo cliente
+  gerado lê uma resposta — passava do build.
+
+- **`class Erro(Exception)` é aceita e não emite nada.** O Modo C já casava
+  exceção por nome (`raise` vira `Error` com `name`, `except` testa `name`), de
+  modo que a declaração nunca carregou valor de runtime; recusá-la só mantinha
+  fora do modo todo módulo que define o próprio tipo de erro.
+
+- **Constante de módulo agora é `export const`**, como classe e função já eram.
+  Era o único nome de topo que um módulo irmão não conseguia importar.
+
+### Fixed
+
+- **`response.json_body` era `undefined` em Modo C, e `native.sync` puxava zero
+  linha em silêncio.** O modelo Python declara
+  `json_body: Any = Field(default=None, alias="json")` e o Pydantic traduz nos
+  Modos A/B; em Modo C não há Pydantic, e `client/native/http.js` emitia só a
+  chave de wire `json`. Toda leitura de `response.json_body` — o cliente gerado
+  por `gen api` inclusive — recebia `undefined`, e `client/native/sync.js:57`
+  caía no `|| {}`, então o delta-sync reconciliava nada sem um único erro. A
+  resposta agora carrega **as duas** chaves.
+
+- **`dataclasses` era liberado em bloco no Modo C.** Diferente de `json`/`math`,
+  que recusam membro por nome, qualquer nome importado de `dataclasses` passava:
+  `asdict` compilava para um identificador nu e a página morria com
+  `ReferenceError: asdict is not defined` no clique que o chamava. Agora só
+  `dataclass` e `field` passam, e o refusal diz o que escrever no lugar.
+
+### Changed
+
+- **O cliente que `tempestweb gen api` escreve roda em Modo C.** O docstring do
+  gerador prometia isso; três defeitos independentes o impediam (ser um pacote,
+  usar `asdict`, ler `json_body`). Com eles fechados, a saída mudou:
+
+  - o corpo de request usa `body.to_dict()` no lugar de `dataclasses.asdict`, o
+    que também **corrige a chave enviada**: `asdict` emitia o campo snake_case,
+    não o nome da propriedade que a API declara, então toda propriedade
+    camelCase ia sob um nome que o servidor não lê;
+  - a classe de service virou `@dataclass`, com `base_url` e `headers` como
+    campos (antes um `__init__`, que o Modo C modela como dataclass e emitia
+    sem efeito) — `TasksService(base_url=..., headers=...)` continua igual, mas
+    a normalização de barra final saiu: passe `base_url` sem barra;
+  - o `__init__.py` de cada tag re-exporta por nome (`import X as X` + `__all__`)
+    no lugar de `from .schemas import *`;
+  - `ApiError` recebe a mensagem **primeiro** (`ApiError(message, status, body)`),
+    porque um `raise` em Modo C conserva só o primeiro argumento.
+
 ## [0.132.0] — 2026-09-06
 
 ### Added

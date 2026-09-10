@@ -19,7 +19,7 @@ import ast
 import builtins
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import tempest_core
@@ -35,6 +35,7 @@ from tempestweb.transpile._native import (
 )
 from tempestweb.transpile._served import SERVED_NAMES
 from tempestweb.transpile.errors import TranspileError
+from tempestweb.transpile.graph import absolute_target
 
 __all__: list[str] = ["generate"]
 
@@ -98,6 +99,23 @@ _TYPE_ONLY_NAMES: frozenset[str] = frozenset({"Widget"})
 # here used as a *value* is refused, because a bare identifier with no import is
 # a `ReferenceError` the browser raises only when the line runs.
 _TYPE_ONLY_MODULES: frozenset[str] = frozenset({"collections.abc", "typing"})
+# The `dataclasses` names Mode C serves. `dataclass` is structural (the emitter
+# reads the class body) and `field` is resolved inside a field default; neither
+# survives into the output as a call. Every other name — `asdict`, `astuple`,
+# `replace`, `fields`, `is_dataclass` — has no counterpart in the emitted JS, so
+# it is refused here for the same reason `_MODULE_CALLS` refuses by member:
+# accepting the import ships a page that dies with a `ReferenceError` on the
+# line that calls it, and only when that line runs.
+_DATACLASS_MEMBERS: frozenset[str] = frozenset({"dataclass", "field"})
+# What to write instead, for the refused `dataclasses` names that have a direct
+# answer. A diagnostic that only lists what is allowed leaves the reader stuck.
+_DATACLASS_HINTS: dict[str, str] = {
+    "asdict": 'build the dict literal yourself — `{"title": task.title}`',
+    "astuple": "build the list literal yourself — `[task.id, task.title]`",
+    "replace": "construct the class again with the changed field",
+    "fields": "name the fields explicitly; the emitted class has no metadata",
+    "is_dataclass": "the emitted class carries no dataclass marker to test",
+}
 # The component facade this package re-exports the core's components through. Of
 # the 77 names it exports, 63 are the core object itself (identity-equal), so
 # they route exactly like a `tempest_core` import; the rest are this repo's own
@@ -406,6 +424,121 @@ def _reject_fn_decorators(
         raise TranspileError("function decorators are not supported", node, filename)
 
 
+def _is_dunder_all(node: ast.stmt) -> bool:
+    """Report whether a top-level statement is the module's ``__all__``.
+
+    Args:
+        node: The top-level statement.
+
+    Returns:
+        True when it is an assignment whose single target is ``__all__``.
+    """
+    if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+        return False
+    targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+    return len(targets) == 1 and (
+        isinstance(targets[0], ast.Name) and targets[0].id == "__all__"
+    )
+
+
+def _dunder_all_names(node: ast.Assign | ast.AnnAssign) -> set[str]:
+    """Return the string entries an ``__all__`` assignment lists.
+
+    Args:
+        node: The ``__all__`` assignment.
+
+    Returns:
+        The listed names; empty when the value is not a literal list/tuple of
+        strings, which the emitter then simply passes on nothing for.
+    """
+    value = node.value
+    if not isinstance(value, (ast.List, ast.Tuple)):
+        return set()
+    return {
+        element.value
+        for element in value.elts
+        if isinstance(element, ast.Constant) and isinstance(element.value, str)
+    }
+
+
+def _declared_target_names(node: ast.stmt) -> set[str]:
+    """Return the top-level names a statement binds.
+
+    Args:
+        node: A top-level function, class or assignment.
+
+    Returns:
+        The bound names, so a re-export never collides with a local `export`.
+    """
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return {node.name}
+    if isinstance(node, ast.AnnAssign):
+        return {node.target.id} if isinstance(node.target, ast.Name) else set()
+    if isinstance(node, ast.Assign):
+        return {t.id for t in node.targets if isinstance(t, ast.Name)}
+    return set()
+
+
+def _is_exception_class(node: ast.ClassDef) -> bool:
+    """Report whether a class only declares an exception type.
+
+    Mode C has no Python exception classes: `raise Exc(msg)` throws an `Error`
+    tagged `name: "Exc"` and `except Exc` tests that name (see
+    :meth:`_Generator._exc_condition`). So a class inheriting `Exception`
+    carries no runtime value — the name is the whole contract — and the emitter
+    drops it. Refusing it instead is what kept the generated OpenAPI client,
+    which declares its own `ApiError`, out of Mode C.
+
+    Only the first argument of a `raise` survives, so a declared `__init__`
+    taking more is emitted as nothing and its extra fields are unreachable in
+    Mode C.
+
+    Args:
+        node: The class definition.
+
+    Returns:
+        True when the class has exactly one base and it is named `Exception`.
+    """
+    return (
+        len(node.bases) == 1
+        and isinstance(node.bases[0], ast.Name)
+        and node.bases[0].id == "Exception"
+    )
+
+
+def _method_decorator(
+    node: ast.FunctionDef | ast.AsyncFunctionDef, filename: str
+) -> str | None:
+    """Return the binding decorator on a method, if it carries one.
+
+    Args:
+        node: The method's AST node.
+        filename: The source file name, for the diagnostic.
+
+    Returns:
+        ``"classmethod"``, ``"staticmethod"``, or None for a plain method.
+
+    Raises:
+        TranspileError: If the method carries any other decorator, or more than
+            one — the emitted class has nowhere to put it.
+    """
+    if not node.decorator_list:
+        return None
+    if len(node.decorator_list) > 1:
+        raise TranspileError("a method carries at most one decorator", node, filename)
+    decorator = node.decorator_list[0]
+    if isinstance(decorator, ast.Name) and decorator.id in {
+        "classmethod",
+        "staticmethod",
+    }:
+        return decorator.id
+    raise TranspileError(
+        "only @classmethod and @staticmethod are supported on a method",
+        node,
+        filename,
+    )
+
+
 def _child_blocks(stmt: ast.stmt) -> list[list[ast.stmt]]:
     """Return the nested statement blocks of a compound statement.
 
@@ -522,13 +655,47 @@ class _Generator:
     a bare ``Foo()`` call becomes ``new Foo()``.
     """
 
-    def __init__(self, filename: str) -> None:
+    def __init__(
+        self,
+        filename: str,
+        *,
+        module_name: str = "",
+        module_is_package: bool = False,
+        local_modules: Mapping[str, frozenset[str]] | None = None,
+    ) -> None:
         """Initialize the generator.
 
         Args:
             filename: Source file name, used in :class:`TranspileError` messages.
+            module_name: This module's dotted name, needed to resolve a relative
+                import against its own package. Empty for a standalone source.
+            module_is_package: Whether this module is a package's
+                ``__init__.py``, which roots a one-dot import at itself.
+            local_modules: Dotted name → declared class names, for every other
+                project module the build is emitting alongside this one. A name
+                imported from one of these is emitted as an ES import of the
+                sibling module instead of being refused as unserved.
         """
         self.filename: str = filename
+        self.module_name: str = module_name
+        self.module_is_package: bool = module_is_package
+        self.local_modules: Mapping[str, frozenset[str]] = local_modules or {}
+        # Dotted module name → {local name: the sibling's exported name}, so the
+        # emitted module carries one `import { … } from "./<module>.gen.js"` per
+        # source, carrying an `as` when the app renamed what it imported.
+        self.local_imports: dict[str, dict[str, str]] = {}
+        # Every name bound by a local import, to keep it out of the served-name
+        # check — the client does not export it; a sibling module does.
+        self.local_names: set[str] = set()
+        # Local-imported names the module passes on to its own importers. A
+        # package's `__init__` references nothing it imports, so without this
+        # the emitted module imported and exported nothing at all. Marked the
+        # two ways Python marks a re-export: a redundant `import X as X`, or a
+        # listing in `__all__`.
+        self.reexported: set[str] = set()
+        # Names the module declares itself. A re-export of a name that is also
+        # declared here would be a duplicate `export`, which is a JS SyntaxError.
+        self.declared_names: set[str] = set()
         self.class_names: set[str] = set()
         # The name the implicit dataclass base is emitted under: the runtime
         # `State`, or `_STATE_BASE_ALIAS` when the module declares its own.
@@ -2433,6 +2600,7 @@ class _Generator:
                 self._collect_imports(node, importable)
             elif isinstance(node, ast.ClassDef):
                 self.class_names.add(node.name)
+                self.declared_names.add(node.name)
                 self.field_names.update(
                     stmt.target.id
                     for stmt in node.body
@@ -2444,6 +2612,12 @@ class _Generator:
                 node,
                 (ast.FunctionDef, ast.AsyncFunctionDef, ast.Assign, ast.AnnAssign),
             ):
+                if isinstance(node, (ast.Assign, ast.AnnAssign)) and _is_dunder_all(
+                    node
+                ):
+                    self.reexported.update(_dunder_all_names(node))
+                    continue
+                self.declared_names.update(_declared_target_names(node))
                 top_level.append(node)
             elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
                 continue  # module docstring
@@ -2516,7 +2690,10 @@ class _Generator:
         """Emit a module-level constant (e.g. a translations table) as `const`.
 
         A single ``NAME = value`` or annotated ``NAME: T = value`` becomes a
-        top-level ``const NAME = value;``. Tuple/multiple targets are unsupported.
+        top-level ``export const NAME = value;``. Tuple/multiple targets are
+        unsupported. The `export` matches what the emitter already does for a
+        class and a function: without it a constant is the one top-level name a
+        sibling module cannot import, which a multi-module app trips over.
         """
         target: ast.expr
         value: ast.expr | None
@@ -2538,7 +2715,7 @@ class _Generator:
                 node,
                 self.filename,
             )
-        return f"const {target.id} = {self.expr(value, 0)};"
+        return f"export const {target.id} = {self.expr(value, 0)};"
 
     def _is_type_alias(self, node: ast.Assign | ast.AnnAssign) -> bool:
         """Whether a module-level assignment is a type alias, and record it.
@@ -2577,6 +2754,38 @@ class _Generator:
             if isinstance(target, ast.Name):
                 self.type_only.add(target.id)
         return True
+
+    def _import_local(self, module: str, node: ast.ImportFrom) -> None:
+        """Record an import of a sibling project module.
+
+        The name is bound to the module the build emits next to this one, so it
+        never reaches the served-name check: the Mode C client does not export
+        it, a sibling `.gen.js` does. A name the sibling declares as a class is
+        recorded as one here too, so constructing it emits `new` — calling an
+        emitted JS class without `new` is a hard `TypeError`.
+
+        Args:
+            module: The sibling's dotted module name.
+            node: The import node, for the diagnostic's line.
+        """
+        bound = self.local_imports.setdefault(module, {})
+        for alias in node.names:
+            if alias.asname is not None and alias.asname == alias.name:
+                self.reexported.add(alias.name)
+            if alias.name == "*":
+                raise TranspileError(
+                    f"`from {module} import *` is not supported: the emitter "
+                    "names every import it re-exports, so a star hides what the "
+                    "module binds — list the names",
+                    node,
+                    self.filename,
+                )
+            local = alias.asname or alias.name
+            bound[local] = alias.name
+            self.local_names.add(local)
+            self.import_nodes[local] = node
+            if alias.name in self.local_modules[module]:
+                self.class_names.add(local)
 
     def _bind_module(self, module: str, local: str, node: ast.stmt) -> None:
         """Bind a module name for `import x` / `import x as y`.
@@ -2632,7 +2841,30 @@ class _Generator:
                 self._bind_module(alias.name, alias.asname or alias.name, node)
             return
         module = node.module or ""
-        if module in {"__future__", "dataclasses"}:
+        if module == "__future__":
+            return
+        if self.local_modules:
+            target = absolute_target(
+                node, self.module_name, is_package=self.module_is_package
+            )
+            if target in self.local_modules:
+                self._import_local(target, node)
+                return
+        if module == "dataclasses":
+            for alias in node.names:
+                if alias.name in _DATACLASS_MEMBERS:
+                    continue
+                hint = _DATACLASS_HINTS.get(alias.name)
+                detail = (
+                    f": {hint}"
+                    if hint is not None
+                    else f" (only {', '.join(sorted(_DATACLASS_MEMBERS))})"
+                )
+                raise TranspileError(
+                    f"`dataclasses.{alias.name}` is not available in Mode C{detail}",
+                    node,
+                    self.filename,
+                )
             return
         # `from tempestweb import native` — the native-capability namespace, which
         # Mode C serves from its in-process JS facade (./native.js).
@@ -2919,6 +3151,23 @@ class _Generator:
         if validators:
             module = "./validators.js"
             lines.append(f'import {{ {", ".join(validators)} }} from "{module}";')
+        for source in sorted(self.local_imports):
+            bound = sorted(self.local_imports[source].items())
+            target = local_module_specifier(source)
+            names = [
+                exported if local == exported else f"{exported} as {local}"
+                for local, exported in bound
+                if local in self.referenced
+            ]
+            if names:
+                lines.append(f'import {{ {", ".join(names)} }} from "{target}";')
+            passed_on = [
+                exported if local == exported else f"{exported} as {local}"
+                for local, exported in bound
+                if local in self.reexported and local not in self.declared_names
+            ]
+            if passed_on:
+                lines.append(f'export {{ {", ".join(passed_on)} }} from "{target}";')
         return "\n".join(lines)
 
     def _field_default(self, value: ast.expr) -> str:
@@ -3058,6 +3307,8 @@ class _Generator:
             for base in node.bases
         ):
             return self._enum_class(node)
+        if _is_exception_class(node):
+            return ""
         for decorator in node.decorator_list:
             if isinstance(decorator, ast.Name):
                 name: str | None = decorator.id
@@ -3126,20 +3377,47 @@ class _Generator:
         lines.append(f"{_INDENT}}}")
         for method in methods:
             lines.append("")
-            lines.extend(self._method(method))
+            lines.extend(self._method(method, node.name))
         lines.append("}")
         return "\n".join(lines)
 
-    def _method(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> list[str]:
-        """Emit a dataclass method as a JS class method (drops the `self` param)."""
-        _reject_fn_decorators(node, self.filename)
+    def _method(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef, owner: str
+    ) -> list[str]:
+        """Emit a dataclass method as a JS class method (drops the `self` param).
+
+        ``@classmethod`` and ``@staticmethod`` become `static`, which is what an
+        alternative constructor needs: the client `tempestweb gen api` generates
+        parses a response with `Model.from_dict(...)`, and refusing the
+        decorator meant that whole client fell outside Mode C. A classmethod
+        also binds `cls` to the class, so `cls(...)` still constructs.
+
+        Args:
+            node: The method's AST node.
+            owner: The declaring class's name, bound to `cls` in a classmethod.
+
+        Returns:
+            The emitted lines.
+
+        Raises:
+            TranspileError: If the method carries any other decorator.
+        """
+        kind = _method_decorator(node, self.filename)
         params = _param_names(node.args, node, self.filename, lambda e: self.expr(e, 1))
-        if params and params[0] == "self":
+        if kind == "classmethod":
+            params = params[1:] if params else params
+        elif kind is None and params and params[0] == "self":
             params = params[1:]
         pad = _INDENT
         prefix = "async " if isinstance(node, ast.AsyncFunctionDef) else ""
-        lines = [f"{pad}{prefix}{_js_name(node.name)}({', '.join(params)}) {{"]
+        static = "static " if kind is not None else ""
+        lines = [f"{pad}{static}{prefix}{_js_name(node.name)}({', '.join(params)}) {{"]
+        if kind == "classmethod":
+            lines.append(f"{_INDENT * 2}const cls = {owner};")
+            self.class_names.add("cls")
         lines.extend(self._emit_fn_body(node.body, 2))
+        if kind == "classmethod":
+            self.class_names.discard("cls")
         lines.append(f"{pad}}}")
         return lines
 
@@ -3156,8 +3434,30 @@ class _Generator:
         return "\n".join(lines)
 
 
+def local_module_specifier(module: str) -> str:
+    """Return the ES import specifier for a sibling project module.
+
+    Every emitted module lands in the same directory as the entrypoint, named
+    by its dotted path, so one flat specifier works from any depth — no
+    ``../..`` to get wrong.
+
+    Args:
+        module: The sibling's dotted module name.
+
+    Returns:
+        The relative specifier (``api.tasks`` → ``./api.tasks.gen.js``).
+    """
+    return f"./{module}.gen.js"
+
+
 def generate(
-    source: str, filename: str = "<source>", *, banner: str | None = None
+    source: str,
+    filename: str = "<source>",
+    *,
+    banner: str | None = None,
+    module_name: str = "",
+    module_is_package: bool = False,
+    local_modules: Mapping[str, frozenset[str]] | None = None,
 ) -> str:
     """Transpile a Python module source string into native-JS module source.
 
@@ -3166,6 +3466,11 @@ def generate(
         filename: The source file name (used in error diagnostics and the banner).
         banner: Optional leading comment line; when omitted a default GENERATED
             banner naming `filename` is emitted.
+        module_name: This module's dotted name, so a relative import resolves
+            against its own package.
+        module_is_package: Whether the module is a package's ``__init__.py``.
+        local_modules: Dotted name → declared class names for every sibling
+            project module being emitted alongside this one.
 
     Returns:
         The generated JavaScript module source, banner included.
@@ -3174,7 +3479,12 @@ def generate(
         TranspileError: If the module uses a construct outside the subset.
     """
     tree = ast.parse(source, filename=filename)
-    body = _Generator(filename).module(tree)
+    body = _Generator(
+        filename,
+        module_name=module_name,
+        module_is_package=module_is_package,
+        local_modules=local_modules,
+    ).module(tree)
     default_banner = (
         f"// GENERATED from {filename} by tempestweb transpile (Mode C). Do not edit."
     )

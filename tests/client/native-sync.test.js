@@ -4,6 +4,7 @@
 // controller (deps.syncController) so no IndexedDB / network is needed.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { IDBFactory } from "fake-indexeddb";
 import { dispatch, subscribeDispatch } from "../../client/native/index.js";
 
 /** A fake sync controller with a controllable observable state. */
@@ -87,4 +88,46 @@ test("sync.watch streams state changes (snake_case) until unsubscribed", async (
   assert.equal(events.length, 2);
   assert.equal(events[1].event.pending, 0);
   assert.ok("last_synced_at" in events[1].event);
+});
+
+// --- the real pull path ----------------------------------------------------
+//
+// Every test above injects `deps.syncController`, so `buildSource`'s own
+// `pullPage` — the code that reads the HTTP response — never runs. That gap is
+// why it could read a field the response did not carry and still ship green.
+
+test("sync.now: the real pullPage reads rows off the HTTP response", async () => {
+  const deps = {
+    indexedDB: new IDBFactory(),
+    fetch: async () => ({
+      status: 200,
+      ok: true,
+      headers: { get: () => "application/json" },
+      text: async () =>
+        JSON.stringify({
+          rows: [{ id: "r1", owner: "me", title: "pulled" }],
+          next_cursor: null,
+          server_time: "2026-01-01T00:00:00Z",
+        }),
+    }),
+  };
+  await dispatch(
+    {
+      call_id: "rp1",
+      capability: "sync.configure",
+      args: {
+        name: "real-pull",
+        url: "/api/sync",
+        database: "tw-real-pull",
+        table: "rows",
+      },
+    },
+    deps,
+  );
+  const res = await dispatch(
+    { call_id: "rp2", capability: "sync.now", args: { name: "real-pull" } },
+    deps,
+  );
+  assert.equal(res.ok, true);
+  assert.equal(res.value.applied, 1);
 });

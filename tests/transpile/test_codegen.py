@@ -1744,3 +1744,98 @@ def test_a_core_widget_method_is_refused_at_build_time() -> None:
     message = str(excinfo.value)
     assert "`Form.model_dump()`" in message
     assert "not the widget's Python methods" in message
+
+
+def test_a_dataclasses_helper_the_emitter_cannot_serve_is_refused_by_name() -> None:
+    """`asdict` is refused at build time, the way `json`/`math` refuse a member.
+
+    `dataclasses` used to be waved through wholesale, so `asdict` compiled into
+    a bare identifier and the page died with `ReferenceError: asdict is not
+    defined` on the click that called it. The refusal also says what to write
+    instead — the generated OpenAPI client used `asdict` for a request body.
+    """
+    with pytest.raises(TranspileError) as exc:
+        transpile_source(
+            "from dataclasses import asdict, dataclass\n", filename="app.py"
+        )
+    message = str(exc.value)
+    assert "app.py:1: `dataclasses.asdict` is not available in Mode C" in message
+    assert "build the dict literal yourself" in message
+
+
+def test_an_unhinted_dataclasses_helper_lists_what_is_served() -> None:
+    """A refused name with no tailored advice still names the served members."""
+    with pytest.raises(TranspileError) as exc:
+        transpile_source("from dataclasses import MISSING\n", filename="app.py")
+    assert "only dataclass, field" in str(exc.value)
+
+
+def test_dataclass_and_field_stay_importable() -> None:
+    """The two names the emitter does serve keep compiling."""
+    js = gen(
+        "from dataclasses import dataclass, field\n"
+        "@dataclass\nclass S:\n    rows: list[str] = field(default_factory=list)\n"
+    )
+    assert "this.rows = opts.rows !== undefined ? opts.rows : [];" in js
+
+
+def test_a_classmethod_becomes_a_static_method_binding_cls() -> None:
+    """An alternative constructor is what a generated client parses with.
+
+    Refusing the decorator is what kept `Model.from_dict(...)` — and therefore
+    the whole `tempestweb gen api` client — outside Mode C.
+    """
+    js = gen(
+        "@dataclass\nclass S:\n"
+        "    n: int = 0\n\n"
+        "    @classmethod\n"
+        "    def parse(cls, data: dict[str, int]) -> 'S':\n"
+        "        return cls(n=data['n'])\n"
+    )
+    assert "static parse(data) {" in js
+    assert "const cls = S;" in js
+    assert "new cls(" in js
+
+
+def test_a_staticmethod_becomes_a_static_method() -> None:
+    """`@staticmethod` takes no receiver, so nothing is dropped or bound."""
+    js = gen(
+        "@dataclass\nclass S:\n"
+        "    n: int = 0\n\n"
+        "    @staticmethod\n"
+        "    def double(value: int) -> int:\n"
+        "        return value * 2\n"
+    )
+    assert "static double(value) {" in js
+    assert "const cls" not in js
+
+
+def test_another_decorator_on_a_method_is_still_refused() -> None:
+    """Only the two binding decorators have somewhere to go in a JS class."""
+    with pytest.raises(TranspileError, match="only @classmethod and @staticmethod"):
+        transpile_source(
+            "@dataclass\nclass S:\n"
+            "    n: int = 0\n\n"
+            "    @property\n"
+            "    def double(self) -> int:\n"
+            "        return self.n * 2\n",
+            filename="app.py",
+        )
+
+
+def test_an_exception_class_declares_a_name_and_emits_nothing() -> None:
+    """Mode C matches exceptions by name, so the class carries no runtime value.
+
+    `raise Exc(msg)` already throws an `Error` tagged with the class name and
+    `except Exc` tests that name, so refusing the declaration bought nothing —
+    and it kept every module defining its own error type, the generated
+    client's `ApiError` included, out of Mode C.
+    """
+    js = gen(
+        "class ApiError(Exception):\n"
+        '    """Raised when the API says no."""\n\n\n'
+        "def fail() -> None:\n"
+        '    raise ApiError("nope")\n'
+    )
+    assert "class ApiError" not in js
+    assert 'Object.assign(new Error("nope"), { name: "ApiError" })' in js

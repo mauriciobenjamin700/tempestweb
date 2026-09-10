@@ -1,28 +1,35 @@
 # Roadmap e fases
 
-!!! info "Estado atual — atualizado em 2026-09-06"
+!!! info "Estado atual — atualizado em 2026-09-10"
     **Todos os trilhos** — 0/W/A/B/P/N/O/S/T/R e a pós-convergência (C/D/E) —
-    estão mesclados na `main` com gate verde: ruff + format ✓ (395 arquivos) ·
-    mypy `--strict` ✓ (156 arquivos, zero issue) · **pytest 2069 pass / 14 skip** ·
-    **jsdom 935 pass / 2 skip / 0 fail** · `mkdocs build --strict` zero warning. Os números
+    estão mesclados na `main` com gate verde: ruff + format ✓ (397 arquivos) ·
+    mypy `--strict` ✓ (157 arquivos, zero issue) · **pytest 2088 pass / 14 skip** ·
+    **jsdom 951 pass / 0 fail** · `mkdocs build --strict` zero warning. Os números
     foram medidos nesta linha da `main` e se reproduzem com `make check` mais o
     `mkdocs build --strict` — não confie neles de memória, rode. O mesmo
     `examples/counter/app.py` roda ao vivo nos **três** modos (Pyodide no browser,
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.132.0; o PyPI serve a 0.130.0.** A diferença mais nova é
-    a **#209**: o contrato do core descreve o campo `secure` do `Input` dizendo
-    que *"the renderer also offers a visibility toggle ('eye') that reveals the
-    text locally without a round-trip to Python"* — e o renderizador DOM só
-    escrevia `type="password"`. Agora todo `Input(secure=True)` carrega o olho,
-    sem prop nova e sem estado de apresentação no `state` da app. O `Input`
-    passou a ser um `<div>` com o `<input>` dentro, porque um `<input>` é
-    elemento void e o botão não tinha onde ir; é legal porque `Input` é folha da
-    IR, como `RangeSlider` e `Autocomplete` já eram. O Modo C saiu de graça (o
-    runtime dele monta pelo mesmo `client/dom.js`) e as fixtures deram diff
-    zero. Segue devendo o `leading_icon`/`trailing_icon`, a mesma promessa pela
-    mesma causa.
+    **Versão do repo: 0.133.0; o PyPI serve a 0.130.0.** A diferença mais nova
+    é que **um app Modo C não precisa mais caber num arquivo**. O emissor
+    recusava todo `from X import` fora de `tempest_core`,
+    `tempestweb.components` e `tempestweb.native`, então dois arquivos já
+    paravam o build. Agora o compilador segue os imports do entrypoint e emite
+    um `.gen.js` por módulo do projeto, com re-export explícito, import
+    relativo e recusa nomeada para ciclo e para colisão com asset do cliente.
+
+    Isso destrava o que a receita fullstack prometia e nunca tinha sido
+    executada em Modo C: o cliente que `tempestweb gen api` escreve — um
+    **pacote** — agora compila e roda. Três defeitos independentes o impediam,
+    todos fechados aqui: o pacote (acima), `dataclasses.asdict` (liberado em
+    bloco no subset, compilava para identificador nu e morria com
+    `ReferenceError` no clique) e `response.json_body` (o shim JS emitia só a
+    chave de wire `json`, então toda leitura recebia `undefined`). Esse último
+    também fazia o `native.sync` reconciliar **zero linha em silêncio** —
+    `client/native/sync.js:57` caía no `|| {}` sem um único erro. Vieram junto
+    `@classmethod`/`@staticmethod` e `class Erro(Exception)` no subset, e
+    `export const` para constante de módulo.
 
     Antes dela, a #208: o
     `Ctrl-C` no `tempestweb dev` não terminava o processo enquanto uma aba do app

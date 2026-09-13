@@ -11,7 +11,7 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.132.0; o PyPI serve a 0.130.0.** A diferença mais nova é
+    **Versão do repo: 0.133.0; o PyPI serve a 0.130.0.** A diferença mais nova é
     a **#209**: o contrato do core descreve o campo `secure` do `Input` dizendo
     que *"the renderer also offers a visibility toggle ('eye') that reveals the
     text locally without a round-trip to Python"* — e o renderizador DOM só
@@ -21,8 +21,11 @@
     elemento void e o botão não tinha onde ir; é legal porque `Input` é folha da
     IR, como `RangeSlider` e `Autocomplete` já eram. O Modo C saiu de graça (o
     runtime dele monta pelo mesmo `client/dom.js`) e as fixtures deram diff
-    zero. Segue devendo o `leading_icon`/`trailing_icon`, a mesma promessa pela
-    mesma causa.
+    zero. A **#211** fechou a dívida gêmea na 0.133.0: `leading_icon` e
+    `trailing_icon` passaram a ser desenhados nos três widgets que os declaram, e
+    o `Dropdown` virou wrapper pelo mesmo motivo que o `Input` — um `<select>` só
+    admite `<option>` dentro. Ele desenha o próprio chevron agora, o que muda a
+    aparência de todo `Dropdown` já entregue.
 
     Antes dela, a #208: o
     `Ctrl-C` no `tempestweb dev` não terminava o processo enquanto uma aba do app

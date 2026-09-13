@@ -68,7 +68,10 @@ _TAG_BY_TYPE: dict[str, str] = {
     # Dropdown a real <select> with its options.
     "Switch": "label",
     "Slider": "input",
-    "Dropdown": "select",
+    # A Dropdown is a ``div`` wrapping the real ``select``: a ``select`` only
+    # admits ``option``/``optgroup``, so the field icons the core promises have
+    # nowhere to go inside one. A port of ``TAG_BY_TYPE`` in ``client/dom.js``.
+    "Dropdown": "div",
     "Autocomplete": "label",
     "DatePicker": "label",
     "TimePicker": "label",
@@ -375,6 +378,104 @@ def _range_thumb_name(dumped: dict[str, Any], part: str) -> str:
 _REVEAL_NAMES: dict[bool, str] = {True: "Hide password", False: "Show password"}
 
 
+def _control_name_attributes(node: Node) -> list[str]:
+    """Build the attributes that belong on a wrapped field's inner control.
+
+    The keyed element is a role-less ``div``: a name or a tab stop written there
+    names nothing a reader can reach and adds a second stop beside the real one.
+    Mirrors what ``applyProps`` in ``client/dom.js`` does by resolving the control
+    before applying the a11y props.
+
+    Args:
+        node: The field node whose ``semantics`` / focus props are being placed.
+
+    Returns:
+        The attribute strings for the inner control, in the client's order.
+    """
+    attributes: list[str] = []
+    semantics = _dump(node.props.get("semantics"))
+    label = semantics.get("label") if isinstance(semantics, dict) else None
+    if label is not None and str(label) != "":
+        attributes.append(f'aria-label="{escape_attr(label)}"')
+    focus_order = node.props.get("focus_order")
+    focusable = node.props.get("focusable")
+    if focus_order is not None:
+        attributes.append(f'tabindex="{escape_attr(focus_order)}"')
+    elif focusable is True:
+        attributes.append('tabindex="0"')
+    elif focusable is False:
+        attributes.append('tabindex="-1"')
+    return attributes
+
+
+def _dropdown_html(node: Node) -> str:
+    """Render a ``Dropdown``'s inner markup: the field icons plus the control.
+
+    The chevron is the renderer's, because the base sheet turns the native arrow
+    off with ``appearance: none`` — otherwise the browser paints it against the
+    control's edge, under whatever ``trailing_icon`` the app asked for. It steps
+    aside when the app supplies its own, exactly as ``ensureDropdownChevron`` in
+    ``client/dom.js`` does.
+
+    Args:
+        node: The ``Dropdown`` node to render the inner HTML for.
+
+    Returns:
+        The inner HTML string: the leading icon, one ``<select>``, and either the
+        app's trailing icon or the renderer's chevron.
+    """
+    parts = ["<select"]
+    if node.key:
+        parts.append(f' name="{escape_attr(node.key)}"')
+    control_attrs = _control_name_attributes(node)
+    if control_attrs:
+        parts.append(" " + " ".join(control_attrs))
+    options = _options_html(node.props.get("options"), node.props.get("placeholder"))
+    parts.append(f">{options}</select>")
+    trailing = _field_icon_html(node, "trailing")
+    if not trailing:
+        trailing = (
+            '<svg data-tw-part="chevron" data-tw-icon="chevron-down" '
+            'aria-hidden="true" focusable="false" style="width: 1em; height: 1em">'
+            "</svg>"
+        )
+    return f"{_field_icon_html(node, 'leading')}{''.join(parts)}{trailing}"
+
+
+def _field_icon_html(node: Node, part: str) -> str:
+    """Render one field icon as the empty, glyph-less svg the client hydrates.
+
+    The shape has to match what ``applyFieldIcons`` in ``client/dom.js`` builds —
+    same part name, same ``data-tw-icon`` — or hydration replaces the subtree and
+    the field jumps. The glyph itself is absent for the same reason an
+    ``IconButton``'s is: this renderer holds no icon path data. ``renderIcon``
+    reads ``data-tw-icon`` when no name comes in the props, so the client fills
+    the path on hydration without the Python side knowing the icon registry.
+
+    The ``1em`` box is **not** decoration: ``renderIcon`` only defaults to it when
+    ``svg.style.width`` is empty, so without it the glyph hydrates from a
+    zero-sized box and the field jumps.
+
+    Decorative, so it is ``aria-hidden`` and never competes with the field's
+    accessible name.
+
+    Args:
+        node: The field node carrying the icon props.
+        part: Which icon to render: ``"leading"`` or ``"trailing"``.
+
+    Returns:
+        The ``<svg>`` markup, or an empty string when that icon is unset.
+    """
+    name = node.props.get(f"{part}_icon")
+    if name is None or str(name) == "":
+        return ""
+    return (
+        f'<svg data-tw-part="{part}" data-tw-icon="{escape_attr(name)}" '
+        'aria-hidden="true" focusable="false" '
+        'style="width: 1em; height: 1em"></svg>'
+    )
+
+
 def _input_html(node: Node) -> str:
     """Render an ``Input``'s inner markup: the control, plus the reveal toggle.
 
@@ -391,7 +492,8 @@ def _input_html(node: Node) -> str:
         node: The ``Input`` node to render the inner HTML for.
 
     Returns:
-        The inner HTML string: one ``<input>``, and a ``<button>`` when secure.
+        The inner HTML string: the field icons the node declares, one ``<input>``,
+        and a ``<button>`` when secure.
     """
     props = node.props
     secure = bool(props.get("secure"))
@@ -409,11 +511,14 @@ def _input_html(node: Node) -> str:
     if label is not None and str(label) != "":
         parts.append(f'aria-label="{escape_attr(label)}"')
     control = f"<input {' '.join(parts)}>"
+    leading = _field_icon_html(node, "leading")
+    trailing = _field_icon_html(node, "trailing")
     if not secure:
-        return control
+        return f"{leading}{control}{trailing}"
     name = escape_attr(_REVEAL_NAMES[False])
+    # The eye stays against the edge, past any trailing icon.
     return (
-        f"{control}"
+        f"{leading}{control}{trailing}"
         f'<button type="button" data-tw-part="reveal" tabindex="0" '
         f'aria-pressed="false" aria-label="{name}"></button>'
     )
@@ -627,7 +732,7 @@ def _inner_html(node: Node) -> str:
     if node.type == "TextArea":
         return escape_text(node.props.get("value"))
     if node.type == "Dropdown":
-        return _options_html(node.props.get("options"), node.props.get("placeholder"))
+        return _dropdown_html(node)
     if node.type == "Input":
         return _input_html(node)
     if node.type == "Autocomplete":
@@ -637,7 +742,9 @@ def _inner_html(node: Node) -> str:
         hint = f' placeholder="{escape_attr(placeholder)}"' if placeholder else ""
         options = _options_html(node.props.get("options"), None)
         return (
+            f"{_field_icon_html(node, 'leading')}"
             f'<input type="text" list="{escape_attr(list_id)}" value="{value}"{hint}>'
+            f"{_field_icon_html(node, 'trailing')}"
             f'<datalist id="{escape_attr(list_id)}">{options}</datalist>'
         )
     if node.type in _PICKER_INPUT_TYPES:

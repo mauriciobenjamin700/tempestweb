@@ -188,15 +188,18 @@ test("Dropdown renders its options, its placeholder, and reports a selection", (
     placeholder: "Choose…",
   });
 
-  assert.equal(el.tagName, "SELECT");
-  const options = el.querySelectorAll("option");
+  // The keyed element is the field box; the select it owns holds the choice.
+  assert.equal(el.tagName, "DIV");
+  const select = el.querySelector(":scope > select");
+  assert.equal(select.tagName, "SELECT");
+  const options = select.querySelectorAll("option");
   assert.equal(options.length, 4);
   assert.equal(options[0].getAttribute("data-tw-part"), "placeholder");
   assert.equal(options[0].textContent, "Choose…");
-  assert.equal(el.value, "Light");
+  assert.equal(select.value, "Light");
 
-  el.value = "Dark";
-  fire(dom, el, "change");
+  select.value = "Dark";
+  fire(dom, select, "change");
 
   // `select`, not `change`: on_select is the handler a Dropdown declares, and the
   // index counts the real options — the placeholder is not one of them.
@@ -213,9 +216,10 @@ test("Dropdown reports one event per choice, not one per DOM event", () => {
     value: "Light",
   });
 
-  el.value = "Dark";
-  fire(dom, el, "input");
-  fire(dom, el, "change");
+  const select = el.querySelector(":scope > select");
+  select.value = "Dark";
+  fire(dom, select, "input");
+  fire(dom, select, "change");
 
   assert.equal(transport.events.length, 1);
 });
@@ -232,7 +236,7 @@ test("Dropdown keeps the reader's choice when only its options are patched", () 
   applyPatches(el, [{ path: [], set_props: { options: ["Recife", "Olinda", "Paulista"] } }]);
 
   assert.equal(el.querySelectorAll("option").length, 3);
-  assert.equal(el.value, "Olinda");
+  assert.equal(el.querySelector(":scope > select").value, "Olinda");
 });
 
 test("Autocomplete wraps an input plus the datalist the browser suggests from", () => {
@@ -571,4 +575,77 @@ test("a visible caption wins over the semantics name, and is not duplicated", ()
 
   assert.equal(el.querySelector("input").hasAttribute("aria-label"), false);
   assert.equal(el.textContent.trim(), "Notifications");
+});
+
+test("a Dropdown's selection payload survives the wrapper (#211)", () => {
+  // Reading `.value` off the keyed element once it is a <div> yields undefined
+  // and an index of -1: a frame that arrives looking valid and carries the wrong
+  // choice. The silence is the danger, so this pins the payload itself.
+  const { dom, el, transport } = mountWidget("Dropdown", "city", {
+    options: ["Recife", "Olinda", "Paulista"],
+    value: "Recife",
+  });
+  const select = el.querySelector(":scope > select");
+  select.value = "Paulista";
+  fire(dom, select, "change");
+
+  assert.deepEqual(transport.events.at(-1), {
+    type: "select",
+    key: "city",
+    payload: { value: "Paulista", index: 2 },
+  });
+});
+
+test("a Dropdown names the select, not the role-less wrapper", () => {
+  const { el } = mountWidget("Dropdown", "city", {
+    options: ["Recife"],
+    semantics: { label: "Cidade" },
+  });
+  const select = el.querySelector(":scope > select");
+  assert.equal(select.getAttribute("aria-label"), "Cidade");
+  assert.equal(select.getAttribute("name"), "city", "autofill needs a named control");
+  assert.equal(el.hasAttribute("aria-label"), false);
+});
+
+test("a Dropdown's tab stop is the select, never the wrapper", () => {
+  const { el } = mountWidget("Dropdown", "city", { options: ["Recife"], focusable: true });
+  assert.equal(el.hasAttribute("tabindex"), false);
+  assert.equal(el.querySelector(":scope > select").getAttribute("tabindex"), "0");
+});
+
+test("a Dropdown draws a chevron, and steps aside for the app's own trailing icon", () => {
+  const { el } = mountWidget("Dropdown", "city", { options: ["Recife"] });
+  const chevron = el.querySelector(':scope > [data-tw-part="chevron"]');
+  assert.notEqual(chevron, null, "appearance:none hides the native arrow, so draw one");
+  assert.equal(chevron.getAttribute("data-tw-icon"), "chevron-down");
+
+  const custom = mountWidget("Dropdown", "other", {
+    options: ["Recife"],
+    trailing_icon: "search",
+  });
+  assert.equal(custom.el.querySelector(':scope > [data-tw-part="chevron"]'), null);
+  assert.notEqual(custom.el.querySelector(':scope > [data-tw-part="trailing"]'), null);
+});
+
+test("a Dropdown draws its leading icon inside the field box", () => {
+  const { el } = mountWidget("Dropdown", "city", {
+    options: ["Recife"],
+    leading_icon: "map-pin",
+  });
+  const leading = el.querySelector(':scope > [data-tw-part="leading"]');
+  assert.notEqual(leading, null);
+  assert.equal(leading.getAttribute("aria-hidden"), "true");
+  const order = [...el.children].map((c) => c.getAttribute("data-tw-part") ?? c.tagName);
+  assert.deepEqual(order, ["leading", "SELECT", "chevron"]);
+});
+
+test("an icon never becomes an Autocomplete's accessible name", () => {
+  // The <label> names what it wraps through its text, so a glyph that ever
+  // contributed text would quietly replace the field's name.
+  const { el } = mountWidget("Autocomplete", "city", {
+    options: ["Recife"],
+    leading_icon: "search",
+    semantics: { label: "Cidade" },
+  });
+  assert.equal(el.querySelector("input").getAttribute("aria-label"), "Cidade");
 });

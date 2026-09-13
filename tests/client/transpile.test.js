@@ -16,6 +16,7 @@ import {
   Color,
   Column,
   Container,
+  Dropdown,
   Edge,
   Input,
   LazyColumn,
@@ -1521,4 +1522,23 @@ test("Mode C gets the reveal toggle from the shared renderer (#209)", () => {
     null,
     "PasswordField is secure, so it gets the eye without asking",
   );
+});
+
+test("Mode C gets the field icons from the shared renderer (#211)", () => {
+  // The parity matrix is IR-only, so only a DOM assertion shows that Mode C
+  // draws what the core promised: its runtime mounts through client/dom.js.
+  const dom = freshDom();
+  globalThis.document = dom.document;
+
+  const field = buildElement(Input({ leadingIcon: "user", key: "u" }));
+  assert.notEqual(field.querySelector(':scope > [data-tw-part="leading"]'), null);
+  assert.equal(
+    field.querySelector(':scope > [data-tw-part="leading"]').getAttribute("data-tw-icon"),
+    "user",
+  );
+
+  const picker = buildElement(Dropdown({ options: ["Recife"], key: "city" }));
+  assert.equal(picker.tagName, "DIV");
+  assert.notEqual(picker.querySelector(":scope > select"), null);
+  assert.notEqual(picker.querySelector(':scope > [data-tw-part="chevron"]'), null);
 });

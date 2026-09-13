@@ -235,6 +235,35 @@ body {
   height: 20px;
 }
 
+/* Field icons: the leading/trailing glyphs the core promises the renderer draws.
+   They sit inside the field box, beside the control, never squeezing it: the
+   control keeps flex:1 and the icons never shrink. Decorative, so they take the
+   muted on-surface-variant role rather than the text colour, and pointer-events
+   are off so a click reaches the field rather than the glyph.
+
+   No width/height here on purpose: renderIcon writes an inline em-based size
+   when the app set no explicit one, and an inline style always beats this sheet.
+   Declaring a pixel size would read as the source of truth while changing
+   nothing — the icon scales with the field's font, which is what we want. */
+[data-tw-type="Input"] > [data-tw-part="leading"],
+[data-tw-type="Input"] > [data-tw-part="trailing"],
+[data-tw-type="Dropdown"] > [data-tw-part="leading"],
+[data-tw-type="Dropdown"] > [data-tw-part="trailing"],
+[data-tw-type="Dropdown"] > [data-tw-part="chevron"],
+[data-tw-type="Autocomplete"] > [data-tw-part="leading"],
+[data-tw-type="Autocomplete"] > [data-tw-part="trailing"] {
+  flex: 0 0 auto;
+  color: var(--tw-on-surface-variant);
+  pointer-events: none;
+}
+[data-tw-type="Input"] > [data-tw-part="leading"],
+[data-tw-type="Dropdown"] > [data-tw-part="leading"],
+[data-tw-type="Autocomplete"] > [data-tw-part="leading"] { margin-right: 8px; }
+[data-tw-type="Input"] > [data-tw-part="trailing"],
+[data-tw-type="Dropdown"] > [data-tw-part="trailing"],
+[data-tw-type="Dropdown"] > [data-tw-part="chevron"],
+[data-tw-type="Autocomplete"] > [data-tw-part="trailing"] { margin-left: 8px; }
+
 /* ── Checkbox: a <label> wrapping the real <input type=checkbox> ─────────────
    dom.js renders a Checkbox as a keyed <label> with the caption text and lays
    the row out inline (display/gap/align/width), so the base only sets the
@@ -331,8 +360,10 @@ body {
 
 /* ── Dropdown: a <select> that matches the Input next to it ────────────────── */
 [data-tw-type="Dropdown"] {
+  display: flex;
+  align-items: center;
   min-height: 40px;
-  padding: 9px 12px;
+  padding: 0 12px;
   background: var(--tw-surface);
   color: var(--tw-on-surface);
   font-family: var(--tw-font);
@@ -341,12 +372,32 @@ body {
   cursor: pointer;
   transition: border-color var(--tw-motion), box-shadow var(--tw-motion);
 }
+[data-tw-type="Dropdown"] > select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  outline: none;
+  cursor: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+}
 [data-tw-type="Dropdown"]:hover { border-color: var(--tw-on-surface); }
-[data-tw-type="Dropdown"]:focus,
-[data-tw-type="Dropdown"]:focus-visible {
+[data-tw-type="Dropdown"]:focus-within {
   outline: none;
   border-color: var(--tw-primary);
   box-shadow: inset 0 0 0 1px var(--tw-primary);
+}
+/* The native option popup is painted by the OS, which does not inherit the
+   transparent background above: without an explicit pair it renders white text
+   on white in dark mode. */
+[data-tw-type="Dropdown"] > select > option {
+  background-color: var(--tw-surface);
+  color: var(--tw-on-surface);
 }
 
 /* ── Autocomplete: the field is the wrapper, the input is transparent ────────

@@ -539,6 +539,208 @@ display = "standalone"
     discreto **"nova versão disponível → Atualizar"**; ao confirmar, o worker novo
     assume e a página recarrega uma vez. Automático — nada a escrever no app.
 
+## Vários módulos 📦
+
+Seu app não precisa caber num arquivo. O compilador segue os imports do
+entrypoint, transpila **cada módulo do projeto** que ele alcança, e emite os
+`import` que ligam um no outro.
+
+```text
+meu-app/
+├── tempestweb.toml
+├── app.py              # entrypoint
+└── loja/
+    ├── __init__.py
+    ├── modelos.py
+    └── rotulos.py
+```
+
+```python title="loja/modelos.py"
+from dataclasses import dataclass
+
+
+@dataclass
+class Produto:
+    """Um item do catálogo."""
+
+    nome: str
+    preco: float
+```
+
+```python title="loja/rotulos.py"
+TITULO = "Catálogo"
+```
+
+```python title="loja/__init__.py"
+from loja.modelos import Produto as Produto
+from loja.rotulos import TITULO as TITULO
+
+__all__ = ["Produto", "TITULO"]
+```
+
+```python title="app.py"
+from dataclasses import dataclass, field
+
+from tempest_core import App, Column, Text, Widget
+
+from loja import TITULO, Produto
+
+
+@dataclass
+class Estado:
+    """Estado da vitrine."""
+
+    itens: list[Produto] = field(default_factory=list)
+
+
+def make_state() -> Estado:
+    """Monta o estado inicial."""
+    return Estado(itens=[Produto(nome="Café", preco=21.9)])
+
+
+def view(app: App[Estado]) -> Widget:
+    """Desenha a vitrine."""
+    linhas = [Text(content=item.nome) for item in app.state.itens]
+    return Column(children=[Text(content=TITULO), *linhas])
+```
+
+`tempestweb build --mode transpile` emite um arquivo por módulo, todos lado a
+lado em `client/transpile/`, nomeados pelo caminho pontilhado:
+
+```text
+client/transpile/app.gen.js
+client/transpile/loja.gen.js
+client/transpile/loja.modelos.gen.js
+client/transpile/loja.rotulos.gen.js
+```
+
+E o entrypoint carrega o que usa:
+
+```javascript title="client/transpile/app.gen.js"
+import { State } from "./runtime.js";
+import { Column, Text } from "./widgets.js";
+import { Produto, TITULO } from "./loja.gen.js";
+```
+
+Todos ficam no precache do service worker, então o app continua abrindo
+offline depois da primeira carga.
+
+!!! tip "Re-export é explícito"
+    Um `__init__.py` não referencia o que importa — ele repassa. O emissor
+    reconhece as duas marcas que o Python usa para isso: `from x import Y as Y`
+    (o alias redundante) e a listagem em `__all__`. Sem uma das duas, o nome é
+    importado para uso interno e **não** sai do módulo.
+
+!!! info "Por que o nome pontilhado"
+    Todo módulo emitido mora no mesmo diretório, então `./loja.modelos.gen.js`
+    vale de qualquer profundidade — não há `../..` para errar. Como
+    consequência, um módulo seu chamado `widgets`, `values` ou `spacing`
+    colidiria com um arquivo que o cliente já ships; o build recusa com
+    `arquivo:linha` pedindo outro nome.
+
+!!! warning "Ciclo é recusado"
+    `a.py` importando `b.py` que importa `a.py` para no build. Os módulos ES
+    até carregariam, mas um nome lido durante a avaliação da outra metade
+    estoura em *temporal dead zone*, numa linha que nenhum dos dois nomeia.
+    Quebre o ciclo movendo o que os dois compartilham para um terceiro módulo.
+
+!!! check "É isso que destrava o cliente tipado da sua API"
+    `tempestweb gen api` escreve um **pacote** — `api/tasks/schemas.py`,
+    `api/tasks/service.py`, `api/tasks/__init__.py`. Antes de o Modo C seguir
+    import local, esse cliente simplesmente não compilava aqui. Agora
+    `from api.tasks import TasksService` funciona: veja
+    [Cliente tipado da API](#cliente-tipado-da-api).
+
+## Cliente tipado da API 🔌
+
+Um app Modo C roda no browser: ele não abre sessão de banco nem chama service
+— fala HTTP com o seu backend. `tempestweb gen api` lê o `openapi.json` e
+escreve esse cliente em Python tipado, para o tipo não driftar do servidor.
+
+```bash
+# com o backend de pé
+tempestweb gen api http://127.0.0.1:8000/openapi.json --out api
+```
+
+Sai um pacote por tag da rota:
+
+```text
+api/
+├── __init__.py
+├── _runtime.py
+└── tasks/
+    ├── __init__.py
+    ├── schemas.py      # @dataclass por componente, from_dict / to_dict
+    └── service.py      # TasksService, um método por rota
+```
+
+E o app consome como qualquer outro módulo local:
+
+```python title="app.py" hl_lines="6 8"
+from dataclasses import dataclass, field
+
+from tempest_core import App, Button, Column, Text, Widget
+
+from api.tasks import Task, TaskCreate, TasksService
+
+SERVICE = TasksService()
+
+
+@dataclass
+class Estado:
+    """Estado da lista."""
+
+    tarefas: list[Task] = field(default_factory=list)
+
+
+def make_state() -> Estado:
+    """Monta o estado inicial."""
+    return Estado()
+
+
+def view(app: App[Estado]) -> Widget:
+    """Desenha a lista."""
+
+    async def carregar() -> None:
+        linhas = await SERVICE.list_tasks()
+        app.set_state(lambda s: setattr(s, "tarefas", linhas))
+
+    async def adicionar() -> None:
+        await SERVICE.create_task(TaskCreate(title="nova"))
+        await carregar()
+
+    return Column(
+        children=[
+            Button(label="Carregar", on_click=carregar),
+            Button(label="Adicionar", on_click=adicionar),
+            *[Text(content=t.title) for t in app.state.tarefas],
+        ]
+    )
+```
+
+O serviço é um `@dataclass`, então `base_url` e `headers` são campos:
+
+```python
+SERVICE = TasksService(base_url="https://api.exemplo.com")
+AUTENTICADO = TasksService(headers={"Authorization": f"Bearer {token}"})
+```
+
+!!! tip "Sirva os dois da mesma origem"
+    Buildando o artefato para dentro do backend e montando-o na raiz, o
+    `base_url` vazio já aponta para a sua API — sem CORS, sem preflight, sem
+    variável de ambiente com a URL. Monte o estático **por último**: um mount
+    na raiz registrado antes dos routers engole todas as rotas seguintes.
+
+!!! warning "O `headers` é fixo no construtor"
+    Ele é enviado em toda requisição, mas nada renova um token que expira. Por
+    ora, construa um serviço novo quando o token mudar.
+
+!!! info "O que o `ApiError` carrega em Modo C"
+    Uma resposta fora da faixa 2xx levanta `ApiError`. Em Modo C um `raise`
+    vira um `Error` do JS com **apenas a mensagem** e o nome da classe, então
+    `except ApiError` funciona e a mensagem traz `HTTP <status>: <corpo>`; os
+    atributos `.status` e `.body` só existem nos Modos A e B.
+
 ## O subset suportado
 
 O Modo C aceita um **subset tipado** de Python — o suficiente para a camada de
@@ -556,6 +758,9 @@ no espírito do `mypy --strict`.
     - **Builtins:** `len`, `str`/`int`/`float`/`bool`, `abs`, `round(x[, n])`,
       `min`/`max` (variádico ou sobre um iterável), `sum(it)`, `range(...)`,
       `enumerate(it)`, `zip(a, b)`.
+    - **`dataclasses`:** `dataclass` e `field`. Os utilitários (`asdict`,
+      `astuple`, `replace`, `fields`, `is_dataclass`) **não** têm contraparte
+      no JS emitido e são recusados no build, dizendo o que escrever no lugar.
     - **Métodos stdlib:** string/list (`.upper`/`.lower`/`.strip`/`.startswith`/
       `.endswith`/`.append`), views de dict (`.items`/`.keys`/`.values` →
       `Object.entries/keys/values`), `sep.join(it)`. Métodos de objetos do runtime
@@ -568,8 +773,14 @@ no espírito do `mypy --strict`.
       dentro de `except`), `assert cond[, msg]`, atribuição (inclusive unpacking
       `a, b = par` e encadeada `a = b = x`), `+=` e afins, `return`.
     - **Estruturas:** `@dataclass` de estado (campos + métodos), herança de
-      dataclass (`class B(A)` → `extends`), `make_state()`, `view()` com closures
-      de handler.
+      dataclass (`class B(A)` → `extends`), `@classmethod` e `@staticmethod`
+      (viram `static`; num classmethod `cls` continua construindo),
+      `class Erro(Exception)` (declara só o nome — o `raise`/`except` casa por
+      nome, então nada é emitido para ela), `make_state()`, `view()` com
+      closures de handler.
+    - **Imports do projeto:** `from meu_modulo import X`, inclusive relativo
+      (`from .modelos import X`) e através de um pacote. Cada módulo alcançado
+      vira um `.gen.js` irmão — veja [Vários módulos](#varios-modulos).
     - **Componentes de layout:** `HStack` / `VStack` (aliases ergonômicos estilo
       SwiftUI) — `gap` por token (`"md"`) ou px, `align`/`justify` diretos.
     - **Widgets:** **todos os ~64 widgets do `tempest_core`** — layout (`Column`,
@@ -818,6 +1029,11 @@ no espírito do `mypy --strict`.
   `run --mode transpile` serve localmente.
 - O mesmo `view()` dos Modos A/B roda aqui — estado, handlers, `Button`/`Input`
   estilizados, binding reativo, navegação, i18n, tema, animação.
+- O app **não precisa caber num arquivo**: o compilador segue seus imports e
+  emite um `.gen.js` por módulo do projeto.
+- `tempestweb gen api` escreve o cliente tipado do seu backend, e o app o
+  importa como qualquer outro módulo — é assim que um monolito FastAPI +
+  Modo C fala consigo mesmo, tipado das duas pontas.
 - É um modo **maduro e de primeira classe**: 100% dos widgets do core, subset
   amplo de Python tipado e PWA turnkey. Detalhes de design em
   [`docs/modo-c-transpile.md`](https://github.com/mauriciobenjamin700/tempestweb/blob/main/docs/modo-c-transpile.md).

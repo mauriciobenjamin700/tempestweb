@@ -142,10 +142,11 @@ def test_service_method_shapes() -> None:
     """Service methods carry path/body/query args and typed returns."""
     service = generate(_SPEC)[0]["users/service.py"]
     assert "class UsersService:" in service
+    assert "@dataclass" in service
     assert "async def list_users(self) -> list[User]:" in service
     assert "return [User.from_dict(item) for item in response.json_body]" in service
     assert "async def create_user(self, body: UserCreate) -> User:" in service
-    assert "json=asdict(body)" in service
+    assert "json=body.to_dict()" in service
     assert "async def get_user(self, user_id: int, params:" in service
     assert "dict[str, Any] | None = None) -> User:" in service
     assert "url += _encode_query(params or {})" in service

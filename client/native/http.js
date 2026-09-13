@@ -28,6 +28,14 @@ function headersToObject(headers) {
 
 /**
  * Parse a fetch Response into the wire shape of `HttpResponse`.
+ *
+ * The parsed body is carried under BOTH keys on purpose. `json` is the wire
+ * name the Python `HttpResponse` model validates through its alias; `json_body`
+ * is the attribute name Python code actually reads, and in Mode C there is no
+ * Pydantic to translate between the two — the transpiled app reads this object
+ * directly. Emitting only `json` made `response.json_body` `undefined` in every
+ * Mode C app and in `native/sync.js`, which then pulled zero rows in silence.
+ *
  * @param {Response} res
  * @returns {Promise<Object>}
  */
@@ -48,6 +56,7 @@ async function readResponse(res) {
     headers: headersToObject(res.headers),
     text,
     json,
+    json_body: json,
   };
 }
 
@@ -124,6 +133,7 @@ export async function httpUpload(args, deps) {
           headers: {},
           text: xhr.responseText || "",
           json: null,
+          json_body: null,
         },
       });
     };

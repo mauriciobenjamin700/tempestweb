@@ -325,12 +325,27 @@ def _emit_dataclass(name: str, schema: dict[str, Any], object_names: set[str]) -
     lines.append('        """Build the model from a decoded JSON object."""')
     if not properties:
         lines.append("        return cls()")
+        lines.append("")
+        lines.append("    def to_dict(self) -> dict[str, Any]:")
+        lines.append(
+            '        """Return the model as the JSON object the API expects."""'
+        )
+        lines.append("        return {}")
         return "\n".join(lines)
     lines.append("        return cls(")
     for prop_name, prop in [*required_fields, *optional_fields]:
         value = _from_dict_expr(prop_name, prop, object_names)
         lines.append(f"            {_snake(prop_name)}={value},")
     lines.append("        )")
+
+    lines.append("")
+    lines.append("    def to_dict(self) -> dict[str, Any]:")
+    lines.append('        """Return the model as the JSON object the API expects."""')
+    lines.append("        return {")
+    for prop_name, prop in [*required_fields, *optional_fields]:
+        value = _to_dict_expr(prop_name, prop, object_names)
+        lines.append(f"            {_py_literal(prop_name)}: {value},")
+    lines.append("        }")
     return "\n".join(lines)
 
 
@@ -365,6 +380,43 @@ def _from_dict_expr(
             ref = ref_name(items["$ref"])
             return f"[{ref}.from_dict(item) for item in (data.get({key}) or [])]"
     return f"data.get({key})"
+
+
+def _to_dict_expr(prop_name: str, prop: dict[str, Any], object_names: set[str]) -> str:
+    """Build the ``to_dict`` value expression for one field.
+
+    The mirror of :func:`_from_dict_expr`. It exists because the request body
+    cannot be built with ``dataclasses.asdict``: Mode C serves no such function
+    (the call compiled and then died with a `ReferenceError` on the click), and
+    ``asdict`` would key the payload by the *snake_case field* rather than the
+    property name the API declared — so any camelCase property was sent under a
+    name the server does not read.
+
+    Args:
+        prop_name: The JSON property name.
+        prop: The property schema.
+        object_names: Names emitted as dataclasses.
+
+    Returns:
+        A Python expression reading ``self.<field>``, unwrapping nested
+        generated models and lists of them.
+    """
+    field_name = _snake(prop_name)
+    if (
+        isinstance(prop, dict)
+        and "$ref" in prop
+        and ref_name(prop["$ref"]) in object_names
+    ):
+        return f"self.{field_name}.to_dict() if self.{field_name} is not None else None"
+    if isinstance(prop, dict) and _primary_type(prop) == "array":
+        items = prop.get("items") or {}
+        if (
+            isinstance(items, dict)
+            and "$ref" in items
+            and ref_name(items["$ref"]) in object_names
+        ):
+            return f"[item.to_dict() for item in (self.{field_name} or [])]"
+    return f"self.{field_name}"
 
 
 def _emit_alias(name: str, schema: dict[str, Any]) -> str:
@@ -427,7 +479,7 @@ def _emit_service_method(
         args.append("params: dict[str, Any] | None = None")
 
     interpolated = re.sub(r"{([^}]+)}", lambda m: "{" + _snake(m.group(1)) + "}", path)
-    url_literal = f'f"{{self._base_url}}{interpolated}"'
+    url_literal = f'f"{{self.base_url}}{interpolated}"'
 
     return_type = _py_type(response) if response is not None else "None"
 
@@ -443,12 +495,13 @@ def _emit_service_method(
         lines.append("        url += _encode_query(params or {})")
     call_args = [f'"{method.upper()}"', "url"]
     if body is not None:
-        call_args.append("json=asdict(body)" if body_is_model else "json=body")
-    call_args.append("headers=self._headers")
+        call_args.append("json=body.to_dict()" if body_is_model else "json=body")
+    call_args.append("headers=self.headers")
     lines.append(f"        response = await request({', '.join(call_args)})")
     lines.append("        if not response.ok:")
     lines.append(
-        "            raise ApiError(response.status, response.text, response.json_body)"
+        '            raise ApiError(f"HTTP {response.status}: {response.text}", '
+        "response.status, response.json_body)"
     )
     lines.append(_return_expr(response, object_names))
     return "\n".join(lines)
@@ -493,19 +546,25 @@ __all__ = ["ApiError", "encode_query"]
 
 
 class ApiError(Exception):
-    """Raised when the API returns a non-2xx response."""
+    """Raised when the API returns a non-2xx response.
 
-    def __init__(self, status: int, message: str, body: Any = None) -> None:
+    The message comes first because Mode C keeps only that argument: a
+    transpiled `raise` throws an `Error` carrying the first argument as its
+    message and the class name as `name`, so `status` and `body` are readable
+    under Modes A and B only.
+    """
+
+    def __init__(self, message: str, status: int = 0, body: Any = None) -> None:
         """Initialize the error.
 
         Args:
+            message: The human-readable summary (status and response text).
             status: The HTTP status code.
-            message: The response body text.
             body: The decoded JSON body, when present.
         """
         self.status = status
         self.body = body
-        super().__init__(f"HTTP {status}: {message}")
+        super().__init__(message)
 
 
 def encode_query(params: dict[str, Any]) -> str:
@@ -611,27 +670,35 @@ def generate(doc: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
         files[f"{slug}/service.py"] = (
             "# Generated by `tempestweb gen api` — do not edit.\n"
             "from __future__ import annotations\n\n"
-            "from dataclasses import asdict\n"
+            "from dataclasses import dataclass, field\n"
             "from typing import Any\n\n"
             "from tempestweb.native.http import request\n\n"
             "from .._runtime import ApiError, encode_query as _encode_query\n"
             f"{schema_import}\n\n"
+            "@dataclass\n"
             f"class {service_class}:\n"
-            f'    """Generated service for the "{tag}" routes."""\n\n'
-            '    def __init__(self, base_url: str = "", '
-            "headers: dict[str, str] | None = None) -> None:\n"
-            '        """Initialize the service.\n\n'
-            "        Args:\n"
-            "            base_url: Base URL prefix prepended to every route.\n"
-            "            headers: Default headers sent with every request.\n"
-            '        """\n'
-            '        self._base_url = base_url.rstrip("/")\n'
-            "        self._headers = headers or {}\n\n" + "\n\n".join(methods) + "\n"
+            f'    """Generated service for the "{tag}" routes.\n\n'
+            "    Attributes:\n"
+            "        base_url: Base URL prefix prepended to every route. Give it\n"
+            "            without a trailing slash — the routes carry their own.\n"
+            "        headers: Default headers sent with every request.\n"
+            '    """\n\n'
+            '    base_url: str = ""\n'
+            "    headers: dict[str, str] = field(default_factory=dict)\n\n"
+            + "\n\n".join(methods)
+            + "\n"
         )
 
+        schema_reexport = "".join(
+            f"from .schemas import {name} as {name}\n" for name in used_sorted
+        )
+        exported = [*used_sorted, service_class]
+        all_names = "".join(f'    "{name}",\n' for name in exported)
         files[f"{slug}/__init__.py"] = (
-            "from .schemas import *  # noqa: F401,F403\n"
-            f"from .service import {service_class}  # noqa: F401\n"
+            "# Generated by `tempestweb gen api` — do not edit.\n"
+            f"{schema_reexport}"
+            f"from .service import {service_class} as {service_class}\n\n"
+            f"__all__ = [\n{all_names}]\n"
         )
 
     root_lines = [

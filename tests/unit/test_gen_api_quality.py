@@ -28,7 +28,7 @@ from typing import Any
 import pytest
 
 from tempestweb.cli import quality
-from tempestweb.cli.openapi import generate
+from tempestweb.cli.openapi import LINE_LIMIT, generate
 
 SPEC_PATH: Path = (
     Path(__file__).resolve().parents[1] / "fixtures" / "openapi_gen_spec.json"
@@ -217,6 +217,43 @@ def test_no_generated_line_exceeds_the_column_budget() -> None:
         f"{relative}:{number}: {line}"
         for relative, contents in files.items()
         for number, line in enumerate(contents.splitlines(), start=1)
-        if len(line) > 88
+        if len(line) > LINE_LIMIT
     ]
     assert too_long == []
+
+
+def test_models_round_trip_and_a_missing_required_key_fails_loudly() -> None:
+    """The emitted models decode, re-encode, and refuse a truncated payload.
+
+    Reading a required property with ``data["x"]`` is only an improvement if it
+    actually raises: the point is that an incomplete response stops at the
+    boundary instead of storing ``None`` under a non-optional annotation.
+
+    Raises:
+        AssertionError: When the round-trip loses or renames a property.
+    """
+    document: dict[str, Any] = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+    files, _ = generate(document)
+    namespace: dict[str, Any] = {}
+    exec(compile(files["catalog/schemas.py"], "schemas.py", "exec"), namespace)
+
+    payload: dict[str, Any] = {
+        "id": 7,
+        "name": "drill",
+        "kind": "physical",
+        "createdAt": "2026-09-13",
+        "owner": {"id": "owner-1", "email": None},
+        "variants": [{"sku": "a-1", "price": 9.5}],
+        "tags": ["tools"],
+    }
+    item = namespace["Item"].from_dict(payload)
+    assert item.created_at == "2026-09-13"
+    assert item.owner.id == "owner-1"
+    assert item.variants[0].sku == "a-1"
+    assert item.class_ is None
+    assert item.to_dict()["createdAt"] == "2026-09-13"
+    assert item.to_dict()["owner"] == {"id": "owner-1", "email": None}
+
+    truncated = {key: value for key, value in payload.items() if key != "name"}
+    with pytest.raises(KeyError):
+        namespace["Item"].from_dict(truncated)

@@ -300,6 +300,11 @@ class AppSession(Generic[S]):
     def _resolved_mode(self) -> str | None:
         """Resolve the app's theme mode to ``"light"``/``"dark"``.
 
+        A ``ThemeMode.SYSTEM`` theme has already been pinned to the platform's
+        dark-mode flag by :func:`~tempestweb.runtime.theme.resolve_platform_theme`
+        when the client reported ``media``, so reading ``Theme.is_dark()`` here
+        gives the same answer the widgets resolved for their inline colors.
+
         Returns:
             The resolved mode, or ``None`` when the app carries no theme at all.
         """
@@ -418,6 +423,7 @@ class AppSession(Generic[S]):
             return
         if event_type == "media":
             apply_media(self.app, event.get("payload", {}))
+            self._emit_theme_if_changed()
             return
         handler = resolve_handler(scene, key, event_type)
         if handler is None:

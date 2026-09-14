@@ -28,6 +28,7 @@ from tempestweb.runtime.serialize import (
     scene_to_initial_patches,
 )
 from tempestweb.runtime.session import AppSession, NativeCallError
+from tempestweb.runtime.theme import resolve_platform_theme
 from tempestweb.runtime.wasm import WasmRuntime, serialize_node, serialize_patches
 from tempestweb.runtime.wasm_main import WasmAppHandle, bootstrap
 
@@ -48,6 +49,7 @@ __all__ = [
     "patch_to_wire",
     "patches_to_wire",
     "resolve_handler",
+    "resolve_platform_theme",
     "scene_to_initial_patches",
     "serialize_node",
     "serialize_patches",

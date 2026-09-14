@@ -76,19 +76,25 @@ def view(app: App[None]) -> Widget:
 
 ## System theme
 
-`platform_dark_mode` arrives in the same snapshot, so an app can follow the OS
-preference without writing any CSS:
+`platform_dark_mode` arrives in the same snapshot — and you do not have to read
+it to follow the system. A theme declared `SYSTEM` (the default of `Theme()` and
+of `Theme.from_seed()`) is pinned light or dark by the runtime from that field,
+before the build, so declaring the theme is enough:
 
 ```python
-from tempest_core import Theme, ThemeMode
+from tempest_core import Color, Theme
 
-
-def view(app: App[None]) -> Widget:
-    """Pick the palette the OS asked for."""
-    mode = ThemeMode.DARK if app.media.platform_dark_mode else ThemeMode.LIGHT
-    theme = Theme.from_seed(seed=..., mode=mode)
-    ...
+THEME: Theme = Theme.from_seed(Color(r=29, g=78, b=216))
 ```
+
+The switch follows the OS with the tab open: the client reports `media` again and
+the page flips, with no reload and no `set_theme`.
+
+!!! tip "When reading the field still pays"
+    To decide something *else* from the OS mode — an icon, an image, a string —
+    `app.media.platform_dark_mode` is still the source. Calling `set_theme` with an
+    absolute mode also still works, and **wins**: the theme the app installs
+    becomes the declared one.
 
 ## How it reaches you
 

@@ -268,9 +268,10 @@ depois.
     seletores: pinta antes de qualquer atributo chegar e continua ganhando da
     folha depois que ele chega.
 
-    Nunca sai media query. Ver "Por que não `prefers-color-scheme`" adiante:
-    um widget não vê o SO, então escurecer a página pelo SO deixava árvore
-    clara em fundo escuro — e o lado inline é o que ganha.
+    Nunca sai media query. Ver "Por que não `prefers-color-scheme` na folha"
+    adiante: quem lê o SO é o runtime, uma vez, e fixa o modo para a árvore e
+    para a folha juntas — o lado inline é o que ganha, então ele não pode ficar
+    de fora da decisão.
 
 !!! info "Só o que a folha consome"
     `theme_css` emite as variáveis que a folha base lê, não os 39 papéis.
@@ -462,12 +463,18 @@ processo.
     e texto escuro (inline), ou seja, ilegível. Passe o tema; é a mesma regra do
     core.
 
-!!! info "Por que não `prefers-color-scheme`"
-    Seria a resposta óbvia — e estaria errada. Um widget construído com
-    `Theme(mode=SYSTEM)` resolve **claro** no core: ele não vê o SO. Escurecer a
-    folha por causa do SO colocaria uma árvore clara numa página escura. Se você
-    quer seguir o SO, leia `app.media.platform_dark_mode` no seu `view` e chame
-    `set_theme` — aí as duas metades andam juntas.
+!!! info "Por que não `prefers-color-scheme` na folha"
+    Seria a resposta óbvia — e estaria errada. O que a folha pinta é metade da
+    tela; a outra metade são as cores que o core resolve **inline**, em Python.
+    Escurecer a folha por media query, sem a árvore saber, colocaria uma árvore
+    clara numa página escura.
+
+    Quem decide é o Python, uma vez, para as duas metades: desde a 0.135.0 o
+    runtime lê `app.media.platform_dark_mode` — o mesmo relato que alimenta
+    `app.media` — e **fixa** um tema declarado `SYSTEM` em `LIGHT` ou `DARK`
+    antes do build. Você não escreve nada: `Theme.from_seed(...)` já nasce em
+    `SYSTEM`, e a página segue o SO, inclusive quando o usuário troca a
+    preferência com a aba aberta.
 
 !!! check "Os pares da paleta têm gate de contraste"
     A regra `color-contrast` do axe precisa de layout real, então o gate de a11y a

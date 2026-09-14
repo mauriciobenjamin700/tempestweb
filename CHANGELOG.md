@@ -4,6 +4,39 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.135.0] — 2026-09-13
+
+### Fixed
+
+- **`ThemeMode.SYSTEM` passou a resolver contra a plataforma (#217).** `SYSTEM` é
+  o modo de `Theme()` **e** de `Theme.from_seed()`, e sua própria docstring diz
+  que *"defers to the platform"* — mas `Theme.is_dark()` recebe
+  `platform_dark_mode` como keyword com default `False`, e nenhum chamador do
+  caminho de render preenchia. Resultado medido em Chrome real com
+  `prefers-color-scheme: dark`: `matchMedia(...).matches` `true` e a página em
+  `rgb(252, 252, 253)` — clara. **Todo app que não escreveu `mode=ThemeMode.DARK`
+  renderizava claro sob um SO escuro.**
+
+  O runtime agora **materializa** a decisão antes do build
+  (`tempestweb/runtime/theme.py`): um app cujo tema declarado é `SYSTEM` roda com
+  um tema equivalente fixado em `LIGHT` ou `DARK` pelo último relato `media` do
+  cliente. As duas metades da #148 concordam por construção — os widgets resolvem
+  a cor do modo fixado, e o `data-tw-theme` da folha sai da mesma chamada
+  `Theme.is_dark()` que os runtimes já faziam. Vale nos Modos A e B juntos,
+  porque o ponto único é `apply_media`.
+
+  A resolução é reversível (o SO voltando ao claro fixa `LIGHT` de novo, sem
+  reload), `LIGHT`/`DARK` continuam absolutos, e `App.set_theme` continua sendo
+  do app: o tema que ele instala vira o novo declarado.
+
+- **O envelope `theme` deixou de ser mudo no evento `media`.** Os dois runtimes
+  tratavam `media` com um `return` antes de qualquer emissão, e só emitiam dentro
+  de `_apply_patches` — que não roda quando o diff da rebuild é vazio. Um app
+  cuja árvore não muda de forma ao trocar de modo (o caso comum: só cores inline
+  mudam) nunca recebia o modo novo, então a folha ficava no anterior.
+
+Medido em Chrome real, Modo A e Modo B, com `tempest-core` 0.18.0.
+
 ## [0.134.0] — 2026-09-13
 
 ### Added

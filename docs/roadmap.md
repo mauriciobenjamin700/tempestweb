@@ -11,7 +11,7 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.138.0; o PyPI serve a 0.137.0.** A diferença mais nova é
+    **Versão do repo: 0.138.0, e é o que o PyPI serve.** A diferença mais nova é
     a **#216**: o cliente que o `tempestweb gen api` escreve passa no
     `tempestweb check`. O arquivo gerado abre com "do not edit", e mesmo assim
     custava **79 erros de ruff e 72 de mypy** ao dono do projeto — que não pode
@@ -141,8 +141,19 @@
     O sintoma deixa de ter caminho: o lote não é construível, não é serializável,
     e um frame ruim é reparado sem a baseline ter andado.
 
-    A última publicada no PyPI é a **0.137.0**, em 2026-09-13 pela tag
-    `v0.137.0`, que carregou sete bumps — a tag anterior era a `v0.130.0`.
+    A última publicada no PyPI é a **0.138.0**, em 2026-09-13 pela tag
+    `v0.138.0` — um bump só, a **#216**: o cliente que o `tempestweb gen api`
+    escreve passa no `tempestweb check`. Validada onde importa, no artefato
+    publicado: venv limpa contra o índice simples instala
+    `tempestweb[server,cli]==0.138.0` (que resolve `tempest-core` 0.19.0
+    sozinho), o `gen api` desse wheel gera os 29 arquivos da mesma spec de 9
+    tags, e sobre eles `ruff check` responde *All checks passed*,
+    `ruff format --check` responde *29 files already formatted* e
+    `mypy --strict` sobre o cliente **mais um call site** responde *no issues
+    found in 30 source files*.
+
+    A anterior, a **0.137.0**, saiu no mesmo dia pela tag `v0.137.0` e carregou
+    sete bumps — a tag antes dela era a `v0.130.0`.
     **0.131.0 a 0.134.0:** o `Input(secure=True)` ganhou o olho que o contrato
     do core prometia (#209), `leading_icon`/`trailing_icon` passaram a ser
     desenhados nos três widgets que os declaram (#211), e um app Modo C deixou

@@ -370,6 +370,46 @@ def view(app: App[MyState]) -> Widget:
     de tema claro↔escuro). Os breakpoints do core (`Breakpoints`: sm/md/lg/xl)
     também estão disponíveis.
 
+### Declare `THEME` e o bundle o entrega
+
+A paleta do app é declarada uma vez, como constante de módulo ao lado da `view`
+— o **mesmo** contrato dos Modos A e B:
+
+```python
+# app.py
+from tempest_core import App, Theme, ThemeMode, Widget
+
+THEME: Theme = Theme(mode=ThemeMode.DARK)
+
+
+def view(app: App[MyState]) -> Widget:
+    """Nenhum widget aqui precisa receber `theme=`."""
+    ...
+```
+
+O compilador transcreve o `THEME` para o módulo gerado, o shell entrega o módulo
+inteiro ao `mountApp`, e o runtime faz as duas coisas que um tema precisa fazer:
+
+* **instala o tema em volta de cada build**, então todo widget nasce com a paleta
+  do app sem que a `view` o repasse — é o `default_factory=current_theme` que o
+  core declara em cada widget, portado;
+* **marca `data-tw-theme="dark"` no documento**, que é o que a folha base lê para
+  o fundo da página, a superfície de um campo e todo estado de hover/foco.
+
+!!! danger "Até a 0.135.0 o Modo C ignorava o `THEME`"
+    O compilador transcrevia a constante e ninguém a lia. A mesma tela saía
+    legível no Modo B e ilegível no C — medido em `examples/router-drawer`:
+    breadcrumb a **1,20:1** e título de seção a **1,02:1** (texto da cor exata do
+    fundo). O primeiro `light` continua não sendo marcado, de propósito: os tokens
+    da folha base *são* a paleta clara, e app que não declara `THEME` sai byte a
+    byte como saía.
+
+!!! info "A paridade é fixada por teste"
+    `tests/fixtures/transpile_theme_samples.json` é gerado do core real e carrega,
+    por caso, o atributo e a **IR inteira**. Os Modos A e B são medidos contra ele
+    em `tests/conformance/test_theme_parity.py`; o Modo C em
+    `tests/client/transpile-theme.test.js`. Três leitores, um golden.
+
 ## Animação (transições)
 
 Anime declarativamente: dê ao `Style` de um widget um `Transition` e o **browser**

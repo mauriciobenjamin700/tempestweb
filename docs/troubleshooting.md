@@ -327,17 +327,20 @@ mesmo artefato transpilado continua claro. Duas causas, as duas corrigidas na
 uv add "tempestweb>=0.99.0"
 ```
 
-!!! note "Passe o tema ao widget"
-    O tema é **campo do widget**, não ambiente: `Button(label="x",
-    theme=app.theme)`. Sem isso, o widget resolve a paleta clara nos três modos —
-    é a regra do core, não um detalhe do Modo C. Veja
-    [Tema](tutorial/theming.md#modo-escuro-passe-o-tema-ao-widget).
+!!! note "Dentro da `view`, o widget herda o tema do app"
+    O tema é **campo do widget**, e o campo tem default: o core instala o tema do
+    app em volta do build, então `Button(label="x")` já nasce com a paleta certa.
+    Widget construído **fora** da `view` não herda — aí passe `theme=app.theme`.
+    Veja [Tema](tutorial/theming.md#modo-escuro-o-widget-herda-o-tema-do-app).
 
-!!! warning "A folha base continua clara"
-    O fundo do `Input`, o fundo da página e os estados de hover/foco vêm dos
-    tokens `--tw-*`, que não têm eixo de modo — num app escuro o campo aparece
-    branco. Rastreado em
-    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+!!! check "Declarou `THEME`? O Modo C obedece desde a 0.136.0"
+    Até a 0.135.0 o transpile ignorava o `THEME` de módulo: nem o
+    `data-tw-theme` no documento, nem a herança do tema na árvore. Era o mesmo
+    defeito de duas metades da
+    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148), um modo
+    atrás — rastreado em
+    [#206](https://github.com/mauriciobenjamin700/tempestweb/issues/206) e fixado
+    por golden nos três modos.
 
 ---
 

@@ -11,19 +11,27 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.135.0; o PyPI serve a 0.130.0.** A diferença mais nova
-    é a **#217**: `ThemeMode.SYSTEM` — o modo default de `Theme()` e de
-    `Theme.from_seed()`, e o único cuja docstring promete seguir a plataforma —
-    resolvia claro sempre. `Theme.is_dark()` recebe `platform_dark_mode` com
-    default `False` e nenhum chamador do caminho de render preenchia, então um
-    app sob SO escuro renderizava claro, medido em Chrome real. O runtime agora
-    **fixa** o modo antes do build, a partir do `media` que o cliente já
-    reporta: as duas metades da #148 — a cor inline dos widgets e o
-    `data-tw-theme` da folha — saem da mesma decisão, nos Modos A e B, e a
-    resolução acompanha o SO ao vivo. Junto foi um defeito irmão: o evento
-    `media` retornava antes de emitir o envelope `theme`, que só saía dentro de
-    `_apply_patches` — e esse não roda quando a rebuild não gera patch, que é
-    exatamente o caso de uma troca só de cores.
+    **Versão do repo: 0.136.0; o PyPI serve a 0.130.0.** A diferença mais nova
+    é que **o Modo C passou a ler o `THEME` que a app declara**. O compilador já
+    transcrevia a constante e ninguém a lia: a mesma tela saía legível no Modo B
+    e ilegível no C — breadcrumb a 1,20:1, título de seção a 1,02:1, medidos em
+    `examples/router-drawer`. Agora o runtime JS instala o tema em volta de cada
+    build (o porte do `use_theme`/`current_theme` do core) e marca
+    `data-tw-theme` no documento, e um golden gerado do core real prende
+    atributo e IR nos **três** modos. No caminho apareceu o irmão menor do
+    defeito: o Modo A só marcava o tema no primeiro rebuild, não no mount.
+
+    Antes dela, a 0.135.0 fechou a **#217**: `ThemeMode.SYSTEM` — o modo default
+    de `Theme()` e de `Theme.from_seed()`, e o único cuja docstring promete
+    seguir a plataforma — resolvia claro sempre, porque `Theme.is_dark()` recebe
+    `platform_dark_mode` com default `False` e nenhum chamador do caminho de
+    render preenchia. O runtime passou a **fixar** o modo antes do build, a
+    partir do `media` que o cliente já reporta, então as duas metades da #148
+    saem da mesma decisão nos Modos A e B e a resolução acompanha o SO ao vivo.
+    Junto foi um defeito irmão: o evento `media` retornava antes de emitir o
+    envelope `theme`, que só saía dentro de `_apply_patches` — e esse não roda
+    quando a rebuild não gera patch, que é exatamente o caso de uma troca só de
+    cores.
 
     Antes dela, a 0.134.0: **um app Modo C não precisa mais caber num arquivo**. O emissor
     recusava todo `from X import` fora de `tempest_core`,

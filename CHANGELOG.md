@@ -4,6 +4,75 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.136.0] — 2026-09-13
+
+### Fixed
+
+- **O Modo C passa a ler o `THEME` que a app declara.** O contrato existia e
+  tinha dois leitores, não três: o Modo A em `bootstrap(..., app.THEME)`, o
+  Modo B em `create_app(..., theme=...)`, e o Modo C nada. O compilador já
+  transcrevia a constante — `export const THEME = new Theme({ mode: ... })` —
+  mas o shell importava `{ makeState, view }` por nome, então ninguém a lia.
+  A mesma tela saía legível no Modo B e ilegível no C; medido em
+  `examples/router-drawer`, que declara `Theme(mode=ThemeMode.DARK)`:
+
+  | | Modo B | Modo C (antes) | Modo C (agora) |
+  | --- | --- | --- | --- |
+  | `data-tw-theme` | `dark` | ausente | `dark` |
+  | breadcrumb | `#e5e5e6` sobre `#1f2937` | `#19191a` sobre `#1f2937` | `#e5e5e6` sobre `#1f2937` |
+  | contraste | 11,66:1 | **1,20:1** | 11,66:1 |
+
+  O defeito tinha as duas metades que a #148 nomeou, e as duas foram fechadas:
+
+  - **As cores.** `client/transpile/theme.js` ganhou o par ambiente
+    `currentTheme`/`setCurrentTheme` — porte do `current_theme`/`use_theme` do
+    core — e `runtime.js` o instala em volta de cada `view(app)`, limpando no
+    `finally`. `widget-support.js` resolve o leaf da tabela gerada pelo tema
+    ambiente quando o widget não recebeu um, que é exatamente o
+    `default_factory=current_theme` que todo widget do core declara. As tabelas
+    já tinham eixo de modo desde a 0.99.0: o que faltava era escolher o leaf
+    certo.
+  - **O atributo.** `mountApp` recebe o **módulo inteiro** (`import * as app$`
+    no shell, porque nomear `THEME` no import seria erro de link em toda app que
+    não declara tema), passa o `THEME` ao construtor do `App` e marca
+    `data-tw-theme` no mount. O primeiro `light` não é marcado, como na sessão do
+    Modo B: os tokens da folha base *são* a paleta clara.
+
+  App sem `THEME` sai byte a byte como saía — é um caso do golden.
+
+  Fecha [#206](https://github.com/mauriciobenjamin700/tempestweb/issues/206).
+
+- **O Modo A marca o tema no mount, não no primeiro rebuild.** A docstring do
+  `on_theme` prometia *"on mount and whenever it changes"*, mas
+  `_emit_theme_if_changed` só era chamado de `_apply_patches`. Numa app escura o
+  `data-tw-theme` só aparecia depois do primeiro rebuild — até alguém clicar, toda
+  regra que a folha base chaveia em `[data-tw-theme="dark"]` (hover, foco, a
+  superfície de um campo) pintava claro sob uma árvore escura. Apareceu ao
+  escrever a paridade dos três modos.
+
+### Added
+
+- **Golden de tema dos três modos.** `tests/fixtures/transpile_theme_samples.json`
+  é gerado do core real (`python -m tests.conformance._transpile_theme`) e carrega,
+  por caso (`no_theme`/`light`/`dark`), o `data-tw-theme` que o documento acaba com
+  no mount e a **IR inteira** — que é onde mora toda cor resolvida, já que o widget
+  leva o preenchimento inline. Três leitores do mesmo arquivo:
+  `tests/conformance/test_theme_parity.py` prende os Modos A e B,
+  `tests/client/transpile-theme.test.js` prende o Modo C. A cena não passa `theme=`
+  para nenhum widget — herdar a paleta sem receber é o comportamento sob teste — e
+  um teste extra recusa a suíte vacuosa, exigindo que o par claro/escuro difira.
+
+  Era exatamente o buraco que o `CHANGELOG` da 0.129.0 já registrava: o job
+  `contrast` audita a IR que o **Python** constrói, e o Modo C constrói a árvore
+  em JS. O gate ficava verde entregando a tela ilegível.
+
+### Changed
+
+- **`mountApp(root, mod)` recebe o módulo, não o par `{ makeState, view }`.** A
+  forma antiga continua funcionando (um objeto com esses dois campos é um módulo
+  válido para o runtime); o que muda é que um `THEME` no módulo agora é lido. O
+  `App` do Modo C aceita o tema como segundo argumento do construtor.
+
 ## [0.135.0] — 2026-09-13
 
 ### Fixed
@@ -36,6 +105,7 @@ versioning.
   mudam) nunca recebia o modo novo, então a folha ficava no anterior.
 
 Medido em Chrome real, Modo A e Modo B, com `tempest-core` 0.18.0.
+
 
 ## [0.134.0] — 2026-09-13
 

@@ -11,7 +11,7 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.137.0; o PyPI serve a 0.130.0.** A diferença mais nova é
+    **Versão do repo: 0.137.0, e é o que o PyPI serve.** A diferença mais nova é
     o repin em `tempest-core>=0.19.0`, que fecha as **#214** e **#215** — as duas
     moravam no core (tabela sem trilha comum entre as linhas, `AppBar` estourando
     em viewport estreita) e foram consertadas lá, não contornadas aqui: o core
@@ -127,8 +127,36 @@
     O sintoma deixa de ter caminho: o lote não é construível, não é serializável,
     e um frame ruim é reparado sem a baseline ter andado.
 
-    A última publicada no PyPI é a **0.130.0**, em 2026-09-02 pela tag
-    `v0.130.0`, que carregou três bumps — a tag anterior era a `v0.127.0`.
+    A última publicada no PyPI é a **0.137.0**, em 2026-09-13 pela tag
+    `v0.137.0`, que carregou sete bumps — a tag anterior era a `v0.130.0`.
+    **0.131.0 a 0.134.0:** o `Input(secure=True)` ganhou o olho que o contrato
+    do core prometia (#209), `leading_icon`/`trailing_icon` passaram a ser
+    desenhados nos três widgets que os declaram (#211), e um app Modo C deixou
+    de precisar caber num arquivo — com isso o cliente que `tempestweb gen api`
+    escreve compila e roda em Modo C. **0.135.0 (#217):** `ThemeMode.SYSTEM` —
+    o modo default de `Theme()` e de `Theme.from_seed()` — resolvia claro
+    sempre, porque `Theme.is_dark()` recebe `platform_dark_mode` com default
+    `False` e nenhum chamador do caminho de render preenchia; o runtime passou a
+    fixar o modo antes do build, nos Modos A e B juntos. **0.136.0 (#206):** o
+    Modo C passou a ler o `THEME` declarado, com um golden gerado do core real
+    prendendo atributo e IR nos três modos. **0.137.0 (#214, #215):** o piso
+    subiu para `tempest-core>=0.19.0`, que dá trilha compartilhada às colunas da
+    tabela e faz a `AppBar` empilhar em viewport estreita.
+
+    Validada em venv limpa contra o índice simples: `tempestweb[server,cli]==0.137.0`
+    resolve `tempest-core` 0.19.0 sozinho, expõe `resolve_platform_theme`, empilha
+    a `AppBar` a 320px, e o wheel carrega os 18 módulos de `client/transpile`. Um
+    app Modo C buildado com esse wheel monta em Chrome real com
+    `data-tw-theme="dark"`, fundo `rgb(20, 18, 24)`, clique real incrementando o
+    estado e console limpo.
+
+    O que segue **aberto** é a **#216** (o cliente que `gen api` escreve não passa
+    no `tempestweb check`: 79 erros de ruff medidos na 0.137.0) e a **#221** (o
+    Modo C segue o `mode` do tema mas ignora o token set, então paleta declarada
+    por `from_seed` não pinta lá).
+
+    A release anterior, a **0.130.0**, saiu em 2026-09-02 carregando três bumps
+    — a tag anterior era a `v0.127.0`.
     **0.128.0 (#201):** o job Lighthouse do PWA Gate nunca auditou uma página, e
     por baixo do duplo soft-fail estava o motivo real — o Lighthouse 12 removeu a
     categoria `pwa`, então 6 dos 7 audits assertados não existem num relatório
@@ -141,14 +169,9 @@
     como o SSE já fazia — medido com o socket cortado de verdade, o contador
     volta em 7 em vez de 0.
 
-    Validada em venv limpa contra o índice simples: `tempestweb[server]==0.130.0`
-    retoma a sessão (`Count: 7`) e `ws_resume_seconds=0` devolve o comportamento
-    antigo (`Count: 0`).
-
-    Fica aberta a **#206**, achada pela verificação em browser da #202: o Modo C
-    ignora o `THEME` que a app declara, então a mesma tela fica legível no Modo B
-    e ilegível no C — e o gate de contraste não pega, porque mede a IR que os
-    Modos A/B renderizam.
+    Validada na época em venv limpa contra o índice simples:
+    `tempestweb[server]==0.130.0` retoma a sessão (`Count: 7`) e
+    `ws_resume_seconds=0` devolve o comportamento antigo (`Count: 0`).
 
     A anterior, a **0.127.0**, saiu em 2026-08-29 e fechou a #195 inteira: o keyspace do `storage` passou a ser
     por dono, uma chamada durante o upgrade de outra aba deixou de pendurar

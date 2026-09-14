@@ -15,9 +15,9 @@
     <div id="app"></div>
     <script type="module">
       import { mountApp } from "./runtime.js";
-      import { makeState, view } from "./counter.gen.js";
+      import * as app$ from "./counter.gen.js";
 
-      mountApp(document.getElementById("app"), { makeState, view });
+      mountApp(document.getElementById("app"), app$);
     </script>
   </body>
 </html>

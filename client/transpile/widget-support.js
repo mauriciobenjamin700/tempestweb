@@ -9,6 +9,7 @@
 
 import { WIDGET_STYLES } from "./widget-styles.gen.js";
 import { COLOR_ROLES } from "./component-styles.gen.js";
+import { currentTheme } from "./theme.js";
 import { Border, SideBorder } from "./values.gen.js";
 
 /**
@@ -193,16 +194,20 @@ export function resolveWidgetStyle(widget, variant, size, colorScheme, override,
 /**
  * Which leaf of a generated style table a theme selects: `"light"` or `"dark"`.
  *
- * A widget built with no theme resolves light in the core, so an absent theme
- * answers `"light"` here too. `SYSTEM` defers to the platform flag exactly as
- * `Theme.is_dark` does, which is why the theme object is asked instead of its
- * `mode` string being read.
+ * An absent theme falls back to the one installed for the current build (see
+ * `setCurrentTheme` in `./theme.js`), which is how the core behaves: every widget
+ * declares `theme` with `default_factory=current_theme`, so the app's palette
+ * reaches a widget the view never passed it to. With nothing installed either,
+ * the answer is `"light"` — a widget built outside a build resolves light in the
+ * core too. `SYSTEM` defers to the platform flag exactly as `Theme.is_dark` does,
+ * which is why the theme object is asked instead of its `mode` string being read.
  *
  * @param {?Object} theme  A `Theme` (or anything with `is_dark`), or null.
  * @returns {string}       The table key.
  */
 export function themeMode(theme) {
-  return theme != null && typeof theme.is_dark === "function" && theme.is_dark()
+  const active = theme ?? currentTheme();
+  return active != null && typeof active.is_dark === "function" && active.is_dark()
     ? "dark"
     : "light";
 }

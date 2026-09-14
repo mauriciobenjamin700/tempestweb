@@ -1689,6 +1689,13 @@ def _index_html_transpile(
     links the Web App Manifest and registers the cache-first service worker, so
     the static bundle is an installable, offline-capable PWA.
 
+    The whole module is handed to ``mountApp``, not a ``{makeState, view}`` pair:
+    the app's optional module-level ``THEME`` — the same contract Mode A reads at
+    :func:`bootstrap` and Mode B at :func:`create_app` — travels with it. Naming
+    ``THEME`` in the import list is not an option, because an ES module import of
+    a name the module does not export is a **link-time** error, so every app that
+    declares no theme would fail to boot.
+
     The tab icon is linked explicitly. The manifest names icons, but a browser
     does not read it for the tab: without ``rel="icon"`` it probes
     ``/favicon.ico`` and a static bundle has no route to answer, so every load of
@@ -1730,9 +1737,9 @@ def _index_html_transpile(
     <div id="app"></div>
     <script type="module">
       import {{ mountApp }} from "./client/transpile/runtime.js";
-      import {{ makeState, view }} from "./client/transpile/{_TRANSPILE_APP_MODULE}";
+      import * as app$ from "./client/transpile/{_TRANSPILE_APP_MODULE}";
 
-      mountApp(document.getElementById("app"), {{ makeState, view }});
+      mountApp(document.getElementById("app"), app$);
     </script>
 {sw_block}
   </body>

@@ -92,3 +92,43 @@ export class Breakpoints {
     this.xl = xl;
   }
 }
+
+/**
+ * The theme installed for the duration of the current build, or `null`.
+ *
+ * The port of `tempest_core.theme._current`: the core declares every widget's
+ * `theme` field with `default_factory=current_theme`, so a widget built inside
+ * `view()` inherits the app's palette without the app passing it anywhere. Mode C
+ * has no context variable, and the build is single-threaded and synchronous, so a
+ * module-level slot set around the build is the exact equivalent.
+ *
+ * @type {?Object}
+ */
+let ambientTheme = null;
+
+/**
+ * The theme a widget defaults to when the caller passes none.
+ *
+ * Mirrors `tempest_core.theme.current_theme()`. Outside a build it answers
+ * `null`, which resolves light — the same answer the core gives a widget built
+ * with no theme installed.
+ *
+ * @returns {?Object}  The active theme, or `null`.
+ */
+export function currentTheme() {
+  return ambientTheme;
+}
+
+/**
+ * Install the theme every widget built from now on defaults to.
+ *
+ * Mirrors entering `tempest_core.theme.use_theme(theme)`. The runtime calls this
+ * around each `view(app)` call (and clears it right after), so a build that threw
+ * cannot leave a stale palette visible to the next one.
+ *
+ * @param {?Object} theme  The theme to install, or `null` to clear.
+ * @returns {void}
+ */
+export function setCurrentTheme(theme) {
+  ambientTheme = theme ?? null;
+}

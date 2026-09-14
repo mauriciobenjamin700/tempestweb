@@ -24,7 +24,7 @@ import { mount } from "../tempestweb.js";
 import { applyThemeMode } from "../theme.js";
 import { diff } from "./diff.js";
 import { NavStack, Route, pathToRoutes, routeToPath } from "./nav.js";
-import { MediaQueryData, Theme } from "./theme.js";
+import { MediaQueryData, Theme, setCurrentTheme } from "./theme.js";
 import { setSlidWindows } from "./widget-support.js";
 // `Form.validate` is the one widget *method* Mode C ports, and the emitted code
 // reaches every helper through this module — so it is re-exported here rather
@@ -65,6 +65,24 @@ function markThemeMode(theme) {
 }
 
 /**
+ * Mark the document at mount time, skipping a first `light`.
+ *
+ * Mirrors the Mode B session, which does not send the first `light`: the base
+ * stylesheet's own tokens *are* the light palette, so marking it at mount would
+ * spend a frame saying what the CSS already says — and an app that declares no
+ * theme must come out byte-identical to before the theme was read at all. Every
+ * later change goes through {@link markThemeMode}, including the return to light.
+ *
+ * @param {?Object} theme  The app's theme at mount.
+ * @returns {void}
+ */
+function markInitialThemeMode(theme) {
+  if (theme != null && typeof theme.is_dark === "function" && theme.is_dark()) {
+    applyThemeMode("dark");
+  }
+}
+
+/**
  * The application handle passed to `view(app)` and closed over by handlers.
  *
  * Exposes the current `state` (read-only) and `setState(mutator)`, which mutates
@@ -75,8 +93,10 @@ function markThemeMode(theme) {
 export class App {
   /**
    * @param {State} state  The initial application state.
+   * @param {?Object} [theme]  The app's palette; `null` keeps the core default
+   *        (a `SYSTEM` theme, which resolves light).
    */
-  constructor(state) {
+  constructor(state, theme = null) {
     /** @type {State} */
     this._state = state;
     /** @type {?() => void} */
@@ -84,7 +104,7 @@ export class App {
     /** @type {NavStack} — the navigation stack (mirrors the core App.nav). */
     this._nav = new NavStack({ stack: [new Route({ name: "/" })] });
     /** @type {Theme} — the active theme (mirrors the core App.theme). */
-    this._theme = new Theme();
+    this._theme = theme ?? new Theme();
     /** @type {MediaQueryData} — the viewport snapshot (mirrors App.media). */
     this._media = new MediaQueryData();
     /** @type {Set<Object>} — registered animation controllers (App clock). */
@@ -302,6 +322,8 @@ function collectHandlers(node) {
  * @typedef {Object} TranspileModule
  * @property {() => State} makeState  Build the initial application state.
  * @property {(app: App) => Node} view  Build the IR tree from the current state.
+ * @property {Object} [THEME]  The app's declared palette, transcribed from the
+ *           module-level `THEME` the other two modes already read.
  */
 
 /**
@@ -337,8 +359,15 @@ function collectHandlers(node) {
  * setTimeout fallback) ticks each with the per-frame dt, re-renders so the view
  * reads their new `value`, and drops any that have settled.
  *
+ * The module's `THEME`, when it declares one, becomes the app's theme before the
+ * first build — the Mode C reader of the same contract Mode A reads with
+ * `bootstrap(..., app.THEME)` and Mode B with `create_app(..., theme=...)`. The
+ * resolved mode is marked on the document so the base stylesheet agrees with the
+ * colours already inline in the tree.
+ *
  * @param {HTMLElement} root  The host element to mount into.
- * @param {TranspileModule} mod  The generated module (`makeState` + `view`).
+ * @param {TranspileModule} mod  The generated module (`makeState` + `view`, and
+ *        optionally `THEME`).
  * @returns {TranspileMountHandle}  A handle to inspect and tear down the app.
  */
 /**
@@ -357,12 +386,18 @@ function collectHandlers(node) {
  * @returns {Object}  The event the handler sees.
  */
 /**
- * Run the app's view with its tracked list windows published to the builders.
+ * Run the app's view with its list windows and palette published to the builders.
  *
  * The core injects a slid window into the widget tree before children are
  * materialized; a Mode C builder materializes as it runs, so the map is ambient
  * for exactly the duration of the build and cleared right after — a build that
  * threw must not leave a stale window visible to the next one.
+ *
+ * The theme travels the same way, and for the same reason the core makes it a
+ * context variable: `App.theme` is what every widget's `theme` field defaults to,
+ * so a view that passes the theme to nothing still renders the app's palette.
+ * Without this the whole Mode C tree resolved its colours light whatever the app
+ * declared, while Modes A and B honoured it (tempestweb#206).
  *
  * @param {function(App): import("../transport.js").Node} view  The app's view.
  * @param {App} app  The application handle.
@@ -370,10 +405,12 @@ function collectHandlers(node) {
  */
 function buildView(view, app) {
   setSlidWindows(app._windows);
+  setCurrentTheme(app.theme);
   try {
     return view(app);
   } finally {
     setSlidWindows(null);
+    setCurrentTheme(null);
   }
 }
 
@@ -382,8 +419,10 @@ function appEvent(event) {
   return { type: event.type, key: event.key, payload, ...payload };
 }
 
-export function mountApp(root, { makeState, view }) {
-  const app = new App(makeState());
+export function mountApp(root, mod) {
+  const { makeState, view, THEME = null } = mod;
+  const app = new App(makeState(), THEME);
+  markInitialThemeMode(app.theme);
 
   /** @type {Node} */
   let node = buildView(view, app);

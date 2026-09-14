@@ -4,6 +4,39 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.137.0] — 2026-09-13
+
+### Fixed
+
+- **Repin em `tempest-core>=0.19.0`, que fecha duas issues de layout abertas
+  aqui (#214 e #215).** As duas moravam no core — `DataTable`/`Table` não
+  alinhavam as colunas entre as linhas, e a `AppBar` estourava em viewport
+  estreita — e foram consertadas lá (tempest-core#29), não contornadas aqui. A
+  alternativa que as issues sugeriam, aposentar os componentes apontando
+  `tempestweb.presets`, não servia: o core alimenta também o **tempestroid**,
+  cujos renderizadores nativos não têm esses presets nem folha de estilo.
+
+  Medido em Chrome real, mesmo app, antes e depois: o desvio entre o centro do
+  cabeçalho e o centro da célula caiu de **293px para 0px** nas seis colunas; a
+  320px a `AppBar` virou coluna e o botão "Sair" saiu de `x=341` — fora da tela
+  — para `x=210`.
+
+### Changed
+
+- **A composição do `AppBar` no Modo C acompanhou o core**, que é o trabalho que
+  todo repin de componente reescrito à mão exige: `client/transpile/components.js`
+  ganhou o `flex_wrap` e o empilhamento por `media`. A matriz de paridade ganhou
+  os dois casos que provam isso (`appbar_narrow_stacks`, `appbar_wide_stays_a_row`)
+  — um caso por componente não pegaria, porque o único sample existente não
+  passava `media`.
+
+- **A fixture `presets_admin_shell.json` ganhou o gerador que nunca teve**
+  (`python -m tests.conformance._presets_admin_shell`). A cena vivia inline no
+  teste e o JSON era atualizado à mão, então os dois eram cópias da mesma
+  intenção: uma mudança legítima de forma no core não tinha como ser refrescada
+  sem redigitar a outra metade. Agora a cena mora no gerador, o teste a importa,
+  e refrescar é um comando com diff revisável.
+
 ## [0.136.0] — 2026-09-13
 
 ### Fixed

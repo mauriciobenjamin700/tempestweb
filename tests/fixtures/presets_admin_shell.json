@@ -385,7 +385,7 @@
               "align_self": null,
               "grow": null,
               "gap": 12.0,
-              "flex_wrap": null,
+              "flex_wrap": "wrap",
               "padding": {
                 "top": 14.0,
                 "right": 16.0,

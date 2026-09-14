@@ -30,6 +30,7 @@ from tempestweb.presets import (
     settings_page,
 )
 from tempestweb.runtime.serialize import node_to_wire
+from tests.conformance._presets_admin_shell import scene
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "presets_admin_shell.json"
 
@@ -453,27 +454,10 @@ def test_admin_shell_fixture_matches_the_presets() -> None:
 
     ``tests/fixtures/presets_admin_shell.json`` is what
     ``tests/client/layouts.test.js`` renders to prove the roles survive into the
-    DOM. Regenerating it by hand is how the two halves drift; this test fails the
-    moment the tree changes shape.
+    DOM. Regenerating it by hand is how the two halves drift, so the scene lives
+    in the generator (``python -m tests.conformance._presets_admin_shell``) and
+    this test only compares against what it wrote — a change of shape is a
+    one-command refresh with a reviewable diff, never hand-edited JSON.
     """
-    tree = admin_shell(
-        title="Painel",
-        brand="ACME",
-        nav=[
-            NavItem("Visão geral", "overview"),
-            NavItem("Usuários", "users", badge="3"),
-        ],
-        active="users",
-        on_navigate=lambda _value: None,
-        on_toggle_sidebar=lambda: None,
-        body=list_page(
-            title="Usuários",
-            subtitle="12 ativos",
-            columns=[TableColumn("Nome"), TableColumn("Saldo", align="end")],
-            rows=[["Ana", "R$ 10"], ["Bo", "R$ 4"]],
-            search="",
-            on_search=lambda _text: None,
-        ),
-    )
     expected = json.loads(FIXTURE.read_text(encoding="utf-8"))
-    assert node_to_wire(build(tree)) == expected
+    assert node_to_wire(build(scene())) == expected

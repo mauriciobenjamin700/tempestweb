@@ -47,6 +47,7 @@ from tempest_core import (
     Header,
     HStack,
     ListTile,
+    MediaQueryData,
     MetricCard,
     NavBar,
     PasswordInput,
@@ -160,6 +161,16 @@ def _cases() -> dict[str, Any]:
             variant="filled",
             leading=Button(label="<", on_click=lambda: None, key="back"),
             actions=[Button(label="+", on_click=lambda: None, key="add")],
+        ),
+        "appbar_narrow_stacks": AppBar(
+            title="Home",
+            actions=[Button(label="+", on_click=lambda: None, key="add")],
+            media=MediaQueryData(width=320.0, height=720.0),
+        ),
+        "appbar_wide_stays_a_row": AppBar(
+            title="Home",
+            actions=[Button(label="+", on_click=lambda: None, key="add")],
+            media=MediaQueryData(width=1280.0, height=800.0),
         ),
         "appbar_outlined_primary_level_2": AppBar(
             title="Home", variant="outlined", color_scheme="primary", elevation=2

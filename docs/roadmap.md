@@ -1,17 +1,31 @@
 # Roadmap e fases
 
-!!! info "Estado atual — atualizado em 2026-09-10"
+!!! info "Estado atual — atualizado em 2026-09-13"
     **Todos os trilhos** — 0/W/A/B/P/N/O/S/T/R e a pós-convergência (C/D/E) —
-    estão mesclados na `main` com gate verde: ruff + format ✓ (397 arquivos) ·
-    mypy `--strict` ✓ (157 arquivos, zero issue) · **pytest 2088 pass / 14 skip** ·
-    **jsdom 951 pass / 0 fail** · `mkdocs build --strict` zero warning. Os números
+    estão mesclados na `main` com gate verde: ruff + format ✓ (404 arquivos) ·
+    mypy `--strict` ✓ (158 arquivos, zero issue) · **pytest 2127 pass / 14 skip** ·
+    **jsdom 969 pass / 0 fail** · `mkdocs build --strict` zero warning. Os números
     foram medidos nesta linha da `main` e se reproduzem com `make check` mais o
     `mkdocs build --strict` — não confie neles de memória, rode. O mesmo
     `examples/counter/app.py` roda ao vivo nos **três** modos (Pyodide no browser,
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.137.0, e é o que o PyPI serve.** A diferença mais nova é
+    **Versão do repo: 0.138.0; o PyPI serve a 0.137.0.** A diferença mais nova é
+    a **#216**: o cliente que o `tempestweb gen api` escreve passa no
+    `tempestweb check`. O arquivo gerado abre com "do not edit", e mesmo assim
+    custava **79 erros de ruff e 72 de mypy** ao dono do projeto — que não pode
+    editá-lo; a saída prática era excluir `api/` do gate e perder a checagem de
+    tipo exatamente na fronteira com a API. Medido na mesma spec de 9 tags,
+    **79 → 0** e **72 → 0**, nos três níveis de strictness e com um call site
+    importando o cliente. O emissor passou a fazer o trabalho do formatador
+    sozinho (aspas duplas, import só do que usa, `__all__` ordenado, quebra em
+    88 colunas na forma do `ruff format`) e a ler propriedade obrigatória com
+    `data["x"]` em vez de `data.get("x")`, que tipava `Any | None` e deixava
+    `None` dentro de um `str`. Um teste novo gera o cliente de uma spec de
+    fixture e roda as ferramentas de verdade sobre ele.
+
+    Antes dela, a 0.137.0:
     o repin em `tempest-core>=0.19.0`, que fecha as **#214** e **#215** — as duas
     moravam no core (tabela sem trilha comum entre as linhas, `AppBar` estourando
     em viewport estreita) e foram consertadas lá, não contornadas aqui: o core
@@ -20,7 +34,7 @@
     em `x=341` a 320px voltou para dentro da tela. A composição do `AppBar` no
     Modo C acompanhou, com dois casos novos na matriz de paridade.
 
-    Antes dela, a 0.136.0:
+    Antes dele, a 0.136.0:
     é que **o Modo C passou a ler o `THEME` que a app declara**. O compilador já
     transcrevia a constante e ninguém a lia: a mesma tela saía legível no Modo B
     e ilegível no C — breadcrumb a 1,20:1, título de seção a 1,02:1, medidos em

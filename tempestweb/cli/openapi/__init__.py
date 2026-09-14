@@ -7,7 +7,7 @@ calls :func:`tempestweb.native.http.request`.
 
 from __future__ import annotations
 
-from tempestweb.cli.openapi.generate import generate, ref_name
+from tempestweb.cli.openapi.generate import LINE_LIMIT, generate, ref_name
 from tempestweb.cli.openapi.load import SpecLoadError, load_spec
 
-__all__ = ["generate", "ref_name", "load_spec", "SpecLoadError"]
+__all__ = ["LINE_LIMIT", "generate", "ref_name", "load_spec", "SpecLoadError"]

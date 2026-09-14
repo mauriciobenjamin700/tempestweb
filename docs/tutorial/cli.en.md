@@ -269,7 +269,9 @@ tempestweb gen api http://127.0.0.1:8000/openapi.json --out api
 tempestweb gen api ./openapi.json --out api   # from a file
 ```
 
-One package per tag, each with `schemas.py` + `service.py`. Details in
+One package per tag, each with `schemas.py` + `service.py`. The output passes
+`tempestweb check` at all three strictness levels — do not exclude `api/` from
+lint or type checking. Details in
 [Generate a client from OpenAPI](../advanced/openapi.md).
 
 ---

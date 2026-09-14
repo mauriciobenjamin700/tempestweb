@@ -4,6 +4,60 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.138.0] — 2026-09-13
+
+### Fixed
+
+- **O cliente que o `tempestweb gen api` escreve passa no `tempestweb check`
+  (#216).** Medido na mesma spec de 9 tags / 29 arquivos, antes e depois:
+  `ruff check --select F,E,W,I,UP,RUF,RET,PL` saiu de **79 erros para 0**
+  (36 E501, 18 UP037, 10 I001, 9 RUF100, 5 RUF022, 1 PLW2901) e `mypy` de
+  **72 erros para 0** — nos três níveis de `typing_strictness` que o gate
+  oferece, e com um call site importando o cliente, que é onde os `arg-type`
+  aparecem. `ruff format --check` diz "29 files already formatted".
+
+  O arquivo gerado abre com "do not edit", então cada um desses erros era um
+  erro que o dono do projeto não podia consertar. A saída prática era excluir
+  `api/` do `ruff.toml` e do `mypy.ini` — desligando a checagem de tipo
+  exatamente na fronteira com a API.
+
+  O emissor passou a fazer o trabalho do formatador sozinho, sem shell-out
+  para ferramenta nenhuma: aspas duplas, import só do que o arquivo usa e na
+  ordem do isort, `__all__` na ordem que a RUF022 exige, nenhum `noqa`
+  (o `from . import x as x` já é re-export explícito — o pragma antigo não
+  suprimia nada), anotação sem aspas, e quebra em 88 colunas na forma exata
+  que o `ruff format` produz para assinatura, chamada, import, ternária,
+  compreensão e f-string de URL.
+
+- **Propriedade obrigatória é lida com `data["x"]`, não `data.get("x")`.**
+  `.get` tipa `Any | None`, então todo campo `required` de todo model era um
+  `arg-type` em quem chamava — e, pior, uma resposta truncada montava o
+  dataclass com `None` dentro de um `str`, com o erro aparecendo longe da
+  causa. Campo que o spec não marca `required` sai anotado `T | None`, nunca
+  `T = None` (que era erro de `assignment` em qualquer type checker).
+
+- **`anyOf: [{$ref}, {type: null}]` volta a reconstruir o model aninhado.** É
+  como o pydantic v2 escreve `Model | None`; o `$ref` fica um nível abaixo e o
+  gerador não desembrulhava, então a anotação dizia `Owner | None` e o
+  `from_dict` devolvia o `dict` cru.
+
+### Added
+
+- **Teste que reprova se o codegen regredir**
+  (`tests/unit/test_gen_api_quality.py` + `tests/fixtures/openapi_gen_spec.json`).
+  Gera o cliente da spec de fixture e roda `ruff` e `mypy` **de verdade** sobre
+  ele, nos três níveis de strictness, mais um `app.py` que o consome. Nada
+  exercitava a saída do gerador — que é exatamente por que os erros existiam.
+
+### Changed
+
+- **`tempestweb.cli.openapi.generate` exporta `LINE_LIMIT`**, o orçamento de
+  coluna em que o emissor quebra (88, o default do ruff).
+
+- **Docs de `gen api` atualizadas nas duas línguas**, com a saída real (os
+  exemplos anteriores ainda mostravam `asdict`, construtor `__init__` e a
+  assinatura antiga do `ApiError`) e a seção nova sobre o gate.
+
 ## [0.137.0] — 2026-09-13
 
 ### Fixed

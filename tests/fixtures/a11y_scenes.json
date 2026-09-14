@@ -87,7 +87,7 @@
               "r": 25
             },
             "direction": null,
-            "flex_wrap": null,
+            "flex_wrap": "wrap",
             "font_asset": null,
             "font_family": null,
             "font_size": null,
@@ -10460,7 +10460,7 @@
                     "bottom": null,
                     "color": null,
                     "direction": null,
-                    "flex_wrap": null,
+                    "flex_wrap": "wrap",
                     "font_asset": null,
                     "font_family": null,
                     "font_size": null,
@@ -10522,7 +10522,7 @@
                   "r": 229
                 },
                 "direction": null,
-                "flex_wrap": null,
+                "flex_wrap": "wrap",
                 "font_asset": null,
                 "font_family": null,
                 "font_size": null,
@@ -14468,7 +14468,7 @@
               "r": 25
             },
             "direction": null,
-            "flex_wrap": null,
+            "flex_wrap": "wrap",
             "font_asset": null,
             "font_family": null,
             "font_size": null,
@@ -18370,7 +18370,7 @@
               "r": 25
             },
             "direction": null,
-            "flex_wrap": null,
+            "flex_wrap": "wrap",
             "font_asset": null,
             "font_family": null,
             "font_size": null,

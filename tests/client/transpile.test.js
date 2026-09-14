@@ -432,6 +432,14 @@ test("every ported component matches the core build (order-agnostic)", () => {
       variant: "filled",
       leading: Button({ label: "<", onClick: noop, key: "back" }),
       actions: [Button({ label: "+", onClick: noop, key: "add" })], theme }),
+    appbar_narrow_stacks: AppBar({
+      title: "Home",
+      actions: [Button({ label: "+", onClick: noop, key: "add" })],
+      media: { width: 320.0, height: 720.0 }, theme }),
+    appbar_wide_stays_a_row: AppBar({
+      title: "Home",
+      actions: [Button({ label: "+", onClick: noop, key: "add" })],
+      media: { width: 1280.0, height: 800.0 }, theme }),
     appbar_outlined_primary_level_2: AppBar({
       title: "Home",
       variant: "outlined",

@@ -357,10 +357,16 @@ export const SegmentedControl = carrying(function SegmentedControl({
  * The bar overrides only the padding step of the resolved surface; the radius
  * keeps the resolver's own default, so a bar carries the same corner as a card.
  *
+ * Below the `md` breakpoint the bar lays out as a column and the title drops its
+ * `grow`, mirroring `tempest_core.components.bars.AppBar._stacks`: a row of a
+ * greedy title and non-shrinking actions pushed the last action off a narrow
+ * screen. The decision needs a reported viewport, so a bar with no `media` — or
+ * one whose `width` is still `0.0`, meaning "not reported yet" — stays a row.
+ *
  * @param {{title?: string, leading?: ?import("../transport.js").Node,
  *          actions?: import("../transport.js").Node[], variant?: string,
  *          colorScheme?: string, elevation?: ?number, style?: ?Object,
- *          key?: ?string}} [args]
+ *          media?: ?Object, key?: ?string}} [args]
  * @returns {import("../transport.js").Node}
  */
 export const AppBar = carrying(function AppBar({
@@ -371,12 +377,16 @@ export const AppBar = carrying(function AppBar({
   colorScheme = "neutral",
   elevation = null,
   style = null,
+  media = null,
   key = null,
   theme = null,
 } = {}) {
   const base = key ?? "appbar";
   const surface = surfaceStyle(variant, colorScheme, elevation, "md", theme);
   const content = surface.color ?? colorRoles(theme).on_surface;
+  const width = media?.width ?? 0.0;
+  const breakpoint = theme?.tokens?.breakpoints?.md ?? 600.0;
+  const stacked = width > 0.0 && width < breakpoint;
   const children = [];
   if (leading != null) {
     children.push(leading);
@@ -385,18 +395,30 @@ export const AppBar = carrying(function AppBar({
     Text({
       content: title,
       key: `${base}-title`,
-      style: Style({ grow: 1.0, font_size: 20.0, font_weight: 700, color: content }), theme }),
+      style: Style({
+        grow: stacked ? null : 1.0,
+        font_size: 20.0,
+        font_weight: 700,
+        color: content,
+      }), theme }),
   );
   if (actions.length > 0) {
     children.push(
-      Row({ key: `${base}-actions`, style: Style({ gap: 8.0 }), children: actions, theme }),
+      Row({
+        key: `${base}-actions`,
+        style: Style({ gap: 8.0, flex_wrap: "wrap" }),
+        children: actions,
+        theme,
+      }),
     );
   }
   const bar = {
     ...surface,
     padding: Edge.symmetric({ vertical: 14.0, horizontal: 16.0 }),
     gap: 12.0,
-    align: "center",
+    direction: stacked ? "column" : null,
+    align: stacked ? "start" : "center",
+    flex_wrap: "wrap",
   };
   return Row({ key: base, style: mergeStyle(bar, style), children, theme });
 });

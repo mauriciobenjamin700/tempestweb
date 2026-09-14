@@ -11,7 +11,16 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.136.0; o PyPI serve a 0.130.0.** A diferença mais nova
+    **Versão do repo: 0.137.0; o PyPI serve a 0.130.0.** A diferença mais nova é
+    o repin em `tempest-core>=0.19.0`, que fecha as **#214** e **#215** — as duas
+    moravam no core (tabela sem trilha comum entre as linhas, `AppBar` estourando
+    em viewport estreita) e foram consertadas lá, não contornadas aqui: o core
+    alimenta o tempestroid também, cujos renderizadores não têm os presets deste
+    repo. Medido, o desvio de coluna caiu de 293px para 0px e o botão que ficava
+    em `x=341` a 320px voltou para dentro da tela. A composição do `AppBar` no
+    Modo C acompanhou, com dois casos novos na matriz de paridade.
+
+    Antes dela, a 0.136.0:
     é que **o Modo C passou a ler o `THEME` que a app declara**. O compilador já
     transcrevia a constante e ninguém a lia: a mesma tela saía legível no Modo B
     e ilegível no C — breadcrumb a 1,20:1, título de seção a 1,02:1, medidos em

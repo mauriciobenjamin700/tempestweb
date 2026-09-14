@@ -326,17 +326,21 @@ the same transpiled artifact stays light. Two causes, both fixed in 0.99.0:
 uv add "tempestweb>=0.99.0"
 ```
 
-!!! note "Pass the theme to the widget"
-    The theme is a **field on the widget**, not ambient: `Button(label="x",
-    theme=app.theme)`. Without it the widget resolves the light palette in all
-    three modes — that is the core's rule, not a Mode C detail. See
-    [Theming](tutorial/theming.md#dark-mode-pass-the-theme-to-the-widget).
+!!! note "Inside `view`, a widget inherits the app's theme"
+    The theme is a **field on the widget**, and the field has a default: the core
+    installs the app's theme around the build, so `Button(label="x")` is already
+    born on the right palette. A widget built **outside** `view` does not inherit
+    — pass `theme=app.theme` there. See
+    [Theming](tutorial/theming.md#dark-mode-a-widget-inherits-the-apps-theme).
 
-!!! warning "The base sheet is still light"
-    An `Input`'s background, the page background and the hover/focus states come
-    from the `--tw-*` tokens, which have no mode axis — in a dark app the field
-    shows up white. Tracked in
-    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148).
+!!! check "Declared a `THEME`? Mode C obeys it since 0.136.0"
+    Up to 0.135.0 the transpiler ignored a module-level `THEME`: neither the
+    `data-tw-theme` on the document nor the theme inheritance in the tree. It was
+    the same two-halved defect as
+    [#148](https://github.com/mauriciobenjamin700/tempestweb/issues/148), one mode
+    behind — tracked in
+    [#206](https://github.com/mauriciobenjamin700/tempestweb/issues/206) and
+    pinned by a golden across the three modes.
 
 ---
 

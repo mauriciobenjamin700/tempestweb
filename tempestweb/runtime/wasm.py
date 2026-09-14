@@ -297,12 +297,19 @@ class WasmRuntime(Generic[S]):
         node the client mounts. Patches emitted by later rebuilds reach the
         client through the transport, not this method.
 
+        The resolved theme mode is reported here too, as Mode B reports it from
+        its own mount. Before that it was only reported from :meth:`_apply_patches`
+        — so a dark app got the mark on its **first rebuild**, and until someone
+        clicked, every rule the base sheet keys on ``[data-tw-theme="dark"]``
+        (hover, focus, a field's surface) painted light under a dark tree.
+
         Returns:
             The serialized initial root node (``{"type", "key", "props",
             "children"}``).
         """
         scene = self._app.start()
         self._refresh_handlers(scene)
+        self._emit_theme_if_changed()
         return serialize_node(scene.root)
 
     def _refresh_handlers(self, scene: Scene) -> None:

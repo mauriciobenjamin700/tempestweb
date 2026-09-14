@@ -371,6 +371,47 @@ def view(app: App[MyState]) -> Widget:
     light↔dark). The core breakpoints (`Breakpoints`: sm/md/lg/xl) are available
     too.
 
+### Declare `THEME` and the bundle delivers it
+
+The app's palette is declared once, as a module constant next to `view` — the
+**same** contract Modes A and B read:
+
+```python
+# app.py
+from tempest_core import App, Theme, ThemeMode, Widget
+
+THEME: Theme = Theme(mode=ThemeMode.DARK)
+
+
+def view(app: App[MyState]) -> Widget:
+    """No widget here has to be handed `theme=`."""
+    ...
+```
+
+The compiler transcribes `THEME` into the generated module, the shell hands the
+whole module to `mountApp`, and the runtime does the two things a theme has to do:
+
+* **it installs the theme around every build**, so each widget is born with the
+  app's palette without `view` passing it down — the port of the
+  `default_factory=current_theme` the core declares on every widget;
+* **it marks `data-tw-theme="dark"` on the document**, which is what the base
+  stylesheet reads for the page background, a field's surface and every
+  hover/focus state.
+
+!!! danger "Until 0.135.0 Mode C ignored `THEME`"
+    The compiler transcribed the constant and nothing read it. The same screen
+    came out legible in Mode B and unreadable in C — measured on
+    `examples/router-drawer`: a breadcrumb at **1.20:1** and a section title at
+    **1.02:1** (text the exact colour of its background). A first `light` is still
+    deliberately not marked: the base sheet's own tokens *are* the light palette,
+    and an app that declares no `THEME` comes out byte for byte as before.
+
+!!! info "The parity is pinned by test"
+    `tests/fixtures/transpile_theme_samples.json` is generated from the real core
+    and carries, per case, the attribute and the **whole IR**. Modes A and B are
+    held to it in `tests/conformance/test_theme_parity.py`; Mode C in
+    `tests/client/transpile-theme.test.js`. Three readers, one golden.
+
 ## Animation (transitions)
 
 Animate declaratively: give a widget's `Style` a `Transition` and the **browser**

@@ -311,8 +311,8 @@ def view(app: App[State]) -> Widget:
 THEME: Theme = Theme.from_seed(seed=Color(r=39, g=58, b=79))
 ```
 
-The generated artifact — Mode B's and Mode A's alike — passes that `THEME` to the
-app when it builds it, and that matters because **components resolve colour in
+The generated artifact — in all **three** modes — passes that `THEME` to the app
+when it builds it, and that matters because **components resolve colour in
 Python**: a filled button carries its own fill as an inline style. A theme that
 never reaches the tree is a theme that never paints, however many tokens the page
 carries.
@@ -321,10 +321,11 @@ The two ends the host covers:
 
 * **The tree** — the theme goes to the `App`, so every component is born with
   your palette.
-* **The page** — the `--tw-*` tokens the base sheet reads. In Mode B they are
-  written into the `<head>` at render time; in Mode A the page is static and the
-  app only exists once Pyodide is up, so the CSS is injected at boot, before the
-  first mount.
+* **The page** — in Mode B the `--tw-*` tokens are written into the `<head>` at
+  render time; in Mode A the page is static and the app only exists once Pyodide
+  is up, so the CSS is injected at boot, before the first mount; in Mode C there
+  is no Python in the browser, so the runtime marks `data-tw-theme` on the
+  document and the base sheet redefines its own tokens under that selector.
 
 !!! warning "`Theme(primary=...)` is not the same as `Theme.from_seed(...)`"
     A `Theme` carries a **token set** (`tokens`) plus a few loose convenience
@@ -342,18 +343,30 @@ The two ends the host covers:
     If runtime switching is the heart of your app, declare `THEME` with the
     palette it opens on.
 
-## Dark mode: pass the theme to the widget
+## Dark mode: a widget inherits the app's theme
 
 A **styled** widget resolves its own colours from the theme it carries — from its
-`theme` field, not from an ambient theme. Which is why the idiom is one line:
+`theme` field. And that field has a default: the core installs the app's theme
+around `view` (`use_theme`), and every widget is born with it
+(`default_factory=current_theme`). So **you do not have to pass anything down**:
 
 ```python
-Button(label="Save", theme=app.theme, on_click=save)
+Button(label="Save", on_click=save)                     # inherits app.theme
+Button(label="Save", theme=app.theme, on_click=save)    # identical, explicit
 ```
 
-Pass `app.theme` and the whole tree follows `app.set_theme(...)`; leave it out and
-the widget resolves the **light** palette, even with the app in dark mode. The
-same in all three modes.
+Passing `app.theme` is still correct, and it is required in one case: a widget
+built **outside** `view` — stashed in the state, assembled by a module helper —
+is born with no ambient theme and resolves the light palette. The same in all
+three modes.
+
+!!! danger "In Mode C the inheritance only landed in 0.136.0"
+    Before that the transpiler ignored the declared `THEME` and the JS runtime had
+    no ambient theme at all, so the same screen came out legible in Mode B and
+    unreadable in C
+    ([#206](https://github.com/mauriciobenjamin700/tempestweb/issues/206)). Today
+    the runtime installs the theme around every build, as the core does, and the
+    parity is pinned by a golden across the three modes.
 
 ```python
 from tempest_core import App, Card, Column, Text, Theme, ThemeMode, Widget
@@ -455,16 +468,16 @@ Now it has one. The renderer marks the document with the resolved mode:
 
 and the base sheet redefines its tokens under that selector. You write nothing for
 this: in Mode B (and SSE) the server sends a `theme` envelope; in Mode A the
-runtime calls the callback directly; in Mode C `set_theme` marks the document
-in-process.
+runtime calls the callback directly; in Mode C the runtime marks the document
+in-process, at mount and on every `set_theme`.
 
-!!! warning "Declared dark? Pass `app.theme` to the widgets"
+!!! warning "A widget built outside `view` does not inherit"
     The marking follows the **app's** theme; each widget's colour follows the
-    `theme` **that widget** received. If you call
-    `app.set_theme(Theme(mode=DARK))` and do not pass `theme=app.theme` to the
-    widgets, the sheet goes dark and the widgets stay light — measured: an `Input`
-    with no `theme` ends up with a dark background (sheet) and dark text (inline),
-    i.e. unreadable. Pass the theme; it is the core's own rule.
+    `theme` **that widget** carries. Inside `view` it inherits, because the theme
+    is installed for the build. Stashed in the state or assembled by a module
+    helper, it does not — and then the sheet goes dark with a light widget: an
+    `Input` like that ends up with a dark background (sheet) and dark text
+    (inline), i.e. unreadable. Pass `theme=app.theme` explicitly in that case.
 
 !!! info "Why not `prefers-color-scheme` in the sheet"
     It would be the obvious answer — and it would be wrong. The sheet paints half

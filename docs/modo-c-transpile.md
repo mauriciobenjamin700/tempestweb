@@ -137,10 +137,12 @@ o renderer ignora props que não conhece.
 
 ### `runtime.js`
 - `class State {}` — base das dataclasses transpiladas.
-- `class App { constructor(state); get state; setState(mutator) }` —
-  `setState(fn)` roda `fn(this.state)` e dispara o re-render do runtime.
-- `mountApp(root, { makeState, view }) → MountHandle` — orquestra App + transporte
-  nativo + `mount()`. Coleta `key → handler` a cada render; `sendEvent` despacha.
+- `class App { constructor(state, theme); get state; get theme; setState(mutator) }`
+  — `setState(fn)` roda `fn(this.state)` e dispara o re-render do runtime.
+- `mountApp(root, mod) → MountHandle` — orquestra App + transporte nativo +
+  `mount()`. Recebe o **módulo gerado inteiro** (`makeState`, `view` e o `THEME`
+  opcional), instala o tema em volta de cada build e marca `data-tw-theme` no
+  documento. Coleta `key → handler` a cada render; `sendEvent` despacha.
 
 ## Verificação (obrigatória)
 

@@ -310,19 +310,20 @@ def view(app: App[State]) -> Widget:
 THEME: Theme = Theme.from_seed(seed=Color(r=39, g=58, b=79))
 ```
 
-O artefato gerado — tanto o do Modo B quanto o do Modo A — passa esse `THEME`
-para o app quando o constrói, e isso importa porque **componente resolve cor em
-Python**: um botão preenchido carrega o próprio fill como estilo inline. Tema que
-não chega na árvore é tema que não pinta, por mais tokens que a página tenha.
+O artefato gerado — nos **três** modos — passa esse `THEME` para o app quando o
+constrói, e isso importa porque **componente resolve cor em Python**: um botão
+preenchido carrega o próprio fill como estilo inline. Tema que não chega na
+árvore é tema que não pinta, por mais tokens que a página tenha.
 
 As duas pontas que o host cobre:
 
 * **A árvore** — o tema vai para o `App`, então cada componente nasce com a sua
   paleta.
-* **A página** — os tokens `--tw-*` que a folha base lê. No Modo B eles são
-  escritos no `<head>` na renderização; no Modo A a página é estática e o app só
-  existe depois do Pyodide subir, então o CSS é injetado no boot, antes do
-  primeiro mount.
+* **A página** — no Modo B os tokens `--tw-*` são escritos no `<head>` na
+  renderização; no Modo A a página é estática e o app só existe depois do Pyodide
+  subir, então o CSS é injetado no boot, antes do primeiro mount; no Modo C não há
+  Python no browser, então o runtime marca `data-tw-theme` no documento e a folha
+  base redefine os próprios tokens sob esse seletor.
 
 !!! warning "`Theme(primary=...)` não é a mesma coisa que `Theme.from_seed(...)`"
     Um `Theme` carrega um **conjunto de tokens** (`tokens`) e alguns campos soltos
@@ -340,18 +341,28 @@ As duas pontas que o host cobre:
     Se a troca em runtime é o coração do seu app, declare `THEME` com a paleta que
     ele abre.
 
-## Modo escuro: passe o tema ao widget
+## Modo escuro: o widget herda o tema do app
 
 Um widget **estilizado** resolve as próprias cores do tema que ele carrega — do
-campo `theme` dele, não de um tema ambiente. É por isso que o idioma é uma linha:
+campo `theme` dele. E esse campo tem default: o core instala o tema do app em
+volta da `view` (`use_theme`), e cada widget nasce com ele
+(`default_factory=current_theme`). Ou seja, **você não precisa repassar nada**:
 
 ```python
-Button(label="Salvar", theme=app.theme, on_click=salvar)
+Button(label="Salvar", on_click=salvar)          # herda app.theme
+Button(label="Salvar", theme=app.theme, on_click=salvar)  # idêntico, explícito
 ```
 
-Passe `app.theme` e a árvore inteira segue o `app.set_theme(...)`; deixe de fora
-e o widget resolve a paleta **clara**, mesmo que o app esteja em modo escuro.
-Vale igual nos três modos.
+Passar `app.theme` continua correto e é obrigatório num caso: widget construído
+**fora** da `view` — guardado no estado, montado num helper de módulo — nasce sem
+tema ambiente e resolve a paleta clara. Vale igual nos três modos.
+
+!!! danger "No Modo C a herança só chegou na 0.136.0"
+    Até lá o transpile ignorava o `THEME` declarado e o tema ambiente não existia
+    no runtime JS, então a mesma tela saía legível no Modo B e ilegível no C
+    ([#206](https://github.com/mauriciobenjamin700/tempestweb/issues/206)). Hoje o
+    runtime instala o tema em volta de cada build, como o core faz, e a paridade é
+    fixada por golden nos três modos.
 
 ```python
 from tempest_core import App, Card, Column, Text, Theme, ThemeMode, Widget
@@ -452,16 +463,16 @@ Agora tem. O renderizador marca o documento com o modo resolvido:
 
 e a folha base redefine seus tokens sob esse seletor. Você não escreve nada para
 isso acontecer: no Modo B (e SSE) o servidor manda um envelope `theme`; no Modo A
-o runtime chama o callback direto; no Modo C o `set_theme` marca o documento em
-processo.
+o runtime chama o callback direto; no Modo C o runtime marca o documento em
+processo, no mount e a cada `set_theme`.
 
-!!! warning "Declarou escuro? Repasse `app.theme` aos widgets"
+!!! warning "Widget construído fora da `view` não herda"
     A marcação segue o **tema do app**; a cor de cada widget segue o `theme` que
-    **aquele widget** recebeu. Se você chama `app.set_theme(Theme(mode=DARK))` e
-    não repassa `theme=app.theme` aos widgets, a folha escurece e os widgets
-    continuam claros — medido: um `Input` sem `theme` fica com fundo escuro (folha)
-    e texto escuro (inline), ou seja, ilegível. Passe o tema; é a mesma regra do
-    core.
+    **aquele widget** carrega. Dentro da `view` ele herda, porque o tema está
+    instalado no build. Guardado no estado ou montado num helper de módulo, não —
+    e aí a folha escurece com o widget claro: um `Input` assim fica com fundo
+    escuro (folha) e texto escuro (inline), ou seja, ilegível. Nesse caso passe
+    `theme=app.theme` explicitamente.
 
 !!! info "Por que não `prefers-color-scheme` na folha"
     Seria a resposta óbvia — e estaria errada. O que a folha pinta é metade da

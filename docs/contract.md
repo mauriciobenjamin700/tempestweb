@@ -286,10 +286,11 @@ paleta clara enquanto a árvore acima ia para o escuro.
   do documento, e a folha base redefine seus tokens sob esse seletor. Nenhuma
   regra de widget sabe qual modo está ativo.
 - **O valor é sempre resolvido** (`"light"` ou `"dark"`, nunca `"system"`): quem
-  resolve é o Python, do mesmo jeito que um **widget** resolve — `Theme.is_dark()`
-  sem a flag de plataforma. É isso que garante que a folha nunca discorde da
-  árvore: um tema `SYSTEM` resolve claro para o widget (ele não vê o SO), então a
-  página também fica clara.
+  resolve é o Python, do mesmo jeito que um **widget** resolve —
+  `Theme.is_dark()`. É isso que garante que a folha nunca discorde da árvore. Um
+  tema declarado `SYSTEM` é **fixado** em `LIGHT` ou `DARK` pelo runtime antes do
+  build, a partir do `platform_dark_mode` que o evento `media` trouxe, então as
+  duas metades leem o mesmo campo em vez de duas fontes que podem divergir.
 - **O primeiro `light` não é enviado.** Os tokens da folha *são* a paleta clara,
   então marcar claro no mount gastaria um frame para dizer o que o CSS já diz.
   Toda mudança posterior é enviada, incluindo a volta ao claro.

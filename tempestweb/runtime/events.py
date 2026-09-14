@@ -29,6 +29,7 @@ from tempest_core import (
 )
 from tempestweb.runtime.routing import path_to_routes
 from tempestweb.runtime.serialize import EVENT_TYPE_TO_HANDLER_PROPS
+from tempestweb.runtime.theme import resolve_platform_theme
 
 __all__ = [
     "apply_media",
@@ -139,6 +140,12 @@ def apply_media(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-s
     field's default, and one carrying a wrong type is ignored entirely rather than
     poisoning the context with a partial snapshot.
 
+    The report also carries ``platform_dark_mode``, so this is where a theme
+    declared ``ThemeMode.SYSTEM`` is resolved: see
+    :func:`~tempestweb.runtime.theme.resolve_platform_theme`. Both rebuild
+    requests coalesce into one build, so the tree and the stylesheet land on the
+    same mode in the same frame.
+
     Args:
         app: The application whose media context to refresh.
         payload: The wire payload, expected to carry any of ``width``, ``height``,
@@ -166,6 +173,7 @@ def apply_media(app: App[Any], payload: Any) -> None:  # noqa: ANN401 — wire-s
             return
         fields["orientation"] = orientation
     app._update_media(MediaQueryData(**fields))  # noqa: SLF001 — renderer-side hook
+    resolve_platform_theme(app)
 
 
 def _build_event_types() -> dict[str, dict[str, type[Event]]]:

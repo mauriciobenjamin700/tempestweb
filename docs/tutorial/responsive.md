@@ -77,19 +77,25 @@ def view(app: App[None]) -> Widget:
 
 ## Tema do sistema
 
-`platform_dark_mode` chega na mesma foto, então um app pode seguir a preferência
-do sistema sem escrever CSS:
+`platform_dark_mode` chega na mesma foto — e você não precisa lê-lo para seguir
+o sistema. Um tema declarado `SYSTEM` (o default de `Theme()` e de
+`Theme.from_seed()`) é fixado pelo runtime em claro ou escuro a partir desse
+campo, antes do build, então basta declarar o tema:
 
 ```python
-from tempest_core import Theme, ThemeMode
+from tempest_core import Color, Theme
 
-
-def view(app: App[None]) -> Widget:
-    """Pick the palette the OS asked for."""
-    mode = ThemeMode.DARK if app.media.platform_dark_mode else ThemeMode.LIGHT
-    theme = Theme.from_seed(seed=..., mode=mode)
-    ...
+THEME: Theme = Theme.from_seed(Color(r=29, g=78, b=216))
 ```
+
+A troca acompanha o SO com a aba aberta: o cliente reporta `media` de novo e a
+página vira, sem reload e sem `set_theme`.
+
+!!! tip "Quando ainda vale ler o campo"
+    Para decidir outra coisa a partir do modo do SO — um ícone, uma imagem, um
+    texto —, `app.media.platform_dark_mode` continua sendo a fonte. Chamar
+    `set_theme` com um modo absoluto também continua valendo, e **ganha**: o tema
+    que o app instala passa a ser o declarado.
 
 ## Como isso chega até você
 

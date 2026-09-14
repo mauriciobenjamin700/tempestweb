@@ -268,9 +268,10 @@ by coming later.
     selectors: it paints before any attribute arrives and still outranks the
     sheet once it does.
 
-    No media query is ever emitted. See "Why not `prefers-color-scheme`" below:
-    a widget never sees the OS, so darkening the page from the OS left a light
-    tree on a dark background — and the inline half is the half that wins.
+    No media query is ever emitted. See "Why not `prefers-color-scheme` in the
+    sheet" below: the runtime is what reads the OS, once, pinning the mode for
+    the tree and the sheet together — the inline half is the half that wins, so
+    it cannot be left out of the decision.
 
 !!! info "Only what the sheet consumes"
     `theme_css` emits the variables the base sheet reads, not all 39 roles.
@@ -465,12 +466,18 @@ in-process.
     with no `theme` ends up with a dark background (sheet) and dark text (inline),
     i.e. unreadable. Pass the theme; it is the core's own rule.
 
-!!! info "Why not `prefers-color-scheme`"
-    It would be the obvious answer — and it would be wrong. A widget built with
-    `Theme(mode=SYSTEM)` resolves **light** in the core: it never sees the OS.
-    Darkening the sheet from the OS alone would put a light tree on a dark page. If
-    you want to follow the OS, read `app.media.platform_dark_mode` in your `view`
-    and call `set_theme` — then both halves move together.
+!!! info "Why not `prefers-color-scheme` in the sheet"
+    It would be the obvious answer — and it would be wrong. The sheet paints half
+    the screen; the other half is the colours the core resolves **inline**, in
+    Python. Darkening the sheet from a media query, without the tree knowing,
+    would put a light tree on a dark page.
+
+    Python decides instead, once, for both halves: since 0.135.0 the runtime reads
+    `app.media.platform_dark_mode` — the same report that feeds `app.media` — and
+    **pins** a theme declared `SYSTEM` to `LIGHT` or `DARK` before the build. You
+    write nothing: `Theme.from_seed(...)` is born in `SYSTEM`, and the page
+    follows the OS, including when the user flips the preference with the tab
+    open.
 
 !!! check "The palette's pairs are contrast-gated"
     axe's `color-contrast` rule needs real layout, so the a11y gate disables it and

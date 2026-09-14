@@ -361,9 +361,11 @@ class WasmRuntime(Generic[S]):
 
         The Mode A counterpart of the ``theme`` envelope Mode B sends: same
         semantics, no wire. The mode is resolved the way a widget resolves it
-        (``Theme.is_dark()``, no platform flag), so the sheet agrees with the
-        inline styles already in the tree. No-op when nothing is wired or the mode
-        is unchanged.
+        (``Theme.is_dark()``), so the sheet agrees with the inline styles already
+        in the tree — including under ``ThemeMode.SYSTEM``, which
+        :func:`~tempestweb.runtime.theme.resolve_platform_theme` has already
+        pinned to the platform's flag on both halves at once. No-op when nothing
+        is wired or the mode is unchanged.
 
         The first ``light`` is skipped, as in Mode B: the sheet's own tokens are
         the light palette, so reporting light at mount would say what the CSS
@@ -417,6 +419,7 @@ class WasmRuntime(Generic[S]):
             return
         if event_type == "media":
             apply_media(self._app, event.get("payload", {}))
+            self._emit_theme_if_changed()
             return
         entry = self._handlers.get(key)
         if entry is None:

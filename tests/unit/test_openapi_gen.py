@@ -131,11 +131,43 @@ def test_dataclass_field_ordering_and_defaults() -> None:
     assert schemas.index("id: int") < schemas.index("bio: str | None = None")
 
 
+def test_optional_scalar_field_admits_none() -> None:
+    """A property the spec does not require is typed ``T | None``, never ``T``.
+
+    ``role: Role = None`` type-checked as an assignment error in every project
+    that imported the client — the annotation promised a value the API never
+    guaranteed.
+    """
+    schemas = generate(_SPEC)[0]["users/schemas.py"]
+    assert "role: Role | None = None" in schemas
+    assert "role: Role = None" not in schemas
+
+
 def test_enum_becomes_literal_alias() -> None:
-    """A string enum component becomes a ``Literal`` alias."""
+    """A string enum component becomes a double-quoted ``Literal`` alias."""
     files, _ = generate(_SPEC)
     schemas = files["users/schemas.py"]
-    assert "Role = Literal['admin', 'member']" in schemas
+    assert 'Role = Literal["admin", "member"]' in schemas
+
+
+def test_required_properties_are_read_by_key() -> None:
+    """``from_dict`` indexes required properties and ``.get``s optional ones.
+
+    ``data.get(...)`` is typed ``Any | None``, so every required field of every
+    model used to be an ``arg-type`` error at the call site — and a truncated
+    response built the dataclass with ``None`` under a non-optional annotation.
+    """
+    schemas = generate(_SPEC)[0]["users/schemas.py"]
+    assert 'id=data["id"]' in schemas
+    assert 'email=data["email"]' in schemas
+    assert 'bio=data.get("bio")' in schemas
+
+
+def test_generated_modules_carry_no_unused_noqa() -> None:
+    """The emitter never writes a pragma, so RUF100 has nothing to report."""
+    files, _ = generate(_SPEC)
+    for contents in files.values():
+        assert "noqa" not in contents
 
 
 def test_service_method_shapes() -> None:
@@ -147,8 +179,9 @@ def test_service_method_shapes() -> None:
     assert "return [User.from_dict(item) for item in response.json_body]" in service
     assert "async def create_user(self, body: UserCreate) -> User:" in service
     assert "json=body.to_dict()" in service
-    assert "async def get_user(self, user_id: int, params:" in service
-    assert "dict[str, Any] | None = None) -> User:" in service
+    assert "async def get_user(" in service
+    assert "user_id: int," in service
+    assert "params: dict[str, Any] | None = None," in service
     assert "url += _encode_query(params or {})" in service
 
 

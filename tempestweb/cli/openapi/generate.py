@@ -1255,6 +1255,7 @@ def _emit_schemas_module(tag: str, blocks: list[str]) -> str:
     header = _module_header(f"Models for the '{_clean_text(tag).rstrip('.')}' routes.")
     if not blocks:
         return f"{header}"
+    gap = "\n\n\n" if body.startswith("@") else "\n\n"
     imports = ["from __future__ import annotations", ""]
     if re.search(r"@dataclass\b", body):
         needed = ["dataclass"]
@@ -1264,7 +1265,7 @@ def _emit_schemas_module(tag: str, blocks: list[str]) -> str:
     typing_names = _typing_imports(body)
     if typing_names:
         imports.append(f"from typing import {', '.join(typing_names)}")
-    return f"{header}\n" + "\n".join(imports) + f"\n\n\n{body}\n"
+    return f"{header}\n" + "\n".join(imports) + f"{gap}{body}\n"
 
 
 def generate(doc: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
@@ -1310,11 +1311,12 @@ def generate(doc: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
                     _collect_refs(schema, schemas, used, set())
         used_sorted = sorted(used)
 
-        blocks: list[str] = [
+        aliases = [
             _emit_alias(cname, schemas.get(cname) or {})
             for cname in used_sorted
             if not _is_object(schemas.get(cname) or {})
         ]
+        blocks: list[str] = ["\n".join(aliases)] if aliases else []
         blocks += [
             _emit_dataclass(cname, schemas.get(cname) or {}, object_names)
             for cname in used_sorted

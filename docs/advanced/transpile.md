@@ -410,6 +410,36 @@ inteiro ao `mountApp`, e o runtime faz as duas coisas que um tema precisa fazer:
     em `tests/conformance/test_theme_parity.py`; o Modo C em
     `tests/client/transpile-theme.test.js`. Três leitores, um golden.
 
+### O Modo C carrega o modo, não a paleta
+
+O `Theme` do Modo C tem **um campo só: `mode`**. Claro, escuro e `SYSTEM`
+funcionam igual aos Modos A e B. Paleta própria, não: as tabelas de estilo do
+Modo C são geradas do token set **default**, com eixo claro/escuro e sem eixo de
+paleta, então uma cor customizada não tem onde cair.
+
+Por isso o compilador **recusa**, com `arquivo:linha`, qualquer tema que traga
+paleta:
+
+| Escrita | Modo C |
+| --- | --- |
+| `Theme(mode=ThemeMode.DARK)` | ✅ compila |
+| `Theme(primary=...)`, `Theme(surface=...)` e os outros overrides de cor | ❌ recusado |
+| `Theme(tokens=...)` | ❌ recusado |
+| `Theme.from_seed(...)` | ❌ recusado |
+
+```text
+`Theme(primary=...)` is not available in Mode C: the client's `Theme` carries
+only `mode`, and its style tables are generated from the default token set — a
+custom palette would compile and render the baseline one
+```
+
+!!! warning "Até a 0.138.0 o `Theme(primary=...)` compilava e mentia"
+    O `from_seed` já era recusado, mas o `Theme(...)` com override de cor passava
+    pela checagem de kwarg — o core declara o campo — e o construtor JS, que só lê
+    `mode`, descartava o resto. A página saía na paleta baseline sem nenhum aviso.
+    Precisa de paleta própria? Use o Modo A ou B, onde quem resolve a cor é o
+    Python com o token set vivo na mão (#221).
+
 ## Animação (transições)
 
 Anime declarativamente: dê ao `Style` de um widget um `Transition` e o **browser**

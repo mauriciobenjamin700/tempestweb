@@ -1320,6 +1320,43 @@ def test_a_core_member_the_client_lacks_is_refused_by_name() -> None:
     assert "carries no such member" in message
 
 
+@pytest.mark.parametrize(
+    "kwarg",
+    [
+        'primary=Color.from_hex("#123456")',
+        'surface=Color.from_hex("#fafafa")',
+        "tokens=default_tokens()",
+    ],
+)
+def test_a_theme_with_a_custom_palette_is_refused(kwarg: str) -> None:
+    """`Theme(primary=...)` compiled and rendered the baseline palette (#221).
+
+    The core declares the field, so the kwarg check let it through; the client's
+    `Theme` destructures `mode` alone and dropped the rest. `from_seed` was
+    already refused by the member check — this was the path that lied.
+    """
+    with pytest.raises(TranspileError) as excinfo:
+        gen(
+            "from tempest_core import Color, Theme, default_tokens\n\n\n"
+            "def f():\n"
+            f"    return Theme({kwarg})\n"
+        )
+    message = str(excinfo.value)
+    name = kwarg.split("=", 1)[0]
+    assert f"Theme({name}=...)" in message
+    assert "carries only `mode`" in message
+
+
+def test_a_theme_that_only_picks_the_mode_still_compiles() -> None:
+    """`mode` is the field Mode C carries, so the #206 path keeps working."""
+    js = gen(
+        "from tempest_core import Theme, ThemeMode\n\n\n"
+        "def f():\n"
+        "    return Theme(mode=ThemeMode.DARK)\n"
+    )
+    assert "new Theme({ mode: ThemeMode.DARK })" in js
+
+
 def test_the_core_members_the_client_does_carry_still_pass() -> None:
     """`Color.from_hex` and the two `Edge` helpers are ported, so they compile."""
     js = gen(

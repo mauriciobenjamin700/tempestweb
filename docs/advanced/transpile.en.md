@@ -412,6 +412,35 @@ whole module to `mountApp`, and the runtime does the two things a theme has to d
     held to it in `tests/conformance/test_theme_parity.py`; Mode C in
     `tests/client/transpile-theme.test.js`. Three readers, one golden.
 
+### Mode C carries the mode, not the palette
+
+Mode C's `Theme` has **a single field: `mode`**. Light, dark and `SYSTEM` work
+exactly as in Modes A and B. A custom palette does not: Mode C's style tables are
+generated from the **default** token set, with a light/dark axis and no palette
+axis, so a custom colour has nowhere to land.
+
+So the compiler **refuses**, with `file:line`, any theme that brings a palette:
+
+| Written | Mode C |
+| --- | --- |
+| `Theme(mode=ThemeMode.DARK)` | ✅ compiles |
+| `Theme(primary=...)`, `Theme(surface=...)` and the other colour overrides | ❌ refused |
+| `Theme(tokens=...)` | ❌ refused |
+| `Theme.from_seed(...)` | ❌ refused |
+
+```text
+`Theme(primary=...)` is not available in Mode C: the client's `Theme` carries
+only `mode`, and its style tables are generated from the default token set — a
+custom palette would compile and render the baseline one
+```
+
+!!! warning "Until 0.138.0 `Theme(primary=...)` compiled and lied"
+    `from_seed` was already refused, but a `Theme(...)` with a colour override got
+    through the kwarg check — the core declares the field — and the JS
+    constructor, which reads `mode` alone, dropped the rest. The page came out in
+    the baseline palette with no warning. Need a custom palette? Use Mode A or B,
+    where the colour is resolved by Python with the live token set in hand (#221).
+
 ## Animation (transitions)
 
 Animate declaratively: give a widget's `Style` a `Transition` and the **browser**

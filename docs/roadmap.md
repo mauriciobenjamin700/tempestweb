@@ -11,7 +11,7 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.139.0; o PyPI serve a 0.138.0.** A diferença mais nova é
+    **Versão do repo: 0.139.0, e é o que o PyPI serve.** A diferença mais nova é
     a **#221**: o Modo C recusa `Theme(primary=...)`, `Theme(tokens=...)` e todo
     override de cor, com `arquivo:linha`. O `from_seed` já era recusado, mas o
     `Theme(...)` com paleta passava pela checagem de kwarg — o core declara o
@@ -148,7 +148,16 @@
     O sintoma deixa de ter caminho: o lote não é construível, não é serializável,
     e um frame ruim é reparado sem a baseline ter andado.
 
-    A última publicada no PyPI é a **0.138.0**, em 2026-09-13 pela tag
+    A última publicada no PyPI é a **0.139.0**, em 2026-10-03 pela tag
+    `v0.139.0` — um bump só, a **#221**: o Modo C recusa tema com paleta
+    própria. Validada no artefato publicado: venv limpa (Python 3.11) contra o
+    índice simples instala `tempestweb[cli]==0.139.0` (que resolve
+    `tempest-core` 0.22.0 sozinho), e o `transpile_source` desse wheel recusa
+    `THEME = Theme(primary=...)` com `a.py:3` e a mensagem que diz o porquê,
+    enquanto `THEME = Theme(mode=ThemeMode.DARK)` segue emitindo
+    `new Theme({ mode: ThemeMode.DARK })`.
+
+    A anterior, a **0.138.0**, saiu em 2026-09-13 pela tag
     `v0.138.0` — um bump só, a **#216**: o cliente que o `tempestweb gen api`
     escreve passa no `tempestweb check`. Validada onde importa, no artefato
     publicado: venv limpa contra o índice simples instala
@@ -159,7 +168,7 @@
     `mypy --strict` sobre o cliente **mais um call site** responde *no issues
     found in 30 source files*.
 
-    A anterior, a **0.137.0**, saiu no mesmo dia pela tag `v0.137.0` e carregou
+    Antes dela, a **0.137.0** saiu no mesmo dia pela tag `v0.137.0` e carregou
     sete bumps — a tag antes dela era a `v0.130.0`.
     **0.131.0 a 0.134.0:** o `Input(secure=True)` ganhou o olho que o contrato
     do core prometia (#209), `leading_icon`/`trailing_icon` passaram a ser

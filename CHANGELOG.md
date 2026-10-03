@@ -4,6 +4,25 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.139.0] — 2026-10-03
+
+### Fixed
+
+- **O Modo C recusa tema com paleta própria em vez de renderizar a baseline
+  (#221).** `Theme(primary=...)`, `Theme(surface=...)`, os outros overrides de
+  cor e `Theme(tokens=...)` passavam pela checagem de kwarg do compilador — o
+  core declara esses campos — e o `Theme` do cliente, que destrutura só `mode`,
+  descartava o resto: compilava, carregava e pintava a paleta default sem nenhum
+  aviso. O `Theme.from_seed(...)` já era recusado pela checagem de membro; este
+  era o caminho que mentia.
+
+  O compilador ganhou `_PORTED_FIELDS`, a lista dos campos que o port de um model
+  do core de fato carrega, e recusa com `arquivo:linha` o campo que o core aceita
+  mas o cliente descarta. `Theme(mode=...)` — o caminho da #206 — segue
+  compilando igual. `docs/advanced/transpile.md` (+ `.en.md`) ganhou a seção "O
+  Modo C carrega o modo, não a paleta", com a tabela do que compila e do que é
+  recusado.
+
 ## [0.138.0] — 2026-09-13
 
 ### Fixed

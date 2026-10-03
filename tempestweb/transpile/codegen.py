@@ -208,6 +208,15 @@ _PATTERN_METHODS: dict[str, str] = {
 #: the live functions are on the node when the helper runs.
 _WIDGET_METHODS: dict[str, str] = {"validate": "formValidate"}
 
+#: Core models whose Mode C port carries only some of their fields, and which.
+#: The kwarg check accepts every field of the core model, but the ported JS
+#: constructor destructures just these and drops the rest without a word — so a
+#: field outside the set compiles and then does nothing. `Theme` carries `mode`
+#: alone: Mode C's style tables are generated from the default token set, with a
+#: light/dark axis and no palette axis, so `tokens` and the colour overrides
+#: (`primary`, `surface`, …) have nowhere to land (#221).
+_PORTED_FIELDS: dict[str, frozenset[str]] = {"Theme": frozenset({"mode"})}
+
 #: Bases that turn a class into a frozen JS object of its members.
 _ENUM_BASES: frozenset[str] = frozenset({"Enum", "IntEnum", "StrEnum"})
 
@@ -1878,13 +1887,18 @@ class _Generator:
         helper function (``t``, ``material_icon``) and a locally declared class
         are somebody else's contract.
 
+        A field the core declares is still refused when the model is listed in
+        :data:`_PORTED_FIELDS` and the port does not carry it: the core accepting
+        ``Theme(primary=...)`` is no answer when Mode C's ``Theme`` drops it.
+
         Args:
             node: The call being emitted.
             target: The core object the call resolves to, or ``None``.
 
         Raises:
             TranspileError: If a keyword is not a field of the model, listing
-                the widget's real child slot when that is what was meant.
+                the widget's real child slot when that is what was meant; or if
+                it is a field the Mode C port does not carry.
         """
         if target is None or not isinstance(node.func, ast.Name):
             return
@@ -1901,9 +1915,22 @@ class _Generator:
             if isinstance(alias, str):
                 accepted.add(alias)
         slots = sorted(getattr(target, "child_field_names", ()) or ())
+        ported = _PORTED_FIELDS.get(origin)
         for kw in node.keywords:
-            if kw.arg is None or kw.arg in accepted:
+            if kw.arg is None:
                 continue
+            if kw.arg in accepted:
+                if ported is None or kw.arg in ported:
+                    continue
+                carried = ", ".join(f"`{name}`" for name in sorted(ported))
+                raise TranspileError(
+                    f"`{origin}({kw.arg}=...)` is not available in Mode C: the "
+                    f"client's `{origin}` carries only {carried}, and its style "
+                    "tables are generated from the default token set — a custom "
+                    "palette would compile and render the baseline one",
+                    node,
+                    self.filename,
+                )
             hint = ""
             if kw.arg in {"child", "children"} and slots:
                 slot_list = ", ".join(f"`{slot}`" for slot in slots)

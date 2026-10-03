@@ -11,8 +11,15 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.138.0, e é o que o PyPI serve.** A diferença mais nova é
-    a **#216**: o cliente que o `tempestweb gen api` escreve passa no
+    **Versão do repo: 0.139.0; o PyPI serve a 0.138.0.** A diferença mais nova é
+    a **#221**: o Modo C recusa `Theme(primary=...)`, `Theme(tokens=...)` e todo
+    override de cor, com `arquivo:linha`. O `from_seed` já era recusado, mas o
+    `Theme(...)` com paleta passava pela checagem de kwarg — o core declara o
+    campo — e o construtor JS, que só lê `mode`, descartava o resto: a página
+    saía na paleta baseline sem aviso. O Modo C carrega o modo, não a paleta, e
+    agora diz isso no build em vez de mentir no pixel.
+
+    Antes dela, a 0.138.0 e a **#216**: o cliente que o `tempestweb gen api` escreve passa no
     `tempestweb check`. O arquivo gerado abre com "do not edit", e mesmo assim
     custava **79 erros de ruff e 72 de mypy** ao dono do projeto — que não pode
     editá-lo; a saída prática era excluir `api/` do gate e perder a checagem de

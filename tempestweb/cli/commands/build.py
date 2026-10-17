@@ -42,7 +42,6 @@ from tempestweb.cli.config import (
 from tempestweb.cli.loader import load_app, render_initial_tree
 from tempestweb.core.constants import (
     WASM_CACHE_MANIFEST,
-    WASM_IMMUTABLE_CACHE_CONTROL,
     WASM_PACKAGE_ARCHIVE,
     WASM_PYODIDE_VERSION,
 )
@@ -287,7 +286,7 @@ _CONTENT_HASH_LENGTH: int = 16
 # Files a wasm artifact always contains under a fixed name, relative to the
 # artifact root (the PWA-complete case). The client bundle and the Python payload
 # are written under content-hashed names on top of these; the build's
-# ``tempestweb-cache.json`` names them (see :func:`_write_cache_manifest`).
+# ``immutable.json`` covers them (see :func:`_write_cache_manifest`).
 WASM_ARTIFACT_FILES: tuple[str, ...] = (
     "index.html",
     "app.py",
@@ -360,8 +359,8 @@ class BuildResult:
         package_archive: The artifact-relative name of the zipped Python payload
             (wasm only) — content-hashed, e.g. ``tempestweb-pkg.<hash>.zip``.
             ``None`` for modes that ship no payload.
-        immutable: The artifact-relative paths whose names carry a content hash,
-            exactly as listed in ``tempestweb-cache.json`` (wasm only).
+        immutable: The artifact-relative files whose names carry a content hash
+            (wasm only); ``immutable.json`` covers each with a glob.
     """
 
     mode: str
@@ -1969,34 +1968,38 @@ def _hash_package_archive(out: Path) -> str:
 
 
 def _write_cache_manifest(out: Path, immutable: list[str]) -> None:
-    """Write ``tempestweb-cache.json``: which paths a server may cache forever.
+    """Write ``immutable.json``: which paths a server may cache forever.
 
-    The contract a server reads (tempest-fastapi-sdk's ``make_web_app_router``
-    among them):
+    The format is the one tempest-fastapi-sdk's ``make_web_app_router`` reads
+    (tempest-fastapi-sdk#570), not one of our own:
 
-    - ``schema`` — the format version, ``1``.
-    - ``immutable`` — artifact-relative POSIX paths, no leading slash, matched
-      **exactly**. Each name embeds a content hash, so its bytes never change;
-      ``immutable_cache_control`` is the header to send for them.
-    - ``revalidate_cache_control`` — what every other file in the artifact
-      should get (``index.html``, ``bootstrap.js``, ``app.py``, this manifest…),
-      since their names are fixed and their content is not.
+    - ``immutable`` — a list of globs relative to the artifact root. ``**``
+      crosses directories; ``*`` and ``?`` match inside one path segment. Every
+      path that matches is answered with
+      ``Cache-Control: public, max-age=31536000, immutable``; everything else is
+      ``no-cache`` (revalidated by ETag).
+    - Any other key is ignored by the server; ``generator`` is here for whoever
+      reads the file by hand.
+
+    Only names that change whenever their bytes do are listed — the bundle's
+    ``client-<hash>/`` directory and the ``tempestweb-pkg.<hash>.zip`` payload.
+    ``index.html`` and ``bootstrap.js`` reference them under fixed names and stay
+    revalidated (the server never marks them immutable, even on a match).
 
     Args:
         out: The artifact root.
-        immutable: The content-hashed paths, artifact-relative.
+        immutable: The content-hashed files, artifact-relative. A file under a
+            ``client-<hash>/`` directory is listed as that directory's ``/**``
+            glob, so anything a later bundle adds beside it is covered too.
     """
     try:
         generator = f"tempestweb {metadata.version('tempestweb')}"
     except metadata.PackageNotFoundError:  # pragma: no cover - odd source layouts
         generator = "tempestweb"
-    manifest = {
-        "schema": 1,
-        "generator": generator,
-        "immutable": sorted(immutable),
-        "immutable_cache_control": WASM_IMMUTABLE_CACHE_CONTROL,
-        "revalidate_cache_control": "no-cache",
-    }
+    globs = sorted(
+        {f"{path.split('/', 1)[0]}/**" if "/" in path else path for path in immutable}
+    )
+    manifest = {"immutable": globs, "generator": generator}
     (out / WASM_CACHE_MANIFEST).write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
     )

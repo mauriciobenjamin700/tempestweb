@@ -10,12 +10,13 @@ the shape that replaced it:
 - the bootstrap starts every download before its first ``await``, and the shell
   hints all of them from the HTML;
 - a pure HTML/CSS loading screen is painted at once and can be turned off;
-- content-hashed names, listed in ``tempestweb-cache.json``, are the contract a
+- content-hashed names, listed in ``immutable.json``, are the contract a
   server reads to cache them as immutable.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import re
@@ -29,7 +30,6 @@ from tempestweb.cli import build_artifact, scaffold_project
 from tempestweb.cli.config import ConfigError, load_config
 from tempestweb.core.constants import (
     WASM_CACHE_MANIFEST,
-    WASM_IMMUTABLE_CACHE_CONTROL,
     WASM_PYODIDE_VERSION,
 )
 
@@ -132,22 +132,36 @@ def test_package_archive_name_is_its_content_hash(tmp_path: Path) -> None:
     assert not (result.out_dir / "tempestweb-pkg.zip").exists()
 
 
-def test_cache_manifest_lists_exactly_the_hashed_files(tmp_path: Path) -> None:
-    """``tempestweb-cache.json`` is the server contract: exact hashed paths."""
+def test_cache_manifest_matches_the_sdk_contract(tmp_path: Path) -> None:
+    """``immutable.json`` is tempest-fastapi-sdk#570's format: root-relative globs.
+
+    Every hashed file matches one glob, and no fixed-name file the boot reads
+    does — those must keep being revalidated.
+    """
     result = build_artifact(_project(tmp_path), mode="wasm")
+    assert WASM_CACHE_MANIFEST == "immutable.json"
     manifest = json.loads(
         (result.out_dir / WASM_CACHE_MANIFEST).read_text(encoding="utf-8")
     )
-    assert manifest["schema"] == 1
-    assert manifest["generator"].startswith("tempestweb")
-    assert manifest["immutable_cache_control"] == WASM_IMMUTABLE_CACHE_CONTROL
-    assert manifest["revalidate_cache_control"] == "no-cache"
-    assert manifest["immutable"] == sorted(result.immutable)
-    for rel in manifest["immutable"]:
-        assert not rel.startswith("/")
-        assert (result.out_dir / rel).is_file(), rel
+    globs = manifest["immutable"]
+    assert isinstance(globs, list)
+    assert all(isinstance(glob, str) and not glob.startswith("/") for glob in globs)
+    bundle = next(p for p in result.immutable if p.endswith(".js"))
+    assert f"{bundle.split('/')[0]}/**" in globs
+    assert result.package_archive in globs
+
+    def matches(path: str) -> bool:
+        for glob in globs:
+            if glob.endswith("/**") and path.startswith(glob[:-2]):
+                return True
+            if fnmatch.fnmatchcase(path, glob) and "/" not in glob:
+                return "/" not in path
+        return False
+
+    for rel in result.immutable:
+        assert matches(rel), rel
     for fixed in ("index.html", "bootstrap.js", "app.py", WASM_CACHE_MANIFEST):
-        assert fixed not in manifest["immutable"]
+        assert not matches(fixed), fixed
 
 
 def test_shell_hints_every_boot_download(tmp_path: Path) -> None:

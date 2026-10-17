@@ -205,6 +205,12 @@ Options:
     build time, so the final bundle doesn't depend on a CDN at runtime — it even
     opens with no network.
 
+!!! tip "Faster Mode A boot"
+    `build --mode wasm` packs bytecode precompiled for Pyodide's Python and only
+    the subpackages the app reaches. Both are tuned with `[wasm] bytecode`,
+    `[wasm] trim` and `[wasm] keep` — see
+    [The Mode A boot payload](../advanced/wasm-boot.md).
+
 ---
 
 ## 4. Package for production — `deploy`

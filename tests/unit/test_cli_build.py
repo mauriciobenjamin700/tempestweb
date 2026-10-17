@@ -19,6 +19,7 @@ from tempestweb.cli import (
     scaffold_project,
 )
 from tempestweb.cli.commands.build import WASM_PACKAGE_ARCHIVE
+from tempestweb.cli.wasm_payload import pyodide_cache_tag
 
 
 def _project(tmp_path: Path) -> Path:
@@ -388,8 +389,10 @@ def test_wasm_package_archive_carries_runtime(tmp_path: Path) -> None:
     # The renderer-agnostic core now ships as the separate tempest_core package.
     assert "tempest_core/__init__.py" in names
     assert "tempest_core/core/reconciler.py" in names
-    # No bytecode leaks into the artifact.
-    assert not any("__pycache__" in name for name in names)
+    # No host bytecode leaks into the artifact: any ``.pyc`` is the build's own,
+    # compiled for Pyodide's Python (see tests/unit/test_wasm_payload.py).
+    tag = pyodide_cache_tag()
+    assert all(name.endswith(f".{tag}.pyc") for name in names if "__pycache__" in name)
 
 
 def test_wasm_emits_installable_manifest(tmp_path: Path) -> None:

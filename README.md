@@ -97,6 +97,14 @@ tempestweb build --mode transpile  --path myapp   # emit a static, CDN-servable 
 > **directory** via `--path` (default: cwd) — not a positional `.py` file. Check
 > your install with `tempestweb --version`.
 
+A Mode A build (`tempestweb build --mode wasm`) loads the client as **one**
+content-hashed file, starts Pyodide, the wheels, the Python payload and `app.py`
+in parallel, paints a loading screen on the first frame (`[loading]` in
+`tempestweb.toml`), and writes an `immutable.json` a server reads to cache the
+hashed files for a year — see the boot & caching guide
+([PT](https://mauriciobenjamin700.github.io/tempestweb/advanced/boot/) ·
+[EN](https://mauriciobenjamin700.github.io/tempestweb/en/advanced/boot/)).
+
 Talking to a FastAPI backend? Generate a typed client from its OpenAPI spec —
 `@dataclass` models + service classes, one package per route group, working in
 all three modes (the Python analog of `tempest-react-sdk`'s `tempest gen api`):

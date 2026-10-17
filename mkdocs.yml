@@ -181,6 +181,7 @@ plugins:
             "Mode C component gallery": "Galeria de componentes em Modo C"
             "Drag, reorder, paginate": "Arrastar, reordenar, paginar"
             "PWA & offline": "PWA e offline"
+            "Mode A boot & caching": "Boot e cache do Modo A"
             "Offline + backend sync": "Offline + sincronização com backend"
             Observability: Observabilidade
             "Security (Mode B)": "Segurança (Modo B)"
@@ -285,6 +286,7 @@ nav:
       - "Mode C — transpile": advanced/transpile.md
       - Static SSR: advanced/ssr.md
       - PWA & offline: advanced/pwa.md
+      - "Mode A boot & caching": advanced/boot.md
       - Offline + backend sync: advanced/offline-sync.md
       - Wire contract: advanced/wire-contract.md
       - Observability: advanced/observability.md

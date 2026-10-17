@@ -20,6 +20,7 @@ __all__ = [
     "VALID_MODES",
     "BytecodeMode",
     "ConfigError",
+    "LoadingConfig",
     "ProjectConfig",
     "PwaConfig",
     "WasmConfig",
@@ -140,6 +141,48 @@ class WasmConfig:
 
 
 @dataclass(slots=True)
+class LoadingConfig:
+    """The Mode A loading screen a project declares under ``[loading]``.
+
+    A wasm app has nothing to paint until Pyodide, the Python payload and the app
+    have all loaded — seconds on a desktop, tens of seconds on a throttled phone.
+    The generated ``index.html`` therefore carries a loading screen written in
+    plain HTML and CSS, visible from the first paint, that the bootstrap advances
+    through three stages and removes once the app has mounted. If the boot fails,
+    the screen stays and shows ``error_text`` with the error message instead of
+    spinning forever.
+
+    Every field is optional. Unset colours follow ``prefers-color-scheme`` with
+    neutral tokens; a colour set here is used in both schemes, since a brand colour
+    is a decision, not a default.
+
+    Attributes:
+        enabled: Whether the loading screen is emitted at all.
+        title: The heading on the screen. Falls back to ``[pwa] name`` and then
+            to the project name.
+        runtime_text: Stage shown while the Python runtime downloads.
+        python_text: Stage shown while Python starts and loads the app's code.
+        app_text: Stage shown while the app builds its first screen.
+        error_text: Lead shown above the error message when the boot fails.
+        background: Screen background (any CSS colour), or ``None`` to follow the
+            colour scheme.
+        foreground: Text colour (any CSS colour), or ``None`` to follow the
+            colour scheme.
+        accent: Spinner colour (any CSS colour), or ``None`` for the foreground.
+    """
+
+    enabled: bool = True
+    title: str | None = None
+    runtime_text: str = "Downloading the runtime…"
+    python_text: str = "Starting Python…"
+    app_text: str = "Building the app…"
+    error_text: str = "The app failed to start."
+    background: str | None = None
+    foreground: str | None = None
+    accent: str | None = None
+
+
+@dataclass(slots=True)
 class ProjectConfig:
     """Resolved configuration for a tempestweb project.
 
@@ -153,6 +196,7 @@ class ProjectConfig:
         wasm: Mode A build extras (extra packages, bundled modules, static
             assets, injected scripts). Empty by default.
         pwa: Web-App-Manifest overrides. Installable-shaped defaults otherwise.
+        loading: The Mode A loading screen (``[loading]``). On by default.
         typing_strictness: How strictly the quality commands (``lint``/``type``/
             ``check``) enforce typing — ``"lenient"`` | ``"standard"`` |
             ``"strict"``. Read from ``[quality] typing_strictness``.
@@ -166,6 +210,7 @@ class ProjectConfig:
     port: int = 8000
     wasm: WasmConfig = field(default_factory=WasmConfig)
     pwa: PwaConfig = field(default_factory=PwaConfig)
+    loading: LoadingConfig = field(default_factory=LoadingConfig)
     typing_strictness: Strictness = DEFAULT_STRICTNESS
 
     @property
@@ -229,6 +274,7 @@ def load_config(root: str | Path) -> ProjectConfig:
         port=int(dev.get("port", 8000)),
         wasm=_parse_wasm(raw.get("wasm", {}), config_path),
         pwa=_parse_pwa(raw.get("pwa", {}), config_path),
+        loading=_parse_loading(raw.get("loading", {}), config_path),
         typing_strictness=cast("Strictness", strictness),
     )
 
@@ -411,4 +457,117 @@ def _parse_pwa(raw: Any, config_path: Path) -> PwaConfig:  # noqa: ANN401 - raw 
         orientation=_opt_str(raw.get("orientation"), "orientation", config_path),
         lang=str(raw.get("lang", defaults.lang)),
         categories=_str_list(raw.get("categories"), "categories", config_path),
+    )
+
+
+def _loading_str(
+    value: Any,  # noqa: ANN401 - raw TOML value
+    key: str,
+    config_path: Path,
+) -> str | None:
+    """Coerce an optional ``[loading]`` string field, or ``None`` when absent.
+
+    Args:
+        value: The raw TOML value (expected to be a string or absent).
+        key: The field name, for error messages.
+        config_path: The config file path, for error messages.
+
+    Returns:
+        The string, or ``None`` when the key is absent.
+
+    Raises:
+        ConfigError: If the value is present but not a string.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ConfigError(f"invalid loading.{key} in {config_path}; expected a string")
+    return value
+
+
+#: Characters a CSS colour never needs and that would let a ``[loading]`` colour
+#: close the declaration, the rule or the ``<style>`` element it is written into.
+_UNSAFE_CSS_CHARS: frozenset[str] = frozenset(";{}<>\"'\\")
+
+
+def _loading_color(
+    value: Any,  # noqa: ANN401 - raw TOML value
+    key: str,
+    config_path: Path,
+) -> str | None:
+    """Coerce an optional ``[loading]`` colour, refusing anything but a value.
+
+    The colour is written verbatim into a custom property inside the shell's
+    inline ``<style>``. Any CSS colour syntax is accepted (``#0b1220``,
+    ``rgb(…)``, ``oklch(…)``, a keyword); a ``;``, brace, quote or angle bracket
+    is not — it could only end the declaration and smuggle in another one.
+
+    Args:
+        value: The raw TOML value (expected to be a string or absent).
+        key: The field name, for error messages.
+        config_path: The config file path, for error messages.
+
+    Returns:
+        The colour, or ``None`` when the key is absent.
+
+    Raises:
+        ConfigError: If the value is not a string, or carries a character no
+            colour needs.
+    """
+    color = _loading_str(value, key, config_path)
+    if color is not None and (
+        not color.strip() or any(ch in _UNSAFE_CSS_CHARS for ch in color)
+    ):
+        raise ConfigError(
+            f"invalid loading.{key} {color!r} in {config_path}; expected a CSS colour"
+        )
+    return color
+
+
+def _parse_loading(raw: Any, config_path: Path) -> LoadingConfig:  # noqa: ANN401 - raw TOML table
+    """Parse the ``[loading]`` table into a :class:`LoadingConfig`.
+
+    Args:
+        raw: The raw ``[loading]`` table (a dict), or an empty dict when absent.
+        config_path: The config file path, for error messages.
+
+    Returns:
+        The resolved :class:`LoadingConfig`; all defaults when the table is absent.
+
+    Raises:
+        ConfigError: If the table or any field has the wrong type, or a key is not
+            one the loading screen knows — a misspelt ``enable = false`` would
+            otherwise leave the screen on with no hint why.
+    """
+    if not raw:
+        return LoadingConfig()
+    if not isinstance(raw, dict):
+        raise ConfigError(f"invalid [loading] table in {config_path}")
+    defaults = LoadingConfig()
+    known = set(LoadingConfig.__dataclass_fields__)
+    unknown = sorted(set(raw) - known)
+    if unknown:
+        raise ConfigError(
+            f"unknown key(s) {unknown} in [loading] of {config_path}; "
+            f"expected any of {sorted(known)}"
+        )
+    enabled = raw.get("enabled")
+    if enabled is not None and not isinstance(enabled, bool):
+        raise ConfigError(
+            f"invalid loading.enabled in {config_path}; expected true or false"
+        )
+    texts = {
+        key: _loading_str(raw.get(key), key, config_path) or getattr(defaults, key)
+        for key in ("runtime_text", "python_text", "app_text", "error_text")
+    }
+    return LoadingConfig(
+        enabled=defaults.enabled if enabled is None else enabled,
+        title=_loading_str(raw.get("title"), "title", config_path),
+        runtime_text=texts["runtime_text"],
+        python_text=texts["python_text"],
+        app_text=texts["app_text"],
+        error_text=texts["error_text"],
+        background=_loading_color(raw.get("background"), "background", config_path),
+        foreground=_loading_color(raw.get("foreground"), "foreground", config_path),
+        accent=_loading_color(raw.get("accent"), "accent", config_path),
     )

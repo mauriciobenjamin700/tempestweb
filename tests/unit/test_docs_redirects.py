@@ -137,6 +137,8 @@ def test_every_moved_page_kept_its_old_url() -> None:
             "tabular",
             # Written for #195; new page, never had a published URL of its own.
             "storage-owner",
+            # Written for the Mode A boot work; new page, never had an old URL.
+            "boot",
             # Written for the wasm boot payload work; new page, never had an old URL.
             "wasm-boot",
         }

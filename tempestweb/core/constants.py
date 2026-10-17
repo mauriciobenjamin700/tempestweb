@@ -39,6 +39,16 @@ WASM_PYODIDE_PYC_MAGIC: bytes = bytes.fromhex("2b0e0d0a")
 #: virtual filesystem by the wasm bootstrap.
 WASM_PACKAGE_ARCHIVE: str = "tempestweb-pkg.zip"
 
+#: Filename of the cache manifest a wasm build writes at the artifact root:
+#: ``{"immutable": [<glob>, ...]}``, the globs (relative to the root; ``**``
+#: crosses directories, ``*``/``?`` stay inside one segment) naming the files
+#: whose name carries a content hash. It is the contract tempest-fastapi-sdk's
+#: ``make_web_app_router`` reads to answer those with
+#: ``Cache-Control: public, max-age=31536000, immutable`` while everything else
+#: (``index.html``, ``bootstrap.js``, ``app.py``…) stays ``no-cache``. Documented
+#: in ``docs/advanced/boot.md``.
+WASM_CACHE_MANIFEST: str = "immutable.json"
+
 #: Heartbeat interval (seconds) between ``ping`` events on the SSE stream.
 DEFAULT_SSE_PING_INTERVAL: float = 15.0
 
@@ -70,6 +80,7 @@ __all__ = [
     "DEFAULT_WATCH_SUFFIXES",
     "DEV_GRACEFUL_SHUTDOWN_SECONDS",
     "VALID_MODES",
+    "WASM_CACHE_MANIFEST",
     "WASM_PACKAGE_ARCHIVE",
     "WASM_PYODIDE_PYC_MAGIC",
     "WASM_PYODIDE_PYTHON",

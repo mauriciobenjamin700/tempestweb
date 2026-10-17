@@ -21,6 +21,7 @@ for what is left.
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 import zipfile
 from pathlib import Path
@@ -30,7 +31,6 @@ import pytest
 from tempestweb.cli import build_artifact, scaffold_project, wasm_payload
 from tempestweb.cli.commands.build import (
     _WASM_PACKAGE_PARTS,
-    WASM_PACKAGE_ARCHIVE,
     BuildError,
     _zip_package,
 )
@@ -305,10 +305,29 @@ def test_zip_package_defaults_keep_the_historical_archive(tmp_path: Path) -> Non
     assert not any(name.endswith(".pyc") for name in names)
 
 
+def test_zip_package_is_byte_identical_across_builds(tmp_path: Path) -> None:
+    """A touched source file does not change the payload's bytes.
+
+    The hashed archive name is what a server caches as immutable, so it must
+    follow content only — not the mtimes a reinstall or a fresh checkout leaves.
+    """
+    module = tmp_path / "extra" / "__init__.py"
+    module.parent.mkdir()
+    module.write_text("VALUE = 1\n", encoding="utf-8")
+    first, second = tmp_path / "a.zip", tmp_path / "b.zip"
+    _zip_package(first, project_root=tmp_path, modules=("extra",))
+    os.utime(module, (1_000_000_000, 1_000_000_000))
+    _zip_package(second, project_root=tmp_path, modules=("extra",))
+    assert first.read_bytes() == second.read_bytes()
+    with zipfile.ZipFile(first) as archive:
+        stamps = {info.date_time for info in archive.infolist()}
+    assert stamps == {(1980, 1, 1, 0, 0, 0)}
+
+
 def _archive_names(root: Path) -> set[str]:
     """Build ``root`` for wasm and list its package archive."""
     result = build_artifact(root, mode="wasm")
-    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+    with zipfile.ZipFile(result.out_dir / result.package_archive) as archive:
         return set(archive.namelist())
 
 
@@ -374,5 +393,5 @@ def test_dev_builds_skip_bytecode(tmp_path: Path) -> None:
     """The dev loop rebuilds on every save; it ships source and stays fast."""
     root = _write_project(tmp_path, "devloop", "", None)
     result = build_artifact(root, mode="wasm", dev=True)
-    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+    with zipfile.ZipFile(result.out_dir / result.package_archive) as archive:
         assert not any(name.endswith(".pyc") for name in archive.namelist())

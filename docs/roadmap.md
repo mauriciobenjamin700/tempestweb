@@ -11,17 +11,18 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.140.0; o PyPI serve a 0.139.0.** A diferença é o
-    payload de boot do Modo A: o `tempestweb-pkg.zip` passa a levar bytecode
-    pré-compilado para o Python exato do Pyodide (checked-hash, magic fixado,
-    fonte + aviso quando a máquina de build não tem esse Python) e só os
-    subpacotes do `tempestweb` que um walk estático de imports alcança
-    (`[wasm] bytecode` / `trim` / `keep`). No painel do `tempest-webtunnel`, os
-    159 módulos que compilavam a cada boot passaram a zero. O memory snapshot do
-    Pyodide foi investigado e descartado — ver
+    **Versão do repo: 0.141.0; o PyPI serve a 0.139.0.** A diferença é o boot do
+    Modo A: o cliente sai num bundle único com hash de conteúdo, o `bootstrap.js`
+    dispara Pyodide, wheels, payload e `app.py` em paralelo, o `index.html` ganha
+    tela de carregamento (`[loading]`) e o build escreve o `immutable.json` que o
+    tempest-fastapi-sdk lê para cachear os nomes com hash por um ano — ver
+    [Boot e cache do Modo A](advanced/boot.md). Junto entra o payload de boot
+    da 0.140.0, que não chegou ao PyPI: bytecode pré-compilado para o Python do
+    Pyodide e só os subpacotes que o app alcança — ver
     [O payload de boot do Modo A](advanced/wasm-boot.md).
 
-    Antes dela, a 0.139.0 e a **#221**: o Modo C recusa `Theme(primary=...)`, `Theme(tokens=...)` e todo
+    Antes dela, a 0.139.0, que o PyPI serve. A diferença mais nova dela é
+    a **#221**: o Modo C recusa `Theme(primary=...)`, `Theme(tokens=...)` e todo
     override de cor, com `arquivo:linha`. O `from_seed` já era recusado, mas o
     `Theme(...)` com paleta passava pela checagem de kwarg — o core declara o
     campo — e o construtor JS, que só lê `mode`, descartava o resto: a página

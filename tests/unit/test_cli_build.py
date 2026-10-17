@@ -34,7 +34,11 @@ def test_build_wasm_layout(tmp_path: Path) -> None:
     assert result.out_dir == (root / "dist" / "wasm").resolve()
     for rel in WASM_ARTIFACT_FILES:
         assert (result.out_dir / rel).is_file(), rel
-    assert set(result.files) == set(WASM_ARTIFACT_FILES)
+    assert result.package_archive is not None
+    assert set(result.files) == {*WASM_ARTIFACT_FILES, *result.immutable}
+    assert result.package_archive in result.immutable
+    for rel in result.immutable:
+        assert (result.out_dir / rel).is_file(), rel
 
 
 def test_build_server_layout(tmp_path: Path) -> None:
@@ -381,7 +385,7 @@ def test_wasm_package_archive_carries_runtime(tmp_path: Path) -> None:
     """The bundled zip carries the tempestweb runtime + the tempest_core engine."""
     root = _project(tmp_path)
     result = build_artifact(root, mode="wasm")
-    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+    with zipfile.ZipFile(result.out_dir / str(result.package_archive)) as archive:
         names = set(archive.namelist())
     assert "tempestweb/__init__.py" in names
     assert "tempestweb/runtime/wasm_main.py" in names

@@ -1290,6 +1290,25 @@ function setBootStage(stage) {{
 }}
 
 /**
+ * Resolve once the browser has had a chance to paint.
+ *
+ * Everything after the "app" stage — importing the app, building its tree,
+ * mounting it — is one synchronous run, so a stage set right before it was
+ * never painted: the screen jumped from "Starting Python…" straight to the app.
+ * Waiting for a frame lets the new text reach the screen first. The timer is the
+ * fallback for a background tab, where `requestAnimationFrame` does not fire and
+ * the boot would otherwise stall until the tab is shown.
+ *
+ * @returns {{Promise<void>}} Settles after the next frame (or 100 ms at most).
+ */
+function nextPaint() {{
+  return new Promise((resolve) => {{
+    requestAnimationFrame(() => setTimeout(resolve, 0));
+    setTimeout(resolve, 100);
+  }});
+}}
+
+/**
  * Fetch a same-origin file, failing loudly on an HTTP error.
  *
  * A bare `fetch().arrayBuffer()` handed a 404 page to `unpackArchive`, which then
@@ -1389,6 +1408,7 @@ export async function boot() {{
     await clientReady;
 
   setBootStage("app");
+  await nextPaint();
 
   // 3. Build the app in Python; _start wires on_patches and returns the handle.
   const start = pyodide.runPython(PY_GLUE);

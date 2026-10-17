@@ -231,7 +231,7 @@ def test_loading_screen_is_on_by_default(tmp_path: Path) -> None:
     bootstrap = (result.out_dir / "bootstrap.js").read_text(encoding="utf-8")
     for stage in ('setBootStage("runtime")', 'setBootStage("python")'):
         assert stage in bootstrap
-    assert 'setBootStage("app")' in bootstrap
+    assert 'setBootStage("app");\n  await nextPaint();' in bootstrap
     assert 'document.getElementById("tw-boot")?.remove();' in bootstrap
     assert "failBoot(error)" in bootstrap
 

@@ -4,6 +4,43 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.141.0] — 2026-10-17
+
+### Changed
+
+- **Modo A: o cliente sai num bundle único e todo download começa junto.** O
+  `bootstrap.js` importava estaticamente uma árvore de 81 módulos (~600 KB), e o
+  Pyodide só começava a baixar depois que ela inteira resolvia (~2,9 s num
+  celular com Fast 4G e CPU 4×); depois disso, pydantic → payload → `app.py`
+  em série. Agora o build copia `client/bundle/tempestweb-wasm.js` (~190 KB,
+  ~60 KB gzip), gerado no release por `scripts/bundle-client.mjs` (esbuild como
+  devDependency npm fixada — nunca dependência do pacote Python), e o bootstrap
+  não tem `import` estático: dispara Pyodide, as wheels do `loadPackage`, o
+  payload, o `app.py` e o cliente antes do primeiro `await`. O `index.html`
+  antecipa tudo com `preload`/`modulepreload`. Medido no painel do
+  tempest-webtunnel: 95 → 22 requisições, Pyodide começa em 0,2 s em vez de
+  2,9 s, montagem quente 26,1–27,3 s → 23,3–23,9 s. O `tempestweb dev` segue
+  carregando os fontes (`client/wasm-entry.js`).
+- **Nomes com hash de conteúdo + `immutable.json`.** O bundle mora em
+  `client-<hash>/` e o payload Python vira `tempestweb-pkg.<hash>.zip`. O build
+  escreve `immutable.json` (`{"immutable": [<glob>, ...]}`) no formato que o
+  `make_web_app_router` do tempest-fastapi-sdk lê para responder esses caminhos
+  com `Cache-Control: public, max-age=31536000, immutable`. `BuildResult` ganhou
+  `package_archive` e `immutable`; `WASM_ARTIFACT_FILES` passa a listar só os
+  arquivos de nome fixo, e o artefato wasm não carrega mais a árvore `client/`
+  (só `client/offline/{store,sync}.js`, quando o service worker está ligado).
+
+### Added
+
+- **Tela de carregamento do Modo A (`[loading]`).** HTML/CSS puro no
+  `index.html`, pintada no primeiro frame, com `prefers-color-scheme`,
+  `prefers-reduced-motion` e três estágios (runtime → Python → app). Some quando
+  o app monta; se o boot falha, fica e mostra o erro em vez de uma página em
+  branco. Título, textos e cores configuráveis; `enabled = false` desliga. Chave
+  desconhecida ou cor com caractere fora de CSS é `ConfigError`.
+- Página nova `docs/advanced/boot.md` (+ `.en.md`): layout do artefato, o
+  contrato `immutable.json`, a tela de carregamento e as medições.
+
 ## [0.139.0] — 2026-10-03
 
 ### Fixed

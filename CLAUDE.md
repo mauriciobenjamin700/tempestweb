@@ -70,6 +70,15 @@ foi a falta dela que deixou 15 exemplos sem página.
   framework, sem etapa de build, sem dependência de runtime além do browser (e do
   Pyodide, no Modo A). O mesmo código roda nos três modos; só a impl de transporte
   difere (`transport-wasm.js` · `transport-ws.js` · `transport-sse.js`).
+- **O Modo A carrega o cliente de um bundle commitado** (`client/bundle/
+  tempestweb-wasm.js`, gerado de `client/wasm-entry.js` por `npm run bundle`,
+  esbuild fixado como devDependency). Mexeu em qualquer módulo que o Modo A
+  importa? **Rode `npm run bundle` e commite o bundle junto** — o
+  `tests/unit/test_wasm_boot.py` reprova bundle velho (re-hash dos inputs) e o
+  `tests/client/wasm-bundle.test.js` reprova bundle que o esbuild não reproduz.
+  O `tempestweb dev` carrega os fontes, então o bundle velho não aparece no loop
+  de dev — só no build. Nome que o shell importa precisa estar no
+  `wasm-entry.js`.
 - **Layout Python:** `transports/`, `runtime/`, `server/` (FastAPI, Modo B),
   `html/` (SSR), `transpile/` (Modo C), `native/`, `observability/`, `pwa/`,
   `presets/`, `components/`, `vision/`, `devserver/`, `cli/`. Pacote publicado é

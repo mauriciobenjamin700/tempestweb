@@ -11,7 +11,14 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.139.0, e é o que o PyPI serve.** A diferença mais nova é
+    **Versão do repo: 0.141.0; o PyPI serve a 0.139.0.** A diferença é o boot do
+    Modo A: o cliente sai num bundle único com hash de conteúdo, o `bootstrap.js`
+    dispara Pyodide, wheels, payload e `app.py` em paralelo, o `index.html` ganha
+    tela de carregamento (`[loading]`) e o build escreve o `immutable.json` que o
+    tempest-fastapi-sdk lê para cachear os nomes com hash por um ano — ver
+    [Boot e cache do Modo A](advanced/boot.md).
+
+    Antes dela, a 0.139.0, que o PyPI serve. A diferença mais nova dela é
     a **#221**: o Modo C recusa `Theme(primary=...)`, `Theme(tokens=...)` e todo
     override de cor, com `arquivo:linha`. O `from_seed` já era recusado, mas o
     `Theme(...)` com paleta passava pela checagem de kwarg — o core declara o

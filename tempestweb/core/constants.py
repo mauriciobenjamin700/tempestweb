@@ -21,6 +21,20 @@ DEFAULT_MODE: str = "wasm"
 #: prebuilt emscripten pydantic_core wheel). See docs/agents/reports/NOTES-T3.md.
 WASM_PYODIDE_VERSION: str = "v314.0.0"
 
+#: The ``major.minor`` of the CPython that :data:`WASM_PYODIDE_VERSION` runs —
+#: ``info.python`` of that release's ``pyodide-lock.json`` is ``3.14.0`` (and the
+#: runtime reports ``3.14.2``). The build looks for a host interpreter of this
+#: version to precompile the package archive's bytecode.
+WASM_PYODIDE_PYTHON: str = "3.14"
+
+#: The ``importlib.util.MAGIC_NUMBER`` of the CPython inside
+#: :data:`WASM_PYODIDE_VERSION`, read from the running runtime. A ``.pyc`` whose
+#: header carries any other magic is bytecode Pyodide would reject (or, worse, a
+#: format it misreads), so the build only ships bytecode compiled by an
+#: interpreter reporting exactly this value — a 3.14 *alpha* reports ``230e0d0a``
+#: and is refused. Bump it together with :data:`WASM_PYODIDE_VERSION`.
+WASM_PYODIDE_PYC_MAGIC: bytes = bytes.fromhex("2b0e0d0a")
+
 #: Filename of the zipped tempestweb/tempest_core payload unpacked into the Pyodide
 #: virtual filesystem by the wasm bootstrap.
 WASM_PACKAGE_ARCHIVE: str = "tempestweb-pkg.zip"
@@ -68,5 +82,7 @@ __all__ = [
     "VALID_MODES",
     "WASM_CACHE_MANIFEST",
     "WASM_PACKAGE_ARCHIVE",
+    "WASM_PYODIDE_PYC_MAGIC",
+    "WASM_PYODIDE_PYTHON",
     "WASM_PYODIDE_VERSION",
 ]

@@ -102,6 +102,7 @@ plugins:
             "Reading remote data": "Lendo dados remotos"
             "Compressing the store": "Comprimir o store"
             "Scoping storage by owner": "Escopo do storage por dono"
+            "Mode A boot payload": "O payload de boot do Modo A"
             "Tabular inference (ONNX)": "Inferência tabular (ONNX)"
             "Tutorial — the Counter": "Tutorial — o Counter"
             "1. The view tree": "1. A árvore de view"
@@ -296,6 +297,7 @@ nav:
       - "Permissions in the view": advanced/access.md
       - "Compressing the store": advanced/storage-codec.md
       - "Scoping storage by owner": advanced/storage-owner.md
+      - "Mode A boot payload": advanced/wasm-boot.md
   - API reference:
       - tempestweb.presets: reference/presets.md
       - tempestweb.components: reference/components.md

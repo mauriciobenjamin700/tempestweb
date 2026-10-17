@@ -16,7 +16,10 @@
     dispara Pyodide, wheels, payload e `app.py` em paralelo, o `index.html` ganha
     tela de carregamento (`[loading]`) e o build escreve o `immutable.json` que o
     tempest-fastapi-sdk lê para cachear os nomes com hash por um ano — ver
-    [Boot e cache do Modo A](advanced/boot.md).
+    [Boot e cache do Modo A](advanced/boot.md). Junto entra o payload de boot
+    da 0.140.0, que não chegou ao PyPI: bytecode pré-compilado para o Python do
+    Pyodide e só os subpacotes que o app alcança — ver
+    [O payload de boot do Modo A](advanced/wasm-boot.md).
 
     Antes dela, a 0.139.0, que o PyPI serve. A diferença mais nova dela é
     a **#221**: o Modo C recusa `Theme(primary=...)`, `Theme(tokens=...)` e todo

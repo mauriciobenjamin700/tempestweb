@@ -15,6 +15,7 @@ import pytest
 from tempestweb.cli import build_artifact, scaffold_project
 from tempestweb.cli.commands.build import BuildError
 from tempestweb.cli.config import ConfigError, WasmConfig, load_config
+from tempestweb.cli.wasm_payload import pyodide_cache_tag
 
 
 def _project_with_wasm(tmp_path: Path) -> Path:
@@ -251,5 +252,8 @@ def test_build_ignores_stale_pycache_only_dir(
     # Bundled from site-packages, not the empty vendored shell.
     assert "stale/__init__.py" in names
     assert "stale/tool.py" in names
-    # The stale bytecode is never bundled.
-    assert not any("__pycache__" in n for n in names if n.startswith("stale/"))
+    # The stale bytecode is never bundled: the only bytecode in the archive is
+    # what the build compiled itself, for Pyodide's Python.
+    assert "stale/__pycache__/__init__.cpython-313.pyc" not in names
+    tag = pyodide_cache_tag()
+    assert all(n.endswith(f".{tag}.pyc") for n in names if "__pycache__" in n)

@@ -29,6 +29,11 @@ versioning.
   `package_archive` e `immutable`; `WASM_ARTIFACT_FILES` passa a listar só os
   arquivos de nome fixo, e o artefato wasm não carrega mais a árvore `client/`
   (só `client/offline/{store,sync}.js`, quando o service worker está ligado).
+- **O zip do payload é determinístico.** Entradas ordenadas, todas com o mesmo
+  timestamp (1980-01-01) e modo `0644`. O staging copia os arquivos, então o
+  mtime deles era o relógio do build: cada build mudava os bytes do zip e, com
+  eles, o nome com hash — e um servidor cacheando esse nome como imutável fazia
+  todo cliente baixar de novo um payload idêntico a cada deploy.
 
 ### Added
 
@@ -40,6 +45,34 @@ versioning.
   desconhecida ou cor com caractere fora de CSS é `ConfigError`.
 - Página nova `docs/advanced/boot.md` (+ `.en.md`): layout do artefato, o
   contrato `immutable.json`, a tela de carregamento e as medições.
+- **O zip do Modo A leva bytecode pré-compilado para o Python do Pyodide.** O
+  Pyodide liga `sys.dont_write_bytecode`, então todo módulo do
+  `tempestweb-pkg.zip` era compilado do fonte em **todo** carregamento de página.
+  O `build --mode wasm` agora roda `compileall` em modo checked-hash com um
+  intérprete cujo magic number é exatamente o do Pyodide fixado
+  (`WASM_PYODIDE_PYTHON = "3.14"`, `WASM_PYODIDE_PYC_MAGIC = 2b0e0d0a`, lido do
+  runtime v314.0.0) — o que roda o build, `uv python find 3.14` ou `python3.14`
+  no `PATH` —, confere o cabeçalho de cada `.pyc` e, se algo não bater, descarta
+  tudo e empacota fonte com um `WasmBytecodeWarning`. O `app.py` ganha o seu
+  `__pycache__/app.cpython-314.pyc` dentro do zip. `[wasm] bytecode =
+  "alongside"` (default) · `"sourceless"` · `"off"`; o `tempestweb dev` não
+  compila. Medido no painel do `tempest-webtunnel`, em Node com o Pyodide
+  v314.0.0: os **159** módulos compilados a cada boot caíram para **0**, e o
+  `import app` de 1454 ms para 1247 ms (mediana de 10; 1176 ms com
+  `sourceless`).
+- **O zip do Modo A deixa de fora os subpacotes que o app não alcança.** Um walk
+  estático de imports a partir do `app.py`, dos `[wasm] modules` e do
+  `tempestweb.runtime` decide quais partes do `tempestweb` viajam — contando
+  import em função, `TYPE_CHECKING`, import relativo, atributo e string
+  pontilhada (`import_module("tempestweb.transports.sse")`), e ignorando
+  docstring. `[wasm] trim = true` (default), `keep = [...]` força um subpacote,
+  `trim = false` volta ao zip completo; nome desconhecido em `keep` falha o
+  build. No mesmo painel: 198 → 168 entradas, sem `access`, `components`,
+  `export`, `query`, `tabular` e `vision`.
+- Página nova `docs/advanced/wasm-boot.md` (+ `.en.md`), com as medições e o
+  porquê de o memory snapshot do Pyodide ter ficado de fora (a API é privada,
+  recusa estado de `loadPackage` e não restaura a extensão nativa do
+  `pydantic_core`).
 
 ## [0.139.0] — 2026-10-03
 

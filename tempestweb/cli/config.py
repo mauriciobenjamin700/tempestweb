@@ -10,13 +10,15 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from tempestweb.cli.quality import DEFAULT_STRICTNESS, VALID_STRICTNESS, Strictness
 from tempestweb.core.constants import VALID_MODES
 
 __all__ = [
+    "VALID_BYTECODE_MODES",
     "VALID_MODES",
+    "BytecodeMode",
     "ConfigError",
     "LoadingConfig",
     "ProjectConfig",
@@ -24,6 +26,13 @@ __all__ = [
     "WasmConfig",
     "load_config",
 ]
+
+
+#: How the Mode A package archive carries Python bytecode (``[wasm] bytecode``).
+BytecodeMode = Literal["alongside", "sourceless", "off"]
+
+#: The accepted ``[wasm] bytecode`` values, in documentation order.
+VALID_BYTECODE_MODES: tuple[BytecodeMode, ...] = ("alongside", "sourceless", "off")
 
 
 class ConfigError(RuntimeError):
@@ -107,12 +116,28 @@ class WasmConfig:
         scripts: URLs or artifact-relative paths injected as classic ``<script>``
             tags in ``index.html`` ``<head>`` before the bootstrap module, so a
             global library (``window.ort``) is ready when Python boots.
+        bytecode: How the package archive carries precompiled bytecode for the
+            Python Pyodide runs: ``"alongside"`` (default) ships an
+            unchecked-hash ``.pyc`` next to every ``.py``, ``"sourceless"`` ships
+            only the ``.pyc`` (smaller, but tracebacks lose their source lines),
+            ``"off"`` ships source only. Without a matching interpreter the build
+            warns and falls back to source.
+        trim: Whether to leave out the ``tempestweb`` subpackages nothing in the
+            app reaches (a static import walk from ``app.py``, the ``modules``
+            and the runtime). ``True`` by default; ``False`` ships every Mode A
+            subpackage, as before.
+        keep: ``tempestweb`` subpackages shipped even when the walk does not
+            reach them — the escape hatch for an import the walk cannot see
+            (a module name computed at runtime), e.g. ``["tabular"]``.
     """
 
     packages: list[str] = field(default_factory=list)
     modules: list[str] = field(default_factory=list)
     assets: list[str] = field(default_factory=list)
     scripts: list[str] = field(default_factory=list)
+    bytecode: BytecodeMode = "alongside"
+    trim: bool = True
+    keep: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -299,7 +324,34 @@ def _parse_wasm(raw: Any, config_path: Path) -> WasmConfig:  # noqa: ANN401 - ra
         modules=_str_list(raw.get("modules"), "modules", config_path),
         assets=_str_list(raw.get("assets"), "assets", config_path),
         scripts=_str_list(raw.get("scripts"), "scripts", config_path),
+        bytecode=_bytecode_mode(raw.get("bytecode"), config_path),
+        trim=_flag(raw.get("trim"), "trim", config_path, default=True, section="wasm"),
+        keep=_str_list(raw.get("keep"), "keep", config_path),
     )
+
+
+def _bytecode_mode(value: Any, config_path: Path) -> BytecodeMode:  # noqa: ANN401 - raw TOML value
+    """Coerce ``[wasm] bytecode`` into a :data:`BytecodeMode`.
+
+    Args:
+        value: The raw TOML value (expected to be one of
+            :data:`VALID_BYTECODE_MODES`, or absent).
+        config_path: The config file path, for error messages.
+
+    Returns:
+        The declared mode, or ``"alongside"`` when the key is absent.
+
+    Raises:
+        ConfigError: If the value is present but not an accepted mode.
+    """
+    if value is None:
+        return "alongside"
+    if value not in VALID_BYTECODE_MODES:
+        raise ConfigError(
+            f"invalid wasm.bytecode in {config_path}; expected one of "
+            f"{', '.join(VALID_BYTECODE_MODES)}"
+        )
+    return cast("BytecodeMode", value)
 
 
 _INSTALLABLE_DISPLAYS: frozenset[str] = frozenset(
@@ -313,8 +365,9 @@ def _flag(
     config_path: Path,
     *,
     default: bool,
+    section: str = "pwa",
 ) -> bool:
-    """Coerce an optional ``[pwa]`` boolean field, or fall back to ``default``.
+    """Coerce an optional boolean field, or fall back to ``default``.
 
     A truthy string (``"false"`` is truthy in Python) silently doing the opposite
     of what it reads is the worst outcome for a switch whose whole job is to turn
@@ -325,6 +378,7 @@ def _flag(
         key: The field name, for error messages.
         config_path: The config file path, for error messages.
         default: What an absent key means.
+        section: The TOML table the key lives in, for error messages.
 
     Returns:
         The declared boolean, or ``default`` when the key is absent.
@@ -335,7 +389,9 @@ def _flag(
     if value is None:
         return default
     if not isinstance(value, bool):
-        raise ConfigError(f"invalid pwa.{key} in {config_path}; expected true or false")
+        raise ConfigError(
+            f"invalid {section}.{key} in {config_path}; expected true or false"
+        )
     return value
 
 

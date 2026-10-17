@@ -11,8 +11,17 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.139.0, e é o que o PyPI serve.** A diferença mais nova é
-    a **#221**: o Modo C recusa `Theme(primary=...)`, `Theme(tokens=...)` e todo
+    **Versão do repo: 0.140.0; o PyPI serve a 0.139.0.** A diferença é o
+    payload de boot do Modo A: o `tempestweb-pkg.zip` passa a levar bytecode
+    pré-compilado para o Python exato do Pyodide (checked-hash, magic fixado,
+    fonte + aviso quando a máquina de build não tem esse Python) e só os
+    subpacotes do `tempestweb` que um walk estático de imports alcança
+    (`[wasm] bytecode` / `trim` / `keep`). No painel do `tempest-webtunnel`, os
+    159 módulos que compilavam a cada boot passaram a zero. O memory snapshot do
+    Pyodide foi investigado e descartado — ver
+    [O payload de boot do Modo A](advanced/wasm-boot.md).
+
+    Antes dela, a 0.139.0 e a **#221**: o Modo C recusa `Theme(primary=...)`, `Theme(tokens=...)` e todo
     override de cor, com `arquivo:linha`. O `from_seed` já era recusado, mas o
     `Theme(...)` com paleta passava pela checagem de kwarg — o core declara o
     campo — e o construtor JS, que só lê `mode`, descartava o resto: a página

@@ -203,6 +203,12 @@ Opções:
     do build, então o bundle final não depende de CDN em runtime — abre até sem
     rede.
 
+!!! tip "Boot mais rápido no Modo A"
+    O `build --mode wasm` empacota bytecode pré-compilado para o Python do Pyodide
+    e só os subpacotes que o app alcança. Os dois se ajustam em `[wasm] bytecode`,
+    `[wasm] trim` e `[wasm] keep` — veja
+    [O payload de boot do Modo A](../advanced/wasm-boot.md).
+
 ---
 
 ## 4. Empacotar para produção — `deploy`

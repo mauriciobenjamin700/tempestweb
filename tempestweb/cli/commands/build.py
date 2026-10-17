@@ -26,12 +26,20 @@ import hashlib
 import importlib.util
 import json
 import shutil
+import tempfile
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from tempestweb.cli.config import VALID_MODES, ProjectConfig, WasmConfig, load_config
+from tempestweb.cli.config import (
+    VALID_MODES,
+    BytecodeMode,
+    ProjectConfig,
+    WasmConfig,
+    load_config,
+)
 from tempestweb.cli.loader import load_app, render_initial_tree
+from tempestweb.cli.wasm_payload import compile_bytecode, resolve_wasm_parts
 from tempestweb.core.constants import WASM_PACKAGE_ARCHIVE, WASM_PYODIDE_VERSION
 from tempestweb.pwa import (
     IconSpec,
@@ -388,38 +396,6 @@ def _tempest_core_dir() -> Path:
     return Path(file).resolve().parent
 
 
-def _zip_tree(
-    archive: zipfile.ZipFile,
-    root: Path,
-    top: str,
-    parts: tuple[str, ...] | None,
-) -> None:
-    """Write a package subtree into ``archive`` under ``top/``.
-
-    Args:
-        archive: The open zip archive to write into.
-        root: The package's parent directory (entries are relative to it).
-        top: The top-level package name the entries live under (e.g. ``tempestweb``).
-        parts: Either ``None`` (the whole ``root/top`` tree) or the part names
-            under ``root/top`` to include.
-
-    Raises:
-        BuildError: If an expected part is missing.
-    """
-    names = [top] if parts is None else [f"{top}/{part}" for part in parts]
-    for name in names:
-        source = root / name
-        if not source.exists():
-            raise BuildError(f"missing package part: {source}")
-        if source.is_file():
-            archive.write(source, name)
-            continue
-        for path in sorted(source.rglob("*")):
-            if path.is_dir() or "__pycache__" in path.parts:
-                continue
-            archive.write(path, str(path.relative_to(root)))
-
-
 def _is_vendored(candidate: Path) -> bool:
     """Tell whether ``candidate`` is a usable vendored module/package.
 
@@ -465,7 +441,7 @@ def _resolve_module(module: str, project_root: Path | None) -> tuple[Path, str]:
     Returns:
         A ``(root, top)`` pair where ``root`` is the parent directory archive
         entries are made relative to and ``top`` is the file or directory name
-        under it — fed straight into :func:`_zip_tree`.
+        under it — fed straight into :func:`_stage_tree`.
 
     Raises:
         BuildError: If the module is neither vendored under ``project_root`` nor
@@ -494,21 +470,67 @@ def _resolve_module(module: str, project_root: Path | None) -> tuple[Path, str]:
     )
 
 
+def _stage_tree(
+    stage: Path, root: Path, top: str, parts: tuple[str, ...] | None
+) -> None:
+    """Copy a package subtree into the staging directory under ``top/``.
+
+    Args:
+        stage: The staging root (the archive's future contents).
+        root: The package's parent directory (entries are relative to it).
+        top: The top-level package name the entries live under (e.g. ``tempestweb``).
+        parts: Either ``None`` (the whole ``root/top`` tree) or the part names
+            under ``root/top`` to include.
+
+    Raises:
+        BuildError: If an expected part is missing.
+    """
+    names = [top] if parts is None else [f"{top}/{part}" for part in parts]
+    for name in names:
+        source = root / name
+        if not source.exists():
+            raise BuildError(f"missing package part: {source}")
+        paths = [source] if source.is_file() else sorted(source.rglob("*"))
+        for path in paths:
+            if path.is_dir() or "__pycache__" in path.parts:
+                continue
+            target = stage / path.relative_to(root)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+
+
+#: The ``tempestweb`` part the bootstrap's Python glue imports
+#: (``tempestweb.runtime.wasm_main``), so the trim walk always starts there.
+_WASM_ENTRY_PARTS: tuple[str, ...] = ("runtime",)
+
+
 def _zip_package(
     dest: Path,
     *,
     project_root: Path | None = None,
     modules: tuple[str, ...] = (),
-) -> None:
+    app_source: str | None = None,
+    bytecode: BytecodeMode = "off",
+    trim: bool = False,
+    keep: tuple[str, ...] = (),
+) -> tuple[str, ...]:
     """Zip the Mode A Python payload (tempestweb subset + tempest_core) into ``dest``.
 
     The archive carries the Mode A subset of ``tempestweb``
-    (:data:`_WASM_PACKAGE_PARTS`) and the whole ``tempest_core`` package, excluding
-    ``__pycache__``. The Pyodide bootstrap unpacks it into the virtual filesystem's
-    working directory (on ``sys.path``), so ``import tempestweb`` and
-    ``import tempest_core`` both resolve in the browser. Any project ``modules``
-    (files or package directories declared under ``[wasm]``) are bundled too, so
-    ``app.py`` can ``import`` them in the browser.
+    (:data:`_WASM_PACKAGE_PARTS`, narrowed by the trim walk when ``trim``) and
+    the whole ``tempest_core`` package, excluding ``__pycache__``. The Pyodide
+    bootstrap unpacks it into the virtual filesystem's working directory (on
+    ``sys.path``), so ``import tempestweb`` and ``import tempest_core`` both
+    resolve in the browser. Any project ``modules`` (files or package
+    directories declared under ``[wasm]``) are bundled too, so ``app.py`` can
+    ``import`` them in the browser.
+
+    The payload is staged in a temporary directory first, so bytecode can be
+    compiled over the exact files that ship. When ``app_source`` is given and
+    bytecode is on, the archive also carries ``__pycache__/app.<tag>.pyc``: the
+    bootstrap writes ``app.py`` into the same directory the archive unpacks
+    into, so importlib finds that bytecode beside it, and its checked hash makes
+    a stale pair recompile instead of running old code.
 
     Args:
         dest: The ``.zip`` path to write.
@@ -520,19 +542,67 @@ def _zip_package(
             pulled from the installed environment (site-packages) via importlib —
             so a dependency declared in the project's ``.venv`` need not be
             vendored into the repository.
+        app_source: The app's ``app.py`` source — the root of the trim walk and,
+            with bytecode on, compiled into the archive. ``None`` skips both.
+        bytecode: ``"alongside"``, ``"sourceless"`` or ``"off"`` (see
+            :class:`~tempestweb.cli.config.WasmConfig`). Falls back to source,
+            with a warning, when no interpreter matches the Pyodide Python.
+        trim: Whether to ship only the ``tempestweb`` parts the app reaches.
+            Needs ``app_source``; without it every part ships.
+        keep: Parts shipped even when the walk does not reach them.
+
+    Returns:
+        The ``tempestweb`` parts that were shipped, in canonical order.
 
     Raises:
-        BuildError: If an expected package part is missing, or a declared module
-            is neither vendored nor importable.
+        BuildError: If an expected package part is missing, a declared module
+            is neither vendored nor importable, or ``keep`` names an unknown part.
     """
     tempestweb_root = _package_dir().parent
     tempest_core_root = _tempest_core_dir().parent
-    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
-        _zip_tree(archive, tempestweb_root, "tempestweb", _WASM_PACKAGE_PARTS)
-        _zip_tree(archive, tempest_core_root, "tempest_core", None)
-        for module in modules:
-            root, top = _resolve_module(module, project_root)
-            _zip_tree(archive, root, top, None)
+    resolved = [_resolve_module(module, project_root) for module in modules]
+    parts = _WASM_PACKAGE_PARTS
+    if trim and app_source is not None:
+        module_files = [
+            (path, root)
+            for root, top in resolved
+            for path in (
+                [root / top]
+                if (root / top).is_file()
+                else sorted((root / top).rglob("*.py"))
+            )
+            if path.suffix == ".py" and "__pycache__" not in path.parts
+        ]
+        try:
+            parts = resolve_wasm_parts(
+                _WASM_PACKAGE_PARTS,
+                tempestweb_root=tempestweb_root,
+                app_source=app_source,
+                module_files=module_files,
+                seeds=_WASM_ENTRY_PARTS,
+                keep=keep,
+            )
+        except ValueError as exc:
+            raise BuildError(str(exc)) from exc
+    with tempfile.TemporaryDirectory(prefix="tempestweb-pkg-") as tmp:
+        stage = Path(tmp)
+        _stage_tree(stage, tempestweb_root, "tempestweb", parts)
+        _stage_tree(stage, tempest_core_root, "tempest_core", None)
+        for root, top in resolved:
+            _stage_tree(stage, root, top, None)
+        app_path = stage / "app.py"
+        if bytecode != "off" and app_source is not None:
+            app_path.write_text(app_source, encoding="utf-8")
+        if bytecode != "off":
+            compile_bytecode(
+                stage, sourceless=bytecode == "sourceless", keep_source=(app_path,)
+            )
+        app_path.unlink(missing_ok=True)
+        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as archive:
+            for path in sorted(stage.rglob("*")):
+                if path.is_file():
+                    archive.write(path, path.relative_to(stage).as_posix())
+    return parts
 
 
 def _manifest_options(config: ProjectConfig) -> ManifestOptions:
@@ -1561,7 +1631,15 @@ def _build_wasm(
         _bootstrap_js(name, pyodide_base, extra_packages), encoding="utf-8"
     )
     (out / "app.py").write_text(app_source, encoding="utf-8")
-    _zip_package(out / WASM_PACKAGE_ARCHIVE, project_root=project_root, modules=modules)
+    _zip_package(
+        out / WASM_PACKAGE_ARCHIVE,
+        project_root=project_root,
+        modules=modules,
+        app_source=app_source,
+        bytecode="off" if dev else wasm.bytecode,
+        trim=wasm.trim,
+        keep=tuple(wasm.keep),
+    )
     _copy_client(client, out / "client", "transport-wasm.js")
     # Native capability bridge + offline/push/pwa closure that the bootstrap's
     # native/index.js eagerly imports (geolocation/clipboard/http/…).

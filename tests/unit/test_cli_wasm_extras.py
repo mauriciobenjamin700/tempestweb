@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 from tempestweb.cli import build_artifact, scaffold_project
-from tempestweb.cli.commands.build import WASM_PACKAGE_ARCHIVE, BuildError
+from tempestweb.cli.commands.build import BuildError
 from tempestweb.cli.config import ConfigError, WasmConfig, load_config
 
 
@@ -75,7 +75,7 @@ def test_config_rejects_non_list_wasm_field(tmp_path: Path) -> None:
 def test_build_bundles_modules_into_package_archive(tmp_path: Path) -> None:
     root = _project_with_wasm(tmp_path)
     result = build_artifact(root, mode="wasm")
-    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+    with zipfile.ZipFile(result.out_dir / str(result.package_archive)) as archive:
         names = set(archive.namelist())
     assert "mypkg/__init__.py" in names
     assert "mypkg/tool.py" in names
@@ -172,7 +172,7 @@ def test_build_bundles_module_from_site_packages(
     assert not (root / "extpkg").exists()
 
     result = build_artifact(root, mode="wasm")
-    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+    with zipfile.ZipFile(result.out_dir / str(result.package_archive)) as archive:
         names = set(archive.namelist())
     assert "extpkg/__init__.py" in names
     assert "extpkg/tool.py" in names
@@ -201,7 +201,7 @@ def test_build_prefers_vendored_copy_over_site_packages(
     (vendored / "local_only.py").write_text("LOCAL = True\n", encoding="utf-8")
 
     result = build_artifact(root, mode="wasm")
-    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+    with zipfile.ZipFile(result.out_dir / str(result.package_archive)) as archive:
         names = set(archive.namelist())
     # The vendored copy is bundled (its unique file is present)…
     assert "dual/local_only.py" in names
@@ -246,7 +246,7 @@ def test_build_ignores_stale_pycache_only_dir(
     (cache / "__init__.cpython-313.pyc").write_bytes(b"\x00stale-bytecode")
 
     result = build_artifact(root, mode="wasm")
-    with zipfile.ZipFile(result.out_dir / WASM_PACKAGE_ARCHIVE) as archive:
+    with zipfile.ZipFile(result.out_dir / str(result.package_archive)) as archive:
         names = set(archive.namelist())
     # Bundled from site-packages, not the empty vendored shell.
     assert "stale/__init__.py" in names

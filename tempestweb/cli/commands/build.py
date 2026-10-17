@@ -23,16 +23,29 @@ WebSocket transport — ``python server.py`` (or ``uvicorn server:app``) serves 
 from __future__ import annotations
 
 import hashlib
+import html
 import importlib.util
 import json
 import shutil
 import zipfile
 from dataclasses import dataclass, field
+from importlib import metadata
 from pathlib import Path
 
-from tempestweb.cli.config import VALID_MODES, ProjectConfig, WasmConfig, load_config
+from tempestweb.cli.config import (
+    VALID_MODES,
+    LoadingConfig,
+    ProjectConfig,
+    WasmConfig,
+    load_config,
+)
 from tempestweb.cli.loader import load_app, render_initial_tree
-from tempestweb.core.constants import WASM_PACKAGE_ARCHIVE, WASM_PYODIDE_VERSION
+from tempestweb.core.constants import (
+    WASM_CACHE_MANIFEST,
+    WASM_IMMUTABLE_CACHE_CONTROL,
+    WASM_PACKAGE_ARCHIVE,
+    WASM_PYODIDE_VERSION,
+)
 from tempestweb.pwa import (
     IconSpec,
     ManifestOptions,
@@ -251,21 +264,37 @@ _PWA_FILES: tuple[str, ...] = (
     *(f"icons/{icon}" for icon in _PWA_ICON_FILES),
 )
 
-# Files a wasm artifact must contain, relative to the artifact root.
+#: The Mode A client surface, as an unbundled ES module: the entry the release
+#: bundler starts from, and what the ``tempestweb dev`` loop loads directly so a
+#: client edit shows up on the next reload without re-bundling.
+_WASM_ENTRY: str = "wasm-entry.js"
+
+#: The bundled Mode A client, relative to the client directory. Generated at
+#: release time by ``scripts/bundle-client.mjs`` (esbuild, an npm devDependency)
+#: and shipped in the wheel with the rest of ``client/``; a build only copies it.
+_WASM_BUNDLE: str = "bundle/tempestweb-wasm.js"
+
+#: The modules the caching service worker imports statically, under
+#: ``client/offline/`` (see :data:`_SW_IMPORT_REWRITES`). A wasm build ships the
+#: client as one bundle, so these are the only loose client files left — and only
+#: when that worker is emitted.
+_SW_CLIENT_ASSETS: tuple[str, ...] = ("offline/store.js", "offline/sync.js")
+
+#: Hex digits of SHA-256 kept in a content-hashed name. 64 bits: a collision
+#: between two builds of the same app is not a practical concern.
+_CONTENT_HASH_LENGTH: int = 16
+
+# Files a wasm artifact always contains under a fixed name, relative to the
+# artifact root (the PWA-complete case). The client bundle and the Python payload
+# are written under content-hashed names on top of these; the build's
+# ``tempestweb-cache.json`` names them (see :func:`_write_cache_manifest`).
 WASM_ARTIFACT_FILES: tuple[str, ...] = (
     "index.html",
     "app.py",
     "bootstrap.js",
-    WASM_PACKAGE_ARCHIVE,
+    WASM_CACHE_MANIFEST,
     *_PWA_FILES,
-    *(f"client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
-    *(f"client/icons/{asset}" for asset in _ICON_ASSETS),
-    *(f"client/native/{asset}" for asset in _NATIVE_ASSETS),
-    *(f"client/offline/{asset}" for asset in _OFFLINE_ASSETS),
-    "client/push/web-push-client.js",
-    "client/pwa/install-prompt.js",
-    "client/pwa/connectivity-banner.js",
-    "client/pwa/post-install-redirect.js",
+    *(f"client/{asset}" for asset in _SW_CLIENT_ASSETS),
 )
 
 # Files a server artifact must contain, relative to the artifact root. Both Mode
@@ -328,11 +357,18 @@ class BuildResult:
         mode: The execution mode that was built (``"wasm"`` or ``"server"``).
         out_dir: The artifact root directory.
         files: Artifact-relative paths that were written, in a stable order.
+        package_archive: The artifact-relative name of the zipped Python payload
+            (wasm only) — content-hashed, e.g. ``tempestweb-pkg.<hash>.zip``.
+            ``None`` for modes that ship no payload.
+        immutable: The artifact-relative paths whose names carry a content hash,
+            exactly as listed in ``tempestweb-cache.json`` (wasm only).
     """
 
     mode: str
     out_dir: Path
     files: tuple[str, ...] = field(default_factory=tuple)
+    package_archive: str | None = None
+    immutable: tuple[str, ...] = field(default_factory=tuple)
 
 
 def _client_dir() -> Path:
@@ -851,17 +887,6 @@ _DEV_CACHE_KILL_SWITCH = """\
       })();
     </script>"""
 
-# Production service-worker registration for the wasm shell.
-_WASM_SW_REGISTER = """\
-    <script type="module">
-      import { registerServiceWorker } from "./register.js";
-      import { mountConnectivityBanner } from "./client/pwa/connectivity-banner.js";
-      mountConnectivityBanner();
-      if ("serviceWorker" in navigator) {
-        registerServiceWorker({ url: "/sw.js" });
-      }
-    </script>"""
-
 # Production service-worker registration for the transpile (Mode C) shell.
 _TRANSPILE_SW_REGISTER = """\
     <script type="module">
@@ -887,6 +912,183 @@ _NO_SW_REGISTER = """\
     </script>"""
 
 
+def _wasm_sw_block(client_url: str, *, dev: bool, with_service_worker: bool) -> str:
+    """The wasm shell's trailing module script: worker registration and banner.
+
+    The connectivity banner is imported from the same client module the
+    bootstrap loads, so the page fetches the client once — the shell used to
+    import it from ``client/pwa/connectivity-banner.js``, a second entry into
+    the tree.
+
+    Args:
+        client_url: The client module URL (bundle in a build, entry in dev).
+        dev: Whether this is the ``tempestweb dev`` loop, which injects the cache
+            kill-switch instead.
+        with_service_worker: Whether the caching worker is registered. When
+            ``False`` the connectivity banner still mounts — it reports the
+            network, not the precache.
+
+    Returns:
+        The ``<script type="module">`` block, indented for the shell body.
+    """
+    if dev:
+        return _DEV_CACHE_KILL_SWITCH
+    register = (
+        '      import { registerServiceWorker } from "./register.js";\n'
+        if with_service_worker
+        else ""
+    )
+    call = (
+        '      if ("serviceWorker" in navigator) {\n'
+        '        registerServiceWorker({ url: "/sw.js" });\n'
+        "      }\n"
+        if with_service_worker
+        else ""
+    )
+    return (
+        '    <script type="module">\n'
+        f"{register}"
+        f'      import {{ mountConnectivityBanner }} from "{client_url}";\n'
+        "      mountConnectivityBanner();\n"
+        f"{call}"
+        "    </script>"
+    )
+
+
+def _wasm_preloads(
+    pyodide_base: str, client_url: str, package_url: str, *, bundled: bool
+) -> str:
+    """The ``<link>`` hints that start every boot download from the HTML.
+
+    Without them the browser learns of Pyodide's files one hop at a time:
+    ``bootstrap.js`` → ``pyodide.mjs`` → ``pyodide.asm.mjs`` → the ``.wasm`` and
+    the stdlib. Each hint below names a URL the boot fetches with the same mode
+    and credentials, so the preloaded response is the one consumed — the
+    ``fetch`` hints carry ``crossorigin`` because ``fetch()`` requests in
+    ``cors`` mode even same-origin, and a hint whose mode differs is a second
+    download plus a console warning.
+
+    Args:
+        pyodide_base: The Pyodide base URL (CDN or ``./pyodide/``).
+        client_url: The client module URL.
+        package_url: The zipped Python payload's URL.
+        bundled: Whether the client is the single bundle. The dev loop's
+            unbundled entry imports its tree on its own, so only the bundle is
+            worth a ``modulepreload``.
+
+    Returns:
+        The link tags, one per line, indented for the shell head.
+    """
+    module_hints = [f"{pyodide_base}pyodide.mjs", f"{pyodide_base}pyodide.asm.mjs"]
+    if bundled:
+        module_hints.insert(0, client_url)
+    fetch_hints = [
+        package_url,
+        "./app.py",
+        f"{pyodide_base}pyodide.asm.wasm",
+        f"{pyodide_base}python_stdlib.zip",
+        f"{pyodide_base}pyodide-lock.json",
+    ]
+    lines = [
+        f'    <link rel="modulepreload" href="{url}" crossorigin="anonymous" />\n'
+        for url in module_hints
+    ]
+    lines.extend(
+        f'    <link rel="preload" href="{url}" as="fetch" crossorigin="anonymous" />\n'
+        for url in fetch_hints
+    )
+    return "".join(lines)
+
+
+#: The loading screen's stylesheet. Pure CSS, inline in the head, so the screen
+#: is painted on the first frame — before any script, wasm or font has loaded.
+#: It follows ``prefers-color-scheme`` and slows the spinner under
+#: ``prefers-reduced-motion``. The three dots mark the stage the bootstrap set on
+#: ``data-stage``; ``data-state="error"`` stops the spinner and tints the text.
+_LOADING_CSS: str = (
+    "#tw-boot{--tw-boot-bg:#ffffff;--tw-boot-fg:#1f2328;--tw-boot-muted:#59636e;"
+    "--tw-boot-error:#cf222e;--tw-boot-accent:var(--tw-boot-fg);position:fixed;"
+    "inset:0;z-index:2147483646;display:flex;flex-direction:column;"
+    "align-items:center;justify-content:center;gap:12px;padding:24px 16px;"
+    "background:var(--tw-boot-bg);color:var(--tw-boot-fg);"
+    'font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;'
+    "text-align:center}"
+    "@media (prefers-color-scheme:dark){#tw-boot{--tw-boot-bg:#0f1115;"
+    "--tw-boot-fg:#e6e8eb;--tw-boot-muted:#9aa4af;--tw-boot-error:#ff7b72}}"
+    ".tw-boot-spinner{width:36px;height:36px;border-radius:50%;"
+    "border:3px solid rgba(127,127,127,.25);border-top-color:var(--tw-boot-accent);"
+    "animation:tw-boot-spin .9s linear infinite}"
+    "@keyframes tw-boot-spin{to{transform:rotate(1turn)}}"
+    "@media (prefers-reduced-motion:reduce){.tw-boot-spinner{animation-duration:3s}}"
+    ".tw-boot-title{margin:4px 0 0;font-size:17px;font-weight:600}"
+    "#tw-boot-stage{margin:0;max-width:36ch;color:var(--tw-boot-muted);"
+    "overflow-wrap:anywhere}"
+    ".tw-boot-steps{display:flex;gap:6px}"
+    ".tw-boot-steps span{width:6px;height:6px;border-radius:50%;"
+    "background:var(--tw-boot-muted);opacity:.35;transition:opacity .2s}"
+    "#tw-boot[data-stage=runtime] .tw-boot-steps span:nth-child(-n+1),"
+    "#tw-boot[data-stage=python] .tw-boot-steps span:nth-child(-n+2),"
+    "#tw-boot[data-stage=app] .tw-boot-steps span"
+    "{opacity:1;background:var(--tw-boot-accent)}"
+    "#tw-boot[data-state=error] .tw-boot-spinner{animation:none;"
+    "border-color:var(--tw-boot-error)}"
+    "#tw-boot[data-state=error] #tw-boot-stage{color:var(--tw-boot-error)}"
+)
+
+
+def _loading_screen(loading: LoadingConfig, title: str) -> tuple[str, str]:
+    """Render the loading screen's ``<style>`` and markup for a wasm shell.
+
+    The stage texts ride on the element as ``data-*`` attributes, which the
+    bootstrap reads, so the bootstrap is the same for every app. Every text is
+    HTML-escaped: they come from ``tempestweb.toml``, and a stray ``<`` in a
+    title must not become markup.
+
+    Args:
+        loading: The project's ``[loading]`` config.
+        title: The heading, already resolved from ``[loading] title``,
+            ``[pwa] name`` or the project name.
+
+    Returns:
+        A ``(head, body)`` pair: the style block for the head and the screen
+        markup for the top of the body. Both are ``""`` when the screen is
+        disabled.
+    """
+    if not loading.enabled:
+        return "", ""
+    overrides = "".join(
+        f"--tw-boot-{prop}:{value};"
+        for prop, value in (
+            ("bg", loading.background),
+            ("fg", loading.foreground),
+            ("accent", loading.accent),
+        )
+        if value
+    )
+    override_rule = f"#tw-boot{{{overrides}}}" if overrides else ""
+    head = f"    <style>{_LOADING_CSS}{override_rule}</style>\n"
+    attrs = "".join(
+        f' data-{key}="{html.escape(text, quote=True)}"'
+        for key, text in (
+            ("runtime", loading.runtime_text),
+            ("python", loading.python_text),
+            ("app", loading.app_text),
+            ("error", loading.error_text),
+        )
+    )
+    body = (
+        f'    <div id="tw-boot" role="status" aria-live="polite" '
+        f'data-stage="runtime"{attrs}>\n'
+        '      <div class="tw-boot-spinner" aria-hidden="true"></div>\n'
+        f'      <p class="tw-boot-title">{html.escape(title)}</p>\n'
+        f'      <p id="tw-boot-stage">{html.escape(loading.runtime_text)}</p>\n'
+        '      <div class="tw-boot-steps" aria-hidden="true">'
+        "<span></span><span></span><span></span></div>\n"
+        "    </div>\n"
+    )
+    return head, body
+
+
 def _manifest_link(with_manifest: bool) -> str:
     """The manifest ``<link>`` line for a shell, or nothing when it is off.
 
@@ -910,8 +1112,19 @@ def _index_html(
     dev: bool = False,
     with_manifest: bool = True,
     with_service_worker: bool = True,
+    pyodide_base: str | None = None,
+    client_url: str = f"./client/{_WASM_ENTRY}",
+    package_url: str = f"./{WASM_PACKAGE_ARCHIVE}",
+    bundled: bool = False,
+    loading: LoadingConfig | None = None,
+    loading_title: str | None = None,
 ) -> str:
     """Render the static ``index.html`` shell for a wasm artifact.
+
+    The head carries the preload hints (see :func:`_wasm_preloads`) and the
+    bootstrap module, so every download the boot needs is requested while the
+    HTML is still parsing; the body opens with the loading screen
+    (:func:`_loading_screen`), painted before any script runs.
 
     Args:
         name: The project name (page title).
@@ -927,17 +1140,29 @@ def _index_html(
         with_service_worker: Whether the shell registers the caching worker. When
             ``False`` the connectivity banner still mounts — it reports the
             network, not the precache.
+        pyodide_base: The Pyodide base URL to preload from, or ``None`` to emit
+            no preload hints.
+        client_url: The client module the shell scripts import.
+        package_url: The zipped Python payload's URL, for its preload hint.
+        bundled: Whether ``client_url`` is the single-file bundle.
+        loading: The ``[loading]`` config; ``None`` means the defaults (on).
+        loading_title: The loading screen's heading; defaults to ``name``.
 
     Returns:
         The HTML document that boots the app in the browser.
     """
     script_tags = "".join(f'\n    <script src="{src}"></script>' for src in scripts)
-    if dev:
-        sw_block = _DEV_CACHE_KILL_SWITCH
-    elif with_service_worker:
-        sw_block = _WASM_SW_REGISTER
-    else:
-        sw_block = _NO_SW_REGISTER
+    sw_block = _wasm_sw_block(
+        client_url, dev=dev, with_service_worker=with_service_worker
+    )
+    preloads = (
+        _wasm_preloads(pyodide_base, client_url, package_url, bundled=bundled)
+        if pyodide_base is not None
+        else ""
+    )
+    loading_head, loading_body = _loading_screen(
+        loading or LoadingConfig(), loading_title or name
+    )
     return f"""\
 <!doctype html>
 <html lang="en">
@@ -946,21 +1171,32 @@ def _index_html(
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{name}</title>
 {_SHELL_RESET}\
+{loading_head}\
 {_manifest_link(with_manifest)}\
     <meta name="theme-color" content="{theme_color}" />
     <link rel="icon" href="./icons/icon-192.png" />
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />{script_tags}
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+{preloads}\
+{script_tags.lstrip(chr(10)) + chr(10) if script_tags else ""}\
+    <script type="module" src="./bootstrap.js"></script>
   </head>
   <body>
+{loading_body}\
     <div id="app"></div>
-    <script type="module" src="./bootstrap.js"></script>
 {sw_block}
   </body>
 </html>
 """
 
 
-def _bootstrap_js(name: str, pyodide_base: str, packages: tuple[str, ...] = ()) -> str:
+def _bootstrap_js(
+    name: str,
+    pyodide_base: str,
+    packages: tuple[str, ...] = (),
+    *,
+    client_url: str = f"./client/{_WASM_ENTRY}",
+    package_url: str = f"./{WASM_PACKAGE_ARCHIVE}",
+) -> str:
     """Render the live wasm bootstrap entrypoint (Mode A, Pyodide).
 
     The emitted module loads Pyodide + ``pydantic`` from ``pyodide_base``, unpacks
@@ -970,11 +1206,22 @@ def _bootstrap_js(name: str, pyodide_base: str, packages: tuple[str, ...] = ()) 
     onto ``#app`` through ``transport-wasm.js`` — Python runs in the same tab, so
     the transport is an in-process bridge with no network.
 
+    **Everything that can download does so at once.** The module has no static
+    import: it starts Pyodide, the package wheels, the Python payload, ``app.py``
+    and the client module in parallel, and only then awaits them in the order the
+    boot consumes them. The client used to be a static import tree, so Pyodide
+    could not even be requested until ~80 modules had resolved (~2.9 s on a
+    throttled phone), and every later step was strictly serial behind it.
+
     The emitted module also wires ``onTheme``, which marks the document with the
     app's resolved theme mode. That is the theme's other half: the colours ride in
     each widget's inline style, but the page, the field surfaces and the
     hover/focus states are CSS, so the base sheet needs the mode on the document
     to pick its token block.
+
+    It drives the loading screen (``#tw-boot``) the shell may carry: each stage
+    swaps its text, the mount removes it, and a failed boot leaves it showing
+    the error. A shell without the screen boots the same way.
 
     Args:
         name: The project name.
@@ -984,6 +1231,11 @@ def _bootstrap_js(name: str, pyodide_base: str, packages: tuple[str, ...] = ()) 
         packages: Extra Pyodide packages to ``loadPackage`` alongside the core's
             own ``pydantic`` (e.g. ``("numpy", "pillow")``), declared under
             ``[wasm]``.
+        client_url: The client module the bootstrap imports — the bundled,
+            content-hashed ``client-<hash>/tempestweb-wasm.js`` in a production
+            build, or the unbundled ``client/wasm-entry.js`` in the dev loop.
+        package_url: Where the zipped Python payload is fetched from (its
+            content-hashed name in a build).
 
     Returns:
         The bootstrap module source.
@@ -992,14 +1244,14 @@ def _bootstrap_js(name: str, pyodide_base: str, packages: tuple[str, ...] = ()) 
     return f"""\
 // bootstrap.js — live wasm artifact entrypoint for "{name}" (Mode A, Pyodide).
 //
-// Loads Pyodide + pydantic, installs the tempestweb package and app.py into the
-// Pyodide virtual FS, builds the app in-process and mounts the shared client.
-import {{ mount }} from "./client/tempestweb.js";
-import {{ createWasmTransport }} from "./client/transport-wasm.js";
-import {{ installNativeBridge }} from "./client/native/index.js";
-import {{ applyThemeMode }} from "./client/theme.js";
+// Starts every download at once (Pyodide, wheels, the Python payload, app.py and
+// the client bundle), installs the payload and app.py into the Pyodide virtual
+// FS, builds the app in-process and mounts the shared client.
 
 const PYODIDE_BASE = "{pyodide_base}";
+const CLIENT_URL = "{client_url}";
+const PACKAGE_URL = "{package_url}";
+const PACKAGES = {package_list_js};
 
 // Python entry: build the app and hand back a _start(on_patches, dispatch) hook.
 // `app.THEME` is optional: an app that declares one gets its palette into the
@@ -1018,20 +1270,126 @@ def _start(on_patches, dispatch, on_navigate, on_theme, subscribe, unsubscribe):
 _start
 `;
 
+/**
+ * Move the loading screen to a boot stage.
+ *
+ * The stage texts live on the screen element itself (`data-runtime`,
+ * `data-python`, `data-app`), written by the build from `[loading]`, so this
+ * module stays the same whatever the app calls its stages. Without the screen
+ * (`[loading] enabled = false`) it does nothing.
+ *
+ * @param {{"runtime" | "python" | "app"}} stage  The stage the boot entered.
+ * @returns {{void}}
+ */
+function setBootStage(stage) {{
+  const screen = document.getElementById("tw-boot");
+  if (!screen) return;
+  screen.setAttribute("data-stage", stage);
+  const label = document.getElementById("tw-boot-stage");
+  const text = screen.getAttribute("data-" + stage);
+  if (label && text) label.textContent = text;
+}}
+
+/**
+ * Fetch a same-origin file, failing loudly on an HTTP error.
+ *
+ * A bare `fetch().arrayBuffer()` handed a 404 page to `unpackArchive`, which then
+ * failed on "not a zip file" with no hint that the file was missing.
+ *
+ * @param {{string}} url  The URL to fetch.
+ * @returns {{Promise<Response>}} The successful response.
+ */
+async function fetchOk(url) {{
+  const response = await fetch(url);
+  if (!response.ok) {{
+    throw new Error(`failed to fetch ${{url}}: HTTP ${{response.status}}`);
+  }}
+  return response;
+}}
+
+/**
+ * Download the Pyodide wheels `loadPackage` will ask for, while Pyodide boots.
+ *
+ * `loadPackage` can only run once the runtime is up, so the wheels (pydantic_core
+ * alone is over a megabyte) used to start downloading only after the whole
+ * runtime had. This walks the same lock file Pyodide reads, resolves the
+ * dependency closure of `PACKAGES`, and fetches each wheel by the exact URL
+ * `loadPackage` will use — so its request is answered from the HTTP cache, or
+ * joins the transfer already in flight.
+ *
+ * It is a warm-up and nothing depends on it: any failure here is ignored, and
+ * `loadPackage` downloads and reports exactly as it would have.
+ *
+ * @returns {{Promise<void>}} Settles when every wheel has been read (or skipped).
+ */
+async function warmPackages() {{
+  try {{
+    const lock = await (await fetchOk(PYODIDE_BASE + "pyodide-lock.json")).json();
+    const entries = lock.packages || {{}};
+    const normalize = (n) => n.toLowerCase().replace(/[-_.]+/g, "-");
+    const seen = new Set();
+    const pending = [...PACKAGES];
+    const files = [];
+    while (pending.length > 0) {{
+      const key = normalize(pending.pop());
+      if (seen.has(key) || !entries[key]) continue;
+      seen.add(key);
+      files.push(entries[key].file_name);
+      pending.push(...(entries[key].depends || []));
+    }}
+    await Promise.all(
+      files.map((file) =>
+        fetch(PYODIDE_BASE + file).then((r) => r.arrayBuffer(), () => null),
+      ),
+    );
+  }} catch {{
+    return;
+  }}
+}}
+
+/**
+ * Boot the app: load Python, build the app in it and mount the client.
+ *
+ * Every download starts before the first `await`. Pyodide is the long pole, so
+ * the payload, `app.py`, the wheels and the client module all ride alongside it
+ * instead of queueing behind it; the awaits below then consume them in the order
+ * the boot needs them, which keeps the Python side exactly as it was. pydantic is
+ * the core's only hard dependency; a project's `[wasm] packages` (numpy, pillow…)
+ * join it in `PACKAGES`.
+ *
+ * The early promises get a no-op `catch` the moment they are created: one that
+ * rejects while the boot is still awaiting Pyodide would otherwise be reported
+ * as an unhandled rejection before its `await` is reached. The `await` still
+ * throws, so a failure is reported once, where it is consumed.
+ *
+ * @returns {{Promise<void>}} Settles once the app is mounted.
+ */
 export async function boot() {{
   const root = document.getElementById("app");
+  setBootStage("runtime");
 
-  // 1. Load Pyodide + the configured packages (pydantic is the core's only hard
-  //    dependency; a project's [wasm] packages — e.g. numpy/pillow — join here).
-  const {{ loadPyodide }} = await import(PYODIDE_BASE + "pyodide.mjs");
-  const pyodide = await loadPyodide({{ indexURL: PYODIDE_BASE }});
-  await pyodide.loadPackage({package_list_js});
+  const pyodideReady = import(PYODIDE_BASE + "pyodide.mjs").then(({{ loadPyodide }}) =>
+    loadPyodide({{ indexURL: PYODIDE_BASE }}),
+  );
+  const wheelsWarm = warmPackages();
+  const pkgZipReady = fetchOk(PACKAGE_URL).then((r) => r.arrayBuffer());
+  const appSourceReady = fetchOk("./app.py").then((r) => r.text());
+  const clientReady = import(CLIENT_URL);
+  for (const pending of [pkgZipReady, appSourceReady, clientReady]) {{
+    pending.catch(() => {{}});
+  }}
 
-  // 2. Install the tempestweb package + the app module into the virtual FS.
-  const pkgZip = await (await fetch("./{WASM_PACKAGE_ARCHIVE}")).arrayBuffer();
-  pyodide.unpackArchive(pkgZip, "zip");
-  const appSource = await (await fetch("./app.py")).text();
-  pyodide.FS.writeFile("app.py", appSource, {{ encoding: "utf8" }});
+  const pyodide = await pyodideReady;
+  setBootStage("python");
+  await wheelsWarm;
+  await pyodide.loadPackage(PACKAGES);
+
+  pyodide.unpackArchive(await pkgZipReady, "zip");
+  pyodide.FS.writeFile("app.py", await appSourceReady, {{ encoding: "utf8" }});
+  const {{ mount, createWasmTransport, installNativeBridge, applyThemeMode }} =
+    await clientReady;
+
+  setBootStage("app");
 
   // 3. Build the app in Python; _start wires on_patches and returns the handle.
   const start = pyodide.runPython(PY_GLUE);
@@ -1135,9 +1493,36 @@ export async function boot() {{
   const transport = createWasmTransport(bridge);
   const initialNode = JSON.parse(handle.initial_node_json());
   mount(root, transport, initialNode);
+  document.getElementById("tw-boot")?.remove();
 }}
 
-boot();
+/**
+ * Turn the loading screen into an error report.
+ *
+ * A boot that throws used to leave a blank page — or, with the loading screen, a
+ * spinner that never stops. The screen stays, stops animating
+ * (`data-state="error"`) and names the failure; the error is still rethrown so
+ * the console keeps the stack.
+ *
+ * @param {{unknown}} error  What the boot threw.
+ * @returns {{void}}
+ */
+function failBoot(error) {{
+  const screen = document.getElementById("tw-boot");
+  if (!screen) return;
+  screen.setAttribute("data-state", "error");
+  const label = document.getElementById("tw-boot-stage");
+  if (label) {{
+    const lead = screen.getAttribute("data-error") || "";
+    const detail = error instanceof Error ? error.message : String(error);
+    label.textContent = lead ? `${{lead}} ${{detail}}` : detail;
+  }}
+}}
+
+boot().catch((error) => {{
+  failBoot(error);
+  throw error;
+}});
 """
 
 
@@ -1352,7 +1737,7 @@ def build_artifact(
     manifest = _manifest_options(config)
 
     if resolved_mode == "wasm":
-        files = _build_wasm(
+        return _build_wasm(
             out,
             client,
             config.name,
@@ -1364,8 +1749,9 @@ def build_artifact(
             dev=dev,
             with_manifest=config.pwa.manifest,
             with_service_worker=config.pwa.service_worker,
+            loading=config.loading,
         )
-    elif resolved_mode == "transpile":
+    if resolved_mode == "transpile":
         files = _build_transpile(
             out,
             client,
@@ -1488,6 +1874,134 @@ def _pwa_precache(
     return tuple(url for url in precache if url not in skipped)
 
 
+def _content_hash(data: bytes) -> str:
+    """The short content hash a cache-busted name carries.
+
+    Args:
+        data: The file's bytes.
+
+    Returns:
+        The first :data:`_CONTENT_HASH_LENGTH` hex digits of its SHA-256.
+    """
+    return hashlib.sha256(data).hexdigest()[:_CONTENT_HASH_LENGTH]
+
+
+def _emit_wasm_client(
+    client: Path, out: Path, *, dev: bool, with_service_worker: bool
+) -> tuple[str, list[str], list[str]]:
+    """Write the Mode A client into ``out`` and say how the shell reaches it.
+
+    A build copies the release-time bundle to ``client-<hash>/tempestweb-wasm.js``,
+    where ``<hash>`` is the bundle's own content hash: the name changes exactly
+    when the bytes do, so the file can be cached as immutable. The dev loop
+    instead copies the readable sources and loads ``client/wasm-entry.js``, so a
+    client edit is live on the next reload instead of waiting for a re-bundle.
+
+    The caching service worker imports two queue modules by fixed path
+    (:data:`_SW_CLIENT_ASSETS`), so those ship whenever it does.
+
+    Args:
+        client: The shared ``client/`` directory.
+        out: The artifact root.
+        dev: Whether this is the ``tempestweb dev`` loop.
+        with_service_worker: Whether the caching worker is emitted.
+
+    Returns:
+        ``(client_url, files, immutable)``: the shell-relative URL the bootstrap
+        imports, every artifact-relative path written, and the subset of them
+        that is content-hashed.
+
+    Raises:
+        BuildError: If the bundle is missing — a source checkout that never ran
+            ``npm run bundle``, or a wheel built without it.
+    """
+    files: list[str] = []
+    if dev:
+        _copy_client(client, out / "client", "transport-wasm.js", _WASM_ENTRY)
+        _copy_client_extras(client, out / "client")
+        files.extend(
+            path.relative_to(out).as_posix()
+            for path in sorted((out / "client").rglob("*.js"))
+        )
+        return f"./client/{_WASM_ENTRY}", files, []
+
+    bundle_source = client / _WASM_BUNDLE
+    if not bundle_source.is_file():
+        raise BuildError(
+            f"missing client bundle: {bundle_source} — run `npm run bundle` in the "
+            "tempestweb checkout"
+        )
+    data = bundle_source.read_bytes()
+    bundle_rel = f"client-{_content_hash(data)}/{Path(_WASM_BUNDLE).name}"
+    (out / bundle_rel).parent.mkdir(parents=True, exist_ok=True)
+    (out / bundle_rel).write_bytes(data)
+    files.append(bundle_rel)
+    if with_service_worker:
+        for asset in _SW_CLIENT_ASSETS:
+            source = client / asset
+            if not source.is_file():
+                raise BuildError(f"missing service worker module: {source}")
+            dest = out / "client" / asset
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, dest)
+            files.append(f"client/{asset}")
+    return f"./{bundle_rel}", files, [bundle_rel]
+
+
+def _hash_package_archive(out: Path) -> str:
+    """Rename the zipped Python payload to its content-hashed name.
+
+    The payload is not determined by the tempestweb version alone — it carries
+    the app's ``[wasm] modules`` and whatever the packaging step decides to put
+    in — so the name is derived from the bytes, not the version.
+
+    Args:
+        out: The artifact root, holding :data:`WASM_PACKAGE_ARCHIVE`.
+
+    Returns:
+        The artifact-relative hashed name, e.g. ``tempestweb-pkg.<hash>.zip``.
+    """
+    plain = out / WASM_PACKAGE_ARCHIVE
+    stem, _, suffix = WASM_PACKAGE_ARCHIVE.rpartition(".")
+    hashed = f"{stem}.{_content_hash(plain.read_bytes())}.{suffix}"
+    plain.replace(out / hashed)
+    return hashed
+
+
+def _write_cache_manifest(out: Path, immutable: list[str]) -> None:
+    """Write ``tempestweb-cache.json``: which paths a server may cache forever.
+
+    The contract a server reads (tempest-fastapi-sdk's ``make_web_app_router``
+    among them):
+
+    - ``schema`` — the format version, ``1``.
+    - ``immutable`` — artifact-relative POSIX paths, no leading slash, matched
+      **exactly**. Each name embeds a content hash, so its bytes never change;
+      ``immutable_cache_control`` is the header to send for them.
+    - ``revalidate_cache_control`` — what every other file in the artifact
+      should get (``index.html``, ``bootstrap.js``, ``app.py``, this manifest…),
+      since their names are fixed and their content is not.
+
+    Args:
+        out: The artifact root.
+        immutable: The content-hashed paths, artifact-relative.
+    """
+    try:
+        generator = f"tempestweb {metadata.version('tempestweb')}"
+    except metadata.PackageNotFoundError:  # pragma: no cover - odd source layouts
+        generator = "tempestweb"
+    manifest = {
+        "schema": 1,
+        "generator": generator,
+        "immutable": sorted(immutable),
+        "immutable_cache_control": WASM_IMMUTABLE_CACHE_CONTROL,
+        "revalidate_cache_control": "no-cache",
+    }
+    (out / WASM_CACHE_MANIFEST).write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+
+
 def _build_wasm(
     out: Path,
     client: Path,
@@ -1501,7 +2015,8 @@ def _build_wasm(
     dev: bool = False,
     with_manifest: bool = True,
     with_service_worker: bool = True,
-) -> tuple[str, ...]:
+    loading: LoadingConfig | None = None,
+) -> BuildResult:
     """Write the wasm (static) artifact layout into ``out``.
 
     Args:
@@ -1516,24 +2031,26 @@ def _build_wasm(
         wasm: The project's ``[wasm]`` extras (packages, modules, assets, scripts).
         manifest: The Web-App-Manifest options; defaults to a name-only manifest.
         dev: When ``True``, inject the dev cache kill-switch into the shell
-            instead of registering the caching service worker.
+            instead of registering the caching service worker, and load the
+            unbundled client.
         with_manifest: Whether to emit ``manifest.webmanifest`` and link it
             (``[pwa] manifest``).
         with_service_worker: Whether to emit and register the caching worker
             (``[pwa] service_worker``). When ``False``, ``sw.js`` is the teardown
             worker and no ``register.js`` is written.
+        loading: The ``[loading]`` screen config; defaults to on.
 
     Returns:
-        The artifact-relative paths written, sorted.
+        The :class:`BuildResult`, with the hashed payload name and the immutable
+        paths.
     """
     wasm = wasm or WasmConfig()
+    loading = loading or LoadingConfig()
+    manifest = manifest or ManifestOptions(name=name)
     extra_packages = tuple(wasm.packages)
     modules = tuple(wasm.modules)
     scripts = tuple(wasm.scripts)
 
-    # Offline: vendor Pyodide same-origin so the service worker can precache it;
-    # otherwise the bootstrap loads it from the (cross-origin) jsdelivr CDN. The
-    # project's extra packages (numpy/pillow) join the vendored closure.
     vendored: list[str] = []
     if offline:
         vendored = vendor_pyodide(
@@ -1545,42 +2062,51 @@ def _build_wasm(
     else:
         pyodide_base = pyodide_cdn_base(WASM_PYODIDE_VERSION)
 
-    theme_color = (manifest or ManifestOptions(name=name)).theme_color
+    _zip_package(out / WASM_PACKAGE_ARCHIVE, project_root=project_root, modules=modules)
+    package_archive = _hash_package_archive(out)
+    client_url, client_files, immutable = _emit_wasm_client(
+        client, out, dev=dev, with_service_worker=with_service_worker
+    )
+    immutable.append(package_archive)
+
     (out / "index.html").write_text(
         _index_html(
             name,
             scripts,
-            theme_color,
+            manifest.theme_color,
             dev=dev,
             with_manifest=with_manifest,
             with_service_worker=with_service_worker,
+            pyodide_base=pyodide_base,
+            client_url=client_url,
+            package_url=f"./{package_archive}",
+            bundled=not dev,
+            loading=loading,
+            loading_title=loading.title or manifest.name,
         ),
         encoding="utf-8",
     )
     (out / "bootstrap.js").write_text(
-        _bootstrap_js(name, pyodide_base, extra_packages), encoding="utf-8"
+        _bootstrap_js(
+            name,
+            pyodide_base,
+            extra_packages,
+            client_url=client_url,
+            package_url=f"./{package_archive}",
+        ),
+        encoding="utf-8",
     )
     (out / "app.py").write_text(app_source, encoding="utf-8")
-    _zip_package(out / WASM_PACKAGE_ARCHIVE, project_root=project_root, modules=modules)
-    _copy_client(client, out / "client", "transport-wasm.js")
-    # Native capability bridge + offline/push/pwa closure that the bootstrap's
-    # native/index.js eagerly imports (geolocation/clipboard/http/…).
-    _copy_client_extras(client, out / "client")
-    # Project static assets (ONNX models, vendored JS libs) copied verbatim,
-    # preserving their relative path, and precached for the offline second load.
+    _write_cache_manifest(out, immutable)
+
     assets: list[str] = []
     if project_root is not None and wasm.assets:
         assets = _copy_assets(project_root, out, tuple(wasm.assets))
-    # Artifact-relative scripts (not external URLs) are part of the shell too.
     local_scripts = [
         s.lstrip(".") if s.startswith("./") else s
         for s in scripts
         if not s.startswith(("http://", "https://"))
     ]
-    # App-shell the service worker precaches for an offline second load. With an
-    # offline build the vendored Pyodide runtime + wheels are same-origin and join
-    # the precache, so the app boots with no network at all; a CDN build precaches
-    # only the local shell + package payload (Pyodide stays cross-origin).
     precache = (
         "/",
         "/index.html",
@@ -1588,23 +2114,8 @@ def _build_wasm(
         "/bootstrap.js",
         "/register.js",
         "/app.py",
-        f"/{WASM_PACKAGE_ARCHIVE}",
-        *(f"/client/{asset}" for asset in (*_CLIENT_ASSETS, "transport-wasm.js")),
-        # Icon resolver + vendored sets: dom.js statically imports ./icons/index.js
-        # at boot, so they are part of the app shell and must precache (cache-first)
-        # or a true offline boot fails to load dom.js's icon dependency.
-        *(f"/client/icons/{asset}" for asset in _ICON_ASSETS),
-        *(f"/client/native/{asset}" for asset in _NATIVE_ASSETS),
-        *(f"/client/offline/{asset}" for asset in _OFFLINE_ASSETS),
-        # native/index.js eagerly imports the push client (via notifications.js) and
-        # the install prompt (via install.js); both are boot-critical shell modules.
-        "/client/push/web-push-client.js",
-        "/client/pwa/install-prompt.js",
-        # The shell's inline script imports the connectivity banner at boot, so it
-        # must precache too for a true offline boot.
-        "/client/pwa/connectivity-banner.js",
-        "/client/pwa/post-install-redirect.js",
-        # PWA icons referenced by the manifest + apple-touch-icon link.
+        f"/{package_archive}",
+        *(f"/{path}" for path in client_files),
         *(f"/icons/{icon}" for icon in _PWA_ICON_FILES),
         *(f"/{asset}" for asset in assets),
         *(s if s.startswith("/") else f"/{s}" for s in local_scripts),
@@ -1613,7 +2124,7 @@ def _build_wasm(
     _build_pwa(
         out,
         client,
-        manifest or ManifestOptions(name=name),
+        manifest,
         _pwa_precache(
             precache,
             with_manifest=with_manifest,
@@ -1622,18 +2133,30 @@ def _build_wasm(
         with_manifest=with_manifest,
         with_service_worker=with_service_worker,
     )
-    return tuple(
-        sorted(
-            [
-                *_pwa_artifact_files(
-                    WASM_ARTIFACT_FILES,
-                    with_manifest=with_manifest,
-                    with_service_worker=with_service_worker,
-                ),
-                *assets,
-                *(f"pyodide/{f}" for f in vendored),
-            ]
+    fixed = [
+        path
+        for path in _pwa_artifact_files(
+            WASM_ARTIFACT_FILES,
+            with_manifest=with_manifest,
+            with_service_worker=with_service_worker,
         )
+        if not path.startswith("client/")
+    ]
+    files = sorted(
+        {
+            *fixed,
+            *client_files,
+            package_archive,
+            *assets,
+            *(f"pyodide/{f}" for f in vendored),
+        }
+    )
+    return BuildResult(
+        mode="wasm",
+        out_dir=out,
+        files=tuple(files),
+        package_archive=package_archive,
+        immutable=tuple(sorted(immutable)),
     )
 
 

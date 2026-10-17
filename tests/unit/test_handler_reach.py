@@ -48,7 +48,7 @@ _MAP_VALUE = re.compile(r':\s*"([a-z][a-z_]*)"')
 
 #: The service worker speaks to the page, not to the runtime: its `type:` keys
 #: ("module", "window") are not wire events.
-_NOT_EVENT_SURFACES = ("sw",)
+_NOT_EVENT_SURFACES = ("sw", "bundle")
 
 #: Handlers no gesture reaches yet, as `(prop, widget)`.
 #:

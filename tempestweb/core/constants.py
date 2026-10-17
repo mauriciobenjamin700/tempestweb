@@ -25,6 +25,18 @@ WASM_PYODIDE_VERSION: str = "v314.0.0"
 #: virtual filesystem by the wasm bootstrap.
 WASM_PACKAGE_ARCHIVE: str = "tempestweb-pkg.zip"
 
+#: Filename of the cache manifest a wasm build writes at the artifact root. It
+#: lists, as artifact-relative POSIX paths, the files whose name carries a content
+#: hash — so a server may answer them with :data:`WASM_IMMUTABLE_CACHE_CONTROL`
+#: while every other file (``index.html``, ``bootstrap.js``, ``app.py``…) stays
+#: revalidated. The format is documented in ``docs/advanced/boot.md``.
+WASM_CACHE_MANIFEST: str = "tempestweb-cache.json"
+
+#: The ``Cache-Control`` value the cache manifest recommends for its immutable
+#: paths. A content-hashed name never changes content, so a year with
+#: ``immutable`` is safe: a new build writes a new name.
+WASM_IMMUTABLE_CACHE_CONTROL: str = "public, max-age=31536000, immutable"
+
 #: Heartbeat interval (seconds) between ``ping`` events on the SSE stream.
 DEFAULT_SSE_PING_INTERVAL: float = 15.0
 
@@ -56,6 +68,8 @@ __all__ = [
     "DEFAULT_WATCH_SUFFIXES",
     "DEV_GRACEFUL_SHUTDOWN_SECONDS",
     "VALID_MODES",
+    "WASM_CACHE_MANIFEST",
+    "WASM_IMMUTABLE_CACHE_CONTROL",
     "WASM_PACKAGE_ARCHIVE",
     "WASM_PYODIDE_VERSION",
 ]

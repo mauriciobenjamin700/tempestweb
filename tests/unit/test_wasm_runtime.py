@@ -499,3 +499,115 @@ def test_the_generated_bootstrap_mounts_after_draining_the_boot_batches() -> Non
         "an await between reading the snapshot and mounting lets Python advance "
         "the tree under the client (tempestweb#160)"
     )
+
+
+@dataclass
+class ScreenState:
+    """State for the two-screen app: which screen shows, and what was clicked."""
+
+    signed_in: bool = False
+    opened: int = 0
+
+
+def two_screen_view(app: App[ScreenState]) -> Widget:
+    """Swap a login screen for a home screen whose keys the first never had."""
+
+    def sign_in() -> None:
+        app.set_state(lambda s: setattr(s, "signed_in", True))
+
+    def sign_out() -> None:
+        app.set_state(lambda s: setattr(s, "signed_in", False))
+
+    def open_item() -> None:
+        app.set_state(lambda s: setattr(s, "opened", s.opened + 1))
+
+    if not app.state.signed_in:
+        return Column(children=[Button(label="Entrar", on_click=sign_in, key="login")])
+    return Column(
+        children=[
+            Button(label="Abrir", on_click=open_item, key="open"),
+            Button(label="Sair", on_click=sign_out, key="logout"),
+        ]
+    )
+
+
+async def _settle() -> None:
+    """Let the coalesced rebuild run and its patch batch be scheduled."""
+    for _ in range(3):
+        await asyncio.sleep(0)
+
+
+@pytest.mark.asyncio
+async def test_a_key_the_rebuild_just_inserted_fires_on_the_first_click() -> None:
+    """The handler registry follows the committed scene, not the one before it.
+
+    The core calls ``apply_patches`` *before* it moves ``current_tree`` to the
+    new scene (tempestweb#160). Refreshing the registry from inside that callback
+    therefore read the previous scene: keys the rebuild had just inserted were
+    missing, and their clicks were dropped in silence until some later rebuild.
+    In an app that meant the first click after login did nothing, and after
+    logging out the login button never worked again.
+    """
+    transport = WasmTransport(lambda _patches: None)
+    runtime: WasmRuntime[ScreenState] = WasmRuntime(
+        ScreenState(), two_screen_view, transport
+    )
+    runtime.start()
+
+    await runtime.dispatch_event({"type": "click", "key": "login", "payload": {}})
+    await _settle()
+    await runtime.dispatch_event({"type": "click", "key": "open", "payload": {}})
+    await _settle()
+    assert runtime.app.state.opened == 1
+
+    await runtime.dispatch_event({"type": "click", "key": "logout", "payload": {}})
+    await _settle()
+    await runtime.dispatch_event({"type": "click", "key": "login", "payload": {}})
+    await _settle()
+    assert runtime.app.state.signed_in is True
+
+
+@dataclass
+class EchoState:
+    """State for the stale-closure app."""
+
+    label: str = "a"
+    seen: str = ""
+
+
+def echo_view(app: App[EchoState]) -> Widget:
+    """A button whose handler captures the label rendered with it."""
+    rendered = app.state.label
+
+    def record() -> None:
+        app.set_state(lambda s: setattr(s, "seen", rendered))
+
+    def relabel() -> None:
+        app.set_state(lambda s: setattr(s, "label", "b"))
+
+    return Column(
+        children=[
+            Button(label=rendered, on_click=record, key="echo"),
+            Button(label="relabel", on_click=relabel, key="relabel"),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_surviving_key_runs_the_handler_of_the_latest_build() -> None:
+    """A key present in both scenes dispatches to the closure built last.
+
+    Same root cause as the dropped click, quieter symptom: the registry held the
+    previous build's callable, so a handler closing over render-time values ran
+    with the values of one render ago.
+    """
+    transport = WasmTransport(lambda _patches: None)
+    runtime: WasmRuntime[EchoState] = WasmRuntime(EchoState(), echo_view, transport)
+    runtime.start()
+
+    await runtime.dispatch_event({"type": "click", "key": "relabel", "payload": {}})
+    await _settle()
+    await runtime.dispatch_event({"type": "click", "key": "echo", "payload": {}})
+    await _settle()
+
+    assert runtime.app.state.seen == "b"

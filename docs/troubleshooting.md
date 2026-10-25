@@ -133,6 +133,29 @@ async def marcar(app: App[State]) -> None:
 
 O repaint é agendado pelo `set_state`, não pela mudança do objeto.
 
+### O primeiro clique depois de trocar de tela não faz nada (Modo A)
+
+Sem erro no console. O clique que **troca a tela** funciona; o clique seguinte,
+num botão que a tela nova acabou de trazer, some. Medido no painel do
+tempest-webtunnel: depois do login, "Entrar" levava ao painel e o primeiro
+clique em qualquer aba era ignorado; depois do logout, o "Entrar" da tela de
+login **nunca mais** respondia, porque nada voltava a reconstruir a árvore.
+
+A causa estava no runtime do Modo A, não no seu app. O core chama o callback de
+patches **antes** de mover `current_tree` para a cena nova (de propósito, desde
+a correção do #160), e o runtime refazia o registro `key → handler` de dentro
+desse callback — logo, a partir da cena **anterior**. Chave recém-inserida não
+existia no registro e o evento era descartado em silêncio; chave que sobrevivia
+chamava o closure do build anterior, com os valores de um render atrás.
+
+Corrigido em 0.141.1: o registro é refeito na hora do despacho, sempre que a
+cena commitada mudou — a mesma regra que o Modo B sempre seguiu. Os Modos B e C
+não tinham o problema.
+
+```bash
+uv add "tempestweb>=0.141.1"
+```
+
 ---
 
 ## Build e Modo C

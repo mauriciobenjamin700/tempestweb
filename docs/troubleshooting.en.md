@@ -133,6 +133,29 @@ async def mark(app: App[State]) -> None:
 
 The repaint is scheduled by `set_state`, not by the object changing.
 
+### The first click after switching screens does nothing (Mode A)
+
+No console error. The click that **switches the screen** works; the next one,
+on a button the new screen just brought in, vanishes. Measured on the
+tempest-webtunnel panel: after login, "Entrar" led to the panel and the first
+click on any tab was ignored; after logout, the login screen's "Entrar" **never**
+responded again, because nothing rebuilt the tree anymore.
+
+The cause was in the Mode A runtime, not in your app. The core calls the patch
+callback **before** it moves `current_tree` to the new scene (on purpose, since
+the #160 fix), and the runtime rebuilt its `key → handler` registry from inside
+that callback — so from the **previous** scene. A freshly inserted key was
+missing from the registry and its event was dropped in silence; a surviving key
+ran the previous build's closure, with the values of one render ago.
+
+Fixed in 0.141.1: the registry is rebuilt at dispatch time whenever the
+committed scene changed — the same rule Mode B always followed. Modes B and C
+never had the problem.
+
+```bash
+uv add "tempestweb>=0.141.1"
+```
+
 ---
 
 ## Build and Mode C

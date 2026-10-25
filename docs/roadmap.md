@@ -11,8 +11,13 @@
     WebSocket contra o servidor, e transpilado para JS), e o core é o pacote
     publicado `tempest-core` — o `_core/` vendorado foi removido.
 
-    **Versão do repo: 0.141.0; o PyPI serve a 0.139.0.** A diferença é o boot do
-    Modo A: o cliente sai num bundle único com hash de conteúdo, o `bootstrap.js`
+    **Versão do repo: 0.141.1.** A correção mais nova é do Modo A: o clique numa
+    chave que o rebuild acabou de inserir (o primeiro clique depois de trocar de
+    tela) era descartado em silêncio, porque o registro de handlers era refeito a
+    partir da cena anterior — ver
+    [Solução de problemas](troubleshooting.md#o-primeiro-clique-depois-de-trocar-de-tela-nao-faz-nada-modo-a).
+
+    Antes dela, a 0.141.0, com o boot do Modo A: o cliente sai num bundle único com hash de conteúdo, o `bootstrap.js`
     dispara Pyodide, wheels, payload e `app.py` em paralelo, o `index.html` ganha
     tela de carregamento (`[loading]`) e o build escreve o `immutable.json` que o
     tempest-fastapi-sdk lê para cachear os nomes com hash por um ano — ver

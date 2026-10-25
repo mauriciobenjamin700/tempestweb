@@ -263,6 +263,7 @@ class WasmRuntime(Generic[S]):
         """
         self._transport: PatchTransport = transport
         self._handlers: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
+        self._handlers_scene: Scene | None = None
         self._on_navigate: Callable[[str], Any] | None = on_navigate
         self._on_theme: Callable[[str], Any] | None = on_theme
         self._last_path: str = "/"
@@ -313,28 +314,62 @@ class WasmRuntime(Generic[S]):
         return serialize_node(scene.root)
 
     def _refresh_handlers(self, scene: Scene) -> None:
-        """Rebuild the handler registry from the current scene.
+        """Rebuild the handler registry from one scene.
 
-        Called after every build so the registry always reflects the live tree:
-        a node removed by a patch can no longer fire, and a freshly inserted
-        node's handler becomes reachable.
+        The registry remembers which scene it was collected from, so
+        :meth:`_resolve_handlers` can tell when the app has committed a newer
+        one: a node removed by a patch can no longer fire, and a freshly
+        inserted node's handler becomes reachable.
 
         Args:
-            scene: The most recently built scene.
+            scene: The scene to collect handlers from.
         """
         registry: dict[str, tuple[str, dict[str, Callable[..., Any]]]] = {}
         _collect_handlers(scene.root, registry)
         for overlay in scene.overlays:
             _collect_handlers(overlay, registry)
         self._handlers = registry
+        self._handlers_scene = scene
+
+    def _resolve_handlers(
+        self, key: str
+    ) -> tuple[str, dict[str, Callable[..., Any]]] | None:
+        """Look one key up in the registry of the scene the app has committed.
+
+        The registry is collected lazily, here, rather than from
+        :meth:`_apply_patches`. The core invokes that callback **before** it
+        moves ``current_tree`` to the new scene — deliberately, since tempestweb
+        #160 — so a refresh from inside it read the previous scene: keys the
+        rebuild had just inserted were missing and their events were dropped in
+        silence, and surviving keys ran the previous build's closures. Mode B
+        never had this, because its session resolves against ``current_tree``
+        at dispatch time; this is the same rule, collected once per committed
+        scene instead of once per event.
+
+        Args:
+            key: The widget key the client reported.
+
+        Returns:
+            The node type and its handlers, or ``None`` when no node in the
+            committed scene carries that key.
+        """
+        scene = self._app.current_tree
+        if scene is not None and scene is not self._handlers_scene:
+            self._refresh_handlers(scene)
+        return self._handlers.get(key)
 
     def _apply_patches(self, patches: list[Patch]) -> None:
         """App callback: serialize patches and push them to the client.
 
         The core calls this synchronously from its rebuild loop. Because the
         transport's :meth:`send_patches` is ``async``, the delivery is scheduled
-        as a task on the running loop; the handler registry is refreshed eagerly
-        against the now-current scene so the next event routes correctly.
+        as a task on the running loop. The handler registry is **not** touched
+        here: ``current_tree`` still names the previous scene at this point, so
+        :meth:`_resolve_handlers` collects it at dispatch time instead.
+
+        View → URL: when the app navigated (the top route changed), the client
+        is told so it can push the new path onto history — the reverse of the
+        ``navigate`` event. No-op when the path is unchanged or no sink is wired.
 
         The scheduled task is held in ``self._sends`` until it settles. The loop
         keeps only a weak reference to a running task, so a batch that is
@@ -344,18 +379,12 @@ class WasmRuntime(Generic[S]):
         Args:
             patches: The patches produced by the core's diff for this tick.
         """
-        scene = self._app.current_tree
-        if scene is not None:
-            self._refresh_handlers(scene)
         wire = serialize_patches(patches)
         send: asyncio.Future[None] = asyncio.ensure_future(
             self._transport.send_patches(wire)
         )
         self._sends.add(send)
         send.add_done_callback(self._sends.discard)
-        # View → URL: when the app navigated (top route changed), tell the client
-        # so it can push the new path onto history (the reverse of the navigate
-        # event). No-op when the path is unchanged or no sink is wired.
         if self._on_navigate is not None:
             path = route_to_path(self._app.nav.top)
             if path != self._last_path:
@@ -428,7 +457,7 @@ class WasmRuntime(Generic[S]):
             apply_media(self._app, event.get("payload", {}))
             self._emit_theme_if_changed()
             return
-        entry = self._handlers.get(key)
+        entry = self._resolve_handlers(key)
         if entry is None:
             return
         node_type, handlers = entry

@@ -4,6 +4,22 @@ All notable changes to **tempestweb** are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/); this project adheres to semantic
 versioning.
 
+## [0.141.1] — 2026-10-25
+
+### Fixed
+
+- **Modo A: o clique numa chave que o rebuild acabou de inserir não se perde
+  mais.** O core chama o callback de patches **antes** de mover `current_tree`
+  para a cena nova (ordem deliberada desde a correção do #160), e o
+  `WasmRuntime` refazia o registro `key → handler` de dentro desse callback —
+  logo, a partir da cena anterior. Chave nova ficava fora do registro e o evento
+  era descartado em silêncio até algum rebuild posterior; chave que sobrevivia
+  chamava o closure do build anterior. No painel do tempest-webtunnel isso era o
+  primeiro clique depois do login ignorado e, depois do logout, o botão
+  "Entrar" morto para sempre. Agora o registro é coletado na hora do despacho,
+  uma vez por cena commitada (`_resolve_handlers`), a mesma regra que o
+  `AppSession` do Modo B sempre seguiu. Modos B e C não eram afetados.
+
 ## [0.141.0] — 2026-10-17
 
 ### Changed
